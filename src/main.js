@@ -16,7 +16,10 @@ const {
   validateProjectRoot,
 } = require('./storage');
 const syncDomain = require('./sync/domain');
-const { ExportJobController } = require('./export/app-bridge');
+const {
+  ExportJobController,
+  validatePickedExportDirectory,
+} = require('./export/app-bridge');
 
 const APP_ROOT = path.resolve(app.getAppPath());
 const configuredProjectRoot = process.env.PITCHING_PROJECT_ROOT;
@@ -139,6 +142,15 @@ function registerIpc() {
   ipcMain.handle('media:remove', (event, payload) => {
     assertTrustedSender(event);
     return projectStore.removeMediaAsset(payload?.projectId, payload?.assetId);
+  });
+  ipcMain.handle('export:pick-directory', async (event) => {
+    const senderWindow = assertTrustedSender(event);
+    const result = await dialog.showOpenDialog(senderWindow, {
+      title: 'Select export output directory',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return validatePickedExportDirectory(PROJECT_ROOT, result.filePaths[0]);
   });
   ipcMain.handle('export:start', async (event, payload) => {
     assertTrustedSender(event);

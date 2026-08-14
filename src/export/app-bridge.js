@@ -65,6 +65,24 @@ async function assertSafeOutputRoot(projectRoot, outputDirectory) {
   return lexicalOutputRoot;
 }
 
+async function validatePickedExportDirectory(projectRoot, selectedDirectory) {
+  if (selectedDirectory === null || selectedDirectory === undefined) return null;
+  if (typeof selectedDirectory !== 'string' || selectedDirectory.trim() === '') {
+    throw new ExportValidationError('Picked export directory is invalid');
+  }
+  const safeDirectory = await assertSafeOutputRoot(projectRoot, selectedDirectory);
+  let stats;
+  try {
+    stats = await fs.stat(safeDirectory);
+  } catch (error) {
+    throw new ExportValidationError('Picked export directory is unavailable', { cause: error });
+  }
+  if (!stats.isDirectory()) {
+    throw new ExportValidationError('Picked export path must be a directory');
+  }
+  return safeDirectory;
+}
+
 function assertProjectId(value) {
   if (typeof value !== 'string' || !PROJECT_ID_PATTERN.test(value)) {
     throw new ExportValidationError('Invalid project id');
@@ -224,5 +242,6 @@ module.exports = {
   ExportJobController,
   assertSafeOutputRoot,
   normalizeExportRequest,
+  validatePickedExportDirectory,
   serializeError,
 };

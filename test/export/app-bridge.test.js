@@ -8,6 +8,7 @@ const test = require('node:test');
 const {
   ExportJobController,
   assertSafeOutputRoot,
+  validatePickedExportDirectory,
 } = require('../../src/export/app-bridge');
 
 let testRoot;
@@ -46,6 +47,29 @@ test('validates export output roots lexically and through realpath ancestors', a
   await assert.rejects(
     assertSafeOutputRoot(testRoot, 'relative-output'),
     /absolute safe path/iu,
+  );
+});
+
+test('validates native picker results as existing directories inside the project root', async () => {
+  const selected = path.join(testRoot, 'selected-output');
+  await fs.mkdir(selected, { recursive: true });
+  assert.equal(await validatePickedExportDirectory(testRoot, selected), path.resolve(selected));
+  assert.equal(await validatePickedExportDirectory(testRoot, null), null);
+  assert.equal(await validatePickedExportDirectory(testRoot, undefined), null);
+
+  await assert.rejects(
+    validatePickedExportDirectory(testRoot, path.join(testRoot, '..', 'outside')),
+    /outside the project root/iu,
+  );
+  const filePath = path.join(testRoot, 'not-a-directory');
+  await fs.writeFile(filePath, 'fixture');
+  await assert.rejects(
+    validatePickedExportDirectory(testRoot, filePath),
+    /must be a directory/iu,
+  );
+  await assert.rejects(
+    validatePickedExportDirectory(testRoot, path.join(testRoot, 'missing-output')),
+    /unavailable/iu,
   );
 });
 
@@ -111,11 +135,28 @@ test('cancels an in-flight export and permits retry without leaving controller s
 test('main/preload keep export lifecycle channels renderer-independent', async () => {
   const mainSource = await fs.readFile(path.join(__dirname, '..', '..', 'src', 'main.js'), 'utf8');
   const preloadSource = await fs.readFile(path.join(__dirname, '..', '..', 'src', 'preload.js'), 'utf8');
-  for (const channel of ['export:start', 'export:status', 'export:wait', 'export:cancel', 'export:retry']) {
+  for (const channel of [
+    'export:pick-directory',
+    'export:start',
+    'export:status',
+    'export:wait',
+    'export:cancel',
+    'export:retry',
+  ]) {
     assert.match(mainSource, new RegExp(`['"]${channel}['"]`, 'u'));
   }
-  for (const method of ['startExport', 'getExportStatus', 'waitForExport', 'cancelExport', 'retryExport']) {
+  for (const method of [
+    'pickExportDirectory',
+    'startExport',
+    'getExportStatus',
+    'waitForExport',
+    'cancelExport',
+    'retryExport',
+  ]) {
     assert.match(preloadSource, new RegExp(String.raw`\b${method}\s*:`, 'u'));
   }
+  assert.match(mainSource, /dialog\.showOpenDialog\(senderWindow[\s\S]*openDirectory/iu);
+  assert.match(mainSource, /validatePickedExportDirectory\(PROJECT_ROOT, result\.filePaths\[0\]\)/u);
+  assert.match(preloadSource, /pickExportDirectory:\s*\(\)\s*=>\s*ipcRenderer\.invoke\(['"]export:pick-directory['"]\)/u);
   assert.doesNotMatch(preloadSource, /document\.querySelector|window\.addEventListener/iu);
 });

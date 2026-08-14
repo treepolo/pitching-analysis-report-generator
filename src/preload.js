@@ -90,6 +90,14 @@ function assertExportJobId(value) {
   return value;
 }
 
+function assertPickedExportDirectory(value) {
+  if (value === null) return null;
+  if (typeof value !== 'string' || value.trim() === '' || CONTROL_CHARACTER_PATTERN.test(value)) {
+    throw new Error('Invalid picked export directory');
+  }
+  return value;
+}
+
 function assertProjectPayload(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('Invalid project payload');
@@ -135,6 +143,7 @@ contextBridge.exposeInMainWorld('pitchingApp', Object.freeze({
     projectId: assertProjectId(projectId),
     assetId: assertMediaId(assetId),
   }),
+  pickExportDirectory: () => ipcRenderer.invoke('export:pick-directory').then(assertPickedExportDirectory),
   startExport: (request) => ipcRenderer.invoke('export:start', assertExportRequest(request)),
   getExportStatus: (jobId) => ipcRenderer.invoke('export:status', assertExportJobId(jobId)),
   waitForExport: (jobId) => ipcRenderer.invoke('export:wait', assertExportJobId(jobId)),
