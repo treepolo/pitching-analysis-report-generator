@@ -84,6 +84,7 @@ input:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px v
 textarea { resize: vertical; }
 .hint { margin: 0; font-size: 12px; }
 .preview-surface { min-height: 250px; padding: 24px; background: #fbfcfe; border: 1px solid var(--line); border-radius: 10px; }
+.preview-export-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
 .report-preview { max-width: 760px; margin: 0 auto; padding: 18px 20px; background: #fff; }
 .report-preview section { padding: 14px 0; border-top: 1px solid var(--line); }
 .report-preview section p { white-space: pre-wrap; }

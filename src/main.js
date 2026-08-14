@@ -372,6 +372,71 @@ async function runElectronSmoke() {
       })()
     `;
     const result = await window.webContents.executeJavaScript(smokeScript, true);
+    const responsiveProbe = `
+      (() => {
+        const selectors = [
+          '#save-project',
+          '#import-text',
+          '#import-media',
+          '#player-panel',
+          '#player-block-select',
+          '#add-single-video',
+          '#add-comparison-video',
+          '#export-report',
+        ];
+        const inspect = (selector) => {
+          const element = document.querySelector(selector);
+          if (!element) return { selector, present: false, visible: false, disabled: null };
+          const style = window.getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          const hiddenAncestor = element.closest('[hidden]');
+          return {
+            selector,
+            present: true,
+            visible: !hiddenAncestor
+              && style.display !== 'none'
+              && style.visibility !== 'hidden'
+              && rect.width > 0
+              && rect.height > 0,
+            disabled: Boolean(element.disabled),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          };
+        };
+        const controls = selectors.map(inspect);
+        const overflow = {
+          document: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+          body: document.body.scrollWidth <= document.body.clientWidth + 1,
+        };
+        return {
+          viewport: { width: window.innerWidth, height: window.innerHeight },
+          controls,
+          overflow,
+          pass: controls.every((control) => control.present && control.visible)
+            && overflow.document
+            && overflow.body,
+        };
+      })()
+    `;
+    const originalSize = window.getSize();
+    let responsiveEvidence;
+    try {
+      const desktop = await window.webContents.executeJavaScript(responsiveProbe, true);
+      // Smoke-only viewport override; production launch keeps the normal minimum size.
+      window.setMinimumSize(320, 480);
+      window.setSize(600, 900);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const narrow = await window.webContents.executeJavaScript(responsiveProbe, true);
+      responsiveEvidence = { desktop, narrow };
+      if (!desktop.pass || !narrow.pass) {
+        throw new Error(`responsive gate failed: ${JSON.stringify(responsiveEvidence)}`);
+      }
+    } finally {
+      window.setMinimumSize(880, 600);
+      window.setSize(originalSize[0], originalSize[1]);
+    }
+    result.responsiveGateVerified = true;
+    result.responsiveEvidence = responsiveEvidence;
     await closeWindowAndWait(window);
 
     window = createWindow({ show: false });
