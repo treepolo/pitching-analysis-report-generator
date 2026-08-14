@@ -16,6 +16,19 @@
     'assetRefs',
     'mediaAssetId',
     'mediaAssetIds',
+    'imageAssetId',
+    'videoAssetId',
+    'posterAssetId',
+    'posterImageAssetId',
+    'leftAssetId',
+    'rightAssetId',
+    'firstAssetId',
+    'secondAssetId',
+    'leftMediaAssetId',
+    'rightMediaAssetId',
+    'firstMediaAssetId',
+    'secondMediaAssetId',
+    'videoAssetIds',
   ];
 
   function isRecord(value) {
@@ -34,6 +47,12 @@
 
   function copyFiniteNumber(source, target, key) {
     if (typeof source[key] === 'number' && Number.isFinite(source[key])) target[key] = source[key];
+  }
+
+  function copyStringArray(source, target, key) {
+    if (!Array.isArray(source[key])) return;
+    const values = source[key].filter((value) => typeof value === 'string');
+    if (values.length > 0) target[key] = [...values];
   }
 
   function cloneAssetReference(value) {
@@ -155,6 +174,7 @@
     }
 
     if (type === 'comparisonVideo') {
+      copyAssetReferences(block, output);
       const left = cloneSideConfig(block.left);
       if (left) output.left = left;
       const right = cloneSideConfig(block.right);
@@ -169,6 +189,7 @@
       }
       copyString(block, output, 'label');
       copyString(block, output, 'caption');
+      copyStringArray(block, output, 'labels');
     }
 
     return output;
@@ -186,7 +207,9 @@
     if (project === null || typeof project !== 'object' || Array.isArray(project)) {
       throw new Error('Project is required to build a report document');
     }
-    const fallbackTitle = typeof project.displayName === 'string' ? project.displayName : '';
+    const fallbackTitle = typeof project.displayName === 'string'
+      ? project.displayName
+      : (typeof project.title === 'string' ? project.title : '');
     const reportTitle = typeof project.reportTitle === 'string' && project.reportTitle.trim() !== ''
       ? project.reportTitle
       : fallbackTitle;
