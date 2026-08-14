@@ -103,8 +103,11 @@ Evidence must distinguish passed automated checks from skipped/unavailable runti
 
 ## Current coordination state
 
-- Current wave: Wave 5 Integrator serial gate; code checkpoint `d9541b812e9853f2e9b4a08dddad742c293caeb3` includes picker bridge `bd9d8ee` and the required prior lane ancestry.
+- Current integrated tip: `30d6392bfa624bde4f82c4351a9152e7b62b3002` on `worker/desktop-vertical-slice`.
+- Wave 5 picker bridge (`bd9d8ee`) and renderer consumer (`d9541b8`) are complete historical implementation checkpoints; `30d6392` is the latest provenance checkpoint.
 - Branch: `worker/desktop-vertical-slice`; configured origin: `https://github.com/treepolo/pitching-analysis-report-generator.git`; the pre-doc worktree was clean.
-- Cross-lane review covered trusted native picker IPC, preload `null` cancellation, renderer selected/default directory state, display-safe labels, export job wiring, and project-root containment.
-- Fresh evidence is 95 tests / 94 pass / 1 explicit exported-folder/extracted-ZIP `file://` skip, 33 JavaScript syntax checks, package/lock, diff, artifact/security checks, and Electron smoke. Native dialog interaction was not exercised by headless smoke; no success is inferred.
-- No product requirement is marked VERIFIED by this plan. Real media/FFmpeg/player/sync/drift, browser/file URL, responsive human, native picker human, and AT-A through AT-G evidence remain separate acceptance gates.
+- Latest QA state: conditional integration pass, product acceptance fail. Automated evidence remains 95 tests / 94 pass / 1 explicit exported-folder/extracted-ZIP `file://` skip, 33 JavaScript syntax checks, package/lock, diff, artifact/security checks, and Electron smoke. Native dialog interaction was not exercised by headless smoke.
+
+## Next gate: Human Checkpoint
+
+The next owner is the Human Checkpoint for real MP4/FFmpeg behavior, native picker selection/cancel interaction, exported folder/ZIP `file://` runtime, responsive behavior, and AT-A through AT-G. These gates remain pending or unavailable until their actual evidence is recorded. No product requirement is marked VERIFIED by this plan.
