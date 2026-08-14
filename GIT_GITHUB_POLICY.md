@@ -1,6 +1,6 @@
 # Git / GitHub Policy
 
-目前狀態：**Phase 1/2 planning**。本文件定義預期 Git/GitHub governance；目前尚未建立 GitHub remote，也沒有 push evidence。Repository visibility 是 BLOCKED_HUMAN。
+目前狀態：**Phase 2 planning**。使用者已於 2026-08-14 決定 GitHub repository 採 **Private**。目前尚未建立 GitHub remote，也沒有 push evidence。
 
 ## 1. Intended repository policy
 
@@ -14,11 +14,11 @@
 
 ## 2. Human visibility checkpoint
 
-狀態：**BLOCKED_HUMAN**。
+狀態：**RESOLVED — Private approved by user on 2026-08-14**。
 
-在建立 remote 前，使用者必須明確選擇 GitHub repository visibility：Private 或 Public。不得以 repository name、未登入 CLI、remote URL 或推送結果假造決策。
+已確認 visibility 不代表 remote 已建立；仍不得以 repository name、未登入 CLI、remote URL 或推送結果假造 remote evidence。
 
-未完成 visibility checkpoint 時：
+在 remote 尚未完成帳號授權與建立前：
 
 - 可繼續 local planning、canonical docs、tests/fixture design。
 - 不建立 GitHub repository。
@@ -64,4 +64,4 @@ Push 前至少檢查：
 
 ## 6. Current state
 
-截至本輪檢查：工作區已有 local main 與 planning commit，但沒有 GitHub remote／push evidence；因此對外狀態為 AWAITING_USER_SETUP，不是已完成 baseline。Architecture 與 visibility checkpoint 解除後，由 Integrator 執行 baseline review、secret scan 與 approved remote setup。
+截至本輪檢查：工作區已有 local main 與 planning commits，但沒有 GitHub remote／push evidence；對外狀態為 `AWAITING_USER_SETUP`，不是已完成 remote baseline。Private visibility checkpoint 已解除；建立 remote 仍需可用的 GitHub 帳號授權與明確外部操作。

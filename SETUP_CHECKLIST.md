@@ -12,18 +12,18 @@
 - [x] GitHub remote 尚未建立，沒有假造 remote evidence
 - [x] 本輪不啟動 sub-agent／multi-agent，符合使用者明確要求
 
-## 2. Human decisions required
+## 2. Human decisions
 
-- [ ] Architecture：local browser-based application 或 desktop application
-- [ ] 若選定 architecture：application data storage 的正式位置與 backup/restore policy
-- [ ] GitHub repository visibility：Private 或 Public
+- [x] Architecture：Desktop application
+- [x] Application data storage：`PROJECT_ROOT\projects\`，backup=`.backups`，temporary=`.tmp`
+- [x] GitHub repository visibility：Private
 - [ ] 若需外部工具／帳號／credential：逐項確認是否允許；目前預設不建立
 
 ## 3. Before implementation
 
-- [ ] 更新 ARCHITECTURE.md 為使用者批准的 decision，移除對應 BLOCKED_HUMAN
-- [ ] 更新 FILESYSTEM_POLICY.md／DATA_MODEL.md 的正式 storage boundary
-- [ ] 更新 GIT_GITHUB_POLICY.md 的 visibility／remote policy
+- [x] 更新 ARCHITECTURE.md 為使用者批准的 decision
+- [x] 更新 FILESYSTEM_POLICY.md 的正式 storage boundary
+- [x] 更新 GIT_GITHUB_POLICY.md 的 Private visibility policy
 - [x] 建立 local Git repository、main branch 與合理 ignore
 - [ ] secret/sensitive scan pass
 - [ ] basic project skeleton 與 smoke validation pass

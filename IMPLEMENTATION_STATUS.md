@@ -1,6 +1,6 @@
 # Implementation Status
 
-目前狀態：**Phase 1/2 planning**。本 repository 已完成 planning canonical state 的第一版，但尚未進入功能 implementation；沒有任何功能 requirement 的 VERIFIED evidence。
+目前狀態：**Phase 2 complete / implementation kickoff ready**。使用者已確認 Desktop application 與 Private GitHub；本 repository 尚未進入功能 implementation，沒有任何功能 requirement 的 VERIFIED evidence。
 
 ## 1. Current gate summary
 
@@ -10,10 +10,10 @@
 | Canonical product specification | DONE（planning） | PRODUCT_REQUIREMENTS、USER_FLOWS、UI_UX_SPEC、DATA_MODEL |
 | Media / sync / output contract | DONE（planning） | MEDIA_PIPELINE、DATA_AND_SYNC、REPORT_OUTPUT_SPEC |
 | Acceptance / traceability | DONE（planning） | ACCEPTANCE_TESTS、TRACEABILITY_MATRIX |
-| Architecture decision | BLOCKED_HUMAN | ARCHITECTURE.md，local browser vs desktop |
-| Application data storage | AWAITING_USER_SETUP | FILESYSTEM_POLICY.md、DATA_MODEL.md |
-| GitHub visibility | BLOCKED_HUMAN | GIT_GITHUB_POLICY.md，Private vs Public |
-| Git baseline / remote push | AWAITING_USER_SETUP | local main planning commit exists；architecture/visibility 尚未核准，沒有 remote evidence |
+| Architecture decision | DONE | 使用者確認 Desktop application；細部 shell/framework 仍採可逆 technical decision |
+| Application data storage | DONE（policy） | `PROJECT_ROOT\projects\`；仍待 implementation containment evidence |
+| GitHub visibility | DONE | 使用者確認 Private |
+| Git baseline / remote push | AWAITING_USER_SETUP | local main planning commits exists；沒有 GitHub remote/push evidence |
 | Feature implementation | NOT_STARTED | 尚無 source code / app skeleton |
 | Real media / human acceptance | AWAITING_USER_SETUP | 尚未提供可用非私人 fixture／真人 evidence |
 
@@ -40,7 +40,7 @@
 
 ## 3. Requirement status rule
 
-除 PRODUCT_REQUIREMENTS.md 已明確標示的 FS-002 AWAITING_USER_SETUP、GIT-002 BLOCKED_HUMAN 外，現階段 in-scope functional requirements 均維持 NOT_STARTED。文件完成只代表 contract/planning 完成，不代表程式存在或 capability verified。
+除 PRODUCT_REQUIREMENTS.md 已明確標示的 GIT-002 AWAITING_USER_SETUP 外，現階段 in-scope functional requirements 均維持 NOT_STARTED。文件完成只代表 contract/planning 完成，不代表程式存在或 capability verified。
 
 ## 4. Evidence inventory
 
@@ -60,12 +60,11 @@
 
 ## 5. Next gates
 
-1. 使用者決定 generator architecture：local browser 或 desktop。
-2. 依決定確認 application data storage boundary。
-3. 使用者決定 GitHub visibility：Private 或 Public。
-4. 建立 local Git baseline、完成 secret scan、basic validation，再於核准 remote 建立 baseline push。
-5. 由 Integrator 依 MULTI_AGENT_PLAN 建立 implementation dependency graph 與 task contracts。
-6. implementation、integration、acceptance 與 final gate 依 TRACEABILITY_MATRIX 更新。
+1. 完成剩餘 governance files 與 canonical cross-reference reconciliation。
+2. 建立 desktop vertical slice：project create/list/open/save 與最小 editor/preview shell。
+3. 建立 media/player/export seams，再依 `TRACEABILITY_MATRIX.md` 逐批實作。
+4. 完成 secret scan、basic smoke validation 與 local checkpoint；GitHub Private remote 需另行授權/設定，未完成前保持 AWAITING_USER_SETUP。
+5. implementation、integration、acceptance 與 final gate 依 TRACEABILITY_MATRIX 更新。
 
 ## 6. Current ownership / handoff
 

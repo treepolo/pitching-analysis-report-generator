@@ -1,69 +1,33 @@
-# Multi-Agent Execution Plan
+# Multi-Agent Plan
 
-目前狀態：**Phase 1/2 planning**。本文件保留 Layer 1/2 要求的未來協作設計；本輪因使用者明確要求「不要使用 sub-agent 或 multi-agent」，沒有 dispatch 任何 worker，也沒有建立 worker branch。
+目前狀態：**Phase 2 planning**。本輪依使用者要求採 direct execution，不啟動 sub-agent；本文件保留未來需要平行開發時的 ownership 與 handoff contract，不能被解讀為目前已存在 worker branch 或 remote。
 
-## 1. Roles
+## Ownership
 
-| Role | Default model | Responsibility |
+| Subsystem | Single writer | 主要責任 |
 |---|---|---|
-| Orchestrator / Control Plane | Sol Xhigh | dependency、conflict graph、ownership、dispatch、human checkpoint、handoff、liveness、integration coordination |
-| Worker / Execution Plane | Luna MAX | scoped implementation、debug、tests、evidence、repo changes |
-| Integrator | 由主控指定唯一 owner | shared merge、conflict resolution、central docs、integration branch、regression、final gate |
+| Report Model / Editor | Report owner | project lifecycle、section/block、文字匯入、persistence-facing editor |
+| Media Pipeline | Media owner | metadata、compatibility、normalization、frame timing、native adapter |
+| Playback / Sync | Playback owner | player blocks、anchor、frame stepping、sync、drift correction |
+| Renderer / Export | Export owner | preview renderer、offline HTML、folder、ZIP、path validation |
+| Application Shell / UX | Shell owner | desktop navigation、editor/preview workflow、jobs、responsive generator UI |
+| QA / Acceptance | QA owner | fixtures、unit/integration/E2E、offline/responsive/interaction evidence |
+| Shared integration | 唯一 Integrator | merge、conflict resolution、shared docs、regression、final gate |
 
-角色不是權限升級；Worker 不可直接改 unrelated shared areas，Orchestrator 不做 routine implementation。
+## Conflict graph
 
-## 2. Dependency / conflict graph
+- `Report Model` ↔ `Application Shell`：shared project state contract；Model owner 是唯一 writer，Shell 只使用 public contract。
+- `Media Pipeline` ↔ `Playback/Sync`：metadata/frame timing contract；Media owner 先定義 capability，Playback owner 消費結果。
+- `Playback/Sync` ↔ `Renderer/Export`：exported player data contract；不得各自發明 anchor schema。
+- `Renderer/Export` ↔ `Filesystem`：所有 output/path validation 由 Export owner 遵守 `FILESYSTEM_POLICY.md`。
+- `QA` 依賴所有 public contracts，但不得為了修 shared defect 跨界寫 owner subsystem。
 
-| Workstream | Depends on | Shared files / conflict risk | Ready condition |
-|---|---|---|---|
-| Canonical product spec | Layer 1/2/3 | central docs | 已完成 planning |
-| Architecture/storage | product spec | ARCHITECTURE、FILESYSTEM_POLICY、DATA_MODEL | human approval |
-| Git baseline | canonical + architecture + visibility | main、.gitignore、central policy | visibility + scan |
-| Report model/editor | model contract | DATA_MODEL、shared renderer types | architecture approved |
-| Media pipeline | storage + model | MediaAsset、job contract | native/browser strategy decided |
-| Playback/sync | data/sync contract + media | PlayerBlock、SyncAnchor | media timing contract ready |
-| Renderer/export | model + media + sync | REPORT_OUTPUT_SPEC、shared renderer | contracts stable |
-| Application shell/UX | architecture + model | navigation shell、async state | storage/bridge ready |
-| QA/acceptance | all runnable work | fixtures、evidence、status docs | integration candidate |
-| Integration/final gate | all worker scopes | central docs、integration branch | worker handoffs pushed |
+## Worker contract
 
-Shared model、renderer、migration、navigation shell、deployment 與 central docs 均採 single writer；發現 shared defect 時回報 Integrator，不順手修改。
+每個未來 Worker 都要收到：Identity、model（預設 Luna MAX）、branch/worktree、starting commit、remote branch、scope、non-scope、ownership、forbidden areas、requirement IDs、acceptance、tests、evidence、push condition、human checkpoint、handoff/stop condition。
 
-## 3. Logical ownership
+完成或 blocker 時不得 silent stop，回報 `DONE`、`HANDOFF_REQUIRED`、`BLOCKED_DEPENDENCY`、`BLOCKED_HUMAN` 或 `NEEDS_ESCALATION`，並附 branch、commit、push、worktree、tests、evidence、next owner。沒有 remote 時使用 `AWAITING_USER_SETUP`，不得捏造 push。
 
-- Report Model / Editor：ReportProject、Section、ContentBlock、import、persistence-facing behavior。
-- Media Pipeline：MediaAsset、inspection、normalization、frame timing、FFmpeg/native adapter（若核准）。
-- Playback / Sync：PlayerBlock、SyncAnchor、frame stepping、sync playback、drift correction。
-- Renderer / Export：preview/export contract、index.html、relative assets、folder/ZIP。
-- Application Shell / UX：navigation、viewport preview、async states、responsive generator UI。
-- QA / Acceptance：fixtures、cross-browser、responsive、offline、interaction、security evidence。
-- Integrator：shared merge、central docs reconciliation、regression、final gate。
+## Liveness / dispatch-and-yield
 
-## 4. Worker task contract
-
-每次 dispatch 必須寫明：
-
-- identity、model、starting branch/commit/worktree
-- expected remote branch and push condition
-- scope、non-scope、ownership、forbidden areas
-- requirement IDs、acceptance、tests、evidence
-- human checkpoint、handoff condition、stop condition
-- source/media/privacy restrictions
-
-Worker 回報必須包含 status、modified files、branch、commit SHA、remote branch/push status、worktree、tests、evidence、acceptance、blocker、next owner。
-
-## 5. Handoff / integration
-
-Worker 在 DONE 或 HANDOFF_REQUIRED 前，若成果值得恢復：
-
-1. required checks pass
-2. commit
-3. push own worker branch
-4. verify remote visibility
-5. report complete state
-
-Integrator 才能 merge、解 conflict、更新 shared docs、跑 regression 與 push integration checkpoint。Force push 禁止。
-
-## 6. Current session override
-
-本輪只由目前 task 直接執行文件 materialization，不啟動 worker。這是本次使用者指示，不等於取消 repository 對未來 multi-agent、single writer、Integrator 與 push governance 的要求。
+Orchestrator（預設 Sol Xhigh）只做 dependency、ownership、dispatch、checkpoint、handoff、integration coordination 與 liveness。只要存在不依賴未決 checkpoint 的 runnable work，就派出至少一條線；派出後 yield，不持續 polling。若所有剩餘工作都依賴人類決策，才允許停止。

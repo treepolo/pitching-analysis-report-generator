@@ -1,6 +1,6 @@
 # Architecture Decision Package
 
-目前狀態：**Phase 2 planning / BLOCKED_HUMAN**。本文件比較至少兩個符合產品目標的架構，提出建議但不把建議當成人類批准。正式 implementation、application data storage 與不可逆 framework selection 必須等 checkpoint。
+目前狀態：**Phase 2 planning / ARCHITECTURE APPROVED BY USER（2026-08-14）**。使用者已選擇 Desktop application。本文件的高層架構 checkpoint 已解除；shell/framework、native media strategy 與 packaging 仍採可替換的 implementation decision，不得擴大產品 scope。
 
 ## 1. Product drivers
 
@@ -73,26 +73,21 @@
 | security | sandbox 較強 | native privilege 需額外 hardening | browser 優；desktop 可治理 |
 | testing | cross-browser/file:// 複雜 | native + browser integration | 兩者皆需完整測試 |
 
-## 5. Recommendation (not approved)
+## 5. Approved direction
 
-依目前 user job，建議採 **Desktop application shell + portable web renderer**：
+依目前 user job，採 **Desktop application shell + portable web renderer**：
 
 - shell 負責 project filesystem、media pipeline、FFmpeg/native adapter、job persistence、folder/ZIP export。
 - web layer 負責 editor、preview、player UI 與可重用 report renderer。
 - exported report 不依賴 desktop shell；仍遵守 REPORT_OUTPUT_SPEC 的 file:// contract。
 - application data 與 generated output 僅可落在 FILESYSTEM_POLICY 定義的 boundary。
 
-這是風險與產品需求導出的 recommendation，不是已核准架構；不得在 checkpoint 前選定 Tauri/Electron、資料庫、FFmpeg distribution 或 app data 路徑。
+這是使用者已確認的高層方向。實作仍不得加入帳號、雲端 database 或超出 scope 的服務。第一個 vertical slice 可先使用可替換的 desktop shell adapter 與 web renderer；不因追求速度而把 source media、generated report 或 ZIP 放進 Git。
 
 ## 6. Human Architecture Checkpoint
 
-狀態：**BLOCKED_HUMAN**。
+狀態：**RESOLVED — Desktop application approved by user on 2026-08-14**。
 
-使用者需確認：
+使用者決定：採 Desktop application。後續仍需以可逆、可測試的 technical decision 逐步確認 shell/framework、native media strategy 與 packaging；不把這些細節冒充新的產品 checkpoint。
 
-1. 採 Local browser-based application，或
-2. 採 Desktop application。
-
-若選 Desktop，後續再決定 shell/framework、native media strategy、application data storage 與 packaging；若選 browser，後續再決定 browser capability baseline、storage/export permission strategy 與 normalization feasibility。
-
-Checkpoint 前可繼續：requirements、UX flow、data model、output contract、acceptance fixture planning。Checkpoint 前不可開始依特定架構的 irreversible implementation。
+已可開始依此高層方向建立 desktop vertical slice。正式 application data storage 採 `FILESYSTEM_POLICY.md` 的 project-root 方案；若未來要改為其他位置，必須更新 policy、backup/restore 與 acceptance evidence。

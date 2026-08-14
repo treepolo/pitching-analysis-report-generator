@@ -1,6 +1,6 @@
 # Data Model
 
-目前狀態：**Phase 1/2 planning**。本文件定義 renderer、editor、media、sync 與 export 共用的語意模型；正式 storage technology 依 ARCHITECTURE.md 的 Human Checkpoint 決定。
+目前狀態：**Phase 2 planning**。Desktop architecture 與 project-root storage direction 已由使用者確認；本文件定義 renderer、editor、media、sync 與 export 共用的語意模型，實際 storage adapter 仍待 implementation。
 
 ## 1. Canonical entities
 
@@ -115,7 +115,7 @@ JobEvent 是 append-only；不可把取消、失敗覆寫成成功。reload 後�
 
 ## 9. Persistence and integrity boundary
 
-- 正式 application data storage 方案目前是 AWAITING_USER_SETUP，因為依賴 Architecture checkpoint。
+- 正式 application data storage policy 已決定為 `PROJECT_ROOT/projects/<project-id>/`；技術 adapter、atomic save 與 recovery implementation 尚未開始。
 - storage adapter 必須將 project、media references、anchors、export settings、job metadata 與 recovery state 以可重開方式保存。
 - export 不可使用 temporary mutation 破壞 source；中斷時 temporary output 只能留在 PROJECT_ROOT/.tmp 下並可辨識為未完成。
 - model read/write 要可測試，不把 UI state 直接當 canonical persisted model。

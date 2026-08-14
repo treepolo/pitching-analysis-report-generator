@@ -59,9 +59,9 @@
 | SEC-001 | 私人影片、專案資料、generated reports、ZIP 不進 Git、不自動上傳第三方、不建立無必要 telemetry。 | secret/sensitive scan 與 log review。 | NOT_STARTED |
 | SEC-002 | logs 不記錄私人影片內容；export/file path、檔名與錯誤訊息經安全處理。 | 不洩漏內容/credential 的 negative test。 | NOT_STARTED |
 | FS-001 | PROJECT_ROOT 下集中管理 `.worktrees`、`.backups`、`.tmp`；不散落 source copy。 | filesystem policy review。 | NOT_STARTED |
-| FS-002 | 正式 application data storage 由 Architecture checkpoint 決定並明確記錄。 | checkpoint 後更新 architecture/setup。 | AWAITING_USER_SETUP |
+| FS-002 | 正式 application data storage 由 Architecture policy 明確記錄在 project boundary 內。 | 實作後驗證 project data 僅落在 `PROJECT_ROOT/projects/`。 | NOT_STARTED |
 | GIT-001 | 使用 local Git、main、origin、worker/<scope> 與唯一 Integrator policy。 | baseline gate 與 branch policy review。 | NOT_STARTED |
-| GIT-002 | GitHub repo 建議名為 `pitching-analysis-report-generator`；Private/Public visibility 需人類決策。 | remote 建立前取得明確選擇。 | BLOCKED_HUMAN |
+| GIT-002 | GitHub repo 建議名為 `pitching-analysis-report-generator`；visibility 已由使用者決定為 Private，remote 建立需授權設定。 | remote 建立後取得實際 URL/branch evidence。 | AWAITING_USER_SETUP |
 | GIT-003 | baseline/handoff/integration/acceptance/release checkpoint 有 push/secret scan 規則；force push 禁止。 | policy review，不能捏造 push evidence。 | NOT_STARTED |
 | QA-001 | Scenario A–G 覆蓋完整流程、offline、重複 asset、不同 FPS、VFR、responsive、error recovery。 | `ACCEPTANCE_TESTS.md` 的 exit criteria。 | NOT_STARTED |
 | QA-002 | unit/integration/E2E/visual/真人驗收 evidence 分層；fixture 不冒充真人；無 evidence 不可 VERIFIED。 | `TRACEABILITY_MATRIX.md` 與 status audit。 | NOT_STARTED |

@@ -1,6 +1,6 @@
 # Filesystem Policy
 
-目前狀態：**Phase 1/2 planning**。本政策先固定 project boundary；正式 application data storage 仍依 ARCHITECTURE.md Human Checkpoint 決定。
+目前狀態：**Phase 2 planning**。Desktop architecture 已由使用者確認；正式 application data 採 project-root 內的受控目錄，避免 source copy 散落未知 AppData。
 
 ## 1. Approved roots
 
@@ -19,14 +19,14 @@
 - 所有 user-supplied filename 必須先做 safe-name validation；禁止 path traversal、path separator、控制字元與保留名稱衝突。
 - export、normalization、ZIP 中斷時的未完成檔案只能位於 TEMP_ROOT，且必須標示為暫存／未完成。
 
-## 3. Application data storage checkpoint
+## 3. Application data storage decision
 
-正式 application data 位置目前為 **AWAITING_USER_SETUP**：
+正式 application data 位置採 **PROJECT_ROOT\projects\**：
 
-- Option 1：project folders 位於 PROJECT_ROOT 內，便於 backup／portable handoff。
-- Option 2：desktop shell 的受控 application data location，但仍需明確 boundary、backup、restore 與 source copy policy。
-
-在選擇前不得偷偷把正式 project source 寫到不明 AppData；implementation 應使用可替換 storage interface 或維持 planning。
+- 每個 project 使用受控子目錄，例如 `projects/<project-id>/project.json`、`media/` 與必要的 normalized copies。
+- 生成中的 output 只寫入 `PROJECT_ROOT\output\`，暫存與中斷產物只寫入 `.tmp`。
+- backup/checkpoint 只寫入 `.backups`；不得把 source copy 寫到 Desktop、Downloads、Documents 或未知 AppData。
+- storage adapter 仍應可替換；若未來改用 desktop app data location，必須先更新本政策、backup/restore 與驗收 evidence。
 
 ## 4. Data classification
 
@@ -43,4 +43,4 @@
 
 ## 6. Review status
 
-FS-001 為 NOT_STARTED（尚待 implementation filesystem review）；FS-002 為 AWAITING_USER_SETUP（等待 architecture/storage 決策）。目前沒有 project-specific media、output 或 backup。
+FS-001 為 NOT_STARTED（尚待 implementation filesystem review）；FS-002 的 human decision 已完成，實作仍須驗證 containment。`projects/`、`output/`、`.tmp/`、`.backups/` 目前不放私人素材或 generated report。
