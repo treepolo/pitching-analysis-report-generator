@@ -10,107 +10,107 @@
   <body class="document-app">
     <header class="document-topbar">
       <div class="brand-lockup">
-        <p class="eyebrow">PITCHING REPORT</p>
-        <span class="brand-name">Long-form studio</span>
+        <p class="eyebrow">投球分析報告</p>
+        <span class="brand-name">長篇報告工作室</span>
       </div>
     </header>
 
     <p id="app-error" class="app-error" role="alert" hidden></p>
 
     <main class="document-shell">
-      <div id="document-command-bar" class="document-command-bar" role="toolbar" aria-label="Document commands">
+      <div id="document-command-bar" class="document-command-bar" role="toolbar" aria-label="文件操作">
         <div class="command-group command-project-group">
           <details class="project-control">
-            <summary>Documents</summary>
-            <div id="project-list" class="project-list" role="listbox" aria-label="Open document list"></div>
-            <p id="project-empty" class="empty-state">No documents yet.</p>
+            <summary>文件</summary>
+            <div id="project-list" class="project-list" role="listbox" aria-label="開啟文件清單"></div>
+            <p id="project-empty" class="empty-state">尚無文件。</p>
           </details>
-          <button id="new-project" class="button button-secondary" type="button">New</button>
+          <button id="new-project" class="button button-secondary" type="button">新增</button>
         </div>
 
         <div class="command-group command-block-group">
-          <label class="compact-control" for="block-section-target">Section
+          <label class="compact-control" for="block-section-target">段落
             <select id="block-section-target" disabled></select>
           </label>
-          <button id="import-text" class="button button-quiet" type="button" disabled>Import .txt / .md</button>
-          <button id="import-media" class="button button-quiet" type="button" disabled>Import media</button>
-          <button id="add-text-block" class="button button-quiet" type="button" disabled>+ Text</button>
-          <button id="add-editor-single-video" class="button button-quiet" type="button" disabled>+ Video</button>
-          <button id="add-editor-comparison-video" class="button button-quiet" type="button" disabled>+ Compare</button>
+          <button id="import-text" class="button button-quiet" type="button" disabled>匯入 .txt / .md</button>
+          <button id="import-media" class="button button-quiet" type="button" disabled>匯入媒體</button>
+          <button id="add-text-block" class="button button-quiet" type="button" disabled>+ 文字</button>
+          <button id="add-editor-single-video" class="button button-quiet" type="button" disabled>+ 影片</button>
+          <button id="add-editor-comparison-video" class="button button-quiet" type="button" disabled>+ 比較</button>
         </div>
 
         <div class="command-group command-save-group">
-          <span id="save-state" class="save-state">Ready</span>
-          <button id="save-project" class="button button-primary" type="button" disabled>Save</button>
+          <span id="save-state" class="save-state">準備就緒</span>
+          <button id="save-project" class="button button-primary" type="button" disabled>儲存</button>
         </div>
 
         <div class="command-group export-command-group">
-          <button id="choose-export-directory" class="button button-quiet" type="button" disabled>Choose folder</button>
-          <label class="compact-control" for="export-kind">Export
+          <button id="choose-export-directory" class="button button-quiet" type="button" disabled>選擇資料夾</button>
+          <label class="compact-control" for="export-kind">匯出
             <select id="export-kind" disabled>
-              <option value="folder">Folder</option>
+              <option value="folder">資料夾</option>
               <option value="zip">ZIP</option>
             </select>
           </label>
-          <button id="export-report" class="button button-secondary" type="button" disabled>Export</button>
-          <button id="export-cancel" class="button button-quiet" type="button" hidden>Cancel</button>
-          <button id="export-retry" class="button button-quiet" type="button" hidden>Retry</button>
+          <button id="export-report" class="button button-secondary" type="button" disabled>匯出</button>
+          <button id="export-cancel" class="button button-quiet" type="button" hidden>取消</button>
+          <button id="export-retry" class="button button-quiet" type="button" hidden>重試</button>
         </div>
       </div>
 
       <section id="editor-empty" class="empty-document" aria-live="polite">
-        <p class="eyebrow">YOUR REPORT</p>
-        <h1>Start with a blank page.</h1>
-        <p>Create a report, then write directly into text blocks and place video cards wherever the story needs them.</p>
-        <button id="empty-new-project" class="button button-primary" type="button">Create document</button>
+        <p class="eyebrow">你的報告</p>
+        <h1>從空白頁開始。</h1>
+        <p>建立報告後，直接在文字區塊中撰寫，並在需要的位置放入影片卡片。</p>
+        <button id="empty-new-project" class="button button-primary" type="button">建立文件</button>
       </section>
 
       <section id="editor" class="document-editor" hidden>
         <header class="document-header">
           <div>
-            <p class="eyebrow">REPORT DOCUMENT</p>
-            <h1 id="project-title">Untitled report</h1>
-            <p id="project-meta" class="document-meta">Local-first document</p>
+            <p class="eyebrow">報告文件</p>
+            <h1 id="project-title">未命名報告</h1>
+            <p id="project-meta" class="document-meta">本機優先文件</p>
           </div>
           <div class="document-header-meta">
-            <span id="block-editor-status" class="document-count">0 blocks</span>
-            <span class="status-pill">Local-first</span>
+            <span id="block-editor-status" class="document-count">0 個區塊</span>
+            <span class="status-pill">本機優先</span>
           </div>
         </header>
 
         <div class="document-status-row">
-          <span id="root-path" class="document-root">Project root</span>
-          <span id="export-directory-status" class="export-directory-status" role="status">Project output folder is the default.</span>
-          <span id="export-status" class="export-status" role="status">Exports are ready when a document is open.</span>
+          <span id="root-path" class="document-root">專案根目錄</span>
+          <span id="export-directory-status" class="export-directory-status" role="status">預設使用專案輸出資料夾。</span>
+          <span id="export-status" class="export-status" role="status">開啟文件後即可匯出。</span>
         </div>
 
-        <div id="block-canvas" class="document-canvas" aria-live="polite" aria-label="Long-form document blocks"></div>
+        <div id="block-canvas" class="document-canvas" aria-live="polite" aria-label="長篇文件區塊"></div>
       </section>
     </main>
 
     <dialog id="new-project-dialog">
       <form id="new-project-form" method="dialog" class="dialog-card">
-        <p class="eyebrow">NEW DOCUMENT</p>
-        <h2>Create a report</h2>
-        <label for="new-project-name">Document name</label>
-        <input id="new-project-name" name="displayName" required maxlength="120" placeholder="Pitch review" />
+        <p class="eyebrow">新增文件</p>
+        <h2>建立報告</h2>
+        <label for="new-project-name">文件名稱</label>
+        <input id="new-project-name" name="displayName" required maxlength="120" placeholder="投球檢視" />
         <div class="dialog-actions">
-          <button type="button" data-close-dialog class="button button-quiet">Cancel</button>
-          <button type="submit" class="button button-primary">Create</button>
+          <button type="button" data-close-dialog class="button button-quiet">取消</button>
+          <button type="submit" class="button button-primary">建立</button>
         </div>
       </form>
     </dialog>
 
     <dialog id="import-text-dialog">
       <div class="dialog-card">
-        <p class="eyebrow">TEXT IMPORT</p>
-        <h2>Review imported text</h2>
+        <p class="eyebrow">文字匯入</p>
+        <h2>檢視匯入文字</h2>
         <p id="import-text-name" class="muted">—</p>
         <pre id="import-text-preview" class="import-preview"></pre>
         <p id="import-text-error" class="app-error" role="alert" hidden></p>
         <div class="dialog-actions">
-          <button id="cancel-import-text" type="button" class="button button-quiet">Cancel</button>
-          <button id="confirm-import-text" type="button" class="button button-primary">Insert block</button>
+          <button id="cancel-import-text" type="button" class="button button-quiet">取消</button>
+          <button id="confirm-import-text" type="button" class="button button-primary">插入區塊</button>
         </div>
       </div>
     </dialog>

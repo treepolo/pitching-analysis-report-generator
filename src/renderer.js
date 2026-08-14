@@ -77,7 +77,60 @@ function escapeHtml(value) {
 
 function formatDate(value) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '時間未知' : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? '時間未知' : date.toLocaleString('zh-TW');
+}
+
+const DISPLAY_STATUS_LABELS = Object.freeze({
+  unknown: '未知',
+  missing: '遺失',
+  pending: '處理中',
+  processing: '處理中',
+  ready: '就緒',
+  verified: '已驗證',
+  unsupported: '不支援',
+  unplayable: '無法播放',
+  'needs-normalization': '待正規化',
+  loaded: '已載入',
+  error: '錯誤',
+});
+
+function displayStatus(value) {
+  if (value === null || value === undefined || value === '') return '未知';
+  const normalized = String(value).toLowerCase();
+  return DISPLAY_STATUS_LABELS[normalized] || (/[A-Za-z]/u.test(normalized) ? '未知' : String(value));
+}
+
+function displayPrecision(value) {
+  const labels = {
+    'exact-frame': '精確影格',
+    exact: '精確',
+    time: '時間',
+    approximate: '約略',
+    unsupported: '不支援',
+    unknown: '未知',
+  };
+  return labels[String(value).toLowerCase()] || displayStatus(value);
+}
+
+function displayBlockType(value) {
+  const labels = {
+    'rich-text': '文字',
+    text: '文字',
+    heading: '標題',
+    subheading: '子標題',
+    image: '圖片',
+    imageblock: '圖片',
+    photo: '照片',
+    singleVideo: '單一影片',
+    comparisonVideo: '影片比較',
+  };
+  return labels[value] || '未知區塊';
+}
+
+function displayErrorMessage(error) {
+  const message = typeof error === 'string' ? error : error?.message;
+  if (!message) return '未知錯誤';
+  return /[A-Za-z]{2,}/u.test(message) ? '操作失敗，請稍後再試。' : String(message);
 }
 
 function activeSection() {
@@ -111,7 +164,7 @@ function mediaStatusLabel(asset) {
   if (!asset) return '找不到此專案媒體';
   const lifecycle = asset.lifecycleStatus || asset.status || 'unknown';
   const compatibility = asset.compatibility || 'unknown';
-  return `狀態：${lifecycle} · 相容性：${compatibility}`;
+  return `狀態：${displayStatus(lifecycle)} · 相容性：${displayStatus(compatibility)}`;
 }
 
 function isVideoAsset(asset) {
@@ -163,7 +216,7 @@ function addPlayerBlock(block) {
   if (!section) return;
   section.blocks.push(block);
   state.player.selectedBlockId = block.id;
-  state.player.notice = 'Player block created; loading project-local media only.';
+  state.player.notice = '已建立影片區塊；僅載入專案內媒體。';
   renderBlockCanvas();
   renderPlayer();
   renderPreview();
@@ -179,7 +232,7 @@ function addTextBlock() {
     type: 'rich-text',
     content: '',
   });
-  state.player.notice = 'Text block created.';
+  state.player.notice = '已建立文字區塊。';
   renderBlockCanvas();
   renderPreview();
   scheduleSave();
@@ -188,7 +241,7 @@ function addTextBlock() {
 function addSingleVideoBlock({ allowEmpty = false } = {}) {
   const videos = videoAssetsForProject(state.activeProject);
   if (videos.length === 0 && !allowEmpty) {
-    state.player.notice = 'No video asset is loaded. Import a real project-local video first.';
+    state.player.notice = '尚未載入影片資產。請先匯入專案內的實際影片。';
     renderPlayer();
     return;
   }
@@ -197,7 +250,7 @@ function addSingleVideoBlock({ allowEmpty = false } = {}) {
     id: makePlayerBlockId('single-video'),
     type: 'singleVideo',
     mediaAssetId: asset?.id || null,
-    label: asset?.displayName || 'Single video',
+    label: asset?.displayName || '單一影片',
     layout: 'side-by-side',
     playback: { rate: 1 },
     segment: { in: 0, out: null },
@@ -209,7 +262,7 @@ function addSingleVideoBlock({ allowEmpty = false } = {}) {
 function addComparisonVideoBlock({ allowEmpty = false } = {}) {
   const videos = videoAssetsForProject(state.activeProject);
   if (videos.length < 2 && !allowEmpty) {
-    state.player.notice = 'Comparison requires two real project-local video assets.';
+    state.player.notice = '比較模式需要兩個專案內的實際影片資產。';
     renderPlayer();
     return;
   }
@@ -218,20 +271,20 @@ function addComparisonVideoBlock({ allowEmpty = false } = {}) {
   addPlayerBlock({
     id: makePlayerBlockId('comparison-video'),
     type: 'comparisonVideo',
-    label: 'Comparison video',
+    label: '影片比較',
     layout: 'side-by-side',
     playback: { rate: 1 },
     sync: { mode: 'time', startAnchor: null },
     left: {
       mediaAssetId: left?.id || null,
-      label: left?.displayName || 'Left video',
+      label: left?.displayName || '左側影片',
       segment: { in: 0, out: null },
       playback: { rate: 1 },
       anchor: null,
     },
     right: {
       mediaAssetId: right?.id || null,
-      label: right?.displayName || 'Right video',
+      label: right?.displayName || '右側影片',
       segment: { in: 0, out: null },
       playback: { rate: 1 },
       anchor: null,
@@ -274,7 +327,7 @@ function exportDirectoryPicker() {
 function displaySafeDirectoryLabel(directory) {
   const normalized = typeof directory === 'string' ? directory.replace(/[\\/]+$/u, '') : '';
   const segments = normalized.split(/[\\/]/u).filter(Boolean);
-  return segments.at(-1) || 'selected folder';
+  return segments.at(-1) || '已選資料夾';
 }
 
 function normalizeExportDirectoryPick(result) {
@@ -299,22 +352,22 @@ async function chooseExportDirectory() {
   if (!state.activeProject || ['running', 'cancelling'].includes(state.export.status)) return;
   const picker = exportDirectoryPicker();
   if (!picker) {
-    state.export.directoryNotice = 'Folder picker unavailable; using the project default.';
+    state.export.directoryNotice = '無法使用資料夾選擇器；改用專案預設位置。';
     renderExportControls();
     return;
   }
   try {
     const picked = normalizeExportDirectoryPick(await picker());
     if (picked.canceled) {
-      state.export.directoryNotice = 'Folder selection cancelled; no export started.';
+      state.export.directoryNotice = '已取消資料夾選擇；尚未開始匯出。';
     } else if (!picked.directory) {
-      state.export.directoryNotice = 'Folder picker returned no usable folder; using the project default.';
+      state.export.directoryNotice = '資料夾選擇器沒有回傳可用資料夾；改用專案預設位置。';
     } else {
       state.export.outputDirectory = picked.directory;
-      state.export.directoryNotice = `Selected folder: ${displaySafeDirectoryLabel(picked.directory)}`;
+      state.export.directoryNotice = `已選資料夾：${displaySafeDirectoryLabel(picked.directory)}`;
     }
   } catch {
-    state.export.directoryNotice = 'Folder selection failed; using the project default.';
+    state.export.directoryNotice = '資料夾選擇失敗；改用專案預設位置。';
   }
   renderExportControls();
 }
@@ -323,7 +376,7 @@ function exportResultLabel(snapshot) {
   const result = snapshot?.result;
   if (!result) return '';
   const output = result.zipPath || result.folderPath;
-  return output ? `Output ready: ${output}` : 'Export completed without an output path.';
+  return output ? `輸出就緒：${output}` : '匯出完成，但沒有輸出路徑。';
 }
 
 function renderExportControls() {
@@ -341,29 +394,29 @@ function renderExportControls() {
   }
   if (elements.exportStatus) elements.exportStatus.dataset.state = exportState.status;
   if (!project) {
-    if (elements.exportDirectoryStatus) elements.exportDirectoryStatus.textContent = 'Open a project to choose an output folder.';
-    if (elements.exportStatus) elements.exportStatus.textContent = 'Export is unavailable until a project is open.';
+    if (elements.exportDirectoryStatus) elements.exportDirectoryStatus.textContent = '開啟專案以選擇輸出資料夾。';
+    if (elements.exportStatus) elements.exportStatus.textContent = '開啟專案後才能匯出。';
   } else if (exportState.outputDirectory) {
     if (elements.exportDirectoryStatus) {
       elements.exportDirectoryStatus.textContent = exportState.directoryNotice
-        || `Selected folder: ${displaySafeDirectoryLabel(exportState.outputDirectory)}`;
+        || `已選資料夾：${displaySafeDirectoryLabel(exportState.outputDirectory)}`;
     }
   } else if (exportState.status === 'running') {
     if (elements.exportDirectoryStatus) {
-      elements.exportDirectoryStatus.textContent = `Using project default: ${displaySafeDirectoryLabel(defaultExportDirectory())}`;
+      elements.exportDirectoryStatus.textContent = `使用專案預設位置：${displaySafeDirectoryLabel(defaultExportDirectory())}`;
     }
     if (elements.exportStatus) {
-      elements.exportStatus.textContent = 'Export running; referenced assets are being copied into a self-contained output.';
+      elements.exportStatus.textContent = '匯出進行中；正在將引用的資產複製到自包含輸出。';
     }
   } else if (exportState.directoryNotice) {
     if (elements.exportDirectoryStatus) elements.exportDirectoryStatus.textContent = exportState.directoryNotice;
   } else if (!pickerAvailable) {
     if (elements.exportDirectoryStatus) {
-      elements.exportDirectoryStatus.textContent = 'Folder picker unavailable; using the project default.';
+      elements.exportDirectoryStatus.textContent = '無法使用資料夾選擇器；改用專案預設位置。';
     }
   } else {
     if (elements.exportDirectoryStatus) {
-      elements.exportDirectoryStatus.textContent = `Using project default: ${displaySafeDirectoryLabel(defaultExportDirectory())}`;
+      elements.exportDirectoryStatus.textContent = `使用專案預設位置：${displaySafeDirectoryLabel(defaultExportDirectory())}`;
     }
   }
   if (!project) {
@@ -371,25 +424,25 @@ function renderExportControls() {
   }
   if (exportState.status === 'running') {
     if (elements.exportStatus) {
-      elements.exportStatus.textContent = 'Export running; referenced assets are being copied into a self-contained output.';
+      elements.exportStatus.textContent = '匯出進行中；正在將引用的資產複製到自包含輸出。';
     }
   } else if (exportState.status === 'cancelling') {
-    if (elements.exportStatus) elements.exportStatus.textContent = 'Cancelling export; waiting for cleanup.';
+    if (elements.exportStatus) elements.exportStatus.textContent = '正在取消匯出；等待清理完成。';
   } else if (exportState.status === 'completed') {
     if (elements.exportStatus) elements.exportStatus.textContent = exportResultLabel(snapshot);
   } else if (exportState.status === 'failed') {
     if (elements.exportStatus) {
-      elements.exportStatus.textContent = `Export failed: ${snapshot?.error?.message || 'unknown error'}`;
+      elements.exportStatus.textContent = `匯出失敗：${displayErrorMessage(snapshot?.error?.message)}`;
     }
   } else if (exportState.status === 'cancelled') {
     if (elements.exportStatus) {
-      elements.exportStatus.textContent = `Export cancelled: ${snapshot?.error?.message || 'no output was created'}`;
+      elements.exportStatus.textContent = `匯出已取消：${displayErrorMessage(snapshot?.error?.message || '尚未建立輸出')}`;
     }
   } else {
     if (elements.exportStatus) {
       elements.exportStatus.textContent = exportState.outputDirectory
-        ? `Exports use the selected folder: ${displaySafeDirectoryLabel(exportState.outputDirectory)}.`
-        : `Exports use ${defaultExportDirectory() || 'the project output folder'}.`;
+        ? `匯出將使用已選資料夾：${displaySafeDirectoryLabel(exportState.outputDirectory)}。`
+        : `匯出將使用${defaultExportDirectory() || '專案輸出資料夾'}。`;
     }
   }
 }
@@ -420,7 +473,7 @@ async function startReportExport() {
     await flushPendingChanges();
     const project = state.activeProject;
     const outputDirectory = state.export.outputDirectory || defaultExportDirectory();
-    if (!outputDirectory) throw new Error('Project output directory is unavailable.');
+    if (!outputDirectory) throw new Error('專案輸出資料夾無法使用。');
     const request = {
       projectId: project.id,
       outputDirectory,
@@ -432,13 +485,13 @@ async function startReportExport() {
     state.export.status = 'running';
     renderExportControls();
     const started = await window.pitchingApp.startExport(request);
-    if (!started?.jobId) throw new Error('Export bridge returned no job id.');
+    if (!started?.jobId) throw new Error('匯出橋接未回傳工作編號。');
     state.export.jobId = started.jobId;
     setExportSnapshot(started);
     await monitorExportJob(started.jobId);
   } catch (error) {
     state.export.jobId = null;
-    setExportSnapshot({ status: 'failed', error: { message: error.message } });
+    setExportSnapshot({ status: 'failed', error: { message: displayErrorMessage(error) } });
   }
 }
 
@@ -448,7 +501,7 @@ async function cancelReportExport() {
   try {
     setExportSnapshot(await window.pitchingApp.cancelExport(jobId));
   } catch (error) {
-    setExportSnapshot({ status: 'failed', error: { message: `Cancel failed: ${error.message}` } });
+    setExportSnapshot({ status: 'failed', error: { message: `取消失敗：${displayErrorMessage(error)}` } });
   }
 }
 
@@ -461,7 +514,7 @@ async function retryReportExport() {
     setExportSnapshot(started);
     await monitorExportJob(started.jobId);
   } catch (error) {
-    setExportSnapshot({ status: 'failed', error: { message: `Retry failed: ${error.message}` } });
+    setExportSnapshot({ status: 'failed', error: { message: `重試失敗：${displayErrorMessage(error)}` } });
   }
 }
 
@@ -471,14 +524,14 @@ function renderProjects() {
   if (control.tagName === 'SELECT') {
     control.innerHTML = state.projects.length > 0
       ? state.projects.map((project) => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.displayName)}</option>`).join('')
-      : '<option value="">No documents yet</option>';
+      : '<option value="">尚無文件</option>';
     control.disabled = state.projects.length === 0;
     if (state.activeProject) control.value = state.activeProject.id;
     return;
   }
   control.innerHTML = state.projects.map((project) => `
     <button class="project-card" data-project-id="${escapeHtml(project.id)}" type="button">
-      <span>${escapeHtml(project.displayName)}</span><small>${project.sectionCount} sections</small>
+      <span>${escapeHtml(project.displayName)}</span><small>${project.sectionCount} 個段落</small>
     </button>`).join('');
   control.querySelectorAll('[data-project-id]').forEach((button) => {
     button.addEventListener('click', () => { void openProject(button.dataset.projectId); });
@@ -496,9 +549,9 @@ function valueAtPath(value, pathValue) {
 function editorVideoAssetOptions(selectedId) {
   const assets = videoAssetsForProject(state.activeProject);
   const selected = referenceId(selectedId);
-  const options = [`<option value="">No asset selected</option>`];
+  const options = [`<option value="">尚未選擇資產</option>`];
   if (selected && !assets.some((asset) => asset.id === selected)) {
-    options.push(`<option value="${escapeHtml(selected)}" selected>Missing asset: ${escapeHtml(selected)}</option>`);
+    options.push(`<option value="${escapeHtml(selected)}" selected>找不到資產：${escapeHtml(selected)}</option>`);
   }
   assets.forEach((asset) => {
     options.push(`<option value="${escapeHtml(asset.id)}"${asset.id === selected ? ' selected' : ''}>${escapeHtml(asset.displayName || asset.id)}</option>`);
@@ -510,19 +563,19 @@ function renderVideoSideEditor(block, side) {
   const comparison = side !== 'single';
   const config = comparison ? (block[side] || {}) : block;
   const prefix = comparison ? `${side}.` : '';
-  const label = comparison ? (side === 'left' ? 'Left source' : 'Right source') : 'Video source';
+  const label = comparison ? (side === 'left' ? '左側來源' : '右側來源') : '影片來源';
   return `
     <fieldset class="video-side-config">
       <legend>${label}</legend>
-      <label>Asset
+      <label>資產
         <select data-block-path="${prefix}mediaAssetId">${editorVideoAssetOptions(config.mediaAssetId)}</select>
       </label>
-      <label>Label <input type="text" data-block-path="${prefix}label" value="${editorValue(config.label)}" /></label>
+      <label>標籤 <input type="text" data-block-path="${prefix}label" value="${editorValue(config.label)}" /></label>
       <div class="block-inline-fields">
-        <label>In <input type="number" min="0" step="0.001" data-block-path="${prefix}segment.in" value="${editorValue(config.segment?.in)}" /></label>
-        <label>Out <input type="number" min="0" step="0.001" data-block-path="${prefix}segment.out" value="${editorValue(config.segment?.out)}" /></label>
-        <label>Rate <input type="number" min="0.1" max="8" step="0.1" data-block-path="${prefix}playback.rate" value="${editorValue(config.playback?.rate || 1)}" /></label>
-        <label>Anchor (s) <input type="number" min="0" step="0.001" data-block-path="${prefix}anchor.observedTime" value="${editorValue(config.anchor?.observedTime)}" /></label>
+        <label>起點 <input type="number" min="0" step="0.001" data-block-path="${prefix}segment.in" value="${editorValue(config.segment?.in)}" /></label>
+        <label>終點 <input type="number" min="0" step="0.001" data-block-path="${prefix}segment.out" value="${editorValue(config.segment?.out)}" /></label>
+        <label>播放速度 <input type="number" min="0.1" max="8" step="0.1" data-block-path="${prefix}playback.rate" value="${editorValue(config.playback?.rate || 1)}" /></label>
+        <label>錨點（秒） <input type="number" min="0" step="0.001" data-block-path="${prefix}anchor.observedTime" value="${editorValue(config.anchor?.observedTime)}" /></label>
       </div>
     </fieldset>`;
 }
@@ -531,26 +584,26 @@ function renderVideoBlockEditor(block) {
   const comparison = block.type === 'comparisonVideo';
   return `
     <div class="block-config-grid">
-      <label>Mode
+      <label>模式
         <select data-block-mode>
-          <option value="single"${comparison ? '' : ' selected'}>Single video</option>
-          <option value="comparison"${comparison ? ' selected' : ''}>Comparison video</option>
+          <option value="single"${comparison ? '' : ' selected'}>單一影片</option>
+          <option value="comparison"${comparison ? ' selected' : ''}>影片比較</option>
         </select>
       </label>
-      <label>Label <input type="text" data-block-path="label" value="${editorValue(block.label)}" /></label>
-      <label>Layout
+      <label>標籤 <input type="text" data-block-path="label" value="${editorValue(block.label)}" /></label>
+      <label>版面
         <select data-block-path="layout">
-          <option value="side-by-side"${block.layout !== 'stacked' ? ' selected' : ''}>Side by side</option>
-          <option value="stacked"${block.layout === 'stacked' ? ' selected' : ''}>Stacked</option>
+          <option value="side-by-side"${block.layout !== 'stacked' ? ' selected' : ''}>並排</option>
+          <option value="stacked"${block.layout === 'stacked' ? ' selected' : ''}>堆疊</option>
         </select>
       </label>
-      <label>Sync mode
+      <label>同步模式
         <select data-block-path="sync.mode">
-          <option value="time"${block.sync?.mode !== 'frame' ? ' selected' : ''}>Time / elapsed playhead</option>
-          <option value="frame"${block.sync?.mode === 'frame' ? ' selected' : ''}>Explicit frame mode</option>
+          <option value="time"${block.sync?.mode !== 'frame' ? ' selected' : ''}>時間／經過時間播放軸</option>
+          <option value="frame"${block.sync?.mode === 'frame' ? ' selected' : ''}>明確影格模式</option>
         </select>
       </label>
-      <label>Sync-start anchor (s) <input type="number" min="0" step="0.001" data-block-path="sync.startAnchor.observedTime" value="${editorValue(block.sync?.startAnchor?.observedTime)}" /></label>
+      <label>同步起點錨點（秒） <input type="number" min="0" step="0.001" data-block-path="sync.startAnchor.observedTime" value="${editorValue(block.sync?.startAnchor?.observedTime)}" /></label>
       <div class="video-side-configs">
         ${comparison ? `${renderVideoSideEditor(block, 'left')}${renderVideoSideEditor(block, 'right')}` : renderVideoSideEditor(block, 'single')}
       </div>
@@ -559,18 +612,18 @@ function renderVideoBlockEditor(block) {
 
 function renderInlineVideoSide(block, side) {
   const config = playerSideConfig(block, side);
-  const label = side === 'left' ? 'Left source' : side === 'right' ? 'Right source' : 'Video source';
+  const label = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
   return `
     <div class="inline-video-side" data-inline-side="${side}">
       <h3>${label}</h3>
       <div class="inline-video-frame"><video data-inline-video playsinline preload="metadata"></video></div>
-      <p class="inline-video-status" data-inline-status role="status">Not loaded; select a project-local asset.</p>
+      <p class="inline-video-status" data-inline-status role="status">尚未載入；請選擇專案內資產。</p>
       <div class="inline-video-controls">
-        <button class="button button-quiet" type="button" data-inline-action="play">Play</button>
-        <button class="button button-quiet" type="button" data-inline-action="pause">Pause</button>
-        <input class="inline-video-seek" data-inline-seek type="range" min="0" max="0" step="0.001" value="0" disabled aria-label="${label} seek" />
+        <button class="button button-quiet" type="button" data-inline-action="play">播放</button>
+        <button class="button button-quiet" type="button" data-inline-action="pause">暫停</button>
+        <input class="inline-video-seek" data-inline-seek type="range" min="0" max="0" step="0.001" value="0" disabled aria-label="${label}時間軸" />
         <output class="inline-video-time" data-inline-time>0.00s</output>
-        <button class="button button-quiet" type="button" data-inline-action="fullscreen">Fullscreen</button>
+        <button class="button button-quiet" type="button" data-inline-action="fullscreen">全螢幕</button>
       </div>
     </div>`;
 }
@@ -579,20 +632,20 @@ function renderInlineVideoBlock(section, block) {
   const comparison = block.type === 'comparisonVideo';
   const layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
   const sides = comparison ? `${renderInlineVideoSide(block, 'left')}${renderInlineVideoSide(block, 'right')}` : renderInlineVideoSide(block, 'single');
-  const syncMode = block.sync?.mode === 'frame' ? 'Explicit frame mode' : 'Shared elapsed-time sync';
+  const syncMode = block.sync?.mode === 'frame' ? '明確影格模式' : '共用經過時間同步';
   return `
     <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block>
       <header class="inline-video-header">
-        <div class="inline-video-title"><strong>${escapeHtml(block.label || (comparison ? 'Comparison video' : 'Video block'))}</strong><span>${comparison ? `${syncMode} · ${layout}` : 'Single source · project-local media'}</span></div>
+        <div class="inline-video-title"><strong>${escapeHtml(block.label || (comparison ? '影片比較' : '影片區塊'))}</strong><span>${comparison ? `${syncMode} · ${layout === 'stacked' ? '堆疊' : '並排'}` : '單一來源 · 專案內媒體'}</span></div>
         <div class="inline-video-actions">
-          <button class="button button-quiet" type="button" data-inline-action="open">Open controls</button>
-          <button class="button button-secondary" type="button" data-inline-action="play-all">Play</button>
-          <button class="button button-quiet" type="button" data-inline-action="pause-all">Pause</button>
-          ${comparison ? '<button class="button button-quiet" type="button" data-inline-action="align-zero">Align 0s</button>' : ''}
+          <button class="button button-quiet" type="button" data-inline-action="open">開啟控制項</button>
+          <button class="button button-secondary" type="button" data-inline-action="play-all">播放</button>
+          <button class="button button-quiet" type="button" data-inline-action="pause-all">暫停</button>
+          ${comparison ? '<button class="button button-quiet" type="button" data-inline-action="align-zero">對齊 0 秒</button>' : ''}
         </div>
       </header>
       <div class="inline-video-grid" data-layout="${layout}">${sides}</div>
-      <details class="inline-video-details"><summary>Block settings</summary>${renderVideoBlockEditor(block)}</details>
+      <details class="inline-video-details"><summary>區塊設定</summary>${renderVideoBlockEditor(block)}</details>
     </article>`;
 }
 
@@ -622,32 +675,32 @@ async function loadInlineVideoSide(card, block, side, generation) {
   const assetId = playerAssetIdFor(block, side);
   const asset = mediaAssetFor(assetId);
   if (!assetId || !asset) {
-    setInlineVideoStatus(sideElement, 'No project-local asset selected.', 'pending');
+    setInlineVideoStatus(sideElement, '尚未選擇專案內資產。', 'pending');
     return;
   }
   if (asset.lifecycleStatus === 'missing' || ['unsupported', 'unplayable'].includes(asset.compatibility)) {
-    setInlineVideoStatus(sideElement, 'This asset is unavailable or unsupported.', 'error');
+    setInlineVideoStatus(sideElement, '此資產無法使用或不受支援。', 'error');
     return;
   }
   if (asset.compatibility === 'needs-normalization' && !asset.normalizedReference) {
-    setInlineVideoStatus(sideElement, 'Metadata is pending normalization; playback is unavailable.', 'pending');
+    setInlineVideoStatus(sideElement, '中繼資料尚待正規化；目前無法播放。', 'pending');
     return;
   }
-  setInlineVideoStatus(sideElement, 'Loading project-local media…', 'pending');
+  setInlineVideoStatus(sideElement, '正在載入專案內媒體…', 'pending');
   try {
     const source = await window.pitchingApp.resolveMediaSource(state.activeProject.id, assetId);
     if (generation !== state.inlineGeneration || !card.isConnected) return;
     video.src = source.sourceUrl;
     video.playbackRate = Number(playerSideConfig(block, side).playback?.rate) || 1;
     video.onloadedmetadata = () => {
-      setInlineVideoStatus(sideElement, 'Ready; real media source loaded.', 'loaded');
+      setInlineVideoStatus(sideElement, '準備就緒；已載入實際媒體來源。', 'loaded');
       updateInlineVideoTime(sideElement);
     };
     video.ontimeupdate = () => updateInlineVideoTime(sideElement);
-    video.onerror = () => setInlineVideoStatus(sideElement, 'Media could not be played by this runtime.', 'error');
+    video.onerror = () => setInlineVideoStatus(sideElement, '此執行環境無法播放媒體。', 'error');
     video.load();
   } catch {
-    setInlineVideoStatus(sideElement, 'Media source could not be resolved safely.', 'error');
+    setInlineVideoStatus(sideElement, '無法安全解析媒體來源。', 'error');
   }
 }
 
@@ -666,13 +719,13 @@ async function playInlineCard(card) {
   const videos = [...card.querySelectorAll('[data-inline-video]')];
   const ready = videos.filter((video) => video.readyState > 0 && video.src);
   if (ready.length === 0) {
-    card.querySelectorAll('[data-inline-side]').forEach((side) => setInlineVideoStatus(side, 'Playback unavailable until a playable source is loaded.', 'pending'));
+    card.querySelectorAll('[data-inline-side]').forEach((side) => setInlineVideoStatus(side, '載入可播放來源後才能播放。', 'pending'));
     return;
   }
   try {
     await Promise.all(ready.map((video) => video.play()));
   } catch {
-    card.querySelectorAll('[data-inline-side]').forEach((side) => setInlineVideoStatus(side, 'Playback was blocked or unavailable.', 'error'));
+    card.querySelectorAll('[data-inline-side]').forEach((side) => setInlineVideoStatus(side, '播放遭阻擋或無法使用。', 'error'));
   }
 }
 
@@ -685,7 +738,7 @@ async function alignInlineComparison(card) {
   const left = playerSideConfig(entry.block, 'left');
   const right = playerSideConfig(entry.block, 'right');
   if (!entry.block || !leftVideo || !rightVideo || !leftVideo.src || !rightVideo.src || !left.anchor || !right.anchor) {
-    setInlineVideoStatus(leftElement, 'Both sources need loaded media and separate anchors.', 'pending');
+    setInlineVideoStatus(leftElement, '兩個來源都必須載入媒體，並分別設定錨點。', 'pending');
     return;
   }
   try {
@@ -695,10 +748,10 @@ async function alignInlineComparison(card) {
     }, 0);
     leftVideo.currentTime = alignment.sides.left.playbackTime;
     rightVideo.currentTime = alignment.sides.right.playbackTime;
-    setInlineVideoStatus(leftElement, `Aligned at 0s (${alignment.precision}).`, 'loaded');
-    setInlineVideoStatus(rightElement, `Aligned at 0s (${alignment.precision}).`, 'loaded');
+    setInlineVideoStatus(leftElement, `已對齊至 0 秒（${displayPrecision(alignment.precision)}）。`, 'loaded');
+    setInlineVideoStatus(rightElement, `已對齊至 0 秒（${displayPrecision(alignment.precision)}）。`, 'loaded');
   } catch {
-    setInlineVideoStatus(leftElement, 'Comparison alignment is unavailable for these sources.', 'error');
+    setInlineVideoStatus(leftElement, '這些來源無法進行比較對齊。', 'error');
   }
 }
 
@@ -724,7 +777,7 @@ function handleInlineVideoEvent(event) {
   } else if (action === 'pause-all') {
     card.querySelectorAll('[data-inline-video]').forEach((item) => item.pause());
   } else if (action === 'play' && video) {
-    void video.play().catch(() => setInlineVideoStatus(sideElement, 'Playback was blocked or unavailable.', 'error'));
+    void video.play().catch(() => setInlineVideoStatus(sideElement, '播放遭阻擋或無法使用。', 'error'));
   } else if (action === 'pause' && video) {
     video.pause();
   } else if (action === 'fullscreen' && video && typeof video.requestFullscreen === 'function') {
@@ -736,20 +789,20 @@ function handleInlineVideoEvent(event) {
 }
 
 function renderBlockEditor(section, block, index) {
-  const typeLabel = block.type === 'comparisonVideo' ? 'Comparison video' : block.type === 'singleVideo' ? 'Single video' : 'Text';
+  const typeLabel = displayBlockType(block.type);
   const body = block.type === 'rich-text' || block.type === 'text'
-    ? `<label class="block-text-editor">Text <textarea rows="5" data-block-field="content">${escapeHtml(block.content || '')}</textarea></label>`
+    ? `<label class="block-text-editor">文字 <textarea rows="5" data-block-field="content">${escapeHtml(block.content || '')}</textarea></label>`
     : (block.type === 'singleVideo' || block.type === 'comparisonVideo')
       ? renderInlineVideoBlock(section, block)
-      : `<p class="hint">Unsupported block type: ${escapeHtml(block.type || 'unknown')}</p>`;
+      : `<p class="hint">不支援的區塊類型：${displayBlockType(block.type)}</p>`;
   return `
     <article class="content-block-card" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}">
       <header class="content-block-header">
         <strong>${typeLabel}</strong>
         <div class="content-block-actions">
-          <button class="icon-button" type="button" data-block-action="move-up" aria-label="Move block up">↑</button>
-          <button class="icon-button" type="button" data-block-action="move-down" aria-label="Move block down">↓</button>
-          <button class="button button-secondary" type="button" data-block-action="delete">Delete</button>
+          <button class="icon-button" type="button" data-block-action="move-up" aria-label="將區塊上移">↑</button>
+          <button class="icon-button" type="button" data-block-action="move-down" aria-label="將區塊下移">↓</button>
+          <button class="button button-secondary" type="button" data-block-action="delete">刪除</button>
         </div>
       </header>
       ${body}
@@ -763,7 +816,7 @@ function renderBlockCanvas() {
     .forEach((element) => { element.disabled = !project; });
   if (!elements.blockCanvas) return;
   if (!project) {
-    elements.blockCanvas.innerHTML = '<p class="empty-state">Open a project to edit blocks.</p>';
+    elements.blockCanvas.innerHTML = '<p class="empty-state">開啟專案以編輯區塊。</p>';
     return;
   }
 
@@ -772,17 +825,17 @@ function renderBlockCanvas() {
   }
   if (elements.blockSectionTarget) {
     elements.blockSectionTarget.innerHTML = project.sections.map((section) => (
-      `<option value="${escapeHtml(section.id)}"${section.id === state.selectedSectionId ? ' selected' : ''}>${escapeHtml(section.title || 'Untitled section')}</option>`
+      `<option value="${escapeHtml(section.id)}"${section.id === state.selectedSectionId ? ' selected' : ''}>${escapeHtml(section.title || '未命名段落')}</option>`
     )).join('');
   }
   if (elements.blockEditorStatus) {
-    elements.blockEditorStatus.textContent = `${project.sections.reduce((count, section) => count + section.blocks.length, 0)} blocks in long-form document`;
+    elements.blockEditorStatus.textContent = `${project.sections.reduce((count, section) => count + section.blocks.length, 0)} 個長篇文件區塊`;
   }
   elements.blockCanvas.innerHTML = project.sections.map((section) => `
     <section class="block-section ${section.id === state.selectedSectionId ? 'is-target' : ''}" data-section-id="${escapeHtml(section.id)}">
       <header class="block-section-header">
-        <input type="text" data-section-title value="${editorValue(section.title)}" aria-label="Section title" />
-        <span class="muted">${section.blocks.length} blocks</span>
+        <input type="text" data-section-title value="${editorValue(section.title)}" aria-label="段落標題" />
+        <span class="muted">${section.blocks.length} 個區塊</span>
       </header>
       <div class="block-list">${section.blocks.map((block, index) => renderBlockEditor(section, block, index)).join('')}</div>
     </section>`).join('');
@@ -814,8 +867,8 @@ function convertVideoBlockMode(block, mode) {
   if (mode === 'comparison' && block.type !== 'comparisonVideo') {
     const singleAsset = referenceId(block.mediaAssetId);
     block.type = 'comparisonVideo';
-    block.left = { mediaAssetId: singleAsset, label: block.label || 'Left video', segment: block.segment, playback: block.playback, anchor: block.anchor };
-    block.right = { mediaAssetId: null, label: 'Right video', segment: { in: 0, out: null }, playback: { rate: 1 }, anchor: null };
+    block.left = { mediaAssetId: singleAsset, label: block.label || '左側影片', segment: block.segment, playback: block.playback, anchor: block.anchor };
+    block.right = { mediaAssetId: null, label: '右側影片', segment: { in: 0, out: null }, playback: { rate: 1 }, anchor: null };
     return;
   }
   if (mode === 'single' && block.type !== 'singleVideo') {
@@ -887,17 +940,17 @@ function renderEditor() {
   if (!project) return;
 
   if (elements.projectTitle) elements.projectTitle.textContent = project.displayName;
-  if (elements.projectMeta) elements.projectMeta.textContent = `Local-first document · ${formatDate(project.updatedAt)}`;
+  if (elements.projectMeta) elements.projectMeta.textContent = `本機優先文件 · ${formatDate(project.updatedAt)}`;
 }
 
 function previewMediaReference(value, role = '媒體') {
   const assetId = referenceId(value);
   const asset = assetId ? mediaAssetFor(assetId) : null;
-  const title = asset?.displayName || assetId || `${role} reference missing`;
+  const title = asset?.displayName || assetId || `${role}找不到引用來源`;
   return `<div class="preview-media-placeholder" data-asset-id="${escapeHtml(assetId || '')}">`
     + `<strong>${escapeHtml(title)}</strong>`
     + `<span>${escapeHtml(mediaStatusLabel(asset))}</span>`
-    + '<small>Renderer-only media seam；實際播放與 metadata inspect 留待後續 slice。</small>'
+    + '<small>僅供畫面層使用的媒體接縫；實際播放與中繼資料檢查留待後續切片。</small>'
     + '</div>';
 }
 
@@ -961,7 +1014,7 @@ async function persistActiveProject() {
       return saved;
     } catch (error) {
       setSaveState('儲存失敗', 'error');
-      setError(`儲存失敗：${error.message}`);
+      setError(`儲存失敗：${displayErrorMessage(error)}`);
       throw error;
     } finally {
       state.saveInFlight = null;
@@ -1021,7 +1074,7 @@ async function openProject(projectId) {
     setSaveState('已載入', 'saved');
   } catch (error) {
     setSaveState('開啟失敗', 'error');
-    setError(`開啟專案失敗：${error.message}`);
+    setError(`開啟專案失敗：${displayErrorMessage(error)}`);
   }
 }
 
@@ -1051,7 +1104,7 @@ async function requestTextImport() {
     elements.importTextDialog?.showModal();
   } catch (error) {
     setSaveState('匯入失敗', 'error');
-    setError(`讀取文字檔失敗：${error.message}`);
+    setError(`讀取文字檔失敗：${displayErrorMessage(error)}`);
   }
 }
 
@@ -1078,10 +1131,10 @@ async function confirmTextImport() {
     setSaveState('文字已匯入並儲存', 'saved');
   } catch (error) {
     if (elements.importTextError) {
-      elements.importTextError.textContent = `匯入失敗：${error.message}`;
+      elements.importTextError.textContent = `匯入失敗：${displayErrorMessage(error)}`;
       elements.importTextError.hidden = false;
     }
-    setError(`匯入文字失敗：${error.message}`);
+    setError(`匯入文字失敗：${displayErrorMessage(error)}`);
   } finally {
     if (elements.confirmImportText) elements.confirmImportText.disabled = false;
   }
@@ -1099,16 +1152,16 @@ async function importMedia() {
     renderProjects();
     renderEditor();
     renderPreview();
-    setSaveState('媒體已登錄；等待 inspect', 'saved');
+    setSaveState('媒體已登錄；等待檢查', 'saved');
   } catch (error) {
     setSaveState('媒體匯入失敗', 'error');
-    setError(`媒體匯入失敗：${error.message}`);
+    setError(`媒體匯入失敗：${displayErrorMessage(error)}`);
   }
 }
 
 async function removeMedia(assetId) {
   if (!state.activeProject || !assetId) return;
-  if (!window.confirm('確定從此專案移除這個媒體 asset？')) return;
+  if (!window.confirm('確定要從此專案移除這個媒體資產嗎？')) return;
   setError('');
   try {
     const saved = await window.pitchingApp.removeMedia(state.activeProject.id, assetId);
@@ -1121,7 +1174,7 @@ async function removeMedia(assetId) {
     setSaveState('媒體已移除並儲存', 'saved');
   } catch (error) {
     setSaveState('媒體移除失敗', 'error');
-    setError(`媒體移除失敗：${error.message}`);
+    setError(`媒體移除失敗：${displayErrorMessage(error)}`);
   }
 }
 
@@ -1138,7 +1191,7 @@ if (elements.newProjectForm) {
       await openProject(project.id);
     } catch (error) {
       setSaveState('建立失敗', 'error');
-      setError(`建立專案失敗：${error.message}`);
+      setError(`建立專案失敗：${displayErrorMessage(error)}`);
     }
   });
 }
@@ -1194,7 +1247,7 @@ if (typeof window.pitchingApp?.onBeforeClose === 'function') {
 (async function bootstrap() {
   try {
     if (!window.pitchingApp || typeof window.pitchingApp.getAppInfo !== 'function') {
-      throw new Error('Renderer bridge unavailable');
+      throw new Error('無法使用畫面層橋接');
     }
     const info = await window.pitchingApp.getAppInfo();
     state.projectRoot = info.projectRoot;
@@ -1205,6 +1258,6 @@ if (typeof window.pitchingApp?.onBeforeClose === 'function') {
   } catch (error) {
     if (elements.rootPath) elements.rootPath.textContent = '無法讀取';
     setSaveState('啟動失敗', 'error');
-    setError(`應用程式啟動失敗：${error.message}`);
+    setError(`應用程式啟動失敗：${displayErrorMessage(error)}`);
   }
 })();

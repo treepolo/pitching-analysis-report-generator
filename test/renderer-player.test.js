@@ -67,16 +67,16 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   }
 
   assert.match(indexHtml, /id="document-command-bar"[\s\S]*id="project-list"[\s\S]*id="save-project"[\s\S]*id="export-report"/u);
-  assert.match(indexHtml, /<div id="block-canvas"[^>]*aria-label="Long-form document blocks"/u);
+  assert.match(indexHtml, /<div id="block-canvas"[^>]*aria-label="長篇文件區塊"/u);
   assert.doesNotMatch(indexHtml, /<video\b/u);
   assert.match(renderer, /resolveMediaSource\(state\.activeProject\.id, assetId\)/u);
   assert.match(renderer, /data-block-path="sync\.mode"/u);
-  assert.match(renderer, /Explicit frame mode/u);
+  assert.match(renderer, /明確影格模式/u);
   assert.match(renderer, /requestFullscreen/u);
   assert.match(renderer, /startExport\(request\)/u);
   assert.match(renderer, /pickExportDirectory/u);
   assert.match(renderer, /normalizeExportDirectoryPick/u);
-  assert.match(renderer, /Folder selection cancelled; no export started/u);
+  assert.match(renderer, /已取消資料夾選擇；尚未開始匯出/u);
   assert.match(renderer, /getExportStatus\(jobId\)/u);
   assert.match(renderer, /cancelExport\(jobId\)/u);
   assert.match(renderer, /retryExport\(jobId\)/u);
@@ -85,7 +85,7 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /state\.export\.outputDirectory \|\| defaultExportDirectory\(\)/u);
   assert.match(renderer, /data-inline-video-block/u);
   assert.match(renderer, /elements\.blockCanvas\?\.addEventListener\('click'/u);
-  assert.match(renderer, /Renderer bridge unavailable/u);
+  assert.match(renderer, /無法使用畫面層橋接/u);
   assert.match(renderer, /elements\.appError\) return/u);
   assert.doesNotMatch(renderer, /elements\.(mediaLibrary|playerPanel|preview|sectionList)\s*=|document\.querySelector\('#(?:media-library|player-panel|preview|section-list)'\)/u);
   assert.match(styles, /\.export-directory-status/u);
