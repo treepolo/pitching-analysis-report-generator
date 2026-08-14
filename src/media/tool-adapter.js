@@ -68,6 +68,7 @@ const MP4_FORMAT_NAMES = new Set(['3gp', '3g2', 'm4a', 'm4v', 'mj2', 'mov', 'mp4
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 const SAFE_COMMAND_PATTERN = /^[a-zA-Z0-9._+-]{1,80}$/u;
 const SAFE_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u;
+const MAX_PROGRESS_BUFFER_BYTES = 256 * 1024;
 
 class MediaToolAdapterError extends Error {
   constructor(message, code = 'MEDIA_TOOL_ADAPTER_FAILED') {
@@ -257,12 +258,15 @@ function createLocalMediaToolRunner(input = {}) {
     throw new MediaToolAdapterError('maxOutputBytes is invalid', 'OUTPUT_LIMIT_INVALID');
   }
 
-  return ({ command, args = [], cwd, env, signal } = {}) => {
+  return ({ command, args = [], cwd, env, signal, onOutput } = {}) => {
     if (typeof command !== 'string' || command.length === 0 || CONTROL_CHARACTER_PATTERN.test(command)) {
       return Promise.reject(new MediaToolAdapterError('command is invalid', 'COMMAND_INVALID'));
     }
     if (!Array.isArray(args) || args.some((arg) => typeof arg !== 'string')) {
       return Promise.reject(new MediaToolAdapterError('args must be strings', 'ARGS_INVALID'));
+    }
+    if (onOutput !== undefined && typeof onOutput !== 'function') {
+      return Promise.reject(new MediaToolAdapterError('onOutput must be a function', 'OUTPUT_CALLBACK_INVALID'));
     }
     return new Promise((resolve, reject) => {
       let child;
@@ -299,6 +303,19 @@ function createLocalMediaToolRunner(input = {}) {
         }
         if (field === 'stdout') stdout = next;
         else stderr = next;
+        if (typeof onOutput === 'function') {
+          try {
+            onOutput({ stream: field, text });
+          } catch (error) {
+            if (child && typeof child.kill === 'function') child.kill();
+            const callbackError = new MediaToolAdapterError(
+              'Media tool output callback failed',
+              'OUTPUT_CALLBACK_FAILED',
+            );
+            callbackError.cause = error;
+            settleReject(callbackError);
+          }
+        }
       };
       const onAbort = () => {
         if (child && typeof child.kill === 'function') child.kill();
@@ -370,12 +387,15 @@ function createMediaToolAdapter(input = {}) {
   const defaultCwd = input.cwd === undefined ? undefined : normalizeText(input.cwd, 'cwd', 1000);
   const environment = input.env === undefined ? undefined : cloneJson(input.env);
 
-  async function run({ tool, args, cwd = defaultCwd, signal } = {}) {
+  async function run({ tool, args, cwd = defaultCwd, signal, onOutput } = {}) {
     if (!Object.values(MEDIA_TOOL_KIND).includes(tool)) {
       throw new MediaToolAdapterError('tool kind is invalid', 'TOOL_KIND_INVALID');
     }
     if (!Array.isArray(args) || args.some((arg) => typeof arg !== 'string')) {
       throw new MediaToolAdapterError('tool args must be strings', 'ARGS_INVALID');
+    }
+    if (onOutput !== undefined && typeof onOutput !== 'function') {
+      throw new MediaToolAdapterError('onOutput must be a function', 'OUTPUT_CALLBACK_INVALID');
     }
     const command = commands[tool];
     if (runner === null) {
@@ -408,6 +428,7 @@ function createMediaToolAdapter(input = {}) {
         cwd,
         env: environment === undefined ? undefined : cloneJson(environment),
         signal,
+        onOutput,
       });
       const result = normalizeRunnerResult(raw);
       if (result.exitCode !== 0) {
@@ -589,14 +610,80 @@ function createNormalizedCopyTarget(input) {
   };
 }
 
+function parseProgressClock(value) {
+  if (typeof value !== 'string') return null;
+  const match = /^(\d+):(\d{2}):(\d{2})(?:\.(\d+))?$/u.exec(value.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3]);
+  const fraction = match[4] === undefined ? 0 : Number(`0.${match[4]}`);
+  const total = (hours * 3600) + (minutes * 60) + seconds + fraction;
+  return Number.isFinite(total) ? total : null;
+}
+
+function parseProgressSpeed(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().replace(/x$/iu, '');
+  return parseFiniteNumber(normalized);
+}
+
+/**
+ * Parse complete machine-readable FFmpeg progress records. FFmpeg emits
+ * key/value lines terminated by progress=continue or progress=end. The
+ * parser returns only values measured by the tool; it never derives a
+ * percentage without a trusted input duration.
+ */
+function parseFfmpegProgressEvents(text) {
+  if (typeof text !== 'string' || text.length === 0) return [];
+  const fields = {};
+  const events = [];
+  for (const line of text.split(/\r?\n/u)) {
+    const separator = line.indexOf('=');
+    if (separator <= 0) continue;
+    const key = line.slice(0, separator).trim();
+    const value = line.slice(separator + 1).trim();
+    if (key.length === 0) continue;
+    fields[key] = value;
+    if (key !== 'progress' || !['continue', 'end'].includes(value)) continue;
+
+    const frame = parseFiniteNumber(fields.frame);
+    const fps = parseFiniteNumber(fields.fps);
+    const outTimeSeconds = parseProgressClock(fields.out_time)
+      ?? (parseFiniteNumber(fields.out_time_us) === null
+        ? parseFiniteNumber(fields.out_time_ms) === null
+          ? null
+          : parseFiniteNumber(fields.out_time_ms) / 1_000_000
+        : parseFiniteNumber(fields.out_time_us) / 1_000_000);
+    const speed = parseProgressSpeed(fields.speed);
+    if (frame === null && fps === null && outTimeSeconds === null && speed === null) {
+      Object.keys(fields).forEach((field) => delete fields[field]);
+      continue;
+    }
+    events.push({
+      frame,
+      fps,
+      outTimeSeconds,
+      speed,
+      state: value,
+    });
+    Object.keys(fields).forEach((field) => delete fields[field]);
+  }
+  return events;
+}
+
 function buildFfmpegCommand(input) {
   const target = createNormalizedCopyTarget(input);
   const command = normalizeCommand(input.ffmpegCommand ?? 'ffmpeg', 'ffmpegCommand');
+  const progressArgs = input.enableProgress === false
+    ? []
+    : ['-progress', 'pipe:2', '-nostats'];
   return {
     tool: MEDIA_TOOL_KIND.FFMPEG,
     command,
     args: [
       '-y',
+      ...progressArgs,
       '-i', target.sourcePath,
       '-map_metadata', '0',
       '-c:v', 'libx264',
@@ -997,6 +1084,8 @@ async function normalizeWithFfmpeg(adapter, input, {
   signal,
   verifyOutput,
   prepareTargetDirectory = false,
+  onProgress,
+  captureProgress = true,
 } = {}) {
   if (!adapter || typeof adapter.run !== 'function') {
     throw new MediaToolAdapterError('A media tool adapter is required', 'ADAPTER_REQUIRED');
@@ -1009,12 +1098,50 @@ async function normalizeWithFfmpeg(adapter, input, {
     await assertNormalizationTargetSafe(target);
   }
   const command = buildFfmpegCommand({ ...input, sourcePath: source.sourcePath });
+  let progressBuffer = '';
+  let progressRecordBuffer = '';
+  let lastProgress = null;
+  const emitProgress = (progress) => {
+    lastProgress = progress;
+    if (typeof onProgress === 'function') onProgress(progress);
+  };
+  const progressObserver = captureProgress === false
+    ? undefined
+    : ({ stream, text } = {}) => {
+      if (stream !== 'stderr' || typeof text !== 'string') return;
+      progressBuffer += text.replace(/\r\n?/gu, '\n');
+      if (Buffer.byteLength(progressBuffer, 'utf8') > MAX_PROGRESS_BUFFER_BYTES) {
+        progressBuffer = progressBuffer.slice(-MAX_PROGRESS_BUFFER_BYTES);
+      }
+      const lastNewline = progressBuffer.lastIndexOf('\n');
+      if (lastNewline < 0) return;
+      const complete = progressBuffer.slice(0, lastNewline + 1);
+      progressBuffer = progressBuffer.slice(lastNewline + 1);
+      progressRecordBuffer += complete;
+      let terminator;
+      let consumed = 0;
+      const terminatorPattern = /progress=(?:continue|end)\n/gu;
+      while ((terminator = terminatorPattern.exec(progressRecordBuffer)) !== null) {
+        consumed = terminator.index + terminator[0].length;
+      }
+      if (consumed > 0) {
+        parseFfmpegProgressEvents(progressRecordBuffer.slice(0, consumed)).forEach(emitProgress);
+        progressRecordBuffer = progressRecordBuffer.slice(consumed);
+      }
+    };
   const execution = await adapter.run({
     tool: MEDIA_TOOL_KIND.FFMPEG,
     args: command.args,
     cwd: command.cwd,
     signal,
+    onOutput: progressObserver,
   });
+  if (progressObserver) {
+    progressRecordBuffer += progressBuffer;
+    if (progressRecordBuffer.length > 0) {
+      parseFfmpegProgressEvents(progressRecordBuffer + '\n').forEach(emitProgress);
+    }
+  }
   const tool = {
     kind: MEDIA_TOOL_KIND.FFMPEG,
     command: execution.command ?? command.command,
@@ -1025,6 +1152,7 @@ async function normalizeWithFfmpeg(adapter, input, {
     sourceReference: target.sourceReference,
     normalizedReference: target.normalizedReference,
     tool,
+    progress: lastProgress,
   };
   if (execution.status !== MEDIA_TOOL_STATUS.AVAILABLE) {
     return {
@@ -1166,10 +1294,13 @@ async function runNormalizationJobWithAdapter(input, { signal, now = () => new D
     realPath: input.realPath,
     assetId: input.assetId ?? current.assetId,
     targetRelativePath: input.targetRelativePath,
+    enableProgress: input.enableProgress,
   }, {
     signal,
     verifyOutput: input.verifyOutput,
     prepareTargetDirectory: input.prepareTargetDirectory === true,
+    onProgress: input.onProgress,
+    captureProgress: input.captureProgress,
   });
   if (normalization.status === MEDIA_OPERATION_STATUS.CANCELLED || signal?.aborted) {
     current = abortJob(current, now);
@@ -1237,6 +1368,7 @@ module.exports = Object.freeze({
   discoverLocalMediaTools,
   inspectWithFfprobe,
   normalizeWithFfmpeg,
+  parseFfmpegProgressEvents,
   parseFfprobeOutput,
   probeMediaToolVersion,
   runNormalizationJobWithAdapter,

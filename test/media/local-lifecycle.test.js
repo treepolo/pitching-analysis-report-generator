@@ -54,13 +54,22 @@ function checksum(bytes) {
 
 test('local runner executes a deterministic process without a shell and preserves exit boundaries', async () => {
   const runner = createLocalMediaToolRunner({ maxOutputBytes: 4096 });
+  const outputEvents = [];
   const success = await runner({
     command: process.execPath,
-    args: ['-e', "process.stdout.write('runner-fixture')"],
+    args: [
+      '-e',
+      "process.stdout.write('runner-fixture'); process.stderr.write('progress=continue\\n')",
+    ],
+    onOutput: (event) => outputEvents.push(event),
   });
   assert.equal(success.exitCode, 0);
   assert.equal(success.stdout, 'runner-fixture');
-  assert.equal(success.stderr, '');
+  assert.equal(success.stderr, 'progress=continue\n');
+  assert.deepEqual(outputEvents, [
+    { stream: 'stdout', text: 'runner-fixture' },
+    { stream: 'stderr', text: 'progress=continue\n' },
+  ]);
 
   const failed = await runner({
     command: process.execPath,

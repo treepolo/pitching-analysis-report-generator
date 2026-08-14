@@ -22,6 +22,7 @@ const {
   discoverLocalMediaTools,
   inspectWithFfprobe,
   normalizeWithFfmpeg,
+  parseFfmpegProgressEvents,
   probeMediaToolVersion,
   registerMediaAsset,
   retryNormalizationJob,
@@ -164,6 +165,7 @@ test('command descriptors preserve project-relative references and reject path e
   assert.equal(ffmpeg.tool, MEDIA_TOOL_KIND.FFMPEG);
   assert.equal(ffmpeg.sourceReference.relativePath, SOURCE_REFERENCE);
   assert.equal(ffmpeg.normalizedReference.relativePath, 'media/normalized/asset-adapter-1.mp4');
+  assert.deepEqual(ffmpeg.args.slice(0, 5), ['-y', '-progress', 'pipe:2', '-nostats', '-i']);
   assert.equal(ffmpeg.args.at(-1), ffmpeg.targetPath);
 
   assert.throws(
@@ -194,6 +196,26 @@ test('command descriptors preserve project-relative references and reject path e
     () => buildFfprobeCommand(sourceInput({ sourcePath: path.join(PROJECT_ROOT, 'media', 'original', 'other.mp4') })),
     /reference does not match/iu,
   );
+});
+
+test('parses FFmpeg progress records without inventing a percentage or duration', () => {
+  const events = parseFfmpegProgressEvents([
+    'frame=12',
+    'fps=29.97',
+    'out_time=00:00:01.250000',
+    'speed=1.2x',
+    'progress=continue',
+    'frame=24',
+    'out_time_us=2500000',
+    'progress=end',
+  ].join('\n'));
+
+  assert.deepEqual(events, [
+    { frame: 12, fps: 29.97, outTimeSeconds: 1.25, speed: 1.2, state: 'continue' },
+    { frame: 24, fps: null, outTimeSeconds: 2.5, speed: null, state: 'end' },
+  ]);
+  assert.equal(Object.hasOwn(events[0], 'percentage'), false);
+  assert.deepEqual(parseFfmpegProgressEvents('frame=12\nfps=30\n'), []);
 });
 
 test('execution rejects existing source or normalized-target symlink escapes', async (t) => {
@@ -400,6 +422,58 @@ test('FFmpeg normalization preserves original and cannot succeed without explici
   assert.equal(verified.metadata.frameTiming, FRAME_TIMING.CFR);
   assert.equal(Object.hasOwn(verified, 'targetPath'), false);
   assert.doesNotMatch(JSON.stringify(verified), new RegExp(PROJECT_ROOT.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+});
+
+test('normalization forwards fragmented real-tool progress and keeps provenance separate', async () => {
+  const progressEvents = [];
+  let captured = null;
+  const adapter = createMediaToolAdapter({
+    runner: async (request) => {
+      captured = request;
+      request.onOutput({
+        stream: 'stderr',
+        text: 'frame=12\nfps=30\nout_time=00:00:01.000000\nspeed=1.0x\nprogress=cont',
+      });
+      request.onOutput({ stream: 'stderr', text: 'inue\n' });
+      return { exitCode: 0, stdout: '', stderr: '' };
+    },
+  });
+  const result = await normalizeWithFfmpeg(
+    adapter,
+    { ...sourceInput(), assetId: 'asset-progress-1' },
+    {
+      onProgress: (progress) => progressEvents.push(progress),
+      verifyOutput: async ({ sourceReference, normalizedReference }) => ({
+        verified: true,
+        verifiedAt: TEST_TIME,
+        metadata: {
+          durationSeconds: 1,
+          width: 640,
+          height: 360,
+          fps: 30,
+          frameTiming: FRAME_TIMING.CFR,
+          timebase: '1/90000',
+          codec: 'h264',
+          container: 'mp4',
+          source: sourceReference.relativePath,
+          target: normalizedReference.relativePath,
+        },
+      }),
+    },
+  );
+
+  assert.deepEqual(progressEvents, [{
+    frame: 12,
+    fps: 30,
+    outTimeSeconds: 1,
+    speed: 1,
+    state: 'continue',
+  }]);
+  assert.deepEqual(result.progress, progressEvents[0]);
+  assert.equal(result.status, MEDIA_OPERATION_STATUS.SUCCEEDED);
+  assert.equal(result.sourceReference.relativePath, SOURCE_REFERENCE);
+  assert.equal(result.normalizedReference.relativePath, 'media/normalized/asset-progress-1.mp4');
+  assert.deepEqual(captured.args.slice(0, 5), ['-y', '-progress', 'pipe:2', '-nostats', '-i']);
 });
 
 test('FFmpeg failure, missing tool, and cancellation remain visible and do not create normalized success', async () => {
