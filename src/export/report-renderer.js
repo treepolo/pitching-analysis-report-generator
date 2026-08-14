@@ -123,7 +123,7 @@ function renderCaption(label) {
 
 function renderImage(asset, label) {
   const alt = label || asset.label || 'Report image';
-  return `<figure class="report-media report-image" data-asset-id="${escapeHtml(asset.id)}">`
+  return '<figure class="report-media report-image">'
     + `<img loading="lazy" src="${escapeHtml(encodeAssetPath(asset.relativePath))}" alt="${escapeHtml(alt)}">`
     + renderCaption(label || asset.label)
     + '</figure>';
@@ -131,7 +131,7 @@ function renderImage(asset, label) {
 
 function renderVideo(asset, label, posterAsset) {
   const poster = posterAsset ? ` poster="${escapeHtml(encodeAssetPath(posterAsset.relativePath))}"` : '';
-  return `<figure class="report-media report-video" data-asset-id="${escapeHtml(asset.id)}">`
+  return '<figure class="report-media report-video">'
     + `<video controls preload="metadata" src="${escapeHtml(encodeAssetPath(asset.relativePath))}"${poster}>`
     + 'Your browser does not support embedded video.'
     + '</video>'

@@ -20,6 +20,10 @@ function crc32(buffer) {
   return (value ^ 0xffffffff) >>> 0;
 }
 
+function sha256(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
 function compareNames(left, right) {
   return left < right ? -1 : (left > right ? 1 : 0);
 }
@@ -45,6 +49,89 @@ async function collectFiles(rootDirectory, currentDirectory = rootDirectory, res
     }
   }
   return result;
+}
+
+async function readZipArchive(zipPath) {
+  const archive = await fs.readFile(zipPath).catch((error) => {
+    throw new ExportValidationError(`ZIP archive is unavailable: ${zipPath}`, { cause: error });
+  });
+  const entries = new Map();
+  let offset = 0;
+  while (offset + 4 <= archive.length && archive.readUInt32LE(offset) === 0x04034b50) {
+    if (offset + 30 > archive.length) throw new ExportValidationError('ZIP local header is truncated');
+    const flags = archive.readUInt16LE(offset + 6);
+    if ((flags & 0x0008) !== 0) throw new ExportValidationError('ZIP data descriptors are not supported for parity validation');
+    const method = archive.readUInt16LE(offset + 8);
+    const crc = archive.readUInt32LE(offset + 14);
+    const compressedSize = archive.readUInt32LE(offset + 18);
+    const uncompressedSize = archive.readUInt32LE(offset + 22);
+    const nameLength = archive.readUInt16LE(offset + 26);
+    const extraLength = archive.readUInt16LE(offset + 28);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const dataEnd = dataStart + compressedSize;
+    if (dataEnd > archive.length) throw new ExportValidationError('ZIP entry payload is truncated');
+    const relativePath = normalizeRelativeAssetPath(
+      archive.subarray(nameStart, nameStart + nameLength).toString('utf8'),
+      { allowRootFile: true },
+    );
+    if (entries.has(relativePath)) throw new ExportValidationError(`ZIP contains a duplicate entry: ${relativePath}`);
+    const payload = archive.subarray(dataStart, dataEnd);
+    let data;
+    try {
+      if (method === 0) data = Buffer.from(payload);
+      else if (method === 8) data = zlib.inflateRawSync(payload);
+      else throw new ExportValidationError(`ZIP compression method is unsupported: ${method}`);
+    } catch (error) {
+      if (error instanceof ExportValidationError) throw error;
+      throw new ExportValidationError(`ZIP entry cannot be decompressed: ${relativePath}`, { cause: error });
+    }
+    if (data.length !== uncompressedSize || crc32(data) !== crc) {
+      throw new ExportValidationError(`ZIP entry checksum mismatch: ${relativePath}`);
+    }
+    entries.set(relativePath, {
+      relativePath,
+      byteLength: data.length,
+      sha256: sha256(data),
+    });
+    offset = dataEnd;
+  }
+  const signature = offset + 4 <= archive.length ? archive.readUInt32LE(offset) : null;
+  if (signature !== 0x02014b50 && signature !== 0x06054b50) {
+    throw new ExportValidationError('ZIP central directory is missing or malformed');
+  }
+  return entries;
+}
+
+async function validateZipParity(sourceDirectory, zipPath) {
+  const sourceRoot = path.resolve(sourceDirectory);
+  const files = await collectFiles(sourceRoot);
+  const archiveEntries = await readZipArchive(zipPath);
+  const expectedPaths = new Set(files.map((file) => file.relativePath));
+  const archivePaths = new Set(archiveEntries.keys());
+  const missing = files.filter((file) => !archivePaths.has(file.relativePath)).map((file) => file.relativePath);
+  const extra = [...archivePaths].filter((relativePath) => !expectedPaths.has(relativePath));
+  if (missing.length > 0 || extra.length > 0) {
+    throw new ExportValidationError('ZIP does not have folder parity', { missing, extra });
+  }
+
+  for (const file of files) {
+    const data = await fs.readFile(file.absolutePath);
+    const expected = { byteLength: data.length, sha256: sha256(data) };
+    const actual = archiveEntries.get(file.relativePath);
+    if (expected.byteLength !== actual.byteLength || expected.sha256 !== actual.sha256) {
+      throw new ExportValidationError(`ZIP parity checksum mismatch: ${file.relativePath}`, {
+        relativePath: file.relativePath,
+        expected,
+        actual,
+      });
+    }
+  }
+  return {
+    valid: true,
+    fileCount: files.length,
+    entries: [...archiveEntries.values()],
+  };
 }
 
 function dosTimestamp() {
@@ -111,10 +198,13 @@ function createEndOfCentralDirectory(entryCount, centralSize, centralOffset) {
 async function createZipArchive(sourceDirectory, zipPath) {
   const sourceRoot = path.resolve(sourceDirectory);
   const targetPath = path.resolve(zipPath);
-  const sourceStats = await fs.stat(sourceRoot).catch((error) => {
+  const sourceEntry = await fs.lstat(sourceRoot).catch((error) => {
     throw new ExportValidationError(`ZIP source directory is unavailable: ${sourceRoot}`, { cause: error });
   });
-  if (!sourceStats.isDirectory()) throw new ExportValidationError(`ZIP source is not a directory: ${sourceRoot}`);
+  if (sourceEntry.isSymbolicLink()) {
+    throw new ExportValidationError(`ZIP source directory must not be a symbolic link: ${sourceRoot}`);
+  }
+  if (!sourceEntry.isDirectory()) throw new ExportValidationError(`ZIP source is not a directory: ${sourceRoot}`);
 
   try {
     await fs.lstat(targetPath);
@@ -185,4 +275,6 @@ async function createZipArchive(sourceDirectory, zipPath) {
 module.exports = {
   createZipArchive,
   crc32,
+  readZipArchive,
+  validateZipParity,
 };

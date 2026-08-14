@@ -3,12 +3,15 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
+  CAPABILITY_STATUS,
   DRIFT_ACTION,
+  FRAME_STEP_RESOLUTION,
   PLAYER_STATUS,
   PRECISION,
   TIMING_KIND,
   advancePlayer,
   alignComparisonAtRelativeTime,
+  captureSyncAnchor,
   createLoop,
   createPlayerBlock,
   createSyncAnchor,
@@ -67,6 +70,116 @@ test('player state, loop and anchor are block-local and transitions do not mutat
   assert.deepEqual(player.loop, { enabled: true, start: 1, end: 2 });
 });
 
+test('anchor capture derives time-only or exact-frame evidence without synthesizing frames', () => {
+  const player = createPlayerBlock({
+    blockId: 'comparison-1-left',
+    comparisonBlockId: 'comparison-1',
+    side: 'left',
+    mediaAssetId: 'asset-left',
+    duration: 3,
+    timing: cfr(30, 90, 3),
+    currentTime: 1.25,
+  });
+
+  const timeOnly = captureSyncAnchor({
+    player,
+    capability: { supportsFrameStep: false },
+    capturedAt: '2026-08-14T00:00:00.000Z',
+  });
+  assert.equal(timeOnly.comparisonBlockId, 'comparison-1');
+  assert.equal(timeOnly.side, 'left');
+  assert.equal(timeOnly.observedTime, 1.25);
+  assert.equal(timeOnly.observedFrameIndex, null);
+  assert.equal(timeOnly.precision, PRECISION.TIME_BASED);
+  assert.equal(timeOnly.captureResolution, FRAME_STEP_RESOLUTION.TIME_ONLY);
+  assert.equal(timeOnly.capabilityStatus, CAPABILITY_STATUS.UNSUPPORTED);
+  assert.equal(Object.prototype.hasOwnProperty.call(timeOnly, 'player'), false);
+
+  const exactFrame = captureSyncAnchor({
+    player,
+    observedFrameIndex: 37,
+    capability: { supportsFrameStep: true },
+    capturedAt: '2026-08-14T00:00:01.000Z',
+  });
+  assert.equal(exactFrame.observedFrameIndex, 37);
+  assert.equal(exactFrame.precision, PRECISION.FRAME_AWARE);
+  assert.equal(exactFrame.captureResolution, FRAME_STEP_RESOLUTION.EXACT_FRAME);
+
+  const unknownPlayer = createPlayerBlock({
+    blockId: 'comparison-2-left',
+    comparisonBlockId: 'comparison-2',
+    side: 'left',
+    mediaAssetId: 'asset-unknown',
+    duration: 3,
+    timing: { kind: TIMING_KIND.UNKNOWN },
+    currentTime: 1,
+  });
+  const unknown = captureSyncAnchor({
+    player: unknownPlayer,
+    capturedAt: '2026-08-14T00:00:02.000Z',
+  });
+  assert.equal(unknown.precision, PRECISION.UNKNOWN);
+  assert.equal(unknown.captureResolution, FRAME_STEP_RESOLUTION.UNKNOWN);
+  assert.equal(unknown.capabilityStatus, CAPABILITY_STATUS.UNKNOWN);
+});
+
+test('player block instance validation prevents an anchor from crossing block-local boundaries', () => {
+  assert.throws(
+    () => createPlayerBlock({
+      blockId: 'comparison-2-left',
+      comparisonBlockId: 'comparison-2',
+      side: 'left',
+      mediaAssetId: 'asset-left',
+      duration: 3,
+      timing: cfr(30, 90, 3),
+      anchor: anchor(),
+    }),
+    /comparisonBlockId does not match the player block instance/,
+  );
+  assert.throws(
+    () => createPlayerBlock({
+      blockId: 'comparison-1-right',
+      comparisonBlockId: 'comparison-1',
+      side: 'right',
+      mediaAssetId: 'asset-left',
+      duration: 3,
+      timing: cfr(30, 90, 3),
+      anchor: anchor(),
+    }),
+    /anchor.side does not match the player block side/,
+  );
+
+  const first = createPlayerBlock({
+    blockId: 'comparison-1-left',
+    comparisonBlockId: 'comparison-1',
+    side: 'left',
+    mediaAssetId: 'asset-shared',
+    duration: 3,
+    timing: cfr(30, 90, 3),
+    loop: { enabled: true, start: 0.5, end: 1.5 },
+    playbackRate: 0.5,
+    anchor: anchor({ mediaAssetId: 'asset-shared' }),
+  });
+  const second = createPlayerBlock({
+    blockId: 'comparison-2-left',
+    comparisonBlockId: 'comparison-2',
+    side: 'left',
+    mediaAssetId: 'asset-shared',
+    duration: 3,
+    timing: cfr(30, 90, 3),
+    loop: { enabled: true, start: 1.5, end: 2.5 },
+    playbackRate: 2,
+    anchor: anchor({ comparisonBlockId: 'comparison-2', mediaAssetId: 'asset-shared' }),
+  });
+  const advanced = advancePlayer(first, 1);
+  assert.equal(first.playbackRate, 0.5);
+  assert.equal(second.playbackRate, 2);
+  assert.equal(first.loop.start, 0.5);
+  assert.equal(second.loop.start, 1.5);
+  assert.equal(advanced.anchor.comparisonBlockId, 'comparison-1');
+  assert.equal(second.anchor.comparisonBlockId, 'comparison-2');
+});
+
 test('relative t=0 maps each side from its own anchor time, not a shared frame number', () => {
   const leftAnchor = anchor({
     side: 'left',
@@ -99,11 +212,22 @@ test('relative t=0 maps each side from its own anchor time, not a shared frame n
   }, 0.5);
 
   assert.equal(aligned.precision, PRECISION.FRAME_AWARE);
+  assert.equal(aligned.resolution, FRAME_STEP_RESOLUTION.EXACT_FRAME);
   assert.equal(aligned.sides.left.targetTime, 10.5);
   assert.equal(aligned.sides.right.targetTime, 20.5);
   assert.equal(aligned.sides.left.frameIndex, 315);
   assert.equal(aligned.sides.right.frameIndex, 1230);
   assert.notEqual(aligned.sides.left.frameIndex, aligned.sides.right.frameIndex);
+
+  const timeOnly = mapAnchorToRelativeTime(leftAnchor, 0.5, {
+    duration: 30,
+    timing: cfr(30, 900, 30),
+    capability: false,
+  });
+  assert.equal(timeOnly.targetTime, 10.5);
+  assert.equal(timeOnly.frameIndex, null);
+  assert.equal(timeOnly.precision, PRECISION.TIME_BASED);
+  assert.equal(timeOnly.resolution, FRAME_STEP_RESOLUTION.TIME_ONLY);
 });
 
 test('VFR alignment uses presentation timestamps when frame-aware timing is available', () => {
@@ -122,6 +246,7 @@ test('VFR alignment uses presentation timestamps when frame-aware timing is avai
 
   assert.ok(Math.abs(mapping.targetTime - 0.15) < 1e-12);
   assert.equal(mapping.precision, PRECISION.FRAME_AWARE);
+  assert.equal(mapping.resolution, FRAME_STEP_RESOLUTION.EXACT_FRAME);
   assert.equal(mapping.frameIndex, 3);
   assert.equal(mapping.frameTime, 0.17);
   assert.equal(mapping.playbackTime, 0.17);
@@ -137,8 +262,19 @@ test('frame stepping reports exact frame mode only when capability and timing su
   });
   assert.equal(exact.action, 'seek');
   assert.equal(exact.precision, PRECISION.FRAME_AWARE);
+  assert.equal(exact.resolution, FRAME_STEP_RESOLUTION.EXACT_FRAME);
+  assert.equal(exact.capabilityStatus, CAPABILITY_STATUS.AVAILABLE);
   assert.equal(exact.exact, true);
   assert.equal(exact.targetTime, 1.0333333333333334);
+
+  const durationFromTiming = planFrameStep({
+    timing: cfr(30, 90, 3),
+    currentTime: 2.99,
+    direction: 1,
+    capability: true,
+  });
+  assert.equal(durationFromTiming.action, 'boundary');
+  assert.equal(durationFromTiming.frameIndex, 89);
 
   const timeFallback = planFrameStep({
     timing: cfr(30, 90, 3),
@@ -148,6 +284,8 @@ test('frame stepping reports exact frame mode only when capability and timing su
     capability: { supportsFrameStep: false },
   });
   assert.equal(timeFallback.precision, PRECISION.TIME_BASED);
+  assert.equal(timeFallback.resolution, FRAME_STEP_RESOLUTION.TIME_ONLY);
+  assert.equal(timeFallback.capabilityStatus, CAPABILITY_STATUS.UNSUPPORTED);
   assert.equal(timeFallback.exact, false);
   assert.equal(timeFallback.fallback, true);
   assert.equal(timeFallback.stepSource, 'timing-metadata');
@@ -174,10 +312,22 @@ test('unknown timing stays explicitly unknown instead of claiming frame precisio
     direction: 1,
   });
   assert.equal(fallback.precision, PRECISION.UNKNOWN);
+  assert.equal(fallback.resolution, FRAME_STEP_RESOLUTION.UNKNOWN);
+  assert.equal(fallback.capabilityStatus, CAPABILITY_STATUS.UNKNOWN);
   assert.equal(fallback.exact, false);
   assert.equal(fallback.fallback, true);
   assert.equal(fallback.stepSource, 'default-time-based-fallback');
   assert.equal(fallback.targetTime, 1 / 30);
+
+  const explicitlyUnsupported = planFrameStep({
+    timing: { kind: TIMING_KIND.UNKNOWN },
+    duration: 2,
+    currentTime: 0,
+    direction: 1,
+    capability: false,
+  });
+  assert.equal(explicitlyUnsupported.resolution, FRAME_STEP_RESOLUTION.UNSUPPORTED);
+  assert.equal(explicitlyUnsupported.capabilityStatus, CAPABILITY_STATUS.UNSUPPORTED);
 });
 
 test('drift policy nudges small drift, seeks large drift, and holds unsafe states', () => {
@@ -278,6 +428,14 @@ test('validation rejects malformed loop and frame-aware anchor evidence', () => 
   assert.equal(validation.valid, false);
   assert.match(validation.issues.join('; '), /observedFrameIndex/);
   assert.match(validation.issues.join('; '), /frame-mappable timing/);
+  assert.throws(
+    () => timeToFrame({
+      kind: TIMING_KIND.VFR,
+      frameTimes: [0, 0.04, 0.09],
+      frameCount: 2,
+    }, 0.04),
+    /frameCount must match timing.frameTimes length/,
+  );
 });
 
 test('timeToFrame projects distinct CFR frame rates from the same media time', () => {

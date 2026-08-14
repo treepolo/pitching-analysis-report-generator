@@ -44,6 +44,7 @@ test('exports a self-contained folder and deterministic ZIP seam without leaking
   await fs.mkdir(path.dirname(sourceVideo), { recursive: true });
   await fs.writeFile(sourceVideo, 'video-fixture-content', 'utf8');
   const sourceVideoBefore = await fs.readFile(sourceVideo);
+  const relativeSourceVideo = path.relative(testRoot, sourceVideo).split(path.sep).join('/');
   const outputRoot = path.join(testRoot, 'output');
 
   const result = await exportReport({
@@ -70,7 +71,12 @@ test('exports a self-contained folder and deterministic ZIP seam without leaking
       }],
     },
     assets: [
-      { id: 'pitch', kind: 'video', sourcePath: sourceVideo, displayName: 'pitch clip.mp4' },
+      {
+        id: 'pitch',
+        kind: 'video',
+        sourceReference: { role: 'source', relativePath: relativeSourceVideo },
+        displayName: 'pitch clip.mp4',
+      },
       { id: 'frame', kind: 'image', data: Buffer.from('image-fixture-content'), displayName: 'release frame.png' },
     ],
   });
@@ -78,7 +84,11 @@ test('exports a self-contained folder and deterministic ZIP seam without leaking
   assert.match(result.safeName, /^[^<>:"/\\|?*]+$/u);
   assert.equal(result.validation.valid, true);
   assert.equal(result.validation.assetCount, 2);
+  assert.equal(result.validation.fileUrlValidation.valid, true);
+  assert.match(result.validation.fileUrlValidation.indexFileUrl, /^file:\/\//u);
+  assert.equal(result.validation.manifestValidation.valid, true);
   assert.ok(result.zipPath);
+  assert.equal(result.zip.parity.valid, true);
   assert.equal(await fs.stat(path.join(result.folderPath, 'index.html')).then((stats) => stats.isFile()), true);
   assert.equal(await fs.stat(path.join(result.folderPath, 'videos')).then((stats) => stats.isDirectory()), true);
   assert.equal(await fs.stat(path.join(result.folderPath, 'images')).then((stats) => stats.isDirectory()), true);
@@ -126,6 +136,44 @@ test('does not create a final folder when a referenced asset is missing', async 
   assert.deepEqual(entries, []);
 });
 
+test('keeps repeated folder and ZIP exports byte-identical for the same canonical document', async () => {
+  const reportDocument = {
+    schemaVersion: 1,
+    title: 'Deterministic report',
+    sections: [{
+      title: 'Summary',
+      blocks: [{ type: 'rich-text', content: 'Stable output' }],
+    }, {
+      title: 'Frame',
+      blocks: [{ type: 'image', imageAssetId: 'frame', alt: 'Stable frame' }],
+    }],
+  };
+  const assets = [{
+    id: 'frame',
+    kind: 'image',
+    data: Buffer.from('stable-image-fixture'),
+    displayName: 'stable frame.png',
+  }];
+  const first = await exportReport({
+    projectRoot: testRoot,
+    outputDirectory: path.join(testRoot, 'deterministic-one'),
+    createZip: true,
+    reportDocument,
+    assets,
+  });
+  const second = await exportReport({
+    projectRoot: testRoot,
+    outputDirectory: path.join(testRoot, 'deterministic-two'),
+    createZip: true,
+    reportDocument,
+    assets,
+  });
+
+  assert.deepEqual(await fs.readFile(first.zipPath), await fs.readFile(second.zipPath));
+  assert.deepEqual(first.manifest, second.manifest);
+  assert.equal(first.zip.parity.fileCount, second.zip.parity.fileCount);
+});
+
 test('rejects source assets outside the project root before export', async () => {
   const outputRoot = path.join(testRoot, 'outside-source-output');
   await assert.rejects(
@@ -140,9 +188,34 @@ test('rejects source assets outside the project root before export', async () =>
       },
       assets: [{ id: 'outside', kind: 'image', sourcePath: path.join(repositoryRoot, 'package.json') }],
     }),
-    (error) => error instanceof ExportValidationError && /outside the project root/i.test(error.message),
+    (error) => error instanceof ExportValidationError && /project-relative|outside the project root/i.test(error.message),
   );
   assert.deepEqual(await fs.readdir(outputRoot), []);
+});
+
+test('rejects absolute and external source references before staging', async () => {
+  for (const [name, sourcePath] of [
+    ['absolute', path.join(testRoot, 'private-source', 'absolute.png')],
+    ['external', 'https://example.test/frame.png'],
+    ['file-url', 'file:///private/frame.png'],
+  ]) {
+    const outputRoot = path.join(testRoot, `${name}-source-output`);
+    await assert.rejects(
+      exportReport({
+        projectRoot: testRoot,
+        outputDirectory: outputRoot,
+        reportName: `${name} source report`,
+        reportDocument: {
+          schemaVersion: 1,
+          title: `${name} source report`,
+          sections: [{ blocks: [{ type: 'image', imageAssetId: name }] }],
+        },
+        assets: [{ id: name, kind: 'image', sourcePath }],
+      }),
+      (error) => error instanceof ExportValidationError && /project-relative/i.test(error.message),
+    );
+    assert.deepEqual(await fs.readdir(outputRoot), []);
+  }
 });
 
 test('rejects symlink source assets when the platform permits symlink creation', async (t) => {
@@ -169,6 +242,27 @@ test('rejects symlink source assets when the platform permits symlink creation',
       },
       assets: [{ id: 'linked', kind: 'image', sourcePath: symlinkPath }],
     }),
-    (error) => error instanceof ExportValidationError && /symlink|outside the project root/i.test(error.message),
+    (error) => error instanceof ExportValidationError && /symlink|project-relative|outside the project root/i.test(error.message),
+  );
+});
+
+test('rejects a symlink used as the ZIP source root', async (t) => {
+  const outsideRoot = path.join(testRoot, 'zip-root-outside');
+  const linkedRoot = path.join(testRoot, 'zip-root-link');
+  const zipPath = path.join(testRoot, 'zip-root-link.zip');
+  await fs.mkdir(outsideRoot, { recursive: true });
+  await fs.writeFile(path.join(outsideRoot, 'index.html'), '<p>outside</p>', 'utf8');
+  try {
+    await fs.symlink(outsideRoot, linkedRoot, 'junction');
+  } catch (error) {
+    if (['EPERM', 'EACCES', 'ENOSYS'].includes(error.code)) {
+      t.skip(`symlink creation unavailable: ${error.code}`);
+      return;
+    }
+    throw error;
+  }
+  await assert.rejects(
+    require('../../src/export/zip-archive').createZipArchive(linkedRoot, zipPath),
+    /symbolic link/iu,
   );
 });

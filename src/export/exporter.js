@@ -14,7 +14,7 @@ const {
 } = require('./asset-paths');
 const { validateExportLayout } = require('./layout-validator');
 const { renderReportHtml } = require('./report-renderer');
-const { createZipArchive } = require('./zip-archive');
+const { createZipArchive, validateZipParity } = require('./zip-archive');
 const { toReportDocument } = require('../report-contract');
 
 function stableValue(value) {
@@ -103,11 +103,43 @@ async function resolveProjectRoots(projectRoot) {
   return { lexicalRoot, realRoot };
 }
 
-function descriptorSourcePath(asset) {
-  if (typeof asset.sourcePath === 'string' && asset.sourcePath.length > 0) return asset.sourcePath;
-  if (typeof asset.filePath === 'string' && asset.filePath.length > 0) return asset.filePath;
-  if (typeof asset.localPath === 'string' && asset.localPath.length > 0) return asset.localPath;
+function referencePath(value) {
+  if (typeof value === 'string' && value.length > 0) return value;
+  if (value && typeof value === 'object') {
+    if (typeof value.relativePath === 'string' && value.relativePath.length > 0) return value.relativePath;
+    if (typeof value.path === 'string' && value.path.length > 0) return value.path;
+  }
   return null;
+}
+
+function descriptorSourcePath(asset) {
+  for (const value of [
+    asset.normalizedReference,
+    asset.sourceReference,
+    asset.sourcePath,
+    asset.filePath,
+    asset.localPath,
+  ]) {
+    const sourcePath = referencePath(value);
+    if (sourcePath) return sourcePath;
+  }
+  return null;
+}
+
+function assertProjectRelativeSourcePath(sourcePath, assetId) {
+  if (typeof sourcePath !== 'string' || sourcePath.trim() === '') {
+    throw new ExportValidationError(`Source asset ${assetId} requires a project-relative path`);
+  }
+  const value = sourcePath.trim();
+  if (path.isAbsolute(value)
+    || value.startsWith('/')
+    || value.startsWith('\\')
+    || /^[a-z]:[\\/]/iu.test(value)
+    || /^[a-z][a-z\d+.-]*:/iu.test(value)
+    || value.startsWith('//')) {
+    throw new ExportValidationError(`Source asset ${assetId} must use a project-relative path`);
+  }
+  return value;
 }
 
 function descriptorData(asset) {
@@ -151,7 +183,17 @@ function prepareAssetDescriptors(assets) {
     const kind = inferDescriptorKind(asset);
     if (!kind) throw new ExportValidationError(`Export asset ${asset.id} has no supported kind`);
 
-    const sourcePath = descriptorSourcePath(asset);
+    for (const value of [
+      referencePath(asset.normalizedReference),
+      referencePath(asset.sourceReference),
+      asset.sourcePath,
+      asset.filePath,
+      asset.localPath,
+    ].filter(Boolean)) {
+      assertProjectRelativeSourcePath(value, asset.id);
+    }
+    const rawSourcePath = descriptorSourcePath(asset);
+    const sourcePath = rawSourcePath ? assertProjectRelativeSourcePath(rawSourcePath, asset.id) : null;
     const data = descriptorData(asset);
     if (!sourcePath && !data) {
       throw new ExportValidationError(`Export asset ${asset.id} needs sourcePath or data`);
@@ -354,6 +396,7 @@ async function exportReport({
       assetManifest: rendererManifest(stagedAssets),
       html,
       requireAllManifestAssetsUsed: false,
+      verifyManifest: true,
     });
     manifest.validation = {
       valid: validation.valid,
@@ -366,6 +409,7 @@ async function exportReport({
     if (shouldCreateZip) {
       zipCreatedPath = resolvedZipPath;
       zip = await createZipArchive(folderPath, resolvedZipPath);
+      zip.parity = await validateZipParity(folderPath, resolvedZipPath);
     }
     return {
       folderPath,

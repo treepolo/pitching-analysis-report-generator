@@ -16,6 +16,19 @@ const PRECISION = Object.freeze({
   UNKNOWN: 'unknown',
 });
 
+const FRAME_STEP_RESOLUTION = Object.freeze({
+  EXACT_FRAME: 'exact-frame',
+  TIME_ONLY: 'time-only',
+  UNSUPPORTED: 'unsupported',
+  UNKNOWN: 'unknown',
+});
+
+const CAPABILITY_STATUS = Object.freeze({
+  AVAILABLE: 'available',
+  UNSUPPORTED: 'unsupported',
+  UNKNOWN: 'unknown',
+});
+
 const TIMING_KIND = Object.freeze({
   CFR: 'cfr',
   VFR: 'vfr',
@@ -165,6 +178,10 @@ function normalizeTimingMetadata(timing = { kind: TIMING_KIND.UNKNOWN }, duratio
       if (!Number.isInteger(normalized.frameCount) || normalized.frameCount < 1) {
         throw new SyncDomainError('timing.frameCount must be a positive integer');
       }
+      if (Array.isArray(normalized.frameTimes)
+          && normalized.frameCount !== normalized.frameTimes.length) {
+        throw new SyncDomainError('timing.frameCount must match timing.frameTimes length');
+      }
     }
   }
 
@@ -296,11 +313,40 @@ function estimateFallbackStep(timingInput, currentTime, direction, duration, fal
 }
 
 function supportsFrameStep(capability) {
-  if (capability === true || capability === 'frame-aware') return true;
-  if (!isRecord(capability)) return false;
-  return capability.frameStep === true
-    || capability.supportsFrameStep === true
-    || capability.mode === PRECISION.FRAME_AWARE;
+  return frameStepCapabilityStatus(capability) === CAPABILITY_STATUS.AVAILABLE;
+}
+
+function frameStepCapabilityStatus(capability) {
+  if (capability === true || capability === 'frame-aware') return CAPABILITY_STATUS.AVAILABLE;
+  if (capability === false) return CAPABILITY_STATUS.UNSUPPORTED;
+  if (!isRecord(capability)) return CAPABILITY_STATUS.UNKNOWN;
+  if (capability.frameStep === true
+      || capability.supportsFrameStep === true
+      || capability.mode === PRECISION.FRAME_AWARE) {
+    return CAPABILITY_STATUS.AVAILABLE;
+  }
+  if (capability.frameStep === false
+      || capability.supportsFrameStep === false
+      || capability.mode === FRAME_STEP_RESOLUTION.TIME_ONLY
+      || capability.supported === false) {
+    return CAPABILITY_STATUS.UNSUPPORTED;
+  }
+  return CAPABILITY_STATUS.UNKNOWN;
+}
+
+function resolutionForTiming(timing, capabilityStatus) {
+  if (timing.kind === TIMING_KIND.UNKNOWN) {
+    return capabilityStatus === CAPABILITY_STATUS.UNSUPPORTED
+      ? FRAME_STEP_RESOLUTION.UNSUPPORTED
+      : FRAME_STEP_RESOLUTION.UNKNOWN;
+  }
+  return FRAME_STEP_RESOLUTION.TIME_ONLY;
+}
+
+function precisionForResolution(resolution) {
+  if (resolution === FRAME_STEP_RESOLUTION.EXACT_FRAME) return PRECISION.FRAME_AWARE;
+  if (resolution === FRAME_STEP_RESOLUTION.TIME_ONLY) return PRECISION.TIME_BASED;
+  return PRECISION.UNKNOWN;
 }
 
 function validateLoopRange(loop, duration) {
@@ -385,13 +431,32 @@ function validateSyncAnchor(anchor, options = {}) {
     if (snapshot && !timingHasFrameMapping(snapshot)) {
       issues.push('frame-aware anchors require frame-mappable timing metadata');
     }
+    if (snapshot && timingHasFrameMapping(snapshot)
+        && Number.isInteger(anchor.observedFrameIndex)) {
+      const frameCount = frameCountForTiming(snapshot, snapshot.duration);
+      if (frameCount !== undefined && anchor.observedFrameIndex >= frameCount) {
+        issues.push('anchor.observedFrameIndex is outside the timing snapshot frame range');
+      }
+    }
   }
   if (options.mediaAssetId !== undefined && anchor.mediaAssetId !== options.mediaAssetId) {
     issues.push('anchor.mediaAssetId does not match the player media asset');
   }
+  if (options.comparisonBlockId !== undefined
+      && anchor.comparisonBlockId !== options.comparisonBlockId) {
+    issues.push('anchor.comparisonBlockId does not match the player block instance');
+  }
+  if (options.side !== undefined && anchor.side !== options.side) {
+    issues.push('anchor.side does not match the player block side');
+  }
   if (options.duration !== undefined && Number.isFinite(anchor.observedTime)
       && anchor.observedTime > options.duration) {
     issues.push('anchor.observedTime must not exceed media duration');
+  }
+  if (snapshot && Number.isFinite(snapshot.duration)
+      && Number.isFinite(anchor.observedTime)
+      && anchor.observedTime > snapshot.duration) {
+    issues.push('anchor.observedTime must not exceed timing snapshot duration');
   }
   return { valid: issues.length === 0, issues };
 }
@@ -413,10 +478,104 @@ function createSyncAnchor(input) {
   return anchor;
 }
 
+/**
+ * Capture an anchor from a block-local player snapshot.  Frame precision is
+ * only claimed when an observed frame index is explicitly supplied together
+ * with frame-mappable timing metadata; currentTime alone never becomes a
+ * synthetic frame observation.
+ */
+function captureSyncAnchor(input) {
+  requireRecord(input, 'anchor capture');
+  const player = input.player === undefined || input.player === null
+    ? null
+    : createPlayerBlock(input.player);
+  const blockId = input.comparisonBlockId ?? player?.comparisonBlockId ?? player?.blockId;
+  const side = input.side ?? player?.side;
+  const mediaAssetId = input.mediaAssetId ?? player?.mediaAssetId;
+  const duration = input.duration ?? player?.duration;
+  const timing = normalizeTimingMetadata(
+    input.timingSnapshot ?? player?.timing ?? { kind: TIMING_KIND.UNKNOWN },
+    duration,
+  );
+  const frameObservation = isRecord(input.frameObservation) ? input.frameObservation : {};
+  const observedTime = input.observedTime
+    ?? frameObservation.mediaTime
+    ?? player?.currentTime;
+  requireFinite(observedTime, 'captured observedTime', 0);
+
+  const observedFrameIndex = input.observedFrameIndex
+    ?? input.frameIndex
+    ?? frameObservation.frameIndex
+    ?? null;
+  if (observedFrameIndex !== null
+      && (!Number.isInteger(observedFrameIndex) || observedFrameIndex < 0)) {
+    throw new SyncDomainError('captured observedFrameIndex must be a non-negative integer or null');
+  }
+
+  const hasFrameEvidence = observedFrameIndex !== null && timingHasFrameMapping(timing);
+  const precision = hasFrameEvidence
+    ? PRECISION.FRAME_AWARE
+    : timing.kind === TIMING_KIND.UNKNOWN
+      ? PRECISION.UNKNOWN
+      : PRECISION.TIME_BASED;
+  const capabilityStatus = frameStepCapabilityStatus(
+    input.capability ?? input.frameStepCapability,
+  );
+  if (player?.comparisonBlockId !== undefined && blockId !== player.comparisonBlockId) {
+    throw new SyncDomainError('captured comparisonBlockId does not match the player block instance');
+  }
+  if (player?.side !== undefined && side !== player.side) {
+    throw new SyncDomainError('captured side does not match the player block side');
+  }
+  if (player?.mediaAssetId !== undefined && mediaAssetId !== player.mediaAssetId) {
+    throw new SyncDomainError('captured mediaAssetId does not match the player media asset');
+  }
+  const resolution = hasFrameEvidence
+    ? FRAME_STEP_RESOLUTION.EXACT_FRAME
+    : resolutionForTiming(timing, capabilityStatus);
+  const anchorMetadata = cloneValue(input);
+  delete anchorMetadata.player;
+  delete anchorMetadata.frameObservation;
+  delete anchorMetadata.capability;
+  delete anchorMetadata.frameStepCapability;
+  delete anchorMetadata.duration;
+  delete anchorMetadata.timingSnapshot;
+  delete anchorMetadata.observedTime;
+  delete anchorMetadata.observedFrameIndex;
+  delete anchorMetadata.frameIndex;
+  const anchor = createSyncAnchor({
+    ...anchorMetadata,
+    comparisonBlockId: blockId,
+    side,
+    mediaAssetId,
+    observedTime,
+    observedFrameIndex,
+    precision,
+    timingSnapshot: timing,
+    capturedAt: input.capturedAt,
+    captureResolution: resolution,
+    capabilityStatus,
+  });
+  assertValid(validateSyncAnchor(anchor, {
+    mediaAssetId,
+    comparisonBlockId: blockId,
+    side,
+    duration,
+  }), 'captured sync anchor');
+  return anchor;
+}
+
 function createPlayerBlock(input) {
   requireRecord(input, 'player block');
   const blockId = requireId(input.blockId, 'player block.blockId');
   const mediaAssetId = requireId(input.mediaAssetId, 'player block.mediaAssetId');
+  const comparisonBlockId = input.comparisonBlockId === undefined
+    ? undefined
+    : requireId(input.comparisonBlockId, 'player block.comparisonBlockId');
+  const side = input.side === undefined ? undefined : input.side;
+  if (side !== undefined && !['left', 'right'].includes(side)) {
+    throw new SyncDomainError('player block.side must be left or right');
+  }
   const duration = requireFinite(input.duration, 'player block.duration', 0);
   const timing = normalizeTimingMetadata(
     input.timing ?? { kind: TIMING_KIND.UNKNOWN },
@@ -443,14 +602,21 @@ function createPlayerBlock(input) {
   if (input.anchor !== undefined && input.anchor !== null) {
     const anchorInput = {
       ...cloneValue(input.anchor),
+      comparisonBlockId: input.anchor.comparisonBlockId ?? comparisonBlockId,
+      side: input.anchor.side ?? side,
       mediaAssetId: input.anchor.mediaAssetId ?? mediaAssetId,
       timingSnapshot: input.anchor.timingSnapshot ?? timing,
     };
     anchor = createSyncAnchor(anchorInput);
-    assertValid(validateSyncAnchor(anchor, { mediaAssetId, duration }), 'player block anchor');
+    assertValid(validateSyncAnchor(anchor, {
+      mediaAssetId,
+      comparisonBlockId,
+      side,
+      duration,
+    }), 'player block anchor');
   }
 
-  return {
+  const player = {
     ...cloneValue(input),
     blockId,
     mediaAssetId,
@@ -463,6 +629,9 @@ function createPlayerBlock(input) {
     loop,
     anchor,
   };
+  if (comparisonBlockId !== undefined) player.comparisonBlockId = comparisonBlockId;
+  if (side !== undefined) player.side = side;
+  return player;
 }
 
 function updatePlayerBlock(player, patch) {
@@ -502,12 +671,16 @@ function setPlayerAnchor(player, anchor) {
   requireRecord(anchor, 'anchor');
   const nextAnchor = createSyncAnchor({
     ...cloneValue(anchor),
+    comparisonBlockId: anchor.comparisonBlockId ?? current.comparisonBlockId,
+    side: anchor.side ?? current.side,
     mediaAssetId: anchor.mediaAssetId ?? current.mediaAssetId,
     timingSnapshot: anchor.timingSnapshot ?? current.timing,
   });
   assertValid(
     validateSyncAnchor(nextAnchor, {
       mediaAssetId: current.mediaAssetId,
+      comparisonBlockId: current.comparisonBlockId,
+      side: current.side,
       duration: current.duration,
     }),
     'player anchor',
@@ -543,15 +716,17 @@ function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
   const timing = normalizeTimingMetadata(options.timing ?? anchor.timingSnapshot, duration);
   const requestedTime = anchor.observedTime + relativeTime;
   const targetTime = clampMediaTime(requestedTime, duration);
-  const frameAwareRequested = options.precision === PRECISION.FRAME_AWARE
-    || options.frameAware === true
-    || supportsFrameStep(options.capability);
-  let precision = timing.kind === TIMING_KIND.UNKNOWN ? PRECISION.UNKNOWN : PRECISION.TIME_BASED;
+  const capabilityStatus = frameStepCapabilityStatus(options.capability);
+  const frameAwareRequested = capabilityStatus !== CAPABILITY_STATUS.UNSUPPORTED
+    && (options.precision === PRECISION.FRAME_AWARE
+      || options.frameAware === true
+      || supportsFrameStep(options.capability));
+  let resolution = resolutionForTiming(timing, capabilityStatus);
   let frameIndex = null;
   let frameTime = null;
   if (frameAwareRequested && timingHasFrameMapping(timing)) {
     const mapped = timeToFrame(timing, targetTime, { duration });
-    precision = PRECISION.FRAME_AWARE;
+    resolution = FRAME_STEP_RESOLUTION.EXACT_FRAME;
     frameIndex = mapped.frameIndex;
     frameTime = mapped.frameTime;
   }
@@ -565,7 +740,9 @@ function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
     playbackTime: frameTime ?? targetTime,
     frameIndex,
     frameTime,
-    precision,
+    precision: precisionForResolution(resolution),
+    resolution,
+    capabilityStatus,
     clamped: Math.abs(requestedTime - targetTime) > EPSILON,
   };
 }
@@ -575,6 +752,20 @@ function overallPrecision(results) {
   if (precisions.some((value) => value === PRECISION.UNKNOWN)) return PRECISION.UNKNOWN;
   if (precisions.every((value) => value === PRECISION.FRAME_AWARE)) return PRECISION.FRAME_AWARE;
   return PRECISION.TIME_BASED;
+}
+
+function overallResolution(results) {
+  const resolutions = results.map((result) => result.resolution);
+  if (resolutions.every((value) => value === FRAME_STEP_RESOLUTION.EXACT_FRAME)) {
+    return FRAME_STEP_RESOLUTION.EXACT_FRAME;
+  }
+  if (resolutions.some((value) => value === FRAME_STEP_RESOLUTION.UNKNOWN)) {
+    return FRAME_STEP_RESOLUTION.UNKNOWN;
+  }
+  if (resolutions.some((value) => value === FRAME_STEP_RESOLUTION.UNSUPPORTED)) {
+    return FRAME_STEP_RESOLUTION.UNSUPPORTED;
+  }
+  return FRAME_STEP_RESOLUTION.TIME_ONLY;
 }
 
 function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
@@ -600,6 +791,7 @@ function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
     comparisonBlockId: alignedSides.left.comparisonBlockId,
     relativeTime,
     precision: overallPrecision(Object.values(alignedSides)),
+    resolution: overallResolution(Object.values(alignedSides)),
     sides: alignedSides,
   };
 }
@@ -624,12 +816,16 @@ function planFrameStep(input) {
   if (direction !== 1 && direction !== -1) {
     throw new SyncDomainError('frame step direction must be 1 or -1');
   }
-  const duration = input.duration === undefined
+  const durationInput = input.duration === undefined
+    ? (isRecord(input.timing) ? input.timing.duration : undefined)
+    : input.duration;
+  const duration = durationInput === undefined
     ? undefined
-    : requireFinite(input.duration, 'frame step duration', 0);
+    : requireFinite(durationInput, 'frame step duration', 0);
   const timing = normalizeTimingMetadata(input.timing ?? { kind: TIMING_KIND.UNKNOWN }, duration);
   const currentTime = clampMediaTime(requireFinite(input.currentTime, 'frame step currentTime'), duration);
-  const canUseFrameApi = supportsFrameStep(input.capability);
+  const capabilityStatus = frameStepCapabilityStatus(input.capability);
+  const canUseFrameApi = capabilityStatus === CAPABILITY_STATUS.AVAILABLE;
   const hasFrameMapping = timingHasFrameMapping(timing);
 
   if (canUseFrameApi && hasFrameMapping) {
@@ -642,6 +838,8 @@ function planFrameStep(input) {
         direction,
         mode: PRECISION.FRAME_AWARE,
         precision: PRECISION.FRAME_AWARE,
+        resolution: FRAME_STEP_RESOLUTION.EXACT_FRAME,
+        capabilityStatus,
         exact: true,
         fallback: false,
         fromTime: currentTime,
@@ -656,6 +854,8 @@ function planFrameStep(input) {
       direction,
       mode: PRECISION.FRAME_AWARE,
       precision: PRECISION.FRAME_AWARE,
+      resolution: FRAME_STEP_RESOLUTION.EXACT_FRAME,
+      capabilityStatus,
       exact: true,
       fallback: false,
       fromTime: currentTime,
@@ -673,14 +873,21 @@ function planFrameStep(input) {
     input.fallbackStepSeconds,
   );
   const targetTime = clampMediaTime(currentTime + direction * fallback.seconds, duration);
-  const precision = timing.kind === TIMING_KIND.UNKNOWN ? PRECISION.UNKNOWN : PRECISION.TIME_BASED;
+  const resolution = resolutionForTiming(timing, capabilityStatus);
+  const precision = precisionForResolution(resolution);
   let reason = 'frame-step-capability-unavailable';
   if (canUseFrameApi && !hasFrameMapping) reason = 'frame-timing-unavailable';
+  if (capabilityStatus === CAPABILITY_STATUS.UNSUPPORTED) reason = 'frame-step-unsupported';
+  if (capabilityStatus === CAPABILITY_STATUS.UNKNOWN && timing.kind === TIMING_KIND.UNKNOWN) {
+    reason = 'frame-step-capability-and-timing-unknown';
+  }
   return {
     action: Math.abs(targetTime - currentTime) <= EPSILON ? 'boundary' : 'seek',
     direction,
     mode: precision,
     precision,
+    resolution,
+    capabilityStatus,
     exact: false,
     fallback: true,
     fromTime: currentTime,
@@ -816,14 +1023,17 @@ function planComparisonDriftCorrection(input, policy = DEFAULT_DRIFT_CORRECTION_
     comparisonBlockId: input.aligned.comparisonBlockId,
     relativeTime: input.aligned.relativeTime,
     precision: input.aligned.precision,
+    resolution: input.aligned.resolution,
     corrections,
   };
 }
 
 module.exports = Object.freeze({
+  CAPABILITY_STATUS,
   DEFAULT_DRIFT_CORRECTION_POLICY,
   DEFAULT_FALLBACK_STEP_SECONDS,
   DRIFT_ACTION,
+  FRAME_STEP_RESOLUTION,
   PLAYER_STATUS,
   PRECISION,
   SyncDomainError,
@@ -831,6 +1041,7 @@ module.exports = Object.freeze({
   advancePlayer,
   alignComparisonAtRelativeTime,
   clampMediaTime,
+  captureSyncAnchor,
   createLoop,
   createPlayerBlock,
   createSyncAnchor,
@@ -849,6 +1060,7 @@ module.exports = Object.freeze({
   setPlayerAnchor,
   setPlayerLoop,
   setPlayerStatus,
+  frameStepCapabilityStatus,
   supportsFrameStep,
   timeToFrame,
   timingHasFrameMapping,

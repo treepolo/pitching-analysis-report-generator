@@ -13,6 +13,7 @@ const MEDIA_KINDS = Object.freeze({
 
 const ASSET_LIFECYCLE_STATUS = Object.freeze({
   DISCOVERED: 'discovered',
+  METADATA_PENDING: 'metadata-pending',
   PROCESSING: 'processing',
   READY: 'ready',
   FAILED: 'failed',
@@ -25,8 +26,22 @@ const COMPATIBILITY = Object.freeze({
   NEEDS_NORMALIZATION: 'needs-normalization',
   NORMALIZED: 'normalized',
   UNSUPPORTED: 'unsupported',
+  UNPLAYABLE: 'unplayable',
   UNKNOWN: 'unknown',
   MISSING: 'missing',
+});
+
+const INSPECTION_STATUS = Object.freeze({
+  METADATA_PENDING: 'metadata-pending',
+  INSPECTED: 'inspected',
+  UNKNOWN: 'unknown',
+  UNPLAYABLE: 'unplayable',
+});
+
+const PLAYABILITY = Object.freeze({
+  PLAYABLE: 'playable',
+  UNPLAYABLE: 'unplayable',
+  UNKNOWN: 'unknown',
 });
 
 const FRAME_TIMING = Object.freeze({
@@ -63,6 +78,8 @@ const SUPPORTED_FRAME_TIMINGS = new Set(Object.values(FRAME_TIMING));
 const SUPPORTED_MEDIA_KINDS = new Set(Object.values(MEDIA_KINDS));
 const SUPPORTED_ASSET_STATUSES = new Set(Object.values(ASSET_LIFECYCLE_STATUS));
 const SUPPORTED_COMPATIBILITIES = new Set(Object.values(COMPATIBILITY));
+const SUPPORTED_INSPECTION_STATUSES = new Set(Object.values(INSPECTION_STATUS));
+const SUPPORTED_PLAYABILITIES = new Set(Object.values(PLAYABILITY));
 const SUPPORTED_JOB_PHASES = new Set(NORMALIZATION_JOB_PHASES);
 const SUPPORTED_JOB_STATUSES = new Set(Object.values(NORMALIZATION_JOB_STATUS));
 
@@ -428,6 +445,25 @@ function normalizeMediaAsset(input) {
     SUPPORTED_ASSET_STATUSES,
     'lifecycleStatus',
   );
+  const inspectionStatus = normalizeEnum(
+    input.inspectionStatus ?? (
+      lifecycleStatus === ASSET_LIFECYCLE_STATUS.READY
+        ? INSPECTION_STATUS.INSPECTED
+        : INSPECTION_STATUS.METADATA_PENDING
+    ),
+    SUPPORTED_INSPECTION_STATUSES,
+    'inspectionStatus',
+  );
+  const playability = normalizeEnum(
+    input.playability ?? (
+      lifecycleStatus === ASSET_LIFECYCLE_STATUS.READY
+        && [COMPATIBILITY.DIRECT, COMPATIBILITY.NORMALIZED].includes(input.compatibility)
+        ? PLAYABILITY.PLAYABLE
+        : PLAYABILITY.UNKNOWN
+    ),
+    SUPPORTED_PLAYABILITIES,
+    'playability',
+  );
   const userLabel = normalizeOptionalText(input.userLabel, 'userLabel', { maxLength: 255 });
   const derived = normalizeAssetDerived(input.derived, displayName, metadata.extension ?? detected.extension);
   const mediaType = normalizeMimeType(input.mediaType ?? metadata.mimeType ?? detected.mimeType);
@@ -442,12 +478,22 @@ function normalizeMediaAsset(input) {
   if (normalizedReference !== null && compatibility === COMPATIBILITY.DIRECT) {
     throw new MediaContractError('Direct compatibility cannot have a normalized reference', 'DIRECT_REFERENCE_CONFLICT');
   }
+  if (lifecycleStatus === ASSET_LIFECYCLE_STATUS.MISSING && compatibility !== COMPATIBILITY.MISSING) {
+    throw new MediaContractError('Missing media must use missing compatibility', 'MISSING_COMPATIBILITY_REQUIRED');
+  }
+  if (lifecycleStatus === ASSET_LIFECYCLE_STATUS.READY
+    && inspectionStatus !== INSPECTION_STATUS.INSPECTED) {
+    throw new MediaContractError('Ready media must have completed inspection', 'READY_INSPECTION_REQUIRED');
+  }
   if (lifecycleStatus === ASSET_LIFECYCLE_STATUS.READY
     && ![COMPATIBILITY.DIRECT, COMPATIBILITY.NORMALIZED].includes(compatibility)) {
     throw new MediaContractError('Ready media must have verified compatibility', 'READY_COMPATIBILITY_REQUIRED');
   }
-  if (lifecycleStatus === ASSET_LIFECYCLE_STATUS.MISSING && compatibility !== COMPATIBILITY.MISSING) {
-    throw new MediaContractError('Missing media must use missing compatibility', 'MISSING_COMPATIBILITY_REQUIRED');
+  if (compatibility === COMPATIBILITY.UNPLAYABLE && playability !== PLAYABILITY.UNPLAYABLE) {
+    throw new MediaContractError('Unplayable compatibility requires unplayable playability', 'UNPLAYABLE_STATE_MISMATCH');
+  }
+  if (inspectionStatus === INSPECTION_STATUS.UNPLAYABLE && playability !== PLAYABILITY.UNPLAYABLE) {
+    throw new MediaContractError('Unplayable inspection requires unplayable playability', 'UNPLAYABLE_INSPECTION_MISMATCH');
   }
 
   return {
@@ -462,6 +508,8 @@ function normalizeMediaAsset(input) {
     metadata,
     compatibility,
     lifecycleStatus,
+    inspectionStatus,
+    playability,
     userLabel,
     derived,
   };
@@ -482,6 +530,8 @@ function createMediaAsset(input) {
     metadata: input.metadata ?? {},
     compatibility: input.compatibility,
     lifecycleStatus: input.lifecycleStatus ?? input.status,
+    inspectionStatus: input.inspectionStatus,
+    playability: input.playability,
     userLabel: input.userLabel,
     derived: input.derived,
   });
@@ -538,6 +588,8 @@ function applyVerifiedNormalization(asset, result) {
     metadata,
     compatibility: COMPATIBILITY.NORMALIZED,
     lifecycleStatus: ASSET_LIFECYCLE_STATUS.READY,
+    inspectionStatus: INSPECTION_STATUS.INSPECTED,
+    playability: PLAYABILITY.PLAYABLE,
   });
 }
 
@@ -944,10 +996,12 @@ module.exports = Object.freeze({
   ASSET_SCHEMA_VERSION,
   COMPATIBILITY,
   FRAME_TIMING,
+  INSPECTION_STATUS,
   JOB_SCHEMA_VERSION,
   MEDIA_KINDS,
   NORMALIZATION_JOB_PHASES,
   NORMALIZATION_JOB_STATUS,
+  PLAYABILITY,
   SUPPORTED_FORMATS,
   SUPPORTED_IMAGE_FORMATS: SUPPORTED_FORMATS.filter((format) => format.kind === MEDIA_KINDS.IMAGE),
   UNSUPPORTED_FORMATS,
