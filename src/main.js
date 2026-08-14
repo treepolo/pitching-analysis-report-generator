@@ -1,7 +1,11 @@
 'use strict';
 
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
-if (process.env.PITCHING_DISABLE_GPU === '1') app.disableHardwareAcceleration();
+if (process.env.PITCHING_DISABLE_GPU === '1') {
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('in-process-gpu');
+  app.disableHardwareAcceleration();
+}
 
 const fs = require('node:fs/promises');
 const path = require('node:path');
