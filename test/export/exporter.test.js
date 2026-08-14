@@ -325,3 +325,35 @@ test('rejects a symlink used as the ZIP source root', async (t) => {
     /symbolic link/iu,
   );
 });
+
+test('rejects ZIP source and target paths that traverse symlink parents', async (t) => {
+  const outsideRoot = path.join(testRoot, 'zip-parent-outside');
+  const linkedParent = path.join(testRoot, 'zip-parent-link');
+  const sourceRoot = path.join(linkedParent, 'source');
+  const targetPath = path.join(linkedParent, 'output.zip');
+  const normalSource = path.join(testRoot, 'zip-parent-normal-source');
+  const normalTargetParent = path.join(testRoot, 'zip-parent-target');
+  await fs.mkdir(outsideRoot, { recursive: true });
+  await fs.mkdir(normalSource, { recursive: true });
+  await fs.mkdir(normalTargetParent, { recursive: true });
+  await fs.writeFile(path.join(normalSource, 'report.html'), '<p>source</p>', 'utf8');
+  try {
+    await fs.symlink(outsideRoot, linkedParent, 'junction');
+  } catch (error) {
+    if (['EPERM', 'EACCES', 'ENOSYS'].includes(error.code)) {
+      t.skip(`symlink creation unavailable: ${error.code}`);
+      return;
+    }
+    throw error;
+  }
+
+  await assert.rejects(
+    require('../../src/export/zip-archive').createZipArchive(sourceRoot, path.join(normalTargetParent, 'source.zip')),
+    /symbolic link/iu,
+  );
+  await assert.rejects(
+    require('../../src/export/zip-archive').createZipArchive(normalSource, targetPath),
+    /symbolic link/iu,
+  );
+  assert.equal(await fs.lstat(path.join(normalTargetParent, 'source.zip')).catch((error) => error.code), 'ENOENT');
+});

@@ -51,6 +51,22 @@ async function collectFiles(rootDirectory, currentDirectory = rootDirectory, res
   return result;
 }
 
+async function assertNoSymbolicLinkAncestors(targetPath, description) {
+  let currentPath = path.resolve(targetPath);
+  while (true) {
+    const entry = await fs.lstat(currentPath).catch((error) => {
+      if (error.code === 'ENOENT') return null;
+      throw new ExportValidationError(`${description} cannot be inspected: ${currentPath}`, { cause: error });
+    });
+    if (entry?.isSymbolicLink()) {
+      throw new ExportValidationError(`${description} contains a symbolic link: ${currentPath}`);
+    }
+    const parentPath = path.dirname(currentPath);
+    if (parentPath === currentPath) return;
+    currentPath = parentPath;
+  }
+}
+
 async function readZipArchive(zipPath) {
   const archive = await fs.readFile(zipPath).catch((error) => {
     throw new ExportValidationError(`ZIP archive is unavailable: ${zipPath}`, { cause: error });
@@ -162,16 +178,8 @@ async function extractZipArchive(zipPath, targetDirectory) {
   }
 
   const parentPath = path.dirname(targetPath);
+  await assertNoSymbolicLinkAncestors(parentPath, 'ZIP extraction parent');
   await fs.mkdir(parentPath, { recursive: true });
-  let realParentPath;
-  try {
-    realParentPath = await fs.realpath(parentPath);
-  } catch (error) {
-    throw new ExportValidationError(`ZIP extraction parent is unavailable: ${parentPath}`, { cause: error });
-  }
-  if (path.resolve(realParentPath) !== path.resolve(parentPath)) {
-    throw new ExportValidationError(`ZIP extraction parent must not contain a symbolic link: ${parentPath}`);
-  }
   const temporaryPath = await fs.mkdtemp(path.join(
     parentPath,
     `.${path.basename(targetPath)}.${process.pid}.extract-`,
@@ -265,6 +273,8 @@ function createEndOfCentralDirectory(entryCount, centralSize, centralOffset) {
 async function createZipArchive(sourceDirectory, zipPath) {
   const sourceRoot = path.resolve(sourceDirectory);
   const targetPath = path.resolve(zipPath);
+  await assertNoSymbolicLinkAncestors(sourceRoot, 'ZIP source path');
+  await assertNoSymbolicLinkAncestors(path.dirname(targetPath), 'ZIP target parent');
   const sourceEntry = await fs.lstat(sourceRoot).catch((error) => {
     throw new ExportValidationError(`ZIP source directory is unavailable: ${sourceRoot}`, { cause: error });
   });
