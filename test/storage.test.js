@@ -71,6 +71,7 @@ test('preserves media metadata and export settings as future vertical-slice seam
     mediaKind: 'video',
     lifecycleStatus: 'missing',
     compatibility: 'unknown',
+    timing: { duration: 1.25, fps: 60, precision: 'unknown' },
   }];
   snapshot.sections[1].blocks.push({
     id: 'video-block',
@@ -83,7 +84,9 @@ test('preserves media metadata and export settings as future vertical-slice seam
     lastOutputPath: path.join(testRoot, 'output'),
     outputKind: 'folder',
     includeMedia: true,
+    validation: { requirePortablePaths: true, futureFlag: 'preserve-me' },
   };
+  snapshot.futureReportExtension = { sourceRevision: 3, owner: 'report-model' };
 
   const saved = await store.saveProject(snapshot);
   assert.equal(saved.reportTitle, 'Payload contract title');
@@ -91,7 +94,10 @@ test('preserves media metadata and export settings as future vertical-slice seam
   assert.deepEqual(saved.media, snapshot.media);
   assert.equal(saved.exportSettings.outputKind, 'folder');
   assert.equal(saved.exportSettings.includeMedia, true);
+  assert.deepEqual(saved.media[0].timing, { duration: 1.25, fps: 60, precision: 'unknown' });
+  assert.deepEqual(saved.exportSettings.validation, { requirePortablePaths: true, futureFlag: 'preserve-me' });
   assert.equal(saved.exportSettings.lastOutputPath, path.resolve(testRoot, 'output'));
+  assert.deepEqual(saved.futureReportExtension, { sourceRevision: 3, owner: 'report-model' });
   assert.deepEqual(saved.sections[1].blocks[1], snapshot.sections[1].blocks[1]);
 
   const reopened = await store.openProject(created.id);
@@ -100,6 +106,12 @@ test('preserves media metadata and export settings as future vertical-slice seam
   assert.deepEqual(reopened.media, snapshot.media);
   assert.deepEqual(reopened.exportSettings, saved.exportSettings);
   assert.deepEqual(reopened.sections[1].blocks[1], snapshot.sections[1].blocks[1]);
+  assert.deepEqual(reopened.futureReportExtension, { sourceRevision: 3, owner: 'report-model' });
+
+  const partialSave = await store.saveProject({ id: created.id, sections: reopened.sections });
+  assert.deepEqual(partialSave.media, snapshot.media);
+  assert.deepEqual(partialSave.exportSettings, saved.exportSettings);
+  assert.deepEqual(partialSave.futureReportExtension, { sourceRevision: 3, owner: 'report-model' });
 });
 
 test('rejects traversal ids before accessing project paths', async () => {
@@ -128,6 +140,52 @@ test('rejects a project root whose realpath escapes its application boundary', a
     assert.deepEqual(await fs.readdir(outsideRoot), []);
   } finally {
     await fs.rm(linkedRoot, { recursive: true, force: true });
+    await fs.rm(outsideRoot, { recursive: true, force: true });
+  }
+});
+
+test('rejects a projects directory symlink that escapes the validated project root', async (t) => {
+  const root = await fs.mkdtemp(path.join(repositoryRoot, '.tmp', 'storage-projects-root-'));
+  const outsideRoot = await fs.mkdtemp(path.join(repositoryRoot, '.tmp', 'storage-projects-outside-'));
+  const linkedProjects = path.join(root, 'projects');
+  try {
+    try {
+      await fs.symlink(outsideRoot, linkedProjects, 'junction');
+    } catch (error) {
+      if (error.code === 'EPERM' || error.code === 'EACCES') {
+        t.skip(`junction creation is unavailable: ${error.code}`);
+        return;
+      }
+      throw error;
+    }
+    await assert.rejects(
+      validateProjectRoot(root, root),
+      /Projects directory realpath escapes the project boundary/,
+    );
+    assert.deepEqual(await fs.readdir(outsideRoot), []);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(outsideRoot, { recursive: true, force: true });
+  }
+});
+
+test('does not list or open a project directory symlink', async (t) => {
+  const outsideRoot = await fs.mkdtemp(path.join(repositoryRoot, '.tmp', 'storage-project-outside-'));
+  const linkedProject = path.join(store.projectsRoot, 'linked-project');
+  try {
+    try {
+      await fs.symlink(outsideRoot, linkedProject, 'junction');
+    } catch (error) {
+      if (error.code === 'EPERM' || error.code === 'EACCES') {
+        t.skip(`junction creation is unavailable: ${error.code}`);
+        return;
+      }
+      throw error;
+    }
+    await assert.rejects(store.openProject('linked-project'), /Project directory is invalid/);
+    assert.equal((await store.listProjects()).some((project) => project.id === 'linked-project'), false);
+  } finally {
+    await fs.rm(linkedProject, { recursive: true, force: true });
     await fs.rm(outsideRoot, { recursive: true, force: true });
   }
 });

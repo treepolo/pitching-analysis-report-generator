@@ -209,10 +209,15 @@ async function requestSave() {
 }
 
 async function flushPendingChanges() {
-  clearTimeout(state.saveTimer);
-  state.saveTimer = null;
-  if (!state.activeProject || !state.dirty) return;
-  await requestSave();
+  while (state.activeProject && (state.dirty || state.saveInFlight)) {
+    clearTimeout(state.saveTimer);
+    state.saveTimer = null;
+    if (state.dirty) {
+      await requestSave();
+    } else if (state.saveInFlight) {
+      await state.saveInFlight;
+    }
+  }
 }
 
 function scheduleSave() {

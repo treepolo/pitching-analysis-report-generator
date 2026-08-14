@@ -34,13 +34,20 @@ function assertTrustedSender(event) {
   const sender = event?.sender;
   const senderFrame = event?.senderFrame;
   const senderWindow = sender ? BrowserWindow.fromWebContents(sender) : null;
-  if (!sender || sender.isDestroyed() || !senderWindow || senderWindow.isDestroyed()) {
+  const mainFrame = sender?.mainFrame;
+  if (!sender || sender.isDestroyed() || !senderWindow || senderWindow.isDestroyed()
+    || senderWindow.webContents !== sender) {
     throw new Error('Untrusted IPC sender');
   }
-  if (!senderFrame || senderFrame !== sender.mainFrame || senderFrame.url !== APP_ENTRY_URL) {
+  if (!senderFrame || !mainFrame || senderFrame !== mainFrame
+    || senderFrame.url !== APP_ENTRY_URL || mainFrame.url !== APP_ENTRY_URL) {
     throw new Error('Untrusted IPC frame');
   }
   return senderWindow;
+}
+
+function guardNavigation(event, navigationUrl) {
+  if (navigationUrl !== APP_ENTRY_URL) event.preventDefault();
 }
 
 function registerIpc() {
@@ -108,9 +115,8 @@ function createWindow({ show = true } = {}) {
   closeGuards.set(window, { allowClose: false, requestPending: false });
   window.setMenuBarVisibility(false);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  window.webContents.on('will-navigate', (event, navigationUrl) => {
-    if (navigationUrl !== APP_ENTRY_URL) event.preventDefault();
-  });
+  window.webContents.on('will-navigate', guardNavigation);
+  window.webContents.on('will-redirect', guardNavigation);
   window.on('close', (event) => {
     const guard = closeGuards.get(window);
     if (!guard || guard.allowClose) return;
@@ -271,12 +277,70 @@ async function runElectronSmoke() {
       throw new Error('project did not reopen with the close-flushed content');
     }
 
+    const payloadSnapshot = await window.webContents.executeJavaScript(`
+      (async () => {
+        const project = await window.pitchingApp.openProject(${JSON.stringify(result.projectId)});
+        project.reportTitle = 'Smoke payload title';
+        project.media = [{
+          id: 'smoke-asset',
+          mediaKind: 'video',
+          displayName: 'smoke.mp4',
+          lifecycleStatus: 'missing',
+          timing: { duration: 2.5, fps: 60, precision: 'unknown' },
+        }];
+        project.sections[0].blocks.push({
+          id: 'smoke-video-block',
+          type: 'singleVideo',
+          mediaAssetId: 'smoke-asset',
+          label: 'Future media block',
+          playback: { rate: 0.75 },
+        });
+        project.exportSettings = {
+          lastOutputPath: ${JSON.stringify(path.join(PROJECT_ROOT, 'output'))},
+          outputKind: 'folder',
+          includeMedia: true,
+          validation: { requirePortablePaths: true },
+        };
+        project.futureReportExtension = { sourceRevision: 4 };
+        return window.pitchingApp.saveProject(project);
+      })()
+    `, true);
+    if (payloadSnapshot.reportTitle !== 'Smoke payload title') {
+      throw new Error('report payload title did not persist');
+    }
+    if (payloadSnapshot.media?.[0]?.timing?.fps !== 60) {
+      throw new Error('media payload schema was dropped');
+    }
+    if (payloadSnapshot.sections[0].blocks.at(-1)?.mediaAssetId !== 'smoke-asset') {
+      throw new Error('future media block payload was dropped');
+    }
+    if (payloadSnapshot.exportSettings?.validation?.requirePortablePaths !== true) {
+      throw new Error('export settings schema was dropped');
+    }
+    const payloadReopened = await window.webContents.executeJavaScript(`
+      window.pitchingApp.openProject(${JSON.stringify(result.projectId)})
+    `, true);
+    if (payloadReopened.media?.[0]?.timing?.precision !== 'unknown'
+      || payloadReopened.exportSettings?.outputKind !== 'folder'
+      || payloadReopened.futureReportExtension?.sourceRevision !== 4) {
+      throw new Error('project payload did not survive reopen');
+    }
+
     const projectFile = path.join(projectStore.projectDirectory(result.projectId), 'project.json');
     const projectFileStat = await fs.stat(projectFile);
-    if (!projectFileStat.isFile() || !isPathInside(projectStore.projectsRoot, projectFile)) {
+    const realProjectsRoot = await fs.realpath(projectStore.projectsRoot);
+    const realProjectFile = await fs.realpath(projectFile);
+    if (!projectFileStat.isFile()
+      || !isPathInside(projectStore.projectsRoot, projectFile)
+      || !isPathInside(realProjectsRoot, realProjectFile)) {
       throw new Error('project file escaped the projects boundary');
     }
-    return { ...result, closeFlushVerified: true, reopenVerified: true };
+    return {
+      ...result,
+      payloadSchemaVerified: true,
+      closeFlushVerified: true,
+      reopenVerified: true,
+    };
   } finally {
     if (!window.isDestroyed()) window.destroy();
   }

@@ -18,6 +18,21 @@ const SUPPORTED_BLOCK_TYPES = new Set([
   'singleVideo',
   'comparisonVideo',
 ]);
+const PROJECT_FIELDS = new Set([
+  'schemaVersion',
+  'id',
+  'displayName',
+  'reportTitle',
+  'safeName',
+  'filesystemName',
+  'createdAt',
+  'updatedAt',
+  'lastOpenedAt',
+  'sections',
+  'media',
+  'exportSettings',
+  'recoveryMetadata',
+]);
 
 function isPlainRecord(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -89,6 +104,16 @@ function safeOptionalTimestamp(value, fieldName) {
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function cloneProjectExtensions(value) {
+  const extensions = Object.create(null);
+  for (const [key, fieldValue] of Object.entries(value)) {
+    if (PROJECT_FIELDS.has(key) || ['__proto__', 'constructor', 'prototype'].includes(key)) continue;
+    if (fieldValue === undefined) continue;
+    extensions[key] = cloneJson(fieldValue);
+  }
+  return extensions;
 }
 
 function normalizeSections(value) {
@@ -178,6 +203,7 @@ function normalizeProjectRecord(value, projectRoot, expectedId = null) {
   if (filesystemName !== id) throw new Error('Filesystem project name does not match project id');
 
   return {
+    ...cloneProjectExtensions(value),
     schemaVersion: 1,
     id,
     displayName: safeDisplayName(value.displayName),
@@ -376,8 +402,9 @@ function createProjectStore(projectRoot, { boundaryRoot = null } = {}) {
 
     const directory = projectDirectory(root, projectId);
     await fs.mkdir(directory, { recursive: false });
-    await fs.mkdir(path.join(directory, 'media'), { recursive: false });
-    const filePath = await projectFile(projectId, { mustExist: false });
+    const realDirectory = await existingProjectDirectory(projectId);
+    await fs.mkdir(path.join(realDirectory, 'media'), { recursive: false });
+    const filePath = path.join(realDirectory, 'project.json');
     await writeJsonAtomic(filePath, project);
     return project;
   }
@@ -399,6 +426,8 @@ function createProjectStore(projectRoot, { boundaryRoot = null } = {}) {
     const current = await readProject(id);
     const now = new Date().toISOString();
     const next = normalizeProjectRecord({
+      ...current,
+      ...payload,
       schemaVersion: current.schemaVersion,
       id: current.id,
       displayName: payload.displayName === undefined ? current.displayName : payload.displayName,
