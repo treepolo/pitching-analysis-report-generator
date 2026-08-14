@@ -1,13 +1,13 @@
 # Traceability Matrix
 
-目前狀態：**Phase 1/2 planning + implementation in progress**。本矩陣是 Requirement → Artifact → Test/Acceptance → Evidence → Status 的唯一追蹤入口。`46bd9d0` 已提供部分 implementation/unit/fixture evidence，但沒有任何 requirement 因此改標 `VERIFIED`，也沒有 real-media、browser/file:// 或真人 evidence。
+目前狀態：**Phase 1/2 planning + implementation in progress**。本矩陣是 Requirement → Artifact → Test/Acceptance → Evidence → Status 的唯一追蹤入口。`fcaa4a6` 已提供部分 implementation/unit/fixture evidence，但沒有任何 requirement 因此改標 `VERIFIED`，也沒有 real-media、browser/file:// pass 或真人 evidence。
 
 ## Current integration checkpoint
 
-- Revision：`46bd9d0 feat: integrate media sync export domain slices`（前一 checkpoint：`00cae62`）。
-- Integrated scope：media contract/path policy、pure sync domain、shared report-contract allowlist parity、export renderer/layout/ZIP seam，以及 project-root realpath/symlink boundary tests。
-- Evidence：52 個 `npm test`、25 個 JS `node --check`、media/export/sync targeted tests 39/39、package/lock consistency、`git diff --check`、Electron smoke（含 text import、close flush/reopen 與 bridge security）。
-- Remaining product scope：real metadata/FFmpeg、actual browser player/anchors/sync runtime、完整 export/browser `file://` evidence、responsive human acceptance、完整 AT-A～G；所有 requirement rows 維持原狀。
+- Revision：`fcaa4a6 feat: integrate media tools and export runtime seams`（承接 app-facing/player checkpoint：`d941b5c`）。
+- Integrated scope：media contract/tool adapter/path and symlink checks、pure sync/player seam、shared report-contract allowlist parity、export renderer/layout/ZIP/atomic extraction/runtime-smoke seam，以及 project-root boundary tests。
+- Evidence：65 pass / 1 skip 的 `npm test`、全部 JS `node --check`、media/export/player targeted 23 pass / 1 skip、package/lock consistency、`git diff --check` 與 app Electron smoke。export Electron `file://` runtime unavailable 的 skip 未轉為 pass。
+- Remaining product scope：real metadata/FFmpeg、real browser player/anchors/sync、完整 export/browser `file://` pass evidence、responsive human acceptance、完整 AT-A～G；所有 requirement rows 維持原狀。
 
 | Requirement | Canonical artifact / owner | Test / acceptance | Evidence required | Status |
 |---|---|---|---|---|
