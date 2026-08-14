@@ -1,10 +1,10 @@
 # Current Project State
 
-## Current Wave 9A/B/C Integrator gate (2026-08-15)
+## Current Wave 10A/B/C Integrator gate (2026-08-15)
 
-- Actual product tip is `7f8b0ea118d1f5539527149dd912dfdc0e4aa212` on `worker/desktop-vertical-slice`, with lane commits `13a1678abf328ffd7b0c2a1f298fef80c9e091ee` (media readiness diagnostics), `7f8b0ea118d1f5539527149dd912dfdc0e4aa212` (sync edge hardening), and `580dd02690f33f693e21c5623a6351f1c91d85b4` (ZIP ancestor-symlink safety) after prior tip `f5af09adf10370fd1eecf2ad19eedf7a65dc7c96`.
-- Fresh regression evidence: `npm test` reports 111 tests, 110 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip; 34 current JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/private scan pass.
-- Real ffprobe/FFmpeg execution, exported `file://` runtime, real video/player/sync/drift runtime, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
+- Actual product tip is `a0fcdb400aa24f36cf430fb23b4e07ef6df370c3` on `worker/desktop-vertical-slice`, integrating the Wave 10A UI localization/static gate PASS on top of the Wave 9A/B/C checkpoint. Traditional Chinese user-facing text and accessibility labels passed the static gate; no general English leakage was found by that gate.
+- Fresh regression evidence: `npm test` reports 113 tests, 112 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip; 35 current JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/private scan pass.
+- The Electron `file://` skip, worker-reported runtime evidence, real ffprobe/FFmpeg execution, real video/player/sync/drift runtime, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
 
 ## Historical Wave 8D Integrator gate (superseded, 2026-08-15)
 

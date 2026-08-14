@@ -1,9 +1,9 @@
 # Traceability Matrix
 
-## Current Wave 9A/B/C Integrator gate (2026-08-15)
+## Current Wave 10A/B/C Integrator gate (2026-08-15)
 
-- Product tip is `7f8b0ea118d1f5539527149dd912dfdc0e4aa212` on `worker/desktop-vertical-slice`; integrated lane commits are `13a1678abf328ffd7b0c2a1f298fef80c9e091ee` (media readiness diagnostics), `7f8b0ea118d1f5539527149dd912dfdc0e4aa212` (sync edge hardening), and `580dd02690f33f693e21c5623a6351f1c91d85b4` (ZIP ancestor-symlink safety), following `f5af09adf10370fd1eecf2ad19eedf7a65dc7c96`.
-- Gate evidence: 111 npm tests / 110 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` skip; 34 JavaScript syntax checks; package/lock, diff-check, and tracked artifact/private scan pass. The Electron skip and real ffprobe/FFmpeg execution remain unavailable evidence, not passes.
+- Product tip is `a0fcdb400aa24f36cf430fb23b4e07ef6df370c3` on `worker/desktop-vertical-slice`; Wave 10A UI localization/static gate is PASS for Traditional Chinese user-facing text/accessibility labels, with no general English leakage found by the static gate.
+- Gate evidence: 113 npm tests / 112 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` skip; 35 JavaScript syntax checks; package/lock, diff-check, and tracked artifact/private scan pass. The Electron skip and worker-reported runtime evidence remain unavailable evidence, not passes.
 - Real media/player/sync/drift runtime, exported browser `file://`, responsive human acceptance, and AT-A through AT-G remain unresolved. Requirement rows remain conservative and none are `VERIFIED`.
 
 ## Historical Wave 8D Integrator gate (superseded, 2026-08-15)
