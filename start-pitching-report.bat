@@ -10,6 +10,11 @@ if not exist "node_modules\electron\package.json" (
   endlocal & exit /b 1
 )
 
-call npm start
+call npm start -- --disable-gpu
 set "exitCode=%ERRORLEVEL%"
+if not "%exitCode%"=="0" (
+  echo [ERROR] Electron failed to start. Exit code: %exitCode%
+  echo 啟動失敗，請查看上方錯誤訊息。
+  pause
+)
 endlocal & exit /b %exitCode%
