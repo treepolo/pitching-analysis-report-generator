@@ -64,4 +64,4 @@ Push 前至少檢查：
 
 ## 6. Current state
 
-截至本輪檢查：工作區尚無可用 Git repository／branch／commit／remote evidence；因此對外狀態為 AWAITING_USER_SETUP，不是已完成 baseline。Architecture 與 visibility checkpoint 解除後，由 Integrator 執行 local Git baseline、secret scan、commit 與 approved remote setup。
+截至本輪檢查：工作區已有 local main 與 planning commit，但沒有 GitHub remote／push evidence；因此對外狀態為 AWAITING_USER_SETUP，不是已完成 baseline。Architecture 與 visibility checkpoint 解除後，由 Integrator 執行 baseline review、secret scan 與 approved remote setup。

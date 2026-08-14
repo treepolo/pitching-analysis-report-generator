@@ -13,7 +13,7 @@
 | Architecture decision | BLOCKED_HUMAN | ARCHITECTURE.md，local browser vs desktop |
 | Application data storage | AWAITING_USER_SETUP | FILESYSTEM_POLICY.md、DATA_MODEL.md |
 | GitHub visibility | BLOCKED_HUMAN | GIT_GITHUB_POLICY.md，Private vs Public |
-| Git baseline / remote push | AWAITING_USER_SETUP | architecture/visibility 尚未核准，沒有 remote evidence |
+| Git baseline / remote push | AWAITING_USER_SETUP | local main planning commit exists；architecture/visibility 尚未核准，沒有 remote evidence |
 | Feature implementation | NOT_STARTED | 尚無 source code / app skeleton |
 | Real media / human acceptance | AWAITING_USER_SETUP | 尚未提供可用非私人 fixture／真人 evidence |
 
@@ -46,7 +46,7 @@
 
 目前沒有：
 
-- implementation commit
+- feature implementation commit
 - runnable app
 - generated report
 - real or controlled video fixture result
@@ -69,4 +69,4 @@
 
 ## 6. Current ownership / handoff
 
-本輪由目前 task 直接完成規格 materialization，遵守使用者「不使用 sub-agent／multi-agent」要求；沒有 worker branch、commit SHA、remote branch 或 push status 可回報。下一個必要 owner 是使用者（兩個人類 checkpoint），之後才是 Integrator／implementation owners。
+本輪由目前 task 直接完成規格 materialization，遵守使用者「不使用 sub-agent／multi-agent」要求；已建立 local main 的 planning commit，但沒有 worker branch、remote branch 或 push status。下一個必要 owner 是使用者（兩個人類 checkpoint），之後才是 Integrator／implementation owners。

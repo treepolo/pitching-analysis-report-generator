@@ -24,7 +24,7 @@
 - [ ] 更新 ARCHITECTURE.md 為使用者批准的 decision，移除對應 BLOCKED_HUMAN
 - [ ] 更新 FILESYSTEM_POLICY.md／DATA_MODEL.md 的正式 storage boundary
 - [ ] 更新 GIT_GITHUB_POLICY.md 的 visibility／remote policy
-- [ ] 建立 local Git repository、main branch 與合理 ignore
+- [x] 建立 local Git repository、main branch 與合理 ignore
 - [ ] secret/sensitive scan pass
 - [ ] basic project skeleton 與 smoke validation pass
 - [ ] commit baseline；visibility approved 後 push origin
