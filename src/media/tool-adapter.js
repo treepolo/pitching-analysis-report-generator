@@ -564,15 +564,28 @@ function parseFrameRate(value) {
   return parsePositiveNumber(trimmed);
 }
 
+function parseTimebase(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  const match = /^(\d+)\/(\d+)$/u.exec(trimmed);
+  if (!match || match[1] === '0' || match[2] === '0') return null;
+  return `${match[1]}/${match[2]}`;
+}
+
 function frameTimingFor(stream) {
   const average = parseFrameRate(stream.avg_frame_rate);
   const raw = parseFrameRate(stream.r_frame_rate);
   if (average === null || raw === null) {
-    return { fps: average ?? raw, frameTiming: FRAME_TIMING.UNKNOWN };
+    return {
+      fps: average ?? raw,
+      frameTiming: FRAME_TIMING.UNKNOWN,
+      timebase: parseTimebase(stream.time_base ?? stream.timebase),
+    };
   }
   return {
     fps: average,
     frameTiming: Math.abs(average - raw) <= 0.000001 ? FRAME_TIMING.CFR : FRAME_TIMING.VFR,
+    timebase: parseTimebase(stream.time_base ?? stream.timebase),
   };
 }
 
@@ -676,6 +689,7 @@ function parseFfprobeOutput(stdout, input = {}) {
     height: parsePositiveNumber(stream.height),
     fps: frame.fps,
     frameTiming: frame.frameTiming,
+    timebase: frame.timebase,
     codec,
     container,
   }, {
@@ -718,6 +732,7 @@ function parseFfprobeOutput(stdout, input = {}) {
     && metadata.height !== null
     && metadata.fps !== null
     && metadata.frameTiming !== FRAME_TIMING.UNKNOWN
+    && metadata.timebase !== null
     && metadata.codec !== null
     && metadata.container !== null;
   const completeImageMetadata = mediaKind === MEDIA_KINDS.IMAGE
@@ -741,7 +756,7 @@ function parseFfprobeOutput(stdout, input = {}) {
       detection: cloneJson(sourceDetected),
       signature: null,
       metadata,
-      warnings: ['ffprobe completed but required duration, resolution, codec, or frame timing metadata is absent.'],
+      warnings: ['ffprobe completed but required duration, resolution, codec, frame timing, or timebase metadata is absent.'],
       tool,
       sourceReference: source.sourceReference,
     };
@@ -1101,6 +1116,33 @@ async function runNormalizationJobWithAdapter(input, { signal, now = () => new D
   return result();
 }
 
+/**
+ * Execute the complete normalization seam with local ffprobe/FFmpeg
+ * processes. Missing tools, non-zero exits, malformed probe output, and
+ * unverified output remain explicit job states; this helper never fabricates
+ * a normalized asset when the external tools are unavailable.
+ */
+async function runNormalizationJobWithLocalTools(input, options = {}) {
+  requireRecord(input, 'Local normalization input');
+  const adapter = input.adapter ?? createLocalMediaToolAdapter(input.toolOptions ?? input);
+  const now = options.now ?? (() => new Date().toISOString());
+  const verifyOutput = input.verifyOutput ?? ((context) => verifyNormalizedOutputWithFfprobe(
+    adapter,
+    {
+      projectRoot: input.projectRoot,
+      normalizedReference: context.normalizedReference,
+      targetPath: context.targetPath,
+    },
+    { signal: context.signal, now },
+  ));
+  return runNormalizationJobWithAdapter({
+    ...input,
+    adapter,
+    verifyOutput,
+    prepareTargetDirectory: input.prepareTargetDirectory ?? true,
+  }, options);
+}
+
 module.exports = Object.freeze({
   DEFAULT_SUPPORTED_IMAGE_CODECS,
   DEFAULT_SUPPORTED_VIDEO_CODECS,
@@ -1118,5 +1160,6 @@ module.exports = Object.freeze({
   normalizeWithFfmpeg,
   parseFfprobeOutput,
   runNormalizationJobWithAdapter,
+  runNormalizationJobWithLocalTools,
   verifyNormalizedOutputWithFfprobe,
 });

@@ -11,12 +11,15 @@ const {
   INSPECTION_STATUS,
   MEDIA_OPERATION_STATUS,
   MEDIA_TOOL_STATUS,
+  NORMALIZATION_JOB_STATUS,
   PLAYABILITY,
   copyMediaSourceIntoProject,
   createLocalMediaToolAdapter,
   createLocalMediaToolRunner,
+  createNormalizationJob,
   inspectWithFfprobe,
   normalizeWithFfmpeg,
+  runNormalizationJobWithLocalTools,
   verifyNormalizedOutputWithFfprobe,
 } = require('../../src/media');
 
@@ -40,6 +43,7 @@ function probeFixture() {
       height: 360,
       avg_frame_rate: '30/1',
       r_frame_rate: '30/1',
+      time_base: '1/90000',
     }],
   });
 }
@@ -87,6 +91,30 @@ test('local adapter reports an unavailable executable without pretending probe s
   assert.equal(inspected.status, MEDIA_OPERATION_STATUS.TOOL_MISSING);
   assert.equal(inspected.tool.status, MEDIA_TOOL_STATUS.TOOL_MISSING);
   assert.equal(inspected.inspectionStatus, INSPECTION_STATUS.METADATA_PENDING);
+});
+
+test('local normalization orchestration keeps missing real tools recoverable', async () => {
+  const projectRoot = path.resolve('local-normalization-boundary-project');
+  const result = await runNormalizationJobWithLocalTools({
+    job: createNormalizationJob({
+      id: 'job-local-tool-missing-1',
+      projectId: 'project-local-1',
+      assetId: 'asset-local-tool-missing-1',
+      sourceReference: 'media/original/source.mp4',
+      createdAt: '2026-08-14T00:00:00.000Z',
+    }),
+    projectRoot,
+    sourceReference: 'media/original/source.mp4',
+    assetId: 'asset-local-tool-missing-1',
+    ffprobeCommand: 'media-tool-does-not-exist',
+    ffmpegCommand: 'media-ffmpeg-does-not-exist',
+  }, { now: () => '2026-08-14T00:00:01.000Z' });
+
+  assert.equal(result.job.status, NORMALIZATION_JOB_STATUS.RECOVERABLE);
+  assert.equal(result.job.phase, 'error');
+  assert.equal(result.inspection.status, MEDIA_OPERATION_STATUS.TOOL_MISSING);
+  assert.equal(result.normalization, null);
+  assert.equal(result.job.normalizedReference, null);
 });
 
 test('copies external source into project-local originals with checksum provenance and preserves source bytes', async () => {

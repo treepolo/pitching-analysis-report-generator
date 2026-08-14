@@ -30,7 +30,13 @@ const PROJECT_ROOT = path.resolve('deterministic-media-tool-project');
 const SOURCE_REFERENCE = 'media/original/pitch.mp4';
 const TEST_TIME = '2026-08-14T00:00:00.000Z';
 
-function probeFixture({ codec = 'h264', average = '60/1', raw = '60/1', duration = '2.5' } = {}) {
+function probeFixture({
+  codec = 'h264',
+  average = '60/1',
+  raw = '60/1',
+  timebase = '1/90000',
+  duration = '2.5',
+} = {}) {
   return JSON.stringify({
     format: {
       format_name: 'mov,mp4,m4a,3gp,3g2,mj2',
@@ -43,6 +49,7 @@ function probeFixture({ codec = 'h264', average = '60/1', raw = '60/1', duration
       height: 1080,
       avg_frame_rate: average,
       r_frame_rate: raw,
+      time_base: timebase,
     }],
   });
 }
@@ -205,6 +212,7 @@ test('parses deterministic ffprobe CFR metadata and keeps the tool evidence visi
   assert.equal(inspected.metadata.height, 1080);
   assert.equal(inspected.metadata.fps, 60);
   assert.equal(inspected.metadata.frameTiming, FRAME_TIMING.CFR);
+  assert.equal(inspected.metadata.timebase, '1/90000');
   assert.equal(inspected.metadata.codec, 'h264');
   assert.equal(inspected.metadata.container, 'mp4');
 
@@ -235,6 +243,7 @@ test('marks VFR as inspected but needs-normalization, and unsupported codecs as 
   assert.equal(vfr.status, MEDIA_OPERATION_STATUS.SUCCEEDED);
   assert.equal(vfr.inspectionStatus, INSPECTION_STATUS.INSPECTED);
   assert.equal(vfr.metadata.frameTiming, FRAME_TIMING.VFR);
+  assert.equal(vfr.metadata.timebase, '1/90000');
   assert.equal(vfr.compatibility, COMPATIBILITY.NEEDS_NORMALIZATION);
   assert.equal(vfr.playability, PLAYABILITY.UNKNOWN);
 
@@ -280,6 +289,21 @@ test('keeps malformed or incomplete ffprobe output visibly pending', async () =>
   assert.equal(incomplete.inspectionStatus, INSPECTION_STATUS.METADATA_PENDING);
   assert.equal(incomplete.metadata.durationSeconds, null);
   assert.equal(incomplete.metadata.fps, null);
+  assert.equal(incomplete.metadata.timebase, '1/90000');
+
+  const unknownTimebase = await inspectWithFfprobe(
+    createMediaToolAdapter({
+      runner: async () => ({
+        exitCode: 0,
+        stdout: probeFixture({ timebase: 'N/A' }),
+        stderr: '',
+      }),
+    }),
+    sourceInput(),
+  );
+  assert.equal(unknownTimebase.status, MEDIA_OPERATION_STATUS.METADATA_PENDING);
+  assert.equal(unknownTimebase.inspectionStatus, INSPECTION_STATUS.METADATA_PENDING);
+  assert.equal(unknownTimebase.metadata.timebase, null);
 });
 
 test('FFmpeg normalization preserves original and cannot succeed without explicit verification', async () => {

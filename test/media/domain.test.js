@@ -17,6 +17,7 @@ const {
   cancelNormalizationJob,
   completeNormalizationJob,
   createMediaIngestRequest,
+  createMediaAssetReference,
   createMediaAsset,
   createNormalizationJob,
   detectContainerSignature,
@@ -122,6 +123,7 @@ test('creates a processing asset with source reference and no unverified normali
       height: 1080,
       fps: 59.94,
       frameTiming: 'vfr',
+      timebase: '1/90000',
       codec: 'h264',
       container: 'mp4',
     },
@@ -139,6 +141,7 @@ test('creates a processing asset with source reference and no unverified normali
   assert.equal(asset.normalizedReference, null);
   assert.equal(asset.metadata.frameTiming, 'vfr');
   assert.equal(asset.metadata.fps, 59.94);
+  assert.equal(asset.metadata.timebase, '1/90000');
   assert.equal(asset.derived.referenceCount, 0);
 
   assert.throws(
@@ -149,6 +152,30 @@ test('creates a processing asset with source reference and no unverified normali
       sourceReference: 'C:\\private\\outside.mp4',
     }),
     /forward slashes/iu,
+  );
+});
+
+test('creates independent project-scoped references for repeated block use', () => {
+  const asset = createMediaAsset({
+    id: 'asset-reusable-1',
+    projectId: 'project-reusable-1',
+    displayName: 'pitch.mp4',
+    sourceReference: 'media/original/pitch.mp4',
+  });
+  const first = createMediaAssetReference(asset);
+  const second = createMediaAssetReference({ asset });
+
+  assert.deepEqual(first, {
+    projectId: 'project-reusable-1',
+    mediaAssetId: 'asset-reusable-1',
+  });
+  assert.deepEqual(second, first);
+  assert.notStrictEqual(first, second);
+  first.mediaAssetId = 'asset-reusable-other';
+  assert.equal(second.mediaAssetId, 'asset-reusable-1');
+  assert.throws(
+    () => createMediaAssetReference({ projectId: 'project-reusable-1', mediaAssetId: '../outside' }),
+    /unsafe identifier/iu,
   );
 });
 

@@ -358,6 +358,24 @@ function createNormalizedReference(value, details = {}) {
   return normalizeReference(input, 'normalized');
 }
 
+/**
+ * Create the stable, block-independent reference carried by a video block.
+ * The media domain owns the asset identity; block-specific playback state
+ * stays outside this object so the same asset can be referenced independently
+ * by multiple blocks.
+ */
+function createMediaAssetReference(value) {
+  assertPlainRecord(value, 'Media asset reference input');
+  const source = isPlainRecord(value.asset) ? value.asset : value;
+  return {
+    projectId: normalizeId(source.projectId, 'reference project id'),
+    mediaAssetId: normalizeId(
+      source.mediaAssetId ?? source.assetId ?? source.id,
+      'reference media asset id',
+    ),
+  };
+}
+
 function normalizeFrameRate(value) {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number') return normalizeNonNegativeNumber(value, 'fps');
@@ -370,6 +388,28 @@ function normalizeFrameRate(value) {
     return numerator / denominator;
   }
   throw new MediaContractError('fps must be a number or rational object', 'FRAME_RATE_INVALID');
+}
+
+function normalizeTimebase(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed === 'N/A') return null;
+    const match = /^(\d+)\/(\d+)$/u.exec(trimmed);
+    if (!match || match[1] === '0' || match[2] === '0') {
+      throw new MediaContractError('timebase must be a positive rational', 'TIMEBASE_INVALID');
+    }
+    return `${match[1]}/${match[2]}`;
+  }
+  if (isPlainRecord(value)) {
+    const numerator = normalizeNonNegativeNumber(value.numerator, 'timebase numerator', { integer: true });
+    const denominator = normalizeNonNegativeNumber(value.denominator, 'timebase denominator', { integer: true });
+    if (numerator === null || numerator === 0 || denominator === null || denominator === 0) {
+      throw new MediaContractError('timebase must have positive numerator and denominator', 'TIMEBASE_INVALID');
+    }
+    return `${numerator}/${denominator}`;
+  }
+  throw new MediaContractError('timebase must be a rational string or object', 'TIMEBASE_INVALID');
 }
 
 function normalizeMediaMetadata(value = {}, detected = null) {
@@ -399,6 +439,7 @@ function normalizeMediaMetadata(value = {}, detected = null) {
     height: normalizeNonNegativeNumber(value.height ?? resolution.height, 'metadata height', { integer: true }),
     fps: normalizeFrameRate(value.fps ?? value.frameRate),
     frameTiming,
+    timebase: normalizeTimebase(value.timebase ?? value.timeBase),
     codec: normalizeOptionalText(value.codec, 'metadata codec', { maxLength: 120 }),
     container: normalizeOptionalText(value.container, 'metadata container', { maxLength: 120 }),
   };
@@ -1013,6 +1054,7 @@ module.exports = Object.freeze({
   advanceNormalizationJob,
   cancelNormalizationJob,
   completeNormalizationJob,
+  createMediaAssetReference,
   createMediaAsset,
   createNormalizedReference,
   createNormalizationJob,
@@ -1022,6 +1064,7 @@ module.exports = Object.freeze({
   normalizeMediaAsset,
   normalizeMediaMetadata,
   normalizeNormalizationJob,
+  normalizeTimebase,
   normalizeProjectRelativePath,
   normalizeReference,
   retryNormalizationJob,
