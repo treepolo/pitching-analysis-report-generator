@@ -48,6 +48,7 @@ const elements = {
   playerEmpty: document.querySelector('#player-empty'),
   singlePlayer: document.querySelector('#single-player'),
   singleVideo: document.querySelector('#single-video'),
+  singleFullscreen: document.querySelector('#single-fullscreen'),
   singleVideoStatus: document.querySelector('#single-video-status'),
   singlePlay: document.querySelector('#single-play'),
   singlePause: document.querySelector('#single-pause'),
@@ -66,6 +67,7 @@ const elements = {
   comparisonAlignZero: document.querySelector('#comparison-align-zero'),
   comparisonSyncStatus: document.querySelector('#comparison-sync-status'),
   comparisonLeftVideo: document.querySelector('#comparison-left-video'),
+  comparisonLeftFullscreen: document.querySelector('#comparison-left-fullscreen'),
   comparisonLeftVideoStatus: document.querySelector('#comparison-left-video-status'),
   comparisonLeftPlay: document.querySelector('#comparison-left-play'),
   comparisonLeftPause: document.querySelector('#comparison-left-pause'),
@@ -76,6 +78,7 @@ const elements = {
   comparisonLeftLoop: document.querySelector('#comparison-left-loop'),
   comparisonLeftAnchor: document.querySelector('#comparison-left-anchor'),
   comparisonRightVideo: document.querySelector('#comparison-right-video'),
+  comparisonRightFullscreen: document.querySelector('#comparison-right-fullscreen'),
   comparisonRightVideoStatus: document.querySelector('#comparison-right-video-status'),
   comparisonRightPlay: document.querySelector('#comparison-right-play'),
   comparisonRightPause: document.querySelector('#comparison-right-pause'),
@@ -230,6 +233,17 @@ function playerAnchorFor(block, side) {
   return config.anchor || (side === 'single' ? block?.syncAnchor : null) || null;
 }
 
+function playerSegmentFor(block, side, duration = null) {
+  const config = playerSideConfig(block, side);
+  const raw = config.segment || {};
+  const start = Number.isFinite(Number(raw.in ?? raw.start)) ? Math.max(0, Number(raw.in ?? raw.start)) : 0;
+  const requestedEnd = Number.isFinite(Number(raw.out ?? raw.end)) ? Number(raw.out ?? raw.end) : null;
+  const end = duration === null
+    ? requestedEnd
+    : (requestedEnd === null ? duration : Math.min(duration, Math.max(start, requestedEnd)));
+  return { in: end === null ? start : Math.min(start, end), out: end };
+}
+
 function playerTimingForAsset(asset, duration) {
   const metadata = asset?.metadata || {};
   const fps = Number(metadata.fps);
@@ -257,6 +271,7 @@ function sideElements(side) {
       rate: elements.singleRate,
       loop: elements.singleLoop,
       anchor: elements.singleAnchor,
+      fullscreen: elements.singleFullscreen,
     };
   }
   const prefix = side === 'left' ? 'Left' : 'Right';
@@ -272,6 +287,7 @@ function sideElements(side) {
     rate: null,
     loop: elements[`comparison${prefix}Loop`],
     anchor: elements[`comparison${prefix}Anchor`],
+    fullscreen: elements[`comparison${prefix}Fullscreen`],
   };
 }
 
@@ -324,7 +340,7 @@ function updatePlayerSideControls(runtime, side) {
   const sideState = runtime.sides[side];
   const controls = sideElements(side);
   const enabled = sideState.loaded && sideState.statusName === 'loaded';
-  [controls.play, controls.pause, controls.prev, controls.next, controls.seek, controls.rate, controls.loop, controls.anchor]
+  [controls.play, controls.pause, controls.prev, controls.next, controls.seek, controls.rate, controls.loop, controls.anchor, controls.fullscreen]
     .filter(Boolean)
     .forEach((control) => { control.disabled = !enabled; });
   if (enabled) {
@@ -332,17 +348,24 @@ function updatePlayerSideControls(runtime, side) {
     controls.seek.value = String(Math.min(sideState.video.currentTime, sideState.duration));
     controls.time.textContent = `${sideState.video.currentTime.toFixed(2)}s / ${sideState.duration.toFixed(2)}s`;
     controls.loop.checked = Boolean(sideState.loop?.enabled);
+    if (controls.fullscreen) controls.fullscreen.textContent = document.fullscreenElement === controls.video ? 'Exit fullscreen' : 'Fullscreen';
     if (controls.rate && sideState.rate) controls.rate.value = String(sideState.rate);
   } else {
     controls.seek.value = '0';
     controls.seek.max = '0';
     controls.time.textContent = '0.00s';
+    if (controls.fullscreen) controls.fullscreen.textContent = 'Fullscreen';
   }
 }
 
 function playerCapabilityLabel(runtime) {
   const sides = Object.values(runtime.sides);
   if (sides.some((side) => !side.loaded)) return '尚未完整載入';
+  if (runtime.mode === 'comparison' && runtime.syncMode === 'time') return 'Shared elapsed-time sync';
+  if (runtime.mode === 'comparison' && runtime.syncMode === 'frame'
+    && sides.some((side) => typeof side.video.seekToNextFrame !== 'function')) {
+    return 'Explicit frame mode · time fallback';
+  }
   if (sides.every((side) => typeof side.video.seekToNextFrame === 'function')) return 'Frame step available';
   if (sides.some((side) => side.timing.kind === 'unknown')) return 'Time-based fallback · timing unknown';
   return 'Time-based fallback · frame API unavailable';
@@ -411,8 +434,10 @@ function buildPlayerRuntime(entry) {
     block: entry.block,
     generation: state.player.generation,
     rate: Number(entry.block.playback?.rate) || 1,
+    syncMode: entry.block.sync?.mode === 'frame' ? 'frame' : 'time',
     alignment: null,
     syncGuard: false,
+    alignmentPending: false,
     sides: {},
   };
   sides.forEach((side) => {
@@ -430,6 +455,7 @@ function buildPlayerRuntime(entry) {
       sourceUrl: null,
       duration: null,
       timing: { kind: 'unknown' },
+      segment: playerSegmentFor(entry.block, side),
       anchor: playerAnchorFor(entry.block, side),
       loop: playerSideConfig(entry.block, side).loop || { enabled: false, start: 0, end: 0 },
       rate: runtime.rate,
@@ -441,7 +467,9 @@ function buildPlayerRuntime(entry) {
 
 function setPlayerCurrentTime(sideState, targetTime) {
   sideState.suppressSeek = true;
-  sideState.video.currentTime = Math.max(0, Math.min(sideState.duration, targetTime));
+  const segmentStart = Number.isFinite(sideState.segment?.in) ? sideState.segment.in : 0;
+  const segmentEnd = Number.isFinite(sideState.segment?.out) ? sideState.segment.out : sideState.duration;
+  sideState.video.currentTime = Math.max(segmentStart, Math.min(segmentEnd, targetTime));
 }
 
 function attachPlayerVideoEvents(runtime, side) {
@@ -456,6 +484,7 @@ function attachPlayerVideoEvents(runtime, side) {
       renderPlayerControls();
       return;
     }
+    sideState.segment = playerSegmentFor(runtime.block, side, sideState.duration);
     sideState.timing = playerTimingForAsset(sideState.asset, sideState.duration);
     sideState.loaded = true;
     sideState.statusName = 'loaded';
@@ -463,6 +492,9 @@ function attachPlayerVideoEvents(runtime, side) {
       ? sideState.loop
       : { enabled: false, start: 0, end: sideState.duration };
     sideState.video.loop = false;
+    if (sideState.video.currentTime < sideState.segment.in || sideState.video.currentTime > sideState.segment.out) {
+      setPlayerCurrentTime(sideState, sideState.segment.in);
+    }
     setPlayerVideoStatus(
       sideState,
       sideState.timing.kind === 'unknown'
@@ -482,18 +514,29 @@ function attachPlayerVideoEvents(runtime, side) {
     renderPlayerControls();
   };
   const restartLoop = () => {
-    if (state.player.runtime !== runtime || !sideState.loaded || !sideState.loop?.enabled) return false;
-    const start = Number.isFinite(sideState.loop.start) ? sideState.loop.start : 0;
-    const end = Number.isFinite(sideState.loop.end) && sideState.loop.end > start
-      ? sideState.loop.end
-      : sideState.duration;
+    if (state.player.runtime !== runtime || !sideState.loaded) return false;
+    const looping = Boolean(sideState.loop?.enabled);
+    const start = looping && Number.isFinite(sideState.loop.start)
+      ? sideState.loop.start
+      : sideState.segment.in;
+    const end = looping && Number.isFinite(sideState.loop.end) && sideState.loop.end > start
+      ? Math.min(sideState.loop.end, sideState.segment.out)
+      : sideState.segment.out;
     if (!Number.isFinite(end) || video.currentTime < end) return false;
-    setPlayerCurrentTime(sideState, start);
-    void video.play().catch(() => {});
+    if (looping) {
+      setPlayerCurrentTime(sideState, start);
+      void video.play().catch(() => {});
+    } else {
+      video.pause();
+      setPlayerCurrentTime(sideState, end);
+    }
     return true;
   };
   video.ontimeupdate = () => {
     restartLoop();
+    if (runtime.mode === 'comparison' && runtime.syncMode === 'time' && !runtime.syncGuard) {
+      void alignComparisonFrom(side);
+    }
     if (state.player.runtime === runtime) renderPlayerControls();
   };
   video.onended = () => {
@@ -695,12 +738,34 @@ function pausePlayerSide(side) {
   renderPlayerStatus(state.player.runtime);
 }
 
+async function togglePlayerFullscreen(side) {
+  const runtime = state.player.runtime;
+  const sideState = playerSideState(side);
+  if (!runtime || !sideState?.loaded) return;
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+    if (typeof sideState.video.requestFullscreen !== 'function') {
+      state.player.notice = 'Fullscreen is unavailable in this runtime.';
+      renderPlayerStatus(runtime);
+      return;
+    }
+    await sideState.video.requestFullscreen();
+  } catch (error) {
+    state.player.notice = `Fullscreen unavailable: ${error.message}`;
+    renderPlayerStatus(runtime);
+  }
+}
+
 async function playComparison() {
   const runtime = state.player.runtime;
   const left = playerSideState('left');
   const right = playerSideState('right');
   if (!runtime || runtime.mode !== 'comparison' || !left?.loaded || !right?.loaded) return;
   try {
+    if (runtime.syncMode === 'time' && left.anchor && right.anchor) await alignComparisonAt(0);
     await Promise.all([left.video.play(), right.video.play()]);
     state.player.notice = 'Comparison playback started on both loaded sources.';
   } catch (error) {
@@ -815,8 +880,8 @@ async function setPlayerLoop(side, enabled) {
   if (!runtime || !sideState?.loaded) return;
   const loop = {
     enabled: Boolean(enabled),
-    start: Number.isFinite(sideState.loop?.start) ? sideState.loop.start : 0,
-    end: sideState.duration,
+    start: Number.isFinite(sideState.loop?.start) ? sideState.loop.start : sideState.segment.in,
+    end: Number.isFinite(sideState.segment?.out) ? sideState.segment.out : sideState.duration,
   };
   try {
     await window.pitchingApp.sync.createPlayerBlock({
@@ -878,9 +943,16 @@ async function alignComparisonAt(relativeTime) {
 async function alignComparisonFrom(side) {
   const runtime = state.player.runtime;
   const sideState = playerSideState(side);
-  if (!runtime || runtime.mode !== 'comparison' || !sideState?.loaded || !sideState.anchor) return;
+  if (!runtime || runtime.mode !== 'comparison' || runtime.syncGuard || runtime.alignmentPending
+    || !sideState?.loaded || !sideState.anchor) return;
+  if (runtime.syncMode !== 'time') return;
   const relativeTime = sideState.video.currentTime - sideState.anchor.observedTime;
-  await alignComparisonAt(relativeTime);
+  runtime.alignmentPending = true;
+  try {
+    await alignComparisonAt(relativeTime);
+  } finally {
+    runtime.alignmentPending = false;
+  }
 }
 
 function activatePlayerBlock(entry) {
@@ -890,6 +962,7 @@ function activatePlayerBlock(entry) {
   state.player.runtime = runtime;
   elements.singlePlayer.hidden = runtime.mode !== 'single';
   elements.comparisonPlayer.hidden = runtime.mode !== 'comparison';
+  elements.comparisonPlayer.dataset.layout = runtime.block.layout === 'stacked' ? 'stacked' : 'side-by-side';
   Object.keys(runtime.sides).forEach((side) => {
     resetPlayerVideo(runtime.sides[side]);
     attachPlayerVideoEvents(runtime, side);
@@ -940,8 +1013,15 @@ function renderPlayer() {
     return;
   }
   state.player.runtime.block = selectedEntry.block;
+  state.player.runtime.syncMode = selectedEntry.block.sync?.mode === 'frame' ? 'frame' : 'time';
+  elements.comparisonPlayer.dataset.layout = selectedEntry.block.layout === 'stacked' ? 'stacked' : 'side-by-side';
   Object.keys(state.player.runtime.sides).forEach((side) => {
     state.player.runtime.sides[side].anchor = playerAnchorFor(selectedEntry.block, side);
+    state.player.runtime.sides[side].segment = playerSegmentFor(
+      selectedEntry.block,
+      side,
+      state.player.runtime.sides[side].duration,
+    );
   });
   renderPlayerControls();
 }
@@ -1047,6 +1127,9 @@ function renderVideoBlockEditor(block) {
 
 function renderBlockEditor(section, block, index) {
   const typeLabel = block.type === 'comparisonVideo' ? 'Comparison video' : block.type === 'singleVideo' ? 'Single video' : 'Text';
+  const playerAction = block.type === 'singleVideo' || block.type === 'comparisonVideo'
+    ? `<button class="button button-secondary" type="button" data-block-action="open-player">Open player</button>`
+    : '';
   const body = block.type === 'rich-text' || block.type === 'text'
     ? `<label class="block-text-editor">Text <textarea rows="5" data-block-field="content">${escapeHtml(block.content || '')}</textarea></label>`
     : (block.type === 'singleVideo' || block.type === 'comparisonVideo')
@@ -1056,7 +1139,7 @@ function renderBlockEditor(section, block, index) {
     <article class="content-block-card" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}">
       <header class="content-block-header">
         <strong>${typeLabel}</strong>
-        <div class="content-block-actions">
+        <div class="content-block-actions">${playerAction}
           <button class="icon-button" type="button" data-block-action="move-up" aria-label="Move block up">↑</button>
           <button class="icon-button" type="button" data-block-action="move-down" aria-label="Move block down">↓</button>
           <button class="button button-secondary" type="button" data-block-action="delete">Delete</button>
@@ -1192,6 +1275,12 @@ function handleBlockEditorEvent(event) {
   const action = target.closest('[data-block-action]')?.dataset.blockAction;
   if (!action) return;
   const index = section.blocks.findIndex((item) => item.id === block.id);
+  if (action === 'open-player') {
+    state.player.selectedBlockId = block.id;
+    renderPlayer();
+    document.querySelector('#player-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
   if (action === 'delete') section.blocks.splice(index, 1);
   if (action === 'move-up' && index > 0) [section.blocks[index - 1], section.blocks[index]] = [section.blocks[index], section.blocks[index - 1]];
   if (action === 'move-down' && index >= 0 && index < section.blocks.length - 1) [section.blocks[index], section.blocks[index + 1]] = [section.blocks[index + 1], section.blocks[index]];
@@ -1544,6 +1633,7 @@ elements.singleSeek.addEventListener('input', () => setPlayerSeek('single', elem
 elements.singleRate.addEventListener('change', () => { void setPlayerRate('single', elements.singleRate.value).catch(() => {}); });
 elements.singleLoop.addEventListener('change', () => { void setPlayerLoop('single', elements.singleLoop.checked); });
 elements.singleAnchor.addEventListener('click', () => { void capturePlayerAnchor('single'); });
+elements.singleFullscreen.addEventListener('click', () => { void togglePlayerFullscreen('single'); });
 
 elements.comparisonPlay.addEventListener('click', () => { void playComparison(); });
 elements.comparisonPause.addEventListener('click', pauseComparison);
@@ -1556,6 +1646,7 @@ elements.comparisonLeftNext.addEventListener('click', () => { void stepPlayerSid
 elements.comparisonLeftSeek.addEventListener('input', () => setPlayerSeek('left', elements.comparisonLeftSeek.value));
 elements.comparisonLeftLoop.addEventListener('change', () => { void setPlayerLoop('left', elements.comparisonLeftLoop.checked); });
 elements.comparisonLeftAnchor.addEventListener('click', () => { void capturePlayerAnchor('left'); });
+elements.comparisonLeftFullscreen.addEventListener('click', () => { void togglePlayerFullscreen('left'); });
 elements.comparisonRightPlay.addEventListener('click', () => { void playPlayerSide('right'); });
 elements.comparisonRightPause.addEventListener('click', () => pausePlayerSide('right'));
 elements.comparisonRightPrev.addEventListener('click', () => { void stepPlayerSide('right', -1); });
@@ -1563,6 +1654,8 @@ elements.comparisonRightNext.addEventListener('click', () => { void stepPlayerSi
 elements.comparisonRightSeek.addEventListener('input', () => setPlayerSeek('right', elements.comparisonRightSeek.value));
 elements.comparisonRightLoop.addEventListener('change', () => { void setPlayerLoop('right', elements.comparisonRightLoop.checked); });
 elements.comparisonRightAnchor.addEventListener('click', () => { void capturePlayerAnchor('right'); });
+elements.comparisonRightFullscreen.addEventListener('click', () => { void togglePlayerFullscreen('right'); });
+document.addEventListener('fullscreenchange', () => { if (state.player.runtime) renderPlayerControls(); });
 
 elements.sectionTitle.addEventListener('input', () => {
   const section = activeSection();

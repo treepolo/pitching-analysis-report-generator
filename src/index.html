@@ -84,7 +84,7 @@
           <p id="player-empty" class="player-empty">沒有可播放影片；不會以 fixture 或假資料冒充載入成功。</p>
 
           <div id="single-player" class="player-runtime" hidden>
-            <div class="player-video-frame"><video id="single-video" playsinline preload="metadata"></video></div>
+            <div class="player-video-frame"><video id="single-video" playsinline preload="metadata"></video><button id="single-fullscreen" class="video-fullscreen-button" type="button" disabled>Fullscreen</button></div>
             <p id="single-video-status" class="player-video-status" role="status">尚未載入來源。</p>
             <div class="player-controls" data-player-side="single">
               <button id="single-play" class="button button-secondary" type="button" disabled>播放</button>
@@ -113,6 +113,7 @@
                 <div class="player-controls player-controls-compact"><button id="comparison-right-play" class="button button-secondary" type="button" disabled>播放</button><button id="comparison-right-pause" class="button button-secondary" type="button" disabled>暫停</button><button id="comparison-right-prev" class="button button-secondary" type="button" disabled>上一幀</button><button id="comparison-right-next" class="button button-secondary" type="button" disabled>下一幀</button><label class="player-range-label" for="comparison-right-seek">Seek <input id="comparison-right-seek" type="range" min="0" max="0" step="0.001" value="0" disabled /></label><output id="comparison-right-time" class="player-time">0.00s</output><label class="checkbox-label"><input id="comparison-right-loop" type="checkbox" disabled /> 循環</label><button id="comparison-right-anchor" class="button button-primary" type="button" disabled>設右側同步點</button></div>
               </article>
             </div>
+            <div class="comparison-fullscreen-actions"><button id="comparison-left-fullscreen" class="button button-secondary" type="button" disabled>Fullscreen left</button><button id="comparison-right-fullscreen" class="button button-secondary" type="button" disabled>Fullscreen right</button></div>
             <div class="comparison-actions"><button id="comparison-play" class="button button-secondary" type="button" disabled>同步播放</button><button id="comparison-pause" class="button button-secondary" type="button" disabled>同步暫停</button><label for="comparison-rate">同步速度</label><select id="comparison-rate" disabled><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><button id="comparison-align-zero" class="button button-primary" type="button" disabled>回到相對時間 0</button></div>
             <p id="comparison-sync-status" class="hint">兩側都設定同步點後，seek 會依 relative time 對齊；沒有 anchor 時只揭露 unknown，不會假裝已同步。</p>
           </div>
