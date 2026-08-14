@@ -1,5 +1,13 @@
 # Current Project State
 
+## Latest current provenance (2026-08-14)
+
+- Current Git state: `fd2f68798097116375ace0372c57f6a8ae137e05` on `worker/desktop-vertical-slice`; worktree clean; no remote configured and no push evidence.
+- Latest app/runtime QA revision: `fd2f687 test: add responsive desktop smoke gate`. It added the smoke-only desktop/narrow responsive gate and preserved the exported-folder/ZIP `file://` runtime result as unavailable; it did not alter production launch security.
+- Evidence provenance: the existing `65 pass / 1 skip` `npm test`, 29 JavaScript `node --check` results, and app Electron smoke output are previous-worker evidence at the `fd2f687` checkpoint, not fresh read-only QA evidence for this docs task.
+- Fresh read-only QA reproduced only 18 pure tests. QA gate remains `CONDITIONAL FAIL / IN_PROGRESS`; no requirement is `VERIFIED`.
+- Remaining blockers: exported Electron `file://` runtime unavailable, real video/FFmpeg evidence unavailable, responsive human evidence and AT-A through AT-G incomplete. GitHub Private setup remains `AWAITING_USER_SETUP`.
+
 這是本專案跨 Session / Agent 延續所需的最小 current state。治理方向以目前提供的 Layer 1 / Layer 2 為準；不要把本文件擴張成工程 SOP。
 
 ## Product
