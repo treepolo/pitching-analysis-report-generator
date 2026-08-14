@@ -103,10 +103,8 @@ Evidence must distinguish passed automated checks from skipped/unavailable runti
 
 ## Current coordination state
 
-- Active lane: Shell / Report Model / Renderer, first canonical block-editor vertical slice.
-- Local branch: `worker/desktop-vertical-slice`.
-- Local HEAD: `93ffb612542e6e202d6de8e2109f636c7b445ee7` (`feat: add canonical block editor vertical slice`).
-- Configured origin: `https://github.com/treepolo/pitching-analysis-report-generator.git`.
-- The code checkpoint push returned success, but the immediate follow-up `ls-remote` was blocked by a GitHub HTTPS connection failure; remote SHA verification remains pending until the command succeeds.
-- At dispatch, shared workspace dirty files from another domain lane were observed; they were not staged into this checkpoint. The current post-commit status was clean. If another dirty lane reappears, ownership-aware serial integration is required before any parallel claim.
-- No product requirement is marked VERIFIED by this plan. Real-media, runtime, browser/file URL, responsive human, and AT-A through AT-G evidence remain separate acceptance gates.
+- Current wave: Wave 4 Integrator serial gate; all required Wave 1/3 commits are in the ancestry of code checkpoint `4ba8704421c75d1b57a98afecd2e3340f4e9fc86`.
+- Branch: `worker/desktop-vertical-slice`; configured origin: `https://github.com/treepolo/pitching-analysis-report-generator.git`.
+- The pre-doc worktree was clean and no overlapping dirty lane was present. The Integrator reviewed the renderer/preload export API, block-local sync/media timing boundary, and referenced-asset export traversal before this docs checkpoint.
+- Fresh evidence is 94 tests / 93 pass / 1 explicit exported-folder/extracted-ZIP `file://` skip, 33 JavaScript syntax checks, package/lock, diff, artifact/security checks, and Electron smoke. The export UI uses a project-root-safe `output` default because no arbitrary output-folder picker bridge exists; this remains follow-up UX.
+- No product requirement is marked VERIFIED by this plan. Real media/FFmpeg, browser/file URL, responsive human, and AT-A through AT-G evidence remain separate acceptance gates.

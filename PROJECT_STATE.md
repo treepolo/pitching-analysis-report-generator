@@ -8,15 +8,14 @@
 - Dependency graph: Report Model/Editor defines block schema and persistence; Media Pipeline supplies project-local asset metadata/status; Playback/Sync consumes block-local video configuration; Renderer/Export derives the referenced set and portable output; Shell/QA owns security, recovery, and acceptance gates.
 - This is a planning decision only. Existing implementation evidence does not mark any requirement `VERIFIED`.
 
-## Latest current provenance (2026-08-14)
+## Latest current provenance (2026-08-14, Wave 4 serial gate)
 
-- Current Git state: `4f83eb3161b2b54f3200f5c814cc2e973908c8b9` on `worker/desktop-vertical-slice`; origin is `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches the local checkpoint, and the worktree is clean.
-- Latest startup revisions: `dfef829 fix: normalize Windows launcher batch syntax` converted the launcher to ASCII/CRLF label/goto syntax; `5bbd845 fix: harden opt-in GPU startup fallback` added opt-in `disable-gpu`/`in-process-gpu` switches plus `app.disableHardwareAcceleration()` before app ready.
-- Exact launch evidence: `cmd.exe /d /c call start-pitching-report.bat` kept Electron running for more than 16 seconds without the GPU fatal; `node --check src/main.js` and `git diff --check` passed. This is runtime evidence for the opt-in launch path, not full product acceptance.
-- Wave 2 integration provenance: ancestry includes `93ffb61` block editor, `56f7159` media lifecycle, `646df8a` block-local sync modes, `121d857` referenced-video-only export, and `4f83eb3` parallel governance protocol. The latest checkpoint was pushed and verified with `git ls-remote`.
-- Current evidence: `npm test` reports 82 tests, 81 pass, 1 explicit Electron `file://` runtime skip, and 0 failures; 30 JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, Electron smoke, block-editor UI, persistence/reopen, bridge security, and referenced-asset export checks pass. The Electron exported `file://` runtime remains unavailable and is not treated as pass.
-- QA gate remains `CONDITIONAL FAIL / IN_PROGRESS`; no requirement is `VERIFIED`.
-- Remaining blockers: real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G remain incomplete. GitHub Private origin is configured and verified, but all product requirements remain conservative and unverified.
+- Current code checkpoint before this docs reconciliation: `4ba8704421c75d1b57a98afecd2e3340f4e9fc86` on `worker/desktop-vertical-slice`; origin is `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matched, and the worktree was clean.
+- Integrated ancestry includes `93ffb61` block editor, `56f7159` media lifecycle, `646df8a` block-local sync, `121d857` referenced-video-only export, `4f83eb3` parallel governance, `d31244b` player runtime, `dad97d0` media timing/tool seam, `21a1bd4` sync hardening, `2278320` export bridge, and `4ba8704` export UI.
+- Fresh evidence: `npm test` reports 94 tests, 93 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip, and 0 failures; 33 JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/security scan pass.
+- Fresh Electron smoke reports block-editor, persistence/reopen, media-list, player-empty, sync-fallback, IPC-security, payload-schema, close-flush, and responsive desktop/narrow controls including export. This is synthetic/domain smoke evidence, not real-video or human acceptance.
+- The export UI uses the project-root-safe `output` directory because no arbitrary output-folder picker bridge exists. This is a follow-up UX limitation, not arbitrary-folder evidence and not fake success.
+- QA gate remains `CONDITIONAL FAIL / IN PROGRESS`; no requirement is `VERIFIED`. Real video/FFmpeg, real player/sync, exported folder/ZIP browser `file://`, responsive human evidence, and AT-A through AT-G remain incomplete.
 
 這是本專案跨 Session / Agent 延續所需的最小 current state。治理方向以目前提供的 Layer 1 / Layer 2 為準；不要把本文件擴張成工程 SOP。
 

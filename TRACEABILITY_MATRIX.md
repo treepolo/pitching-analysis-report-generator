@@ -6,6 +6,14 @@
 - Export inclusion is derived from video-block references only; unused Media Library assets are excluded and originals remain untouched.
 - The new target is planning scope only. Existing rows remain conservative and no requirement is `VERIFIED`.
 
+## Wave 4 serial integration provenance (current, 2026-08-14)
+
+- Code checkpoint reviewed: `4ba8704421c75d1b57a98afecd2e3340f4e9fc86` on `worker/desktop-vertical-slice`; origin is configured and the pre-doc worktree was clean.
+- Integrated ancestry includes `93ffb61`, `56f7159`, `646df8a`, `121d857`, `4f83eb3`, `d31244b`, `dad97d0`, `21a1bd4`, `2278320`, and `4ba8704`.
+- Cross-lane review: renderer export calls the allowlisted preload job bridge; main re-reads the saved canonical project; player source resolution stays behind the safe media bridge; sync consumes per-source timing metadata; exporter traverses only canonical video blocks and stages only referenced assets.
+- Evidence: 94 tests / 93 pass / 1 explicit Electron `file://` skip / 0 fail; 33 JavaScript syntax checks; package/lock consistency; `git diff --check`; artifact/security scan; and fresh Electron smoke for block editor, persistence/reopen/security, player/sync fallback, responsive desktop+narrow controls, and export control.
+- The export UI uses the project-root-safe `output` directory because no arbitrary output-folder picker bridge exists. This is follow-up UX, not arbitrary-folder evidence. Real video/FFmpeg, browser `file://`, responsive human evidence, and AT-A through AT-G remain unresolved; no requirement row is `VERIFIED`.
+
 ## Latest current provenance (2026-08-14)
 
 - Current Git state: `4f83eb3161b2b54f3200f5c814cc2e973908c8b9` on `worker/desktop-vertical-slice`; origin is configured at `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches, and the worktree is clean.

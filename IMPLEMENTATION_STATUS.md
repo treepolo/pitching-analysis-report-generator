@@ -7,6 +7,13 @@
 - Existing shell, storage, media, sync, and export seams remain reusable only where they satisfy this canonical contract. This docs update does not claim migration or implementation completion.
 - QA status remains conservative: no requirement is `VERIFIED`; real video/FFmpeg, real player/sync, export `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G remain incomplete.
 
+## Wave 4 serial integration provenance (current, 2026-08-14)
+
+- Code checkpoint reviewed: `4ba8704421c75d1b57a98afecd2e3340f4e9fc86` on `worker/desktop-vertical-slice`; origin is configured and the pre-doc worktree was clean.
+- Integrated ancestry includes `93ffb61`, `56f7159`, `646df8a`, `121d857`, `4f83eb3`, `d31244b`, `dad97d0`, `21a1bd4`, `2278320`, and `4ba8704`.
+- Fresh evidence: `npm test` 94 total / 93 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip / 0 fail; 33 JavaScript syntax checks; package/lock consistency; `git diff --check`; tracked artifact/security scan; and Electron smoke covering persistence/import/block editor/media-list/player-empty/sync-fallback/IPC-security/responsive desktop+narrow/export-control/payload-schema/close-flush/reopen.
+- The export UI uses the project-root-safe `output` directory because no arbitrary output-folder picker bridge exists; this is a follow-up UX limitation, not arbitrary-folder evidence. No requirement is `VERIFIED`; real video/FFmpeg, actual player/sync, browser `file://`, responsive human, and AT-A through AT-G evidence remain incomplete.
+
 ## Latest current provenance (2026-08-14)
 
 - Current Git state: `4f83eb3161b2b54f3200f5c814cc2e973908c8b9` on `worker/desktop-vertical-slice`; origin is configured at `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches, and the worktree is clean.
