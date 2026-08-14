@@ -5,5 +5,6 @@ module.exports = {
   ...require('./exporter'),
   ...require('./layout-validator'),
   ...require('./report-renderer'),
+  ...require('./runtime-smoke'),
   ...require('./zip-archive'),
 };

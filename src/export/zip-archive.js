@@ -93,6 +93,7 @@ async function readZipArchive(zipPath) {
       relativePath,
       byteLength: data.length,
       sha256: sha256(data),
+      data,
     });
     offset = dataEnd;
   }
@@ -130,8 +131,65 @@ async function validateZipParity(sourceDirectory, zipPath) {
   return {
     valid: true,
     fileCount: files.length,
-    entries: [...archiveEntries.values()],
+    entries: [...archiveEntries.values()].map(({ relativePath, byteLength, sha256: digest }) => ({
+      relativePath,
+      byteLength,
+      sha256: digest,
+    })),
   };
+}
+
+function isPathInside(rootPath, candidatePath) {
+  const relative = path.relative(path.resolve(rootPath), path.resolve(candidatePath));
+  return relative === ''
+    || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+async function extractZipArchive(zipPath, targetDirectory) {
+  const targetPath = path.resolve(targetDirectory);
+  const existing = await fs.lstat(targetPath).catch((error) => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (existing?.isSymbolicLink()) {
+    throw new ExportValidationError(`ZIP extraction target must not be a symbolic link: ${targetPath}`);
+  }
+  if (existing && !existing.isDirectory()) {
+    throw new ExportValidationError(`ZIP extraction target is not a directory: ${targetPath}`);
+  }
+  if (existing) {
+    throw new ExportValidationError(`ZIP extraction target already exists: ${targetPath}`);
+  }
+
+  const parentPath = path.dirname(targetPath);
+  await fs.mkdir(parentPath, { recursive: true });
+  const temporaryPath = await fs.mkdtemp(path.join(
+    parentPath,
+    `.${path.basename(targetPath)}.${process.pid}.extract-`,
+  ));
+  try {
+    const archiveEntries = await readZipArchive(zipPath);
+    for (const entry of archiveEntries.values()) {
+      const destination = path.join(temporaryPath, ...entry.relativePath.split('/'));
+      if (!isPathInside(temporaryPath, destination) || destination === temporaryPath) {
+        throw new ExportValidationError(`ZIP entry resolves outside extraction target: ${entry.relativePath}`);
+      }
+      await fs.mkdir(path.dirname(destination), { recursive: true });
+      await fs.writeFile(destination, entry.data, { flag: 'wx' });
+    }
+    await fs.rename(temporaryPath, targetPath);
+    return {
+      targetDirectory: targetPath,
+      entries: [...archiveEntries.values()].map(({ relativePath, byteLength, sha256: digest }) => ({
+        relativePath,
+        byteLength,
+        sha256: digest,
+      })),
+    };
+  } catch (error) {
+    await fs.rm(temporaryPath, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 function dosTimestamp() {
@@ -275,6 +333,7 @@ async function createZipArchive(sourceDirectory, zipPath) {
 module.exports = {
   createZipArchive,
   crc32,
+  extractZipArchive,
   readZipArchive,
   validateZipParity,
 };

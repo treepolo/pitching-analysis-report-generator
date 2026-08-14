@@ -520,6 +520,12 @@ async function loadPlayerSide(runtime, side) {
     renderPlayerControls();
     return;
   }
+  if (asset.compatibility === 'needs-normalization' && !asset.normalizedReference) {
+    sideState.statusName = 'pending';
+    setPlayerVideoStatus(sideState, 'Metadata 已檢查，但 normalization 尚未完成；暫停直接播放。', 'pending');
+    renderPlayerControls();
+    return;
+  }
   sideState.statusName = 'loading';
   setPlayerVideoStatus(sideState, '正在解析 project-local media source…');
   renderPlayerControls();

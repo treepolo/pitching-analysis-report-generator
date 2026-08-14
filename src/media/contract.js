@@ -924,7 +924,10 @@ function transitionNormalizationJob(job, action, details = {}) {
       next.processed = current.total;
       next.counts = { success: current.total, skipped: 0, failed: 0 };
       next.normalizedReference = normalizedReference;
-      next.resultLocation = normalizedReference;
+      next.resultLocation = {
+        ...normalizedReference,
+        role: 'result',
+      };
       next.verification = verification;
       next.error = null;
       next.cancelRequested = false;
