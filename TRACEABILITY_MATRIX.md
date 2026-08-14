@@ -6,6 +6,13 @@
 - Export inclusion is derived from video-block references only; unused Media Library assets are excluded and originals remain untouched.
 - The new target is planning scope only. Existing rows remain conservative and no requirement is `VERIFIED`.
 
+## Wave 5 serial integration provenance (current, 2026-08-14)
+
+- Code checkpoint before this docs reconciliation: `d9541b812e9853f2e9b4a08dddad742c293caeb3`; `bd9d8ee` adds the secure native output-directory picker bridge. Branch is `worker/desktop-vertical-slice`, origin is configured, and the pre-doc worktree was clean.
+- Contract evidence: main trusted picker IPC returns only a project-root-contained directory or `null`; preload validates the returned value; renderer uses the selected directory or project-safe default, shows only a basename label, and does not start export when cancelled.
+- Fresh evidence: 95 tests / 94 pass / 1 explicit Electron `file://` skip / 0 fail; 33 JS syntax checks; package/lock, diff, artifact/security checks; and Electron smoke for block editor, persistence/reopen, player/sync fallback, bridge security, responsive controls, and export control.
+- Native folder-dialog interaction was not exercised by headless smoke; exported folder/ZIP `file://` runtime remains unavailable. Real video/FFmpeg/player/sync/drift, responsive human evidence, and AT-A through AT-G remain unresolved. No requirement row is `VERIFIED`.
+
 ## Wave 4 serial integration provenance (current, 2026-08-14)
 
 - Code checkpoint reviewed: `4ba8704421c75d1b57a98afecd2e3340f4e9fc86` on `worker/desktop-vertical-slice`; origin is configured and the pre-doc worktree was clean.

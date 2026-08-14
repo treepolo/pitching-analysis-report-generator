@@ -7,6 +7,14 @@
 - Existing shell, storage, media, sync, and export seams remain reusable only where they satisfy this canonical contract. This docs update does not claim migration or implementation completion.
 - QA status remains conservative: no requirement is `VERIFIED`; real video/FFmpeg, real player/sync, export `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G remain incomplete.
 
+## Wave 5 serial integration provenance (current, 2026-08-14)
+
+- Code checkpoint before this docs reconciliation: `d9541b812e9853f2e9b4a08dddad742c293caeb3`; `bd9d8ee` provides the native picker bridge. Branch is `worker/desktop-vertical-slice`, origin is configured, and the pre-doc worktree was clean.
+- Picker parity review passed: main `export:pick-directory` validates trusted sender and project-root realpath containment; preload exposes `pickExportDirectory()` with `null` cancellation; renderer consumes the selected path, falls back safely, shows a display-safe label, and passes the selected directory to `startExport`.
+- Fresh regression evidence: 95 total / 94 pass / 1 explicit Electron exported `file://` skip / 0 fail; 33 JS syntax checks; package/lock consistency; `git diff --check`; tracked artifact/security scan; and Electron smoke for persistence/import/block editor/media/player empty/sync fallback/security/responsive/reopen gates.
+- Native dialog selection/cancel was not exercised by the headless smoke, and exported folder/ZIP `file://` runtime remains unavailable. These are explicit evidence gaps, not passes. No requirement may be marked `VERIFIED`.
+- Remaining blockers: real video/FFmpeg, actual player/sync/drift, native picker/human evidence, exported `file://` runtime, responsive human evidence, and AT-A through AT-G.
+
 ## Wave 4 serial integration provenance (current, 2026-08-14)
 
 - Code checkpoint reviewed: `4ba8704421c75d1b57a98afecd2e3340f4e9fc86` on `worker/desktop-vertical-slice`; origin is configured and the pre-doc worktree was clean.

@@ -103,8 +103,8 @@ Evidence must distinguish passed automated checks from skipped/unavailable runti
 
 ## Current coordination state
 
-- Current wave: Wave 4 Integrator serial gate; all required Wave 1/3 commits are in the ancestry of code checkpoint `4ba8704421c75d1b57a98afecd2e3340f4e9fc86`.
-- Branch: `worker/desktop-vertical-slice`; configured origin: `https://github.com/treepolo/pitching-analysis-report-generator.git`.
-- The pre-doc worktree was clean and no overlapping dirty lane was present. The Integrator reviewed the renderer/preload export API, block-local sync/media timing boundary, and referenced-asset export traversal before this docs checkpoint.
-- Fresh evidence is 94 tests / 93 pass / 1 explicit exported-folder/extracted-ZIP `file://` skip, 33 JavaScript syntax checks, package/lock, diff, artifact/security checks, and Electron smoke. The export UI uses a project-root-safe `output` default because no arbitrary output-folder picker bridge exists; this remains follow-up UX.
-- No product requirement is marked VERIFIED by this plan. Real media/FFmpeg, browser/file URL, responsive human, and AT-A through AT-G evidence remain separate acceptance gates.
+- Current wave: Wave 5 Integrator serial gate; code checkpoint `d9541b812e9853f2e9b4a08dddad742c293caeb3` includes picker bridge `bd9d8ee` and the required prior lane ancestry.
+- Branch: `worker/desktop-vertical-slice`; configured origin: `https://github.com/treepolo/pitching-analysis-report-generator.git`; the pre-doc worktree was clean.
+- Cross-lane review covered trusted native picker IPC, preload `null` cancellation, renderer selected/default directory state, display-safe labels, export job wiring, and project-root containment.
+- Fresh evidence is 95 tests / 94 pass / 1 explicit exported-folder/extracted-ZIP `file://` skip, 33 JavaScript syntax checks, package/lock, diff, artifact/security checks, and Electron smoke. Native dialog interaction was not exercised by headless smoke; no success is inferred.
+- No product requirement is marked VERIFIED by this plan. Real media/FFmpeg/player/sync/drift, browser/file URL, responsive human, native picker human, and AT-A through AT-G evidence remain separate acceptance gates.

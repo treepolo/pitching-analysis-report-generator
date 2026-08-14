@@ -8,6 +8,15 @@
 - Dependency graph: Report Model/Editor defines block schema and persistence; Media Pipeline supplies project-local asset metadata/status; Playback/Sync consumes block-local video configuration; Renderer/Export derives the referenced set and portable output; Shell/QA owns security, recovery, and acceptance gates.
 - This is a planning decision only. Existing implementation evidence does not mark any requirement `VERIFIED`.
 
+## Wave 5 serial integration provenance (current, 2026-08-14)
+
+- Code checkpoint before this docs reconciliation: `d9541b812e9853f2e9b4a08dddad742c293caeb3` on `worker/desktop-vertical-slice`; picker bridge commit `bd9d8ee` is in its ancestry, origin matched, and the worktree was clean.
+- Native export-folder contract reviewed: trusted main IPC opens an `openDirectory` dialog, validates the selected directory through project-root realpath containment, preload returns a safe string or `null`, and renderer preserves a project-safe default when no folder is selected.
+- Fresh evidence: `npm test` reports 95 tests, 94 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip, and 0 failures; 33 JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/security scan pass.
+- Fresh Electron smoke passes persistence/import/block-editor/media-list/player-empty/sync-fallback/IPC-security/responsive desktop+narrow/reopen assertions. Native folder-dialog selection/cancel was not exercised by headless smoke, and exported `file://` runtime remains unavailable; neither is treated as pass.
+- The renderer now displays only a safe folder label, keeps selected output separate from the project default, and does not start a job on picker cancellation. No requirement is `VERIFIED`.
+- Remaining blockers: real video/FFmpeg, actual player/sync/drift, native dialog/human folder-picker evidence, exported folder/ZIP browser `file://`, responsive human evidence, and AT-A through AT-G.
+
 ## Latest current provenance (2026-08-14, Wave 4 serial gate)
 
 - Current code checkpoint before this docs reconciliation: `4ba8704421c75d1b57a98afecd2e3340f4e9fc86` on `worker/desktop-vertical-slice`; origin is `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matched, and the worktree was clean.
