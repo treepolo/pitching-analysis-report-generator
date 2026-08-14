@@ -1,5 +1,12 @@
 # Current Project State
 
+## Latest Integrator renderer gate (current, 2026-08-15)
+
+- Current integrated checkpoint: `e65240b6aeabd099af8bb24d56d0af7bb75dd82a` on `worker/desktop-vertical-slice`; ancestry includes the UI redesign crash-recovery guide `2db74bb`, document CSS `05f442e`, document HTML `c4915ff`, and renderer inline-player change `e65240b`. Origin is the configured private repository and `git ls-remote` matches the local HEAD; worktree is clean.
+- Renderer behavior now boots without requiring legacy `#media-library`, `#player-panel`, `#preview`, `#section-list`, or static player controls; video blocks render inline in `#block-canvas`. Partial-DOM guards cover startup/error, block-canvas delegation, import/save, export, and inline player controls. This is implementation evidence, not product acceptance.
+- Fresh regression evidence: 98 npm tests, 97 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip; 34 current JavaScript files pass `node --check`; focused renderer tests pass 2/2; package/lock metadata and `git diff --check` pass; tracked artifact scan shows no private media, generated output, `.tmp`, or environment files.
+- Electron `file://` runtime remains unavailable and is not treated as pass. Real MP4/FFmpeg metadata, real player/sync/drift runtime, native picker interaction, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`.
+
 ## Canonical scope/architecture decision (2026-08-14)
 
 - The former fixed-form/editor UI is superseded. It must not remain as an in-product compatibility mode; the canonical UI is a block-based long-form editor.

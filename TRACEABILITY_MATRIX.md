@@ -1,5 +1,12 @@
 # Traceability Matrix
 
+## Latest Integrator renderer gate (current, 2026-08-15)
+
+- Current checkpoint is `e65240b6aeabd099af8bb24d56d0af7bb75dd82a` on `worker/desktop-vertical-slice`, with ancestry `2db74bb` (UI redesign recovery guide), `05f442e` (document CSS), `c4915ff` (document HTML), and `e65240b` (renderer inline video behavior). Origin remote SHA matches and the worktree is clean.
+- Renderer evidence covers legacy-panel-independent boot, inline video block rendering, block-canvas event delegation, optional DOM guards, and safe media bridge usage. It does not establish runtime or human acceptance of product requirements.
+- Gate evidence: 98 npm tests / 97 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` skip; 34 JavaScript syntax checks; focused renderer tests 2 pass; package/lock consistency, diff check, and artifact/security scan pass. The Electron `file://` skip remains unavailable evidence, not a pass.
+- Unresolved evidence remains real MP4/FFmpeg, real player/sync/drift, native picker interaction, exported folder/ZIP browser `file://`, responsive human acceptance, and AT-A through AT-G. Requirement rows remain conservative and none are `VERIFIED`.
+
 ## Canonical scope/architecture decision (2026-08-14)
 
 - The former fixed-form editor is superseded and is not a product compatibility mode. The canonical target is a block-based long-form editor with many text blocks and independent single/comparison video blocks.

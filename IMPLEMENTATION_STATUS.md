@@ -1,5 +1,12 @@
 # Implementation Status
 
+## Latest Integrator renderer gate (current, 2026-08-15)
+
+- Integrated HEAD is `e65240b6aeabd099af8bb24d56d0af7bb75dd82a` on `worker/desktop-vertical-slice`; ancestry includes `2db74bb` UI redesign recovery guidance, `05f442e` CSS, `c4915ff` HTML, and `e65240b` renderer behavior. Origin points to the configured private repository, remote SHA matches, and the worktree is clean.
+- Renderer consumer no longer requires the legacy global media/player/preview/section panels at boot. Inline video cards and their per-block controls are delegated from `#block-canvas`; startup and optional DOM elements are guarded. No source contract was changed in this integration gate.
+- Evidence: `npm test` 98 total / 97 pass / 1 explicit Electron exported `file://` skip / 0 fail; 34 current `src`/`test`/`scripts` JavaScript files pass `node --check`; focused renderer tests 2 pass; package/lock consistency, `git diff --check`, and private/generated artifact scan pass.
+- Electron exported folder/ZIP `file://` runtime is unavailable in this environment, not a pass. Real video/FFmpeg, actual player/sync/drift, native picker/human interaction, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement may be marked `VERIFIED`.
+
 ## Canonical scope/architecture decision (2026-08-14)
 
 - The former fixed-form/editor UI is superseded and is not a compatibility mode. Implementation must converge on a block-based long-form editor with many text blocks and independent single/comparison video blocks.
