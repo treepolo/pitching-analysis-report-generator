@@ -1,5 +1,11 @@
 # Traceability Matrix
 
+## Latest legacy-player cleanup gate (current, 2026-08-15)
+
+- Current checkpoint is `cea6472b120fa81be51f03c02162ec0ff7dd6e72` on `worker/desktop-vertical-slice`; unreachable global-player helper/reference code was removed while preserving inline video behavior and shared contracts. Origin matches and the worktree is clean.
+- Evidence: 98 npm tests / 97 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` skip; 34 JavaScript syntax checks; focused renderer tests 2 pass; diff check and stale-global-element scan pass. No requirement row is `VERIFIED`.
+- Remaining evidence gaps are real MP4/FFmpeg/player/sync runtime, exported folder/ZIP `file://`, native picker, responsive human acceptance, and AT-A through AT-G.
+
 ## Latest Integrator renderer gate (current, 2026-08-15)
 
 - Current checkpoint is `e65240b6aeabd099af8bb24d56d0af7bb75dd82a` on `worker/desktop-vertical-slice`, with ancestry `2db74bb` (UI redesign recovery guide), `05f442e` (document CSS), `c4915ff` (document HTML), and `e65240b` (renderer inline video behavior). Origin remote SHA matches and the worktree is clean.

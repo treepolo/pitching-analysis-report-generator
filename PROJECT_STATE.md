@@ -1,5 +1,11 @@
 # Current Project State
 
+## Latest legacy-player cleanup gate (current, 2026-08-15)
+
+- Current HEAD is `cea6472b120fa81be51f03c02162ec0ff7dd6e72` on `worker/desktop-vertical-slice`; it follows the renderer integration checkpoint and removes unreachable legacy global-player helpers without changing HTML/CSS or domain contracts. Origin matches this HEAD and the worktree is clean.
+- Regression evidence remains 98 npm tests / 97 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip, 34 JavaScript syntax checks, focused renderer tests 2 pass, and `git diff --check` pass. The legacy global element scan is clean.
+- No product requirement is `VERIFIED`; Electron `file://`, real media/FFmpeg/player/sync, native picker, responsive human evidence, and AT-A through AT-G remain incomplete.
+
 ## Latest Integrator renderer gate (current, 2026-08-15)
 
 - Current integrated checkpoint: `e65240b6aeabd099af8bb24d56d0af7bb75dd82a` on `worker/desktop-vertical-slice`; ancestry includes the UI redesign crash-recovery guide `2db74bb`, document CSS `05f442e`, document HTML `c4915ff`, and renderer inline-player change `e65240b`. Origin is the configured private repository and `git ls-remote` matches the local HEAD; worktree is clean.
