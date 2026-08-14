@@ -29,6 +29,12 @@ const CAPABILITY_STATUS = Object.freeze({
   UNKNOWN: 'unknown',
 });
 
+const SYNC_MODE = Object.freeze({
+  TIME: 'time',
+  FRAME: 'frame',
+  UNKNOWN: 'unknown',
+});
+
 const TIMING_KIND = Object.freeze({
   CFR: 'cfr',
   VFR: 'vfr',
@@ -717,7 +723,10 @@ function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
   const requestedTime = anchor.observedTime + relativeTime;
   const targetTime = clampMediaTime(requestedTime, duration);
   const capabilityStatus = frameStepCapabilityStatus(options.capability);
-  const frameAwareRequested = capabilityStatus !== CAPABILITY_STATUS.UNSUPPORTED
+  const anchorHasFrameEvidence = anchor.precision === PRECISION.FRAME_AWARE
+    && Number.isInteger(anchor.observedFrameIndex);
+  const frameAwareRequested = anchorHasFrameEvidence
+    && capabilityStatus !== CAPABILITY_STATUS.UNSUPPORTED
     && (options.precision === PRECISION.FRAME_AWARE
       || options.frameAware === true
       || supportsFrameStep(options.capability));
@@ -793,6 +802,193 @@ function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
     precision: overallPrecision(Object.values(alignedSides)),
     resolution: overallResolution(Object.values(alignedSides)),
     sides: alignedSides,
+  };
+}
+
+function createPlaybackRelationship(input = {}) {
+  requireRecord(input, 'playback relationship');
+  const mode = input.mode ?? SYNC_MODE.TIME;
+  if (![SYNC_MODE.TIME, SYNC_MODE.FRAME].includes(mode)) {
+    throw new SyncDomainError('playback relationship.mode must be time or frame');
+  }
+  const relativeTime = input.relativeTime === undefined
+    ? 0
+    : requireFinite(input.relativeTime, 'playback relationship.relativeTime', 0);
+  const playbackRate = input.playbackRate ?? input.rate ?? 1;
+  requireFinite(playbackRate, 'playback relationship.playbackRate', Number.MIN_VALUE);
+  const status = input.status ?? PLAYER_STATUS.PAUSED;
+  if (!Object.values(PLAYER_STATUS).includes(status)) {
+    throw new SyncDomainError('playback relationship.status is invalid');
+  }
+  const clockSide = input.clockSide ?? null;
+  if (clockSide !== null && !['left', 'right'].includes(clockSide)) {
+    throw new SyncDomainError('playback relationship.clockSide must be left, right, or null');
+  }
+  return {
+    mode,
+    relativeTime,
+    playbackRate,
+    status,
+    clockSide,
+  };
+}
+
+function createComparisonSyncState(input) {
+  requireRecord(input, 'comparison sync state');
+  const comparisonBlockId = requireId(
+    input.comparisonBlockId,
+    'comparison sync state.comparisonBlockId',
+  );
+  const rawAnchors = input.startAnchors ?? input.anchors ?? {};
+  requireRecord(rawAnchors, 'comparison sync state.startAnchors');
+  const startAnchors = { left: null, right: null };
+  for (const side of ['left', 'right']) {
+    const rawAnchor = rawAnchors[side];
+    if (rawAnchor === undefined || rawAnchor === null) continue;
+    requireRecord(rawAnchor, `comparison sync state.startAnchors.${side}`);
+    const anchor = createSyncAnchor({
+      ...cloneValue(rawAnchor),
+      comparisonBlockId: rawAnchor.comparisonBlockId ?? comparisonBlockId,
+      side: rawAnchor.side ?? side,
+    });
+    assertValid(validateSyncAnchor(anchor, {
+      comparisonBlockId,
+      side,
+    }), `comparison sync state ${side} anchor`);
+    startAnchors[side] = anchor;
+  }
+  return {
+    comparisonBlockId,
+    startAnchors,
+    playback: createPlaybackRelationship(input.playback ?? {}),
+  };
+}
+
+function setSyncStartAnchor(stateInput, side, anchorInput) {
+  if (!['left', 'right'].includes(side)) {
+    throw new SyncDomainError('sync start anchor side must be left or right');
+  }
+  const state = createComparisonSyncState(stateInput);
+  let anchor = null;
+  if (anchorInput !== null) {
+    requireRecord(anchorInput, 'sync start anchor');
+    anchor = createSyncAnchor({
+      ...cloneValue(anchorInput),
+      comparisonBlockId: anchorInput.comparisonBlockId ?? state.comparisonBlockId,
+      side: anchorInput.side ?? side,
+    });
+    assertValid(validateSyncAnchor(anchor, {
+      comparisonBlockId: state.comparisonBlockId,
+      side,
+    }), `comparison sync state ${side} anchor`);
+  }
+  return {
+    ...state,
+    startAnchors: {
+      ...state.startAnchors,
+      [side]: anchor,
+    },
+  };
+}
+
+function clearSyncStartAnchor(stateInput, side) {
+  return setSyncStartAnchor(stateInput, side, null);
+}
+
+function setPlaybackRelationship(stateInput, patch) {
+  const state = createComparisonSyncState(stateInput);
+  requireRecord(patch, 'playback relationship patch');
+  return {
+    ...state,
+    playback: createPlaybackRelationship({ ...state.playback, ...cloneValue(patch) }),
+  };
+}
+
+function advancePlaybackRelationship(stateInput, deltaSeconds) {
+  const state = createComparisonSyncState(stateInput);
+  requireFinite(deltaSeconds, 'playback relationship deltaSeconds');
+  if (state.playback.status !== PLAYER_STATUS.PLAYING) return state;
+  const relativeTime = Math.max(
+    0,
+    state.playback.relativeTime + deltaSeconds * state.playback.playbackRate,
+  );
+  return setPlaybackRelationship(state, { relativeTime });
+}
+
+function effectiveModeForResolution(requestedMode, resolution) {
+  if (requestedMode === SYNC_MODE.TIME) return SYNC_MODE.TIME;
+  if (resolution === FRAME_STEP_RESOLUTION.EXACT_FRAME) return SYNC_MODE.FRAME;
+  if (resolution === FRAME_STEP_RESOLUTION.TIME_ONLY) return SYNC_MODE.TIME;
+  return SYNC_MODE.UNKNOWN;
+}
+
+function mapComparisonSyncState(stateInput, sources) {
+  const state = createComparisonSyncState(stateInput);
+  requireRecord(sources, 'comparison sync sources');
+  const requestedMode = state.playback.mode;
+  const missingSides = ['left', 'right'].filter((side) => !state.startAnchors[side]);
+  if (missingSides.length > 0) {
+    return {
+      valid: false,
+      comparisonBlockId: state.comparisonBlockId,
+      requestedMode,
+      effectiveMode: SYNC_MODE.UNKNOWN,
+      relativeTime: state.playback.relativeTime,
+      resolution: FRAME_STEP_RESOLUTION.UNKNOWN,
+      missingSides,
+      repairAction: 'set-sync-start-anchors',
+      sides: {},
+    };
+  }
+
+  const sides = {};
+  for (const side of ['left', 'right']) {
+    const source = sources[side];
+    if (!isRecord(source)) throw new SyncDomainError(`comparison sync source ${side} is required`);
+    const player = source.player ? createPlayerBlock(source.player) : null;
+    const timing = source.timing ?? player?.timing ?? state.startAnchors[side].timingSnapshot;
+    const duration = source.duration ?? player?.duration;
+    const capability = source.capability;
+    const anchor = state.startAnchors[side];
+    if (source.mediaAssetId !== undefined && source.mediaAssetId !== anchor.mediaAssetId) {
+      throw new SyncDomainError(`comparison sync source ${side} asset does not match its anchor`);
+    }
+    if (player?.mediaAssetId !== undefined && player.mediaAssetId !== anchor.mediaAssetId) {
+      throw new SyncDomainError(`comparison sync player ${side} asset does not match its anchor`);
+    }
+    if (player?.comparisonBlockId !== undefined
+        && player.comparisonBlockId !== state.comparisonBlockId) {
+      throw new SyncDomainError(`comparison sync player ${side} block does not match its state`);
+    }
+    if (player?.side !== undefined && player.side !== side) {
+      throw new SyncDomainError(`comparison sync player ${side} side does not match its state`);
+    }
+    const frameModeRequested = requestedMode === SYNC_MODE.FRAME;
+    const mapping = mapAnchorToRelativeTime(anchor, state.playback.relativeTime, {
+      duration,
+      timing,
+      capability: frameModeRequested ? capability : false,
+      frameAware: frameModeRequested && supportsFrameStep(capability),
+    });
+    sides[side] = {
+      ...mapping,
+      requestedMode,
+      fallback: frameModeRequested && mapping.resolution !== FRAME_STEP_RESOLUTION.EXACT_FRAME,
+    };
+  }
+  const resolution = overallResolution(Object.values(sides));
+  return {
+    valid: true,
+    comparisonBlockId: state.comparisonBlockId,
+    requestedMode,
+    effectiveMode: effectiveModeForResolution(requestedMode, resolution),
+    relativeTime: state.playback.relativeTime,
+    playbackRate: state.playback.playbackRate,
+    status: state.playback.status,
+    resolution,
+    fallback: requestedMode === SYNC_MODE.FRAME
+      && resolution !== FRAME_STEP_RESOLUTION.EXACT_FRAME,
+    sides,
   };
 }
 
@@ -1036,19 +1232,25 @@ module.exports = Object.freeze({
   FRAME_STEP_RESOLUTION,
   PLAYER_STATUS,
   PRECISION,
+  SYNC_MODE,
   SyncDomainError,
   TIMING_KIND,
   advancePlayer,
+  advancePlaybackRelationship,
   alignComparisonAtRelativeTime,
   clampMediaTime,
   captureSyncAnchor,
+  clearSyncStartAnchor,
   createLoop,
+  createComparisonSyncState,
+  createPlaybackRelationship,
   createPlayerBlock,
   createSyncAnchor,
   estimateFallbackStep,
   frameDurationForTiming,
   frameTimeForIndex,
   mapAnchorToRelativeTime,
+  mapComparisonSyncState,
   normalizeDriftPolicy,
   normalizeTimingMetadata,
   planComparisonDriftCorrection,
@@ -1057,9 +1259,11 @@ module.exports = Object.freeze({
   seekPlayer,
   seekPlayerToRelativeTime,
   setPlaybackRate,
+  setPlaybackRelationship,
   setPlayerAnchor,
   setPlayerLoop,
   setPlayerStatus,
+  setSyncStartAnchor,
   frameStepCapabilityStatus,
   supportsFrameStep,
   timeToFrame,
