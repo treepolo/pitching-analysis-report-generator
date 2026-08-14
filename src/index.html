@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' file:; object-src 'none'; base-uri 'none'; form-action 'self'" />
     <title>投球動作分析報告產生器</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -57,10 +57,56 @@
           </div>
         </div>
 
-        <section id="media-library" class="media-panel panel" hidden>
-          <div class="panel-heading"><div><p class="eyebrow">MEDIA LIBRARY</p><h2>專案媒體</h2></div><button id="import-media" class="button button-secondary" type="button" disabled>匯入圖片 / 影片</button></div>
-          <p id="media-status" class="hint">尚未載入媒體。</p>
-          <div id="media-list" class="media-list"></div>
+    <section id="media-library" class="media-panel panel" hidden>
+      <div class="panel-heading"><div><p class="eyebrow">MEDIA LIBRARY</p><h2>專案媒體</h2></div><button id="import-media" class="button button-secondary" type="button" disabled>匯入圖片 / 影片</button></div>
+      <p id="media-status" class="hint">尚未載入媒體。</p>
+      <div id="media-list" class="media-list"></div>
+    </section>
+
+        <section id="player-panel" class="player-panel panel" hidden>
+          <div class="panel-heading"><div><p class="eyebrow">PLAYBACK / SYNC</p><h2>影片播放器與同步</h2></div><span id="player-capability" class="status-pill status-planned">尚未載入影片</span></div>
+          <p id="player-status" class="hint" role="status">尚未載入影片；請先匯入專案媒體。</p>
+          <div class="player-block-toolbar">
+            <label for="player-block-select">Player block</label>
+            <select id="player-block-select" disabled><option value="">尚未建立 player block</option></select>
+            <button id="add-single-video" class="button button-secondary" type="button" disabled>新增單影片</button>
+            <button id="add-comparison-video" class="button button-secondary" type="button" disabled>新增兩影片比較</button>
+          </div>
+          <p id="player-empty" class="player-empty">沒有可播放影片；不會以 fixture 或假資料冒充載入成功。</p>
+
+          <div id="single-player" class="player-runtime" hidden>
+            <div class="player-video-frame"><video id="single-video" playsinline preload="metadata"></video></div>
+            <p id="single-video-status" class="player-video-status" role="status">尚未載入來源。</p>
+            <div class="player-controls" data-player-side="single">
+              <button id="single-play" class="button button-secondary" type="button" disabled>播放</button>
+              <button id="single-pause" class="button button-secondary" type="button" disabled>暫停</button>
+              <button id="single-prev" class="button button-secondary" type="button" disabled>上一幀</button>
+              <button id="single-next" class="button button-secondary" type="button" disabled>下一幀</button>
+              <label class="player-range-label" for="single-seek">Seek <input id="single-seek" type="range" min="0" max="0" step="0.001" value="0" disabled /></label>
+              <output id="single-time" class="player-time">0.00s</output>
+              <label for="single-rate">速度</label><select id="single-rate" disabled><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>
+              <label class="checkbox-label"><input id="single-loop" type="checkbox" disabled /> 循環</label>
+              <button id="single-anchor" class="button button-primary" type="button" disabled>設為同步點</button>
+            </div>
+            <p id="single-sync-status" class="hint">單影片 anchor 會保存於此 block；精度依實際播放器能力顯示。</p>
+          </div>
+
+          <div id="comparison-player" class="player-runtime" hidden>
+            <div class="comparison-runtime-grid">
+              <article class="comparison-side" data-comparison-side="left">
+                <h3>左側影片</h3><div class="player-video-frame"><video id="comparison-left-video" playsinline preload="metadata"></video></div>
+                <p id="comparison-left-video-status" class="player-video-status" role="status">尚未載入來源。</p>
+                <div class="player-controls player-controls-compact"><button id="comparison-left-play" class="button button-secondary" type="button" disabled>播放</button><button id="comparison-left-pause" class="button button-secondary" type="button" disabled>暫停</button><button id="comparison-left-prev" class="button button-secondary" type="button" disabled>上一幀</button><button id="comparison-left-next" class="button button-secondary" type="button" disabled>下一幀</button><label class="player-range-label" for="comparison-left-seek">Seek <input id="comparison-left-seek" type="range" min="0" max="0" step="0.001" value="0" disabled /></label><output id="comparison-left-time" class="player-time">0.00s</output><label class="checkbox-label"><input id="comparison-left-loop" type="checkbox" disabled /> 循環</label><button id="comparison-left-anchor" class="button button-primary" type="button" disabled>設左側同步點</button></div>
+              </article>
+              <article class="comparison-side" data-comparison-side="right">
+                <h3>右側影片</h3><div class="player-video-frame"><video id="comparison-right-video" playsinline preload="metadata"></video></div>
+                <p id="comparison-right-video-status" class="player-video-status" role="status">尚未載入來源。</p>
+                <div class="player-controls player-controls-compact"><button id="comparison-right-play" class="button button-secondary" type="button" disabled>播放</button><button id="comparison-right-pause" class="button button-secondary" type="button" disabled>暫停</button><button id="comparison-right-prev" class="button button-secondary" type="button" disabled>上一幀</button><button id="comparison-right-next" class="button button-secondary" type="button" disabled>下一幀</button><label class="player-range-label" for="comparison-right-seek">Seek <input id="comparison-right-seek" type="range" min="0" max="0" step="0.001" value="0" disabled /></label><output id="comparison-right-time" class="player-time">0.00s</output><label class="checkbox-label"><input id="comparison-right-loop" type="checkbox" disabled /> 循環</label><button id="comparison-right-anchor" class="button button-primary" type="button" disabled>設右側同步點</button></div>
+              </article>
+            </div>
+            <div class="comparison-actions"><button id="comparison-play" class="button button-secondary" type="button" disabled>同步播放</button><button id="comparison-pause" class="button button-secondary" type="button" disabled>同步暫停</button><label for="comparison-rate">同步速度</label><select id="comparison-rate" disabled><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><button id="comparison-align-zero" class="button button-primary" type="button" disabled>回到相對時間 0</button></div>
+            <p id="comparison-sync-status" class="hint">兩側都設定同步點後，seek 會依 relative time 對齊；沒有 anchor 時只揭露 unknown，不會假裝已同步。</p>
+          </div>
         </section>
 
         <section class="preview-panel panel">

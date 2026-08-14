@@ -693,6 +693,46 @@ function createProjectStore(projectRoot, { boundaryRoot = null } = {}) {
     return saved;
   }
 
+  async function resolveMediaAssetSource(projectId, assetId) {
+    const id = safeProjectId(projectId);
+    if (typeof assetId !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u.test(assetId)) {
+      throw new Error('Media asset id is invalid');
+    }
+    const current = await readProject(id);
+    const asset = current.media.find((item) => isPlainRecord(item) && item.id === assetId);
+    if (!asset) throw new Error('Media asset was not found');
+    const relativePath = asset.normalizedReference?.relativePath || asset.sourceReference?.relativePath;
+    if (typeof relativePath !== 'string' || relativePath.length === 0) {
+      throw new Error('Media asset has no project-local source');
+    }
+    const candidate = resolveStoredMediaPath(root, id, relativePath);
+    const projectDirectoryPath = await existingProjectDirectory(id);
+    let candidateStat;
+    try {
+      candidateStat = await fs.lstat(candidate);
+    } catch {
+      throw new Error('Media source is unavailable');
+    }
+    if (candidateStat.isSymbolicLink() || !candidateStat.isFile()) {
+      throw new Error('Media source is not a regular file');
+    }
+    let realSource;
+    try {
+      realSource = await fs.realpath(candidate);
+    } catch {
+      throw new Error('Media source cannot be resolved safely');
+    }
+    if (!isPathInside(projectDirectoryPath, realSource)) {
+      throw new Error('Media source escapes the project boundary');
+    }
+    return {
+      assetId,
+      relativePath,
+      sourcePath: realSource,
+      sourceRole: asset.normalizedReference?.relativePath ? 'normalized' : 'source',
+    };
+  }
+
   async function saveProject(payload) {
     if (!isPlainRecord(payload)) throw new Error('Invalid project payload');
     const id = safeProjectId(payload.id);
@@ -736,6 +776,7 @@ function createProjectStore(projectRoot, { boundaryRoot = null } = {}) {
     insertTextBlock,
     registerMediaFiles,
     removeMediaAsset,
+    resolveMediaAssetSource,
     readTextImportFile,
   });
 }

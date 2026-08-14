@@ -177,6 +177,40 @@ test('registers project-local media with explicit unknown/discovered status and 
   await assert.rejects(fs.stat(path.join(testRoot, asset.sourceReference.relativePath)), /ENOENT/iu);
 });
 
+test('resolves player media only through real project-local files', async (t) => {
+  const created = await store.createProject('Media source resolver');
+  const sourcePath = path.join(testRoot, 'resolver-source.mp4');
+  await fs.writeFile(sourcePath, Buffer.from('fixture'));
+  const registered = await store.registerMediaFiles(created.id, [sourcePath]);
+  const asset = registered.media[0];
+
+  const resolved = await store.resolveMediaAssetSource(created.id, asset.id);
+  assert.equal(resolved.relativePath, asset.sourceReference.relativePath);
+  assert.equal(await fs.realpath(resolved.sourcePath), resolved.sourcePath);
+  assert.equal(isPathInside(store.projectDirectory(created.id), resolved.sourcePath), true);
+
+  const outsidePath = path.join(testRoot, 'resolver-outside.mp4');
+  const linkedPath = path.join(store.projectDirectory(created.id), 'media', 'original', 'linked.mp4');
+  await fs.writeFile(outsidePath, Buffer.from('outside fixture'));
+  try {
+    await fs.symlink(outsidePath, linkedPath, 'file');
+  } catch (error) {
+    if (error.code === 'EPERM' || error.code === 'EACCES') {
+      t.skip(`file symlink creation is unavailable: ${error.code}`);
+      return;
+    }
+    throw error;
+  }
+  const snapshot = await store.openProject(created.id);
+  snapshot.media[0].sourceReference.relativePath = `projects/${created.id}/media/original/linked.mp4`;
+  await store.saveProject(snapshot);
+  await assert.rejects(
+    store.resolveMediaAssetSource(created.id, asset.id),
+    /symlink|realpath|contained|regular file/iu,
+  );
+  await fs.rm(linkedPath, { force: true });
+});
+
 test('protects media assets referenced by report blocks from removal', async () => {
   const created = await store.createProject('Media reference protection');
   const sourcePath = path.join(testRoot, 'referenced-frame.png');

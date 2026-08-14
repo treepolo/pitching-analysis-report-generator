@@ -6,6 +6,21 @@ const PROJECT_ID_PATTERN = /^[a-z0-9-]{1,80}$/u;
 const MEDIA_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 const closeCallbacks = new Set();
+const syncApi = Object.freeze({
+  alignComparisonAtRelativeTime: (sides, relativeTime, options) => ipcRenderer.invoke('sync:align', {
+    sides,
+    relativeTime,
+    options,
+  }),
+  captureAnchor: (input) => ipcRenderer.invoke('sync:capture', input),
+  createPlayerBlock: (input) => ipcRenderer.invoke('sync:create-player', input),
+  mapAnchorToRelativeTime: (anchor, relativeTime, options) => ipcRenderer.invoke('sync:map-anchor', {
+    anchor,
+    relativeTime,
+    options,
+  }),
+  planFrameStep: (input) => ipcRenderer.invoke('sync:frame-step', input),
+});
 
 function assertProjectId(value) {
   if (typeof value !== 'string' || !PROJECT_ID_PATTERN.test(value)) {
@@ -77,11 +92,16 @@ contextBridge.exposeInMainWorld('pitchingApp', Object.freeze({
   insertTextBlock: (payload) => ipcRenderer.invoke('project:insert-text', assertTextImportPayload(payload)),
   listMedia: (projectId) => ipcRenderer.invoke('media:list', assertProjectId(projectId)),
   pickMediaFiles: (projectId) => ipcRenderer.invoke('media:pick', assertProjectId(projectId)),
+  resolveMediaSource: (projectId, assetId) => ipcRenderer.invoke('media:source', {
+    projectId: assertProjectId(projectId),
+    assetId: assertMediaId(assetId),
+  }),
   removeMedia: (projectId, assetId) => ipcRenderer.invoke('media:remove', {
     projectId: assertProjectId(projectId),
     assetId: assertMediaId(assetId),
   }),
   getAppInfo: () => ipcRenderer.invoke('app:info'),
+  sync: syncApi,
   onBeforeClose: (callback) => {
     if (typeof callback !== 'function') throw new Error('Close callback must be a function');
     closeCallbacks.add(callback);

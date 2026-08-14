@@ -9,6 +9,7 @@ const {
   isPathInside,
   validateProjectRoot,
 } = require('./storage');
+const syncDomain = require('./sync/domain');
 
 const APP_ROOT = path.resolve(app.getAppPath());
 const configuredProjectRoot = process.env.PITCHING_PROJECT_ROOT;
@@ -81,6 +82,26 @@ function registerIpc() {
     assertTrustedSender(event);
     return projectStore.insertTextBlock(payload?.projectId, payload);
   });
+  ipcMain.handle('sync:align', (event, payload) => {
+    assertTrustedSender(event);
+    return syncDomain.alignComparisonAtRelativeTime(payload?.sides, payload?.relativeTime, payload?.options);
+  });
+  ipcMain.handle('sync:capture', (event, payload) => {
+    assertTrustedSender(event);
+    return syncDomain.captureSyncAnchor(payload);
+  });
+  ipcMain.handle('sync:create-player', (event, payload) => {
+    assertTrustedSender(event);
+    return syncDomain.createPlayerBlock(payload);
+  });
+  ipcMain.handle('sync:map-anchor', (event, payload) => {
+    assertTrustedSender(event);
+    return syncDomain.mapAnchorToRelativeTime(payload?.anchor, payload?.relativeTime, payload?.options);
+  });
+  ipcMain.handle('sync:frame-step', (event, payload) => {
+    assertTrustedSender(event);
+    return syncDomain.planFrameStep(payload);
+  });
   ipcMain.handle('media:list', async (event, projectId) => {
     assertTrustedSender(event);
     const project = await projectStore.readProject(projectId);
@@ -98,6 +119,16 @@ function registerIpc() {
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     return projectStore.registerMediaFiles(projectId, result.filePaths);
+  });
+  ipcMain.handle('media:source', async (event, payload) => {
+    assertTrustedSender(event);
+    const resolved = await projectStore.resolveMediaAssetSource(payload?.projectId, payload?.assetId);
+    return {
+      assetId: resolved.assetId,
+      relativePath: resolved.relativePath,
+      sourceRole: resolved.sourceRole,
+      sourceUrl: pathToFileURL(resolved.sourcePath).href,
+    };
   });
   ipcMain.handle('media:remove', (event, payload) => {
     assertTrustedSender(event);
@@ -289,6 +320,28 @@ async function runElectronSmoke() {
         }
         const listedMedia = await window.pitchingApp.listMedia(createdId);
         if (!Array.isArray(listedMedia) || listedMedia.length !== 0) throw new Error('empty media library did not list safely');
+        const playerEmpty = document.querySelector('#player-empty');
+        if (!playerEmpty || playerEmpty.hidden || !document.querySelector('#player-panel')) {
+          throw new Error('player empty state is not rendered without media');
+        }
+        if (!document.querySelector('#add-single-video')?.disabled
+          || !document.querySelector('#add-comparison-video')?.disabled
+          || !document.querySelector('#single-play')?.disabled) {
+          throw new Error('player controls were enabled without a loaded real video');
+        }
+        if (typeof window.pitchingApp.sync?.planFrameStep !== 'function') {
+          throw new Error('sync frame-step bridge is missing');
+        }
+        const unknownStep = await window.pitchingApp.sync.planFrameStep({
+          timing: { kind: 'unknown' },
+          duration: 2.5,
+          currentTime: 0,
+          direction: 1,
+          capability: false,
+        });
+        if (!unknownStep.fallback || unknownStep.resolution !== 'unsupported') {
+          throw new Error('unknown frame-step capability did not remain an explicit fallback');
+        }
 
         sectionTitle.value = 'Close flush section';
         sectionTitle.dispatchEvent(new Event('input', { bubbles: true }));
@@ -311,6 +364,8 @@ async function runElectronSmoke() {
           explicitSaveVerified: true,
           textImportVerified: true,
           mediaListVerified: true,
+          playerEmptyStateVerified: true,
+          syncFallbackVerified: true,
           bridgeSecurityVerified: true,
           invalidProjectRejected,
         };
