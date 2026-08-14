@@ -11,6 +11,7 @@ const {
   INSPECTION_STATUS,
   MEDIA_OPERATION_STATUS,
   MEDIA_TOOL_KIND,
+  MEDIA_TOOL_READINESS_STATUS,
   MEDIA_TOOL_STATUS,
   NORMALIZATION_JOB_STATUS,
   PLAYABILITY,
@@ -27,6 +28,7 @@ const {
   registerMediaAsset,
   retryNormalizationJob,
   runNormalizationJobWithAdapter,
+  summarizeMediaToolReadiness,
 } = require('../../src/media');
 
 const PROJECT_ROOT = path.resolve('deterministic-media-tool-project');
@@ -85,6 +87,11 @@ test('discovers ffprobe and FFmpeg versions without claiming media support', asy
   assert.equal(discovery.ffmpeg.version, '7.0.0-test');
   assert.deepEqual(calls.map((call) => call.args), [['-version'], ['-version']]);
   assert.equal(Object.hasOwn(discovery.ffprobe, 'mediaInspection'), false);
+  assert.equal(discovery.readiness.status, MEDIA_TOOL_READINESS_STATUS.READY);
+  assert.equal(discovery.readiness.canInspect, true);
+  assert.equal(discovery.readiness.canNormalize, true);
+  assert.deepEqual(discovery.readiness.blockingTools, []);
+  assert.equal(discovery.readiness.evidence, 'version-command-only');
 });
 
 test('keeps malformed version output and missing tools explicit', async () => {
@@ -105,6 +112,12 @@ test('keeps malformed version output and missing tools explicit', async () => {
   assert.equal(missing.ffmpeg.status, MEDIA_TOOL_STATUS.TOOL_MISSING);
   assert.equal(missing.ffprobe.available, false);
   assert.equal(missing.ffmpeg.available, false);
+  assert.equal(missing.readiness.status, MEDIA_TOOL_READINESS_STATUS.INSPECTION_UNAVAILABLE);
+  assert.equal(missing.readiness.canInspect, false);
+  assert.equal(missing.readiness.canNormalize, false);
+  assert.deepEqual(missing.readiness.blockingTools, ['ffprobe', 'ffmpeg']);
+  assert.equal(missing.ffprobe.diagnostic.action, 'install-or-configure-tool');
+  assert.equal(missing.ffprobe.diagnostic.retryable, true);
 
   const controller = new AbortController();
   controller.abort();
@@ -114,6 +127,46 @@ test('keeps malformed version output and missing tools explicit', async () => {
   assert.equal(cancelled.ffprobe.status, MEDIA_TOOL_STATUS.CANCELLED);
   assert.equal(cancelled.ffmpeg.status, MEDIA_TOOL_STATUS.CANCELLED);
   assert.equal(cancelled.allAvailable, false);
+  assert.equal(cancelled.readiness.status, MEDIA_TOOL_READINESS_STATUS.CANCELLED);
+  assert.equal(cancelled.readiness.actions[0], 'retry-capability-check');
+});
+
+test('readiness distinguishes inspection availability from normalization availability', async () => {
+  const partial = await discoverLocalMediaTools({
+    runner: async ({ tool }) => {
+      if (tool === MEDIA_TOOL_KIND.FFPROBE) {
+        return { exitCode: 0, stdout: 'ffprobe version 7.0.0-test', stderr: '' };
+      }
+      const error = new Error('configured FFmpeg is unavailable');
+      error.code = 'ENOENT';
+      throw error;
+    },
+  });
+
+  assert.equal(partial.ffprobe.available, true);
+  assert.equal(partial.ffmpeg.status, MEDIA_TOOL_STATUS.TOOL_MISSING);
+  assert.equal(partial.readiness.status, MEDIA_TOOL_READINESS_STATUS.NORMALIZATION_UNAVAILABLE);
+  assert.equal(partial.readiness.canInspect, true);
+  assert.equal(partial.readiness.canNormalize, false);
+  assert.deepEqual(partial.readiness.blockingTools, ['ffmpeg']);
+  assert.match(partial.readiness.message, /normalization.*blocked/iu);
+
+  const malformed = await probeMediaToolVersion(
+    createMediaToolAdapter({
+      runner: async () => ({ exitCode: 0, stdout: 'wrapper started successfully', stderr: '' }),
+    }),
+    MEDIA_TOOL_KIND.FFMPEG,
+  );
+  assert.equal(malformed.status, MEDIA_OPERATION_STATUS.MALFORMED_OUTPUT);
+  assert.equal(malformed.diagnostic.action, 'check-tool-command');
+  assert.equal(malformed.diagnostic.retryable, true);
+
+  const summarized = summarizeMediaToolReadiness({
+    ffprobe: { tool: 'ffprobe', available: true, status: MEDIA_TOOL_STATUS.AVAILABLE },
+    ffmpeg: malformed,
+  });
+  assert.equal(summarized.status, MEDIA_TOOL_READINESS_STATUS.NORMALIZATION_UNAVAILABLE);
+  assert.deepEqual(summarized.actions, ['check-tool-command']);
 });
 
 test('adapter exposes missing and process-failure states without claiming inspection success', async () => {
@@ -123,6 +176,7 @@ test('adapter exposes missing and process-failure states without claiming inspec
   );
   assert.equal(missing.status, MEDIA_OPERATION_STATUS.TOOL_MISSING);
   assert.equal(missing.tool.status, MEDIA_TOOL_STATUS.TOOL_MISSING);
+  assert.equal(missing.tool.diagnostic.action, 'install-or-configure-tool');
   assert.equal(missing.inspectionStatus, INSPECTION_STATUS.METADATA_PENDING);
   assert.equal(missing.playability, PLAYABILITY.UNKNOWN);
   assert.equal(missing.metadata.durationSeconds, null);
@@ -493,6 +547,7 @@ test('FFmpeg failure, missing tool, and cancellation remain visible and do not c
   );
   assert.equal(missing.status, MEDIA_OPERATION_STATUS.TOOL_MISSING);
   assert.equal(missing.verification, undefined);
+  assert.equal(missing.diagnostic.action, 'install-or-configure-tool');
 
   const controller = new AbortController();
   controller.abort();

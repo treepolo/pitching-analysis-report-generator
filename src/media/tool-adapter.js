@@ -42,6 +42,13 @@ const MEDIA_TOOL_STATUS = Object.freeze({
   CANCELLED: 'cancelled',
 });
 
+const MEDIA_TOOL_READINESS_STATUS = Object.freeze({
+  READY: 'ready',
+  INSPECTION_UNAVAILABLE: 'inspection-unavailable',
+  NORMALIZATION_UNAVAILABLE: 'normalization-unavailable',
+  CANCELLED: 'cancelled',
+});
+
 const MEDIA_OPERATION_STATUS = Object.freeze({
   SUCCEEDED: 'succeeded',
   TOOL_MISSING: 'tool-missing',
@@ -495,6 +502,110 @@ function parseToolVersion(tool, output) {
   return match?.[1] ?? null;
 }
 
+function createToolDiagnostic(tool, result = {}) {
+  const label = tool === MEDIA_TOOL_KIND.FFPROBE ? 'ffprobe' : 'FFmpeg';
+  const status = result.status ?? 'unknown';
+  const errorCode = result.errorCode ?? null;
+  if (status === MEDIA_TOOL_STATUS.AVAILABLE) {
+    return {
+      status,
+      errorCode: null,
+      retryable: false,
+      action: 'none',
+      message: `${label} executable responded to version discovery.`,
+      evidence: 'version-command-only',
+    };
+  }
+  if (status === MEDIA_TOOL_STATUS.TOOL_MISSING) {
+    return {
+      status,
+      errorCode,
+      retryable: true,
+      action: 'install-or-configure-tool',
+      message: `${label} is unavailable; install it or configure its executable path before retrying.`,
+      evidence: 'version-command-only',
+    };
+  }
+  if (status === MEDIA_TOOL_STATUS.CANCELLED) {
+    return {
+      status,
+      errorCode,
+      retryable: true,
+      action: 'retry-capability-check',
+      message: `${label} capability discovery was cancelled; retry when the worker is ready.`,
+      evidence: 'version-command-only',
+    };
+  }
+  if (status === MEDIA_OPERATION_STATUS.MALFORMED_OUTPUT) {
+    return {
+      status,
+      errorCode,
+      retryable: true,
+      action: 'check-tool-command',
+      message: `${label} responded, but its version output did not identify the requested tool.`,
+      evidence: 'version-command-only',
+    };
+  }
+  if (status === MEDIA_TOOL_STATUS.PROCESS_FAILED) {
+    return {
+      status,
+      errorCode,
+      retryable: true,
+      action: 'review-tool-diagnostics',
+      message: `${label} version discovery failed; review the process diagnostics before retrying.`,
+      evidence: 'version-command-only',
+    };
+  }
+  return {
+    status,
+    errorCode,
+    retryable: false,
+    action: 'inspect-capability-state',
+    message: `${label} capability state is unavailable for automated use.`,
+    evidence: 'version-command-only',
+  };
+}
+
+function summarizeMediaToolReadiness(input) {
+  requireRecord(input, 'Media tool readiness input');
+  const ffprobe = requireRecord(input.ffprobe, 'ffprobe capability');
+  const ffmpeg = requireRecord(input.ffmpeg, 'FFmpeg capability');
+  const capabilities = [ffprobe, ffmpeg];
+  const blockingTools = capabilities
+    .filter((capability) => capability.available !== true)
+    .map((capability) => capability.tool);
+  const cancelled = capabilities.some((capability) => capability.status === MEDIA_TOOL_STATUS.CANCELLED);
+  const status = cancelled
+    ? MEDIA_TOOL_READINESS_STATUS.CANCELLED
+    : ffprobe.available !== true
+      ? MEDIA_TOOL_READINESS_STATUS.INSPECTION_UNAVAILABLE
+      : ffmpeg.available !== true
+        ? MEDIA_TOOL_READINESS_STATUS.NORMALIZATION_UNAVAILABLE
+        : MEDIA_TOOL_READINESS_STATUS.READY;
+  const diagnostics = capabilities.map((capability) => capability.diagnostic
+    ?? createToolDiagnostic(capability.tool, capability));
+  const actions = [...new Set(diagnostics
+    .filter((diagnostic) => diagnostic.action !== 'none')
+    .map((diagnostic) => diagnostic.action))];
+  const message = status === MEDIA_TOOL_READINESS_STATUS.READY
+    ? 'ffprobe and FFmpeg are executable; real media support still requires a file inspection or normalization run.'
+    : status === MEDIA_TOOL_READINESS_STATUS.CANCELLED
+      ? 'Media tool capability discovery was cancelled; retry before starting media work.'
+      : status === MEDIA_TOOL_READINESS_STATUS.INSPECTION_UNAVAILABLE
+        ? 'ffprobe is not ready; media metadata inspection and full normalization must remain blocked.'
+        : 'FFmpeg is not ready; media inspection may run, but normalization must remain blocked.';
+  return {
+    status,
+    canInspect: ffprobe.available === true,
+    canNormalize: ffprobe.available === true && ffmpeg.available === true,
+    blockingTools,
+    retryable: status !== MEDIA_TOOL_READINESS_STATUS.READY,
+    actions,
+    message,
+    evidence: 'version-command-only',
+  };
+}
+
 /**
  * Probe only the external tool capability boundary. A version response proves
  * that a command is executable, not that any particular media file is valid
@@ -523,6 +634,7 @@ async function probeMediaToolVersion(adapter, tool, { signal } = {}) {
     return {
       ...base,
       reason: execution.status ?? 'tool-status-unknown',
+      diagnostic: createToolDiagnostic(tool, base),
     };
   }
 
@@ -536,6 +648,10 @@ async function probeMediaToolVersion(adapter, tool, { signal } = {}) {
       status: MEDIA_OPERATION_STATUS.MALFORMED_OUTPUT,
       errorCode: 'VERSION_OUTPUT_INVALID',
       reason: 'version output did not identify the requested tool',
+      diagnostic: createToolDiagnostic(tool, {
+        status: MEDIA_OPERATION_STATUS.MALFORMED_OUTPUT,
+        errorCode: 'VERSION_OUTPUT_INVALID',
+      }),
     };
   }
   return {
@@ -546,6 +662,7 @@ async function probeMediaToolVersion(adapter, tool, { signal } = {}) {
     evidence: 'version-command',
     errorCode: null,
     reason: null,
+    diagnostic: createToolDiagnostic(tool, { status: MEDIA_TOOL_STATUS.AVAILABLE }),
   };
 }
 
@@ -564,6 +681,7 @@ async function discoverLocalMediaTools(input = {}, { signal } = {}) {
     allAvailable: ffprobe.available && ffmpeg.available,
     ffprobe,
     ffmpeg,
+    readiness: summarizeMediaToolReadiness({ ffprobe, ffmpeg }),
   };
 }
 
@@ -969,6 +1087,7 @@ async function inspectWithFfprobe(adapter, input, { signal } = {}) {
     command: execution.command ?? command.command,
     status: execution.status,
     exitCode: execution.exitCode,
+    diagnostic: createToolDiagnostic(MEDIA_TOOL_KIND.FFPROBE, execution),
   };
   if (execution.status !== MEDIA_TOOL_STATUS.AVAILABLE) {
     return baseInspectionResult(
@@ -1147,11 +1266,13 @@ async function normalizeWithFfmpeg(adapter, input, {
     command: execution.command ?? command.command,
     status: execution.status,
     exitCode: execution.exitCode,
+    diagnostic: createToolDiagnostic(MEDIA_TOOL_KIND.FFMPEG, execution),
   };
   const base = {
     sourceReference: target.sourceReference,
     normalizedReference: target.normalizedReference,
     tool,
+    diagnostic: tool.diagnostic,
     progress: lastProgress,
   };
   if (execution.status !== MEDIA_TOOL_STATUS.AVAILABLE) {
@@ -1357,6 +1478,7 @@ module.exports = Object.freeze({
   DEFAULT_SUPPORTED_VIDEO_CODECS,
   MEDIA_OPERATION_STATUS,
   MEDIA_TOOL_KIND,
+  MEDIA_TOOL_READINESS_STATUS,
   MEDIA_TOOL_STATUS,
   MediaToolAdapterError,
   buildFfmpegCommand,
@@ -1373,5 +1495,6 @@ module.exports = Object.freeze({
   probeMediaToolVersion,
   runNormalizationJobWithAdapter,
   runNormalizationJobWithLocalTools,
+  summarizeMediaToolReadiness,
   verifyNormalizedOutputWithFfprobe,
 });
