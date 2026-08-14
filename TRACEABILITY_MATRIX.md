@@ -36,13 +36,13 @@
 | PERSIST-003 | DATA_MODEL、REPORT_OUTPUT_SPEC / Renderer | AT-A、AT-B | pre/post export semantic comparison | NOT_STARTED |
 | ASYNC-001 | MEDIA_PIPELINE、DATA_MODEL / Job owners | AT-A、AT-E | phase and processed/total evidence | NOT_STARTED |
 | ASYNC-002 | MEDIA_PIPELINE、DATA_MODEL / Job owners | AT-E、AT-G | cancel/retry/error/reload result evidence | NOT_STARTED |
-| SEC-001 | FILESYSTEM_POLICY、GIT_GITHUB_POLICY、OPERATIONS | AT-SEC | secret/sensitive scan and Git review | NOT_STARTED |
+| SEC-001 | PROJECT_STATE、.gitignore | AT-SEC | secret/sensitive scan and Git review | NOT_STARTED |
 | SEC-002 | MEDIA_PIPELINE、OPERATIONS | AT-SEC、AT-G | redacted log and credential negative test | NOT_STARTED |
-| FS-001 | FILESYSTEM_POLICY | setup/operations review | boundary and containment review | NOT_STARTED |
-| FS-002 | ARCHITECTURE、FILESYSTEM_POLICY | architecture checkpoint | user-approved storage decision | AWAITING_USER_SETUP |
-| GIT-001 | GIT_GITHUB_POLICY、MULTI_AGENT_PLAN | baseline gate | local Git/branch policy review | NOT_STARTED |
-| GIT-002 | GIT_GITHUB_POLICY | visibility checkpoint | explicit Private/Public decision and remote evidence | BLOCKED_HUMAN |
-| GIT-003 | GIT_GITHUB_POLICY、OPERATIONS | baseline/handoff/final gate | push, scan and no-force-push evidence | NOT_STARTED |
+| FS-001 | PROJECT_STATE | storage review | boundary and containment review | NOT_STARTED |
+| FS-002 | ARCHITECTURE、PROJECT_STATE | implementation storage review | project-root storage evidence | NOT_STARTED |
+| GIT-001 | PROJECT_STATE | local checkpoint | local Git/branch state review | NOT_STARTED |
+| GIT-002 | PROJECT_STATE | external setup | Private remote evidence | AWAITING_USER_SETUP |
+| GIT-003 | PROJECT_STATE | checkpoint/final gate | push, scan and no-force-push evidence | NOT_STARTED |
 | QA-001 | ACCEPTANCE_TESTS | AT-A through AT-G | complete scenario evidence | NOT_STARTED |
 | QA-002 | ACCEPTANCE_TESTS、TRACEABILITY_MATRIX | final gate | layered test/evidence/status audit | NOT_STARTED |
 

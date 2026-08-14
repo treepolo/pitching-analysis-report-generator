@@ -69,7 +69,7 @@ Long job 至少保存：
 - 私人影片內容、影格、完整路徑與 credential 不進一般 log。
 - log 只記錄 safe asset id、phase、非敏感錯誤類型與計數；必要時以 redacted path 表示。
 - 不上傳第三方、不建立無必要 telemetry。
-- generated media 與 output 受 FILESYSTEM_POLICY.md 管理，不進 Git。
+- generated media 與 output 受 `PROJECT_STATE.md` 的 project-root boundary 管理，不進 Git。
 
 ## 8. Required evidence
 

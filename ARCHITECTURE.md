@@ -80,7 +80,7 @@
 - shell 負責 project filesystem、media pipeline、FFmpeg/native adapter、job persistence、folder/ZIP export。
 - web layer 負責 editor、preview、player UI 與可重用 report renderer。
 - exported report 不依賴 desktop shell；仍遵守 REPORT_OUTPUT_SPEC 的 file:// contract。
-- application data 與 generated output 僅可落在 FILESYSTEM_POLICY 定義的 boundary。
+- application data 與 generated output 僅可落在 `PROJECT_STATE.md` 定義的 boundary。
 
 這是使用者已確認的高層方向。實作仍不得加入帳號、雲端 database 或超出 scope 的服務。第一個 vertical slice 可先使用可替換的 desktop shell adapter 與 web renderer；不因追求速度而把 source media、generated report 或 ZIP 放進 Git。
 
@@ -90,4 +90,4 @@
 
 使用者決定：採 Desktop application。後續仍需以可逆、可測試的 technical decision 逐步確認 shell/framework、native media strategy 與 packaging；不把這些細節冒充新的產品 checkpoint。
 
-已可開始依此高層方向建立 desktop vertical slice。正式 application data storage 採 `FILESYSTEM_POLICY.md` 的 project-root 方案；若未來要改為其他位置，必須更新 policy、backup/restore 與 acceptance evidence。
+已可開始依此高層方向建立 desktop vertical slice。正式 application data storage 採 `PROJECT_STATE.md` 的 project-root 方案；若未來要改為其他位置，必須更新 current state、backup/restore 與 acceptance evidence。
