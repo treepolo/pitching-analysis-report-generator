@@ -114,6 +114,51 @@ test('preserves media metadata and export settings as future vertical-slice seam
   assert.deepEqual(partialSave.futureReportExtension, { sourceRevision: 3, owner: 'report-model' });
 });
 
+test('persists block-local video editor configuration across reopen', async () => {
+  const created = await store.createProject('Block editor video config');
+  const snapshot = await store.openProject(created.id);
+  snapshot.sections[0].blocks.push({
+    id: 'single-block-config',
+    type: 'singleVideo',
+    mediaAssetId: 'asset-front',
+    label: 'Front view',
+    layout: 'stacked',
+    playback: { rate: 0.75 },
+    segment: { in: 0.25, out: 2.5 },
+    sync: { mode: 'frame', startAnchor: { observedTime: 0.5, frameIndex: 15 } },
+    anchor: { observedTime: 1.25, frameIndex: 38, precision: 'frame-aware' },
+  });
+  snapshot.sections[0].blocks.push({
+    id: 'comparison-block-config',
+    type: 'comparisonVideo',
+    label: 'Front and side',
+    layout: 'side-by-side',
+    playback: { rate: 1 },
+    sync: { mode: 'time', startAnchor: { observedTime: 0.75 } },
+    left: {
+      mediaAssetId: 'asset-front',
+      label: 'Front',
+      segment: { in: 0, out: 3 },
+      playback: { rate: 0.5 },
+      anchor: { observedTime: 1.1 },
+    },
+    right: {
+      mediaAssetId: 'asset-side',
+      label: 'Side',
+      segment: { in: 0.1, out: 2.9 },
+      playback: { rate: 0.5 },
+      anchor: { observedTime: 1.4 },
+    },
+  });
+
+  const saved = await store.saveProject(snapshot);
+  const reopened = await store.openProject(created.id);
+  assert.deepEqual(reopened.sections[0].blocks.slice(-2), saved.sections[0].blocks.slice(-2));
+  assert.equal(reopened.sections[0].blocks.at(-2).sync.mode, 'frame');
+  assert.equal(reopened.sections[0].blocks.at(-1).left.segment.out, 3);
+  assert.equal(reopened.sections[0].blocks.at(-1).right.anchor.observedTime, 1.4);
+});
+
 test('previews strict UTF-8 txt/md imports and persists imported content across reopen', async () => {
   const created = await store.createProject('Text import test');
   const textPath = path.join(testRoot, 'incoming-notes.md');

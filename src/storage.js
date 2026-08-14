@@ -121,6 +121,101 @@ function safeContent(value) {
   return value;
 }
 
+function normalizeOptionalAssetId(value, fieldName) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u.test(value)) {
+    throw new Error(`${fieldName} is invalid`);
+  }
+  return value;
+}
+
+function normalizeOptionalNonNegative(value, fieldName) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new Error(`${fieldName} is invalid`);
+  }
+  return value;
+}
+
+function normalizeAnchor(value, fieldName) {
+  if (value === null || value === undefined) return null;
+  if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
+  const anchor = cloneJson(value);
+  anchor.observedTime = normalizeOptionalNonNegative(anchor.observedTime, `${fieldName}.observedTime`);
+  if (anchor.frameIndex !== null && anchor.frameIndex !== undefined) {
+    if (!Number.isInteger(anchor.frameIndex) || anchor.frameIndex < 0) {
+      throw new Error(`${fieldName}.frameIndex is invalid`);
+    }
+  }
+  return anchor;
+}
+
+function normalizeSegment(value, fieldName) {
+  if (value === null || value === undefined) return { in: 0, out: null };
+  if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
+  const segment = cloneJson(value);
+  segment.in = normalizeOptionalNonNegative(segment.in ?? segment.start, `${fieldName}.in`) ?? 0;
+  segment.out = normalizeOptionalNonNegative(segment.out ?? segment.end, `${fieldName}.out`);
+  if (segment.out !== null && segment.out < segment.in) throw new Error(`${fieldName} range is invalid`);
+  return segment;
+}
+
+function normalizePlayback(value, fieldName) {
+  if (value === null || value === undefined) return { rate: 1 };
+  if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
+  const playback = cloneJson(value);
+  if (playback.rate === undefined) playback.rate = 1;
+  if (typeof playback.rate !== 'number' || !Number.isFinite(playback.rate) || playback.rate <= 0 || playback.rate > 8) {
+    throw new Error(`${fieldName}.rate is invalid`);
+  }
+  return playback;
+}
+
+function normalizeVideoSide(value, fieldName) {
+  if (value === undefined || value === null) return undefined;
+  if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
+  const side = cloneJson(value);
+  if (side.mediaAssetId !== undefined || side.videoAssetId !== undefined || side.assetId !== undefined) {
+    side.mediaAssetId = normalizeOptionalAssetId(side.mediaAssetId ?? side.videoAssetId ?? side.assetId, `${fieldName}.mediaAssetId`);
+  }
+  if (side.label !== undefined) side.label = safeOptionalText(side.label, `${fieldName}.label`, 160);
+  if (side.segment !== undefined) side.segment = normalizeSegment(side.segment, `${fieldName}.segment`);
+  if (side.playback !== undefined) side.playback = normalizePlayback(side.playback, `${fieldName}.playback`);
+  if (side.anchor !== undefined) side.anchor = normalizeAnchor(side.anchor, `${fieldName}.anchor`);
+  return side;
+}
+
+function normalizeVideoBlock(block) {
+  const normalized = { ...cloneJson(block) };
+  if (normalized.label !== undefined) normalized.label = safeOptionalText(normalized.label, 'Video block label', 160);
+  if (normalized.layout !== undefined) normalized.layout = normalized.layout === 'stacked' ? 'stacked' : 'side-by-side';
+  if (normalized.playback !== undefined) normalized.playback = normalizePlayback(normalized.playback, 'Video block playback');
+  if (normalized.sync !== undefined) {
+    if (!isPlainRecord(normalized.sync)) throw new Error('Video block sync is invalid');
+    normalized.sync = cloneJson(normalized.sync);
+    normalized.sync.mode = normalized.sync.mode === 'frame' ? 'frame' : 'time';
+    if (normalized.sync.startAnchor !== undefined) {
+      normalized.sync.startAnchor = normalizeAnchor(normalized.sync.startAnchor, 'Video block sync.startAnchor');
+    }
+  }
+  if (normalized.type === 'singleVideo') {
+    if (normalized.mediaAssetId !== undefined || normalized.videoAssetId !== undefined || normalized.assetId !== undefined) {
+      normalized.mediaAssetId = normalizeOptionalAssetId(
+        normalized.mediaAssetId ?? normalized.videoAssetId ?? normalized.assetId,
+        'Video block mediaAssetId',
+      );
+    }
+    if (normalized.segment !== undefined) normalized.segment = normalizeSegment(normalized.segment, 'Video block segment');
+    if (normalized.anchor !== undefined) normalized.anchor = normalizeAnchor(normalized.anchor, 'Video block anchor');
+  } else {
+    const left = normalizeVideoSide(normalized.left, 'Video block left');
+    const right = normalizeVideoSide(normalized.right, 'Video block right');
+    if (left !== undefined) normalized.left = left;
+    if (right !== undefined) normalized.right = right;
+  }
+  return normalized;
+}
+
 function safeTextImportFileName(value) {
   if (typeof value !== 'string' || value.length === 0 || CONTROL_CHARACTER_PATTERN.test(value)) {
     throw new Error('Text import filename is invalid');
@@ -240,6 +335,9 @@ function normalizeSections(value) {
       };
       if (block.type === 'rich-text' || block.type === 'text') {
         normalizedBlock.content = safeContent(block.content);
+      }
+      if (block.type === 'singleVideo' || block.type === 'comparisonVideo') {
+        Object.assign(normalizedBlock, normalizeVideoBlock(normalizedBlock));
       }
       return normalizedBlock;
     });

@@ -45,7 +45,16 @@
             <div><p class="eyebrow">EDITOR</p><h2 id="project-title">—</h2><p id="project-meta" class="muted">—</p></div>
             <div class="editor-header-actions"><button id="import-text" class="button button-secondary" type="button" disabled>匯入 .txt / .md</button><span class="status-pill">Local-first</span></div>
           </div>
-          <div class="editor-grid">
+          <div class="block-editor-toolbar" aria-label="Block editor actions">
+            <label for="block-section-target">Section</label>
+            <select id="block-section-target" disabled></select>
+            <button id="add-text-block" class="button button-secondary" type="button" disabled>Add text block</button>
+            <button id="add-editor-single-video" class="button button-secondary" type="button" disabled>Add single-video block</button>
+            <button id="add-editor-comparison-video" class="button button-secondary" type="button" disabled>Add comparison block</button>
+            <span id="block-editor-status" class="hint">Long-form block canvas</span>
+          </div>
+          <div id="block-canvas" class="block-canvas" aria-live="polite"></div>
+          <div class="editor-grid" hidden>
             <nav id="section-list" class="section-list" aria-label="報告章節"></nav>
             <div class="section-editor">
               <label for="section-title">章節名稱</label>

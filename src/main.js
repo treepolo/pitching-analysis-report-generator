@@ -324,6 +324,13 @@ async function runElectronSmoke() {
         }
         const listedMedia = await window.pitchingApp.listMedia(createdId);
         if (!Array.isArray(listedMedia) || listedMedia.length !== 0) throw new Error('empty media library did not list safely');
+        if (!document.querySelector('#block-canvas')
+          || !document.querySelector('#add-text-block')
+          || !document.querySelector('#add-editor-single-video')
+          || !document.querySelector('#add-editor-comparison-video')
+          || !document.querySelector('.editor-grid')?.hidden) {
+          throw new Error('canonical block editor UI is not rendered');
+        }
         const playerEmpty = document.querySelector('#player-empty');
         if (!playerEmpty || playerEmpty.hidden || !document.querySelector('#player-panel')) {
           throw new Error('player empty state is not rendered without media');
@@ -367,6 +374,7 @@ async function runElectronSmoke() {
           autosaveVerified: true,
           explicitSaveVerified: true,
           textImportVerified: true,
+          blockEditorUiVerified: true,
           mediaListVerified: true,
           playerEmptyStateVerified: true,
           syncFallbackVerified: true,

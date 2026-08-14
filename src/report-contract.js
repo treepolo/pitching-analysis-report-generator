@@ -89,6 +89,25 @@
     return Object.keys(loop).length > 0 ? loop : undefined;
   }
 
+  function cloneSegmentConfig(value) {
+    if (!isRecord(value)) return undefined;
+    const segment = {};
+    copyFiniteNumber(value, segment, 'in');
+    copyFiniteNumber(value, segment, 'out');
+    copyFiniteNumber(value, segment, 'start');
+    copyFiniteNumber(value, segment, 'end');
+    return Object.keys(segment).length > 0 ? segment : undefined;
+  }
+
+  function cloneSyncConfig(value) {
+    if (!isRecord(value)) return undefined;
+    const sync = {};
+    if (value.mode === 'time' || value.mode === 'frame') sync.mode = value.mode;
+    const startAnchor = cloneAnchor(value.startAnchor);
+    if (startAnchor) sync.startAnchor = startAnchor;
+    return Object.keys(sync).length > 0 ? sync : undefined;
+  }
+
   function clonePlaybackConfig(value) {
     if (!isRecord(value)) return undefined;
     const playback = {};
@@ -138,6 +157,8 @@
     if (loop) side.loop = loop;
     const loopRange = cloneLoopConfig(value.loopRange);
     if (loopRange) side.loopRange = loopRange;
+    const segment = cloneSegmentConfig(value.segment);
+    if (segment) side.segment = segment;
     const playback = clonePlaybackConfig(value.playback);
     if (playback) side.playback = playback;
     return Object.keys(side).length > 0 ? side : undefined;
@@ -163,6 +184,13 @@
       copyAssetReferences(block, output);
       copyString(block, output, 'label');
       copyString(block, output, 'caption');
+      copyString(block, output, 'layout');
+      const segment = cloneSegmentConfig(block.segment);
+      if (segment) output.segment = segment;
+      const sync = cloneSyncConfig(block.sync);
+      if (sync) output.sync = sync;
+      const anchor = cloneAnchor(block.anchor);
+      if (anchor) output.anchor = anchor;
       const playback = clonePlaybackConfig(block.playback);
       if (playback) output.playback = playback;
       const playbackOptions = clonePlaybackConfig(block.playbackOptions);
@@ -189,6 +217,9 @@
       }
       copyString(block, output, 'label');
       copyString(block, output, 'caption');
+      copyString(block, output, 'layout');
+      const sync = cloneSyncConfig(block.sync);
+      if (sync) output.sync = sync;
       copyStringArray(block, output, 'labels');
     }
 

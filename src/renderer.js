@@ -25,6 +25,12 @@ const elements = {
   editor: document.querySelector('#editor'),
   projectTitle: document.querySelector('#project-title'),
   projectMeta: document.querySelector('#project-meta'),
+  blockSectionTarget: document.querySelector('#block-section-target'),
+  addTextBlock: document.querySelector('#add-text-block'),
+  addEditorSingleVideo: document.querySelector('#add-editor-single-video'),
+  addEditorComparisonVideo: document.querySelector('#add-editor-comparison-video'),
+  blockEditorStatus: document.querySelector('#block-editor-status'),
+  blockCanvas: document.querySelector('#block-canvas'),
   sectionList: document.querySelector('#section-list'),
   sectionTitle: document.querySelector('#section-title'),
   sectionContent: document.querySelector('#section-content'),
@@ -578,15 +584,30 @@ function addPlayerBlock(block) {
   state.player.selectedBlockId = block.id;
   state.player.notice = 'Player block created; loading project-local media only.';
   renderSectionList();
+  renderBlockCanvas();
   renderPlayer();
   renderPreview();
   scheduleSave();
   void requestSave().catch(() => {});
 }
 
-function addSingleVideoBlock() {
+function addTextBlock() {
+  const section = activeSection();
+  if (!section) return;
+  section.blocks.push({
+    id: makePlayerBlockId('text'),
+    type: 'rich-text',
+    content: '',
+  });
+  state.player.notice = 'Text block created.';
+  renderBlockCanvas();
+  renderPreview();
+  scheduleSave();
+}
+
+function addSingleVideoBlock({ allowEmpty = false } = {}) {
   const videos = videoAssetsForProject(state.activeProject);
-  if (videos.length === 0) {
+  if (videos.length === 0 && !allowEmpty) {
     state.player.notice = 'No video asset is loaded. Import a real project-local video first.';
     renderPlayer();
     return;
@@ -595,26 +616,46 @@ function addSingleVideoBlock() {
   addPlayerBlock({
     id: makePlayerBlockId('single-video'),
     type: 'singleVideo',
-    mediaAssetId: asset.id,
-    label: asset.displayName || 'Single video',
+    mediaAssetId: asset?.id || null,
+    label: asset?.displayName || 'Single video',
+    layout: 'side-by-side',
     playback: { rate: 1 },
+    segment: { in: 0, out: null },
+    sync: { mode: 'time', startAnchor: null },
+    anchor: null,
   });
 }
 
-function addComparisonVideoBlock() {
+function addComparisonVideoBlock({ allowEmpty = false } = {}) {
   const videos = videoAssetsForProject(state.activeProject);
-  if (videos.length < 2) {
+  if (videos.length < 2 && !allowEmpty) {
     state.player.notice = 'Comparison requires two real project-local video assets.';
     renderPlayer();
     return;
   }
+  const left = videos[0];
+  const right = videos[1];
   addPlayerBlock({
     id: makePlayerBlockId('comparison-video'),
     type: 'comparisonVideo',
     label: 'Comparison video',
+    layout: 'side-by-side',
     playback: { rate: 1 },
-    left: { mediaAssetId: videos[0].id, label: videos[0].displayName || 'Left video' },
-    right: { mediaAssetId: videos[1].id, label: videos[1].displayName || 'Right video' },
+    sync: { mode: 'time', startAnchor: null },
+    left: {
+      mediaAssetId: left?.id || null,
+      label: left?.displayName || 'Left video',
+      segment: { in: 0, out: null },
+      playback: { rate: 1 },
+      anchor: null,
+    },
+    right: {
+      mediaAssetId: right?.id || null,
+      label: right?.displayName || 'Right video',
+      segment: { in: 0, out: null },
+      playback: { rate: 1 },
+      anchor: null,
+    },
   });
 }
 
@@ -932,6 +973,128 @@ function renderProjects() {
   });
 }
 
+function editorValue(value) {
+  return value === null || value === undefined ? '' : escapeHtml(String(value));
+}
+
+function valueAtPath(value, pathValue) {
+  return pathValue.split('.').reduce((current, key) => current?.[key], value);
+}
+
+function editorVideoAssetOptions(selectedId) {
+  const assets = videoAssetsForProject(state.activeProject);
+  const selected = referenceId(selectedId);
+  const options = [`<option value="">No asset selected</option>`];
+  if (selected && !assets.some((asset) => asset.id === selected)) {
+    options.push(`<option value="${escapeHtml(selected)}" selected>Missing asset: ${escapeHtml(selected)}</option>`);
+  }
+  assets.forEach((asset) => {
+    options.push(`<option value="${escapeHtml(asset.id)}"${asset.id === selected ? ' selected' : ''}>${escapeHtml(asset.displayName || asset.id)}</option>`);
+  });
+  return options.join('');
+}
+
+function renderVideoSideEditor(block, side) {
+  const comparison = side !== 'single';
+  const config = comparison ? (block[side] || {}) : block;
+  const prefix = comparison ? `${side}.` : '';
+  const label = comparison ? (side === 'left' ? 'Left source' : 'Right source') : 'Video source';
+  return `
+    <fieldset class="video-side-config">
+      <legend>${label}</legend>
+      <label>Asset
+        <select data-block-path="${prefix}mediaAssetId">${editorVideoAssetOptions(config.mediaAssetId)}</select>
+      </label>
+      <label>Label <input type="text" data-block-path="${prefix}label" value="${editorValue(config.label)}" /></label>
+      <div class="block-inline-fields">
+        <label>In <input type="number" min="0" step="0.001" data-block-path="${prefix}segment.in" value="${editorValue(config.segment?.in)}" /></label>
+        <label>Out <input type="number" min="0" step="0.001" data-block-path="${prefix}segment.out" value="${editorValue(config.segment?.out)}" /></label>
+        <label>Rate <input type="number" min="0.1" max="8" step="0.1" data-block-path="${prefix}playback.rate" value="${editorValue(config.playback?.rate || 1)}" /></label>
+        <label>Anchor (s) <input type="number" min="0" step="0.001" data-block-path="${prefix}anchor.observedTime" value="${editorValue(config.anchor?.observedTime)}" /></label>
+      </div>
+    </fieldset>`;
+}
+
+function renderVideoBlockEditor(block) {
+  const comparison = block.type === 'comparisonVideo';
+  return `
+    <div class="block-config-grid">
+      <label>Mode
+        <select data-block-mode>
+          <option value="single"${comparison ? '' : ' selected'}>Single video</option>
+          <option value="comparison"${comparison ? ' selected' : ''}>Comparison video</option>
+        </select>
+      </label>
+      <label>Label <input type="text" data-block-path="label" value="${editorValue(block.label)}" /></label>
+      <label>Layout
+        <select data-block-path="layout">
+          <option value="side-by-side"${block.layout !== 'stacked' ? ' selected' : ''}>Side by side</option>
+          <option value="stacked"${block.layout === 'stacked' ? ' selected' : ''}>Stacked</option>
+        </select>
+      </label>
+      <label>Sync mode
+        <select data-block-path="sync.mode">
+          <option value="time"${block.sync?.mode !== 'frame' ? ' selected' : ''}>Time / elapsed playhead</option>
+          <option value="frame"${block.sync?.mode === 'frame' ? ' selected' : ''}>Explicit frame mode</option>
+        </select>
+      </label>
+      <label>Sync-start anchor (s) <input type="number" min="0" step="0.001" data-block-path="sync.startAnchor.observedTime" value="${editorValue(block.sync?.startAnchor?.observedTime)}" /></label>
+      <div class="video-side-configs">
+        ${comparison ? `${renderVideoSideEditor(block, 'left')}${renderVideoSideEditor(block, 'right')}` : renderVideoSideEditor(block, 'single')}
+      </div>
+    </div>`;
+}
+
+function renderBlockEditor(section, block, index) {
+  const typeLabel = block.type === 'comparisonVideo' ? 'Comparison video' : block.type === 'singleVideo' ? 'Single video' : 'Text';
+  const body = block.type === 'rich-text' || block.type === 'text'
+    ? `<label class="block-text-editor">Text <textarea rows="5" data-block-field="content">${escapeHtml(block.content || '')}</textarea></label>`
+    : (block.type === 'singleVideo' || block.type === 'comparisonVideo')
+      ? renderVideoBlockEditor(block)
+      : `<p class="hint">Unsupported block type: ${escapeHtml(block.type || 'unknown')}</p>`;
+  return `
+    <article class="content-block-card" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}">
+      <header class="content-block-header">
+        <strong>${typeLabel}</strong>
+        <div class="content-block-actions">
+          <button class="icon-button" type="button" data-block-action="move-up" aria-label="Move block up">↑</button>
+          <button class="icon-button" type="button" data-block-action="move-down" aria-label="Move block down">↓</button>
+          <button class="button button-secondary" type="button" data-block-action="delete">Delete</button>
+        </div>
+      </header>
+      ${body}
+    </article>`;
+}
+
+function renderBlockCanvas() {
+  const project = state.activeProject;
+  elements.blockSectionTarget.disabled = !project;
+  elements.addTextBlock.disabled = !project;
+  elements.addEditorSingleVideo.disabled = !project;
+  elements.addEditorComparisonVideo.disabled = !project;
+  if (!project) {
+    elements.blockSectionTarget.innerHTML = '';
+    elements.blockCanvas.innerHTML = '<p class="empty-state">Open a project to edit blocks.</p>';
+    return;
+  }
+
+  if (!project.sections.some((section) => section.id === state.selectedSectionId)) {
+    state.selectedSectionId = project.sections[0]?.id || null;
+  }
+  elements.blockSectionTarget.innerHTML = project.sections.map((section) => (
+    `<option value="${escapeHtml(section.id)}"${section.id === state.selectedSectionId ? ' selected' : ''}>${escapeHtml(section.title || 'Untitled section')}</option>`
+  )).join('');
+  elements.blockEditorStatus.textContent = `${project.sections.reduce((count, section) => count + section.blocks.length, 0)} blocks in long-form document`;
+  elements.blockCanvas.innerHTML = project.sections.map((section) => `
+    <section class="block-section ${section.id === state.selectedSectionId ? 'is-target' : ''}" data-section-id="${escapeHtml(section.id)}">
+      <header class="block-section-header">
+        <input type="text" data-section-title value="${editorValue(section.title)}" aria-label="Section title" />
+        <span class="muted">${section.blocks.length} blocks</span>
+      </header>
+      <div class="block-list">${section.blocks.map((block, index) => renderBlockEditor(section, block, index)).join('')}</div>
+    </section>`).join('');
+}
+
 function renderSectionList() {
   const project = state.activeProject;
   elements.sectionList.innerHTML = project.sections.map((section) => `
@@ -948,6 +1111,96 @@ function renderSectionList() {
   });
 }
 
+function setEditorPath(target, pathValue, value) {
+  const keys = pathValue.split('.');
+  let current = target;
+  keys.slice(0, -1).forEach((key) => {
+    if (!current[key] || typeof current[key] !== 'object') current[key] = {};
+    current = current[key];
+  });
+  current[keys.at(-1)] = value;
+}
+
+function editorControlValue(target) {
+  if (target.type === 'number') return target.value === '' ? null : Number(target.value);
+  return target.value;
+}
+
+function blockForEditorCard(card) {
+  const section = state.activeProject?.sections.find((item) => item.id === card.dataset.sectionId);
+  const block = section?.blocks.find((item) => item.id === card.dataset.blockId);
+  return { section, block };
+}
+
+function convertVideoBlockMode(block, mode) {
+  if (mode === 'comparison' && block.type !== 'comparisonVideo') {
+    const singleAsset = referenceId(block.mediaAssetId);
+    block.type = 'comparisonVideo';
+    block.left = { mediaAssetId: singleAsset, label: block.label || 'Left video', segment: block.segment, playback: block.playback, anchor: block.anchor };
+    block.right = { mediaAssetId: null, label: 'Right video', segment: { in: 0, out: null }, playback: { rate: 1 }, anchor: null };
+    return;
+  }
+  if (mode === 'single' && block.type !== 'singleVideo') {
+    block.type = 'singleVideo';
+    block.mediaAssetId = referenceId(block.left?.mediaAssetId);
+    block.segment = block.left?.segment || { in: 0, out: null };
+    block.playback = block.left?.playback || { rate: 1 };
+    block.anchor = block.left?.anchor || null;
+    delete block.left;
+    delete block.right;
+  }
+}
+
+function handleBlockEditorEvent(event) {
+  const target = event.target;
+  const card = target.closest('[data-block-id]');
+  if (target.matches('[data-section-title]')) {
+    const section = state.activeProject?.sections.find((item) => item.id === target.closest('[data-section-id]')?.dataset.sectionId);
+    if (!section) return;
+    section.title = target.value;
+    renderSectionList();
+    renderPreview();
+    scheduleSave();
+    return;
+  }
+  if (!card) return;
+  const { section, block } = blockForEditorCard(card);
+  if (!section || !block) return;
+
+  if (target.matches('[data-block-mode]')) {
+    convertVideoBlockMode(block, target.value);
+    renderBlockCanvas();
+    renderPlayer();
+    renderPreview();
+    scheduleSave();
+    return;
+  }
+  if (target.matches('[data-block-field="content"]')) {
+    block.content = target.value;
+    renderPreview();
+    scheduleSave();
+    return;
+  }
+  if (target.matches('[data-block-path]')) {
+    setEditorPath(block, target.dataset.blockPath, editorControlValue(target));
+    renderPreview();
+    renderPlayer();
+    scheduleSave();
+    return;
+  }
+  if (event.type !== 'click') return;
+  const action = target.closest('[data-block-action]')?.dataset.blockAction;
+  if (!action) return;
+  const index = section.blocks.findIndex((item) => item.id === block.id);
+  if (action === 'delete') section.blocks.splice(index, 1);
+  if (action === 'move-up' && index > 0) [section.blocks[index - 1], section.blocks[index]] = [section.blocks[index], section.blocks[index - 1]];
+  if (action === 'move-down' && index >= 0 && index < section.blocks.length - 1) [section.blocks[index], section.blocks[index + 1]] = [section.blocks[index + 1], section.blocks[index]];
+  renderBlockCanvas();
+  renderPlayer();
+  renderPreview();
+  scheduleSave();
+}
+
 function renderEditor({ preserveForm = false } = {}) {
   const project = state.activeProject;
   elements.editorEmpty.hidden = Boolean(project);
@@ -955,6 +1208,7 @@ function renderEditor({ preserveForm = false } = {}) {
   elements.saveProject.disabled = !project;
   renderMediaLibrary();
   renderPlayer();
+  renderBlockCanvas();
   if (!project) return;
 
   elements.projectTitle.textContent = project.displayName;
@@ -1056,7 +1310,8 @@ async function persistActiveProject() {
         state.activeProject = saved;
         state.dirty = false;
         renderProjects();
-        renderEditor({ preserveForm: true });
+        renderMediaLibrary();
+        renderPlayer();
         renderPreview();
         setSaveState('已儲存', 'saved');
       } else {
@@ -1271,6 +1526,16 @@ elements.playerBlockSelect.addEventListener('change', () => {
 });
 elements.addSingleVideo.addEventListener('click', addSingleVideoBlock);
 elements.addComparisonVideo.addEventListener('click', addComparisonVideoBlock);
+elements.blockSectionTarget.addEventListener('change', () => {
+  state.selectedSectionId = elements.blockSectionTarget.value || null;
+  renderBlockCanvas();
+});
+elements.addTextBlock.addEventListener('click', addTextBlock);
+elements.addEditorSingleVideo.addEventListener('click', () => addSingleVideoBlock({ allowEmpty: true }));
+elements.addEditorComparisonVideo.addEventListener('click', () => addComparisonVideoBlock({ allowEmpty: true }));
+elements.blockCanvas.addEventListener('input', handleBlockEditorEvent);
+elements.blockCanvas.addEventListener('change', handleBlockEditorEvent);
+elements.blockCanvas.addEventListener('click', handleBlockEditorEvent);
 elements.singlePlay.addEventListener('click', () => { void playPlayerSide('single'); });
 elements.singlePause.addEventListener('click', () => pausePlayerSide('single'));
 elements.singlePrev.addEventListener('click', () => { void stepPlayerSide('single', -1); });

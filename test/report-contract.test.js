@@ -99,3 +99,65 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
     },
   }]);
 });
+
+test('preserves block-local video settings in the shared report contract', () => {
+  const document = toReportDocument({
+    displayName: 'Block settings',
+    sections: [{
+      title: 'Video analysis',
+      blocks: [{
+        type: 'singleVideo',
+        mediaAssetId: 'asset-front',
+        label: 'Front view',
+        layout: 'stacked',
+        segment: { in: 0.25, out: 2.5, editorOnly: 'drop' },
+        playback: { rate: 0.75 },
+        sync: { mode: 'frame', startAnchor: { observedTime: 0.5, frameIndex: 15, editorOnly: 'drop' } },
+        anchor: { observedTime: 1.25, frameIndex: 38, precision: 'frame-aware' },
+      }, {
+        type: 'comparisonVideo',
+        layout: 'side-by-side',
+        sync: { mode: 'time', startAnchor: { observedTime: 0.75 } },
+        left: {
+          mediaAssetId: 'asset-front',
+          segment: { in: 0, out: 3 },
+          playback: { rate: 0.5 },
+          anchor: { observedTime: 1.1 },
+        },
+        right: {
+          mediaAssetId: 'asset-side',
+          segment: { in: 0.1, out: 2.9 },
+          playback: { rate: 0.5 },
+          anchor: { observedTime: 1.4 },
+        },
+      }],
+    }],
+  });
+
+  assert.deepEqual(document.sections[0].blocks, [{
+    type: 'singleVideo',
+    mediaAssetId: 'asset-front',
+    label: 'Front view',
+    layout: 'stacked',
+    segment: { in: 0.25, out: 2.5 },
+    playback: { rate: 0.75 },
+    sync: { mode: 'frame', startAnchor: { observedTime: 0.5, frameIndex: 15 } },
+    anchor: { observedTime: 1.25, frameIndex: 38, precision: 'frame-aware' },
+  }, {
+    type: 'comparisonVideo',
+    layout: 'side-by-side',
+    sync: { mode: 'time', startAnchor: { observedTime: 0.75 } },
+    left: {
+      mediaAssetId: 'asset-front',
+      segment: { in: 0, out: 3 },
+      playback: { rate: 0.5 },
+      anchor: { observedTime: 1.1 },
+    },
+    right: {
+      mediaAssetId: 'asset-side',
+      segment: { in: 0.1, out: 2.9 },
+      playback: { rate: 0.5 },
+      anchor: { observedTime: 1.4 },
+    },
+  }]);
+});
