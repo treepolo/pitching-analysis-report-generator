@@ -4,6 +4,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const PROJECT_ID_PATTERN = /^[a-z0-9-]{1,80}$/u;
 const MEDIA_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u;
+const EXPORT_JOB_ID_PATTERN = /^[0-9a-f-]{36}$/iu;
+const EXPORT_OUTPUT_KINDS = new Set(['folder', 'zip', 'both']);
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 const closeCallbacks = new Set();
 const syncApi = Object.freeze({
@@ -55,6 +57,39 @@ function assertTextImportPayload(value) {
   return value;
 }
 
+function assertExportRequest(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid export request');
+  }
+  assertProjectId(value.projectId);
+  if (typeof value.outputDirectory !== 'string'
+    || value.outputDirectory.trim() === ''
+    || CONTROL_CHARACTER_PATTERN.test(value.outputDirectory)) {
+    throw new Error('Invalid export output directory');
+  }
+  if (value.reportName !== undefined && value.reportName !== null
+    && (typeof value.reportName !== 'string' || value.reportName.length > 160
+      || CONTROL_CHARACTER_PATTERN.test(value.reportName))) {
+    throw new Error('Invalid export report name');
+  }
+  if (value.outputKind !== undefined && !EXPORT_OUTPUT_KINDS.has(value.outputKind)) {
+    throw new Error('Invalid export output kind');
+  }
+  return {
+    projectId: value.projectId,
+    outputDirectory: value.outputDirectory,
+    reportName: value.reportName,
+    outputKind: value.outputKind,
+  };
+}
+
+function assertExportJobId(value) {
+  if (typeof value !== 'string' || !EXPORT_JOB_ID_PATTERN.test(value)) {
+    throw new Error('Invalid export job id');
+  }
+  return value;
+}
+
 function assertProjectPayload(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('Invalid project payload');
@@ -100,6 +135,11 @@ contextBridge.exposeInMainWorld('pitchingApp', Object.freeze({
     projectId: assertProjectId(projectId),
     assetId: assertMediaId(assetId),
   }),
+  startExport: (request) => ipcRenderer.invoke('export:start', assertExportRequest(request)),
+  getExportStatus: (jobId) => ipcRenderer.invoke('export:status', assertExportJobId(jobId)),
+  waitForExport: (jobId) => ipcRenderer.invoke('export:wait', assertExportJobId(jobId)),
+  cancelExport: (jobId) => ipcRenderer.invoke('export:cancel', assertExportJobId(jobId)),
+  retryExport: (jobId) => ipcRenderer.invoke('export:retry', assertExportJobId(jobId)),
   getAppInfo: () => ipcRenderer.invoke('app:info'),
   sync: syncApi,
   onBeforeClose: (callback) => {

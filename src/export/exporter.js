@@ -150,6 +150,13 @@ function descriptorData(asset) {
   return null;
 }
 
+function throwIfAborted(signal) {
+  if (!signal?.aborted) return;
+  const error = new ExportValidationError('Export cancelled');
+  error.code = 'EXPORT_CANCELLED';
+  throw error;
+}
+
 function inferDescriptorKind(asset) {
   return normalizeAssetKind(
     asset.kind ?? asset.mediaKind ?? asset.assetKind,
@@ -330,6 +337,7 @@ async function exportReport({
   createZip = false,
   outputKind = 'folder',
   zipPath,
+  signal,
 } = {}) {
   if (typeof outputDirectory !== 'string' || outputDirectory.length === 0) {
     throw new ExportValidationError('Export outputDirectory is required');
@@ -373,23 +381,27 @@ async function exportReport({
       description: 'ZIP target directory',
     });
   }
+  throwIfAborted(signal);
   const temporaryRoot = await fs.mkdtemp(path.join(outputRoot, '.report-export-'));
   const stagingPath = path.join(temporaryRoot, safeName);
   const reportFileName = 'report.html';
   let moved = false;
   let zipCreatedPath = null;
   try {
+    throwIfAborted(signal);
     await fs.mkdir(path.join(stagingPath, 'videos'), { recursive: true });
     await fs.mkdir(path.join(stagingPath, 'images'), { recursive: true });
     const preparedAssets = prepareAssetDescriptors(assets, { referencedAssetIds });
     const stagedAssets = [];
     for (const asset of preparedAssets) {
+      throwIfAborted(signal);
       stagedAssets.push(await stageAsset(asset, stagingPath, {
         projectRootLexical,
         projectRootReal,
       }));
     }
 
+    throwIfAborted(signal);
     const stagedManifest = rendererManifest(stagedAssets);
     validateReferencedVideoAssetReferences(safeReportDocument, stagedManifest);
     const html = renderReportHtml(safeReportDocument, { assetManifest: stagedManifest });
@@ -423,10 +435,12 @@ async function exportReport({
 
     let zip = null;
     if (shouldCreateZip) {
+      throwIfAborted(signal);
       zipCreatedPath = resolvedZipPath;
       zip = await createZipArchive(folderPath, resolvedZipPath);
       zip.parity = await validateZipParity(folderPath, resolvedZipPath);
     }
+    throwIfAborted(signal);
     return {
       folderPath,
       zipPath: zip ? zip.zipPath : null,

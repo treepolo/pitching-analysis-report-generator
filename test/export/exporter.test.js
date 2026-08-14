@@ -164,6 +164,28 @@ test('ignores unused library descriptors, including invalid source paths', async
   await assert.rejects(fs.stat(path.join(result.folderPath, 'videos', 'private.mp4')), /ENOENT/u);
 });
 
+test('honors cancellation before staging and leaves no partial export', async () => {
+  const outputRoot = path.join(testRoot, 'cancelled-output');
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    exportReport({
+      projectRoot: testRoot,
+      outputDirectory: outputRoot,
+      reportName: 'Cancelled report',
+      reportDocument: {
+        schemaVersion: 1,
+        title: 'Cancelled report',
+        sections: [{ blocks: [{ type: 'rich-text', content: 'cancel' }] }],
+      },
+      assets: [],
+      signal: controller.signal,
+    }),
+    (error) => error.code === 'EXPORT_CANCELLED',
+  );
+  assert.deepEqual(await fs.readdir(outputRoot), []);
+});
+
 test('keeps repeated folder and ZIP exports byte-identical for the same canonical document', async () => {
   const reportDocument = {
     schemaVersion: 1,

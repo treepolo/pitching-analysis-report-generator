@@ -16,6 +16,7 @@ const {
   validateProjectRoot,
 } = require('./storage');
 const syncDomain = require('./sync/domain');
+const { ExportJobController } = require('./export/app-bridge');
 
 const APP_ROOT = path.resolve(app.getAppPath());
 const configuredProjectRoot = process.env.PITCHING_PROJECT_ROOT;
@@ -34,6 +35,7 @@ if (!isPathInside(APP_ROOT, PROJECT_ROOT)) {
 }
 
 const projectStore = createProjectStore(PROJECT_ROOT, { boundaryRoot: APP_ROOT });
+const exportJobs = new ExportJobController();
 
 function assertTrustedSender(event) {
   const sender = event?.sender;
@@ -137,6 +139,36 @@ function registerIpc() {
   ipcMain.handle('media:remove', (event, payload) => {
     assertTrustedSender(event);
     return projectStore.removeMediaAsset(payload?.projectId, payload?.assetId);
+  });
+  ipcMain.handle('export:start', async (event, payload) => {
+    assertTrustedSender(event);
+    const projectId = payload?.projectId;
+    const project = await projectStore.readProject(projectId);
+    return exportJobs.start({
+      projectId: project.id,
+      projectRoot: PROJECT_ROOT,
+      reportDocument: project,
+      assets: project.media,
+      outputDirectory: payload?.outputDirectory,
+      reportName: payload?.reportName ?? project.reportTitle ?? project.displayName,
+      outputKind: payload?.outputKind,
+    });
+  });
+  ipcMain.handle('export:status', (event, jobId) => {
+    assertTrustedSender(event);
+    return exportJobs.status(jobId);
+  });
+  ipcMain.handle('export:wait', (event, jobId) => {
+    assertTrustedSender(event);
+    return exportJobs.wait(jobId);
+  });
+  ipcMain.handle('export:cancel', (event, jobId) => {
+    assertTrustedSender(event);
+    return exportJobs.cancel(jobId);
+  });
+  ipcMain.handle('export:retry', (event, jobId) => {
+    assertTrustedSender(event);
+    return exportJobs.retry(jobId);
   });
   ipcMain.handle('app:info', (event) => {
     assertTrustedSender(event);
