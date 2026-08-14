@@ -111,6 +111,7 @@ textarea { resize: vertical; }
 .preview-export-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
 .preview-export-actions label { font-size: 12px; font-weight: 750; }
 .preview-export-actions select { width: auto; min-width: 110px; }
+.export-directory-status { margin-top: 8px; overflow-wrap: anywhere; }
 .export-status[data-state="running"], .export-status[data-state="cancelling"] { color: var(--blue); }
 .export-status[data-state="completed"] { color: var(--green); }
 .export-status[data-state="failed"], .export-status[data-state="cancelled"] { color: #b42318; }

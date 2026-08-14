@@ -18,6 +18,8 @@ test('renderer player UI exposes block-local controls and honest capability seam
     'comparison-right-video',
     'comparison-left-fullscreen',
     'comparison-right-fullscreen',
+    'choose-export-directory',
+    'export-directory-status',
     'export-kind',
     'export-report',
     'export-cancel',
@@ -34,11 +36,16 @@ test('renderer player UI exposes block-local controls and honest capability seam
   assert.match(renderer, /requestFullscreen/u);
   assert.match(styles, /#comparison-player\[data-layout="stacked"\]/u);
   assert.match(renderer, /startExport\(request\)/u);
+  assert.match(renderer, /pickExportDirectory/u);
+  assert.match(renderer, /normalizeExportDirectoryPick/u);
+  assert.match(renderer, /Folder selection cancelled; no export started/u);
   assert.match(renderer, /getExportStatus\(jobId\)/u);
   assert.match(renderer, /cancelExport\(jobId\)/u);
   assert.match(renderer, /retryExport\(jobId\)/u);
   assert.match(renderer, /await flushPendingChanges\(\)/u);
   assert.match(renderer, /outputKind: elements\.exportKind\.value/u);
+  assert.match(renderer, /state\.export\.outputDirectory \|\| defaultExportDirectory\(\)/u);
+  assert.match(styles, /\.export-directory-status/u);
 });
 
 test('renderer source never constructs a media URL from a filesystem path', () => {

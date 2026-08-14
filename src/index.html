@@ -123,6 +123,7 @@
           <div class="panel-heading"><div><p class="eyebrow">PREVIEW</p><h2>報告預覽</h2></div><span class="status-pill status-planned">Renderer-only · Export seam</span></div>
           <div id="preview" class="preview-surface"></div>
           <div class="preview-export-actions">
+            <button id="choose-export-directory" class="button button-secondary" type="button" disabled>Choose output folder</button>
             <label for="export-kind">Output</label>
             <select id="export-kind" disabled>
               <option value="folder">Folder</option>
@@ -132,6 +133,7 @@
             <button id="export-cancel" class="button button-secondary" type="button" hidden>Cancel</button>
             <button id="export-retry" class="button button-secondary" type="button" hidden>Retry</button>
           </div>
+          <p id="export-directory-status" class="export-directory-status hint" role="status">Project output folder is the default.</p>
           <p id="export-status" class="export-status hint" role="status">Export is unavailable until a project is open.</p>
         </section>
       </section>

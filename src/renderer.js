@@ -15,6 +15,8 @@ const state = {
     jobId: null,
     status: 'idle',
     snapshot: null,
+    outputDirectory: '',
+    directoryNotice: '',
     pollTimer: null,
   },
   player: {
@@ -109,6 +111,8 @@ const elements = {
   saveState: document.querySelector('#save-state'),
   rootPath: document.querySelector('#root-path'),
   appError: document.querySelector('#app-error'),
+  chooseExportDirectory: document.querySelector('#choose-export-directory'),
+  exportDirectoryStatus: document.querySelector('#export-directory-status'),
   exportKind: document.querySelector('#export-kind'),
   exportReport: document.querySelector('#export-report'),
   exportCancel: document.querySelector('#export-cancel'),
@@ -1058,6 +1062,60 @@ function defaultExportDirectory() {
   return `${root}${root.includes('\\') ? '\\' : '/'}output`;
 }
 
+function exportDirectoryPicker() {
+  return typeof window.pitchingApp?.pickExportDirectory === 'function'
+    ? window.pitchingApp.pickExportDirectory
+    : null;
+}
+
+function displaySafeDirectoryLabel(directory) {
+  const normalized = typeof directory === 'string' ? directory.replace(/[\\/]+$/u, '') : '';
+  const segments = normalized.split(/[\\/]/u).filter(Boolean);
+  return segments.at(-1) || 'selected folder';
+}
+
+function normalizeExportDirectoryPick(result) {
+  if (result === null || result === undefined || result?.canceled === true) {
+    return { canceled: true, directory: '' };
+  }
+  const candidate = typeof result === 'string'
+    ? result
+    : (result.path ?? result.directory ?? result.outputDirectory);
+  if (typeof candidate !== 'string' || candidate.trim() === '') {
+    return { canceled: false, directory: '' };
+  }
+  return { canceled: false, directory: candidate.trim() };
+}
+
+function resetExportSelection() {
+  state.export.outputDirectory = '';
+  state.export.directoryNotice = '';
+}
+
+async function chooseExportDirectory() {
+  if (!state.activeProject || ['running', 'cancelling'].includes(state.export.status)) return;
+  const picker = exportDirectoryPicker();
+  if (!picker) {
+    state.export.directoryNotice = 'Folder picker unavailable; using the project default.';
+    renderExportControls();
+    return;
+  }
+  try {
+    const picked = normalizeExportDirectoryPick(await picker());
+    if (picked.canceled) {
+      state.export.directoryNotice = 'Folder selection cancelled; no export started.';
+    } else if (!picked.directory) {
+      state.export.directoryNotice = 'Folder picker returned no usable folder; using the project default.';
+    } else {
+      state.export.outputDirectory = picked.directory;
+      state.export.directoryNotice = `Selected folder: ${displaySafeDirectoryLabel(picked.directory)}`;
+    }
+  } catch {
+    state.export.directoryNotice = 'Folder selection failed; using the project default.';
+  }
+  renderExportControls();
+}
+
 function exportResultLabel(snapshot) {
   const result = snapshot?.result;
   if (!result) return '';
@@ -1070,14 +1128,33 @@ function renderExportControls() {
   const exportState = state.export;
   const snapshot = exportState.snapshot;
   const running = exportState.status === 'running' || exportState.status === 'cancelling';
+  const pickerAvailable = Boolean(exportDirectoryPicker());
+  elements.chooseExportDirectory.disabled = !project || running || !pickerAvailable;
   elements.exportKind.disabled = !project || running;
   elements.exportReport.disabled = !project || running;
   elements.exportCancel.hidden = !running;
   elements.exportRetry.hidden = !exportState.jobId || !snapshot || !['failed', 'cancelled'].includes(exportState.status);
   elements.exportStatus.dataset.state = exportState.status;
   if (!project) {
+    elements.exportDirectoryStatus.textContent = 'Open a project to choose an output folder.';
     elements.exportStatus.textContent = 'Export is unavailable until a project is open.';
+  } else if (exportState.outputDirectory) {
+    elements.exportDirectoryStatus.textContent = exportState.directoryNotice
+      || `Selected folder: ${displaySafeDirectoryLabel(exportState.outputDirectory)}`;
   } else if (exportState.status === 'running') {
+    elements.exportDirectoryStatus.textContent = `Using project default: ${displaySafeDirectoryLabel(defaultExportDirectory())}`;
+    elements.exportStatus.textContent = 'Export running; referenced assets are being copied into a self-contained output.';
+  } else if (exportState.directoryNotice) {
+    elements.exportDirectoryStatus.textContent = exportState.directoryNotice;
+  } else if (!pickerAvailable) {
+    elements.exportDirectoryStatus.textContent = 'Folder picker unavailable; using the project default.';
+  } else {
+    elements.exportDirectoryStatus.textContent = `Using project default: ${displaySafeDirectoryLabel(defaultExportDirectory())}`;
+  }
+  if (!project) {
+    return;
+  }
+  if (exportState.status === 'running') {
     elements.exportStatus.textContent = 'Export running; referenced assets are being copied into a self-contained output.';
   } else if (exportState.status === 'cancelling') {
     elements.exportStatus.textContent = 'Cancelling export; waiting for cleanup.';
@@ -1088,7 +1165,9 @@ function renderExportControls() {
   } else if (exportState.status === 'cancelled') {
     elements.exportStatus.textContent = `Export cancelled: ${snapshot?.error?.message || 'no output was created'}`;
   } else {
-    elements.exportStatus.textContent = `Exports use ${defaultExportDirectory() || 'the project output folder'}.`;
+    elements.exportStatus.textContent = exportState.outputDirectory
+      ? `Exports use the selected folder: ${displaySafeDirectoryLabel(exportState.outputDirectory)}.`
+      : `Exports use ${defaultExportDirectory() || 'the project output folder'}.`;
   }
 }
 
@@ -1117,7 +1196,7 @@ async function startReportExport() {
   try {
     await flushPendingChanges();
     const project = state.activeProject;
-    const outputDirectory = defaultExportDirectory();
+    const outputDirectory = state.export.outputDirectory || defaultExportDirectory();
     if (!outputDirectory) throw new Error('Project output directory is unavailable.');
     const request = {
       projectId: project.id,
@@ -1585,6 +1664,7 @@ async function openProject(projectId) {
     if (state.activeProject && state.dirty) await requestSave();
     const project = await window.pitchingApp.openProject(projectId);
     state.activeProject = project;
+    resetExportSelection();
     state.selectedSectionId = project.sections[0]?.id || null;
     state.dirty = false;
     state.revision = 0;
@@ -1725,6 +1805,7 @@ document.querySelectorAll('[data-close-dialog]').forEach((button) => {
 elements.saveProject.addEventListener('click', () => {
   void requestSave().catch(() => {});
 });
+elements.chooseExportDirectory.addEventListener('click', () => { void chooseExportDirectory(); });
 elements.exportReport.addEventListener('click', () => { void startReportExport(); });
 elements.exportCancel.addEventListener('click', () => { void cancelReportExport(); });
 elements.exportRetry.addEventListener('click', () => { void retryReportExport(); });
