@@ -1,5 +1,11 @@
 # Implementation Status
 
+## Latest Wave 8D Integrator gate (current, 2026-08-15)
+
+- Product checkpoint is `edeaa95a4ebb682e29fadf26d4dc161c49d19499` on `worker/desktop-vertical-slice`, including `5e8b652` media capability discovery, `f478197` export path safety, `7b15f4d` sync hardening, and `edeaa95` honest FFmpeg progress boundaries. The current provenance change is docs-only and follows this product checkpoint.
+- Evidence: 108 npm tests / 107 pass / 1 explicit Electron exported `file://` skip; 34 JavaScript syntax checks; package/lock consistency; `git diff --check`; and tracked artifact/private scan. No requirement may be marked `VERIFIED`.
+- Product acceptance remains conditional fail/in progress: real ffprobe/FFmpeg, real media/player/sync/drift, exported folder/ZIP `file://`, responsive human evidence, and AT-A through AT-G remain pending or unavailable.
+
 ## Latest legacy-player cleanup gate (current, 2026-08-15)
 
 - Current HEAD is `cea6472b120fa81be51f03c02162ec0ff7dd6e72` on `worker/desktop-vertical-slice`; unreachable legacy renderer helpers that referenced removed global controls were removed. HTML/CSS and domain contracts were not changed. Origin matches and the worktree is clean.

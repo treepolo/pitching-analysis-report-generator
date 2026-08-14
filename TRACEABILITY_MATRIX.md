@@ -1,5 +1,11 @@
 # Traceability Matrix
 
+## Latest Wave 8D Integrator gate (current, 2026-08-15)
+
+- Product integration tip is `edeaa95a4ebb682e29fadf26d4dc161c49d19499` on `worker/desktop-vertical-slice`; included lane commits are `5e8b652` (media capability), `f478197` (export safety), `7b15f4d` (sync hardening), and `edeaa95` (FFmpeg progress boundaries). This entry is recorded by a docs-only reconciliation checkpoint.
+- Gate evidence: 108 npm tests / 107 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` skip; 34 JavaScript syntax checks; package/lock, diff-check, and artifact/private scan pass. The Electron skip and missing real ffprobe/FFmpeg evidence remain unavailable, not passes.
+- Real media/player/sync/drift runtime, exported browser `file://`, responsive human acceptance, and AT-A through AT-G remain unresolved. Requirement rows remain conservative and none are `VERIFIED`.
+
 ## Latest legacy-player cleanup gate (current, 2026-08-15)
 
 - Current checkpoint is `cea6472b120fa81be51f03c02162ec0ff7dd6e72` on `worker/desktop-vertical-slice`; unreachable global-player helper/reference code was removed while preserving inline video behavior and shared contracts. Origin matches and the worktree is clean.
