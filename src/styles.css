@@ -108,7 +108,12 @@ input:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px v
 textarea { resize: vertical; }
 .hint { margin: 0; font-size: 12px; }
 .preview-surface { min-height: 250px; padding: 24px; background: #fbfcfe; border: 1px solid var(--line); border-radius: 10px; }
-.preview-export-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+.preview-export-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
+.preview-export-actions label { font-size: 12px; font-weight: 750; }
+.preview-export-actions select { width: auto; min-width: 110px; }
+.export-status[data-state="running"], .export-status[data-state="cancelling"] { color: var(--blue); }
+.export-status[data-state="completed"] { color: var(--green); }
+.export-status[data-state="failed"], .export-status[data-state="cancelled"] { color: #b42318; }
 .report-preview { max-width: 760px; margin: 0 auto; padding: 18px 20px; background: #fff; }
 .report-preview section { padding: 14px 0; border-top: 1px solid var(--line); }
 .report-preview section p { white-space: pre-wrap; }

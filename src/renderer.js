@@ -10,6 +10,13 @@ const state = {
   dirty: false,
   revision: 0,
   pendingTextImport: null,
+  projectRoot: '',
+  export: {
+    jobId: null,
+    status: 'idle',
+    snapshot: null,
+    pollTimer: null,
+  },
   player: {
     selectedBlockId: null,
     runtime: null,
@@ -102,6 +109,11 @@ const elements = {
   saveState: document.querySelector('#save-state'),
   rootPath: document.querySelector('#root-path'),
   appError: document.querySelector('#app-error'),
+  exportKind: document.querySelector('#export-kind'),
+  exportReport: document.querySelector('#export-report'),
+  exportCancel: document.querySelector('#export-cancel'),
+  exportRetry: document.querySelector('#export-retry'),
+  exportStatus: document.querySelector('#export-status'),
 };
 
 function escapeHtml(value) {
@@ -1040,6 +1052,117 @@ function setSaveState(value, stateName = '') {
   elements.saveState.dataset.state = stateName;
 }
 
+function defaultExportDirectory() {
+  const root = typeof state.projectRoot === 'string' ? state.projectRoot.replace(/[\\/]+$/u, '') : '';
+  if (!root) return '';
+  return `${root}${root.includes('\\') ? '\\' : '/'}output`;
+}
+
+function exportResultLabel(snapshot) {
+  const result = snapshot?.result;
+  if (!result) return '';
+  const output = result.zipPath || result.folderPath;
+  return output ? `Output ready: ${output}` : 'Export completed without an output path.';
+}
+
+function renderExportControls() {
+  const project = state.activeProject;
+  const exportState = state.export;
+  const snapshot = exportState.snapshot;
+  const running = exportState.status === 'running' || exportState.status === 'cancelling';
+  elements.exportKind.disabled = !project || running;
+  elements.exportReport.disabled = !project || running;
+  elements.exportCancel.hidden = !running;
+  elements.exportRetry.hidden = !exportState.jobId || !snapshot || !['failed', 'cancelled'].includes(exportState.status);
+  elements.exportStatus.dataset.state = exportState.status;
+  if (!project) {
+    elements.exportStatus.textContent = 'Export is unavailable until a project is open.';
+  } else if (exportState.status === 'running') {
+    elements.exportStatus.textContent = 'Export running; referenced assets are being copied into a self-contained output.';
+  } else if (exportState.status === 'cancelling') {
+    elements.exportStatus.textContent = 'Cancelling export; waiting for cleanup.';
+  } else if (exportState.status === 'completed') {
+    elements.exportStatus.textContent = exportResultLabel(snapshot);
+  } else if (exportState.status === 'failed') {
+    elements.exportStatus.textContent = `Export failed: ${snapshot?.error?.message || 'unknown error'}`;
+  } else if (exportState.status === 'cancelled') {
+    elements.exportStatus.textContent = `Export cancelled: ${snapshot?.error?.message || 'no output was created'}`;
+  } else {
+    elements.exportStatus.textContent = `Exports use ${defaultExportDirectory() || 'the project output folder'}.`;
+  }
+}
+
+function setExportSnapshot(snapshot) {
+  state.export.snapshot = snapshot;
+  state.export.status = snapshot?.status || 'failed';
+  renderExportControls();
+}
+
+function exportDelay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function monitorExportJob(jobId) {
+  while (state.export.jobId === jobId) {
+    const snapshot = await window.pitchingApp.getExportStatus(jobId);
+    setExportSnapshot(snapshot);
+    if (!['running', 'cancelling'].includes(snapshot.status)) return snapshot;
+    await exportDelay(180);
+  }
+  return state.export.snapshot;
+}
+
+async function startReportExport() {
+  if (!state.activeProject || state.export.status === 'running' || state.export.status === 'cancelling') return;
+  try {
+    await flushPendingChanges();
+    const project = state.activeProject;
+    const outputDirectory = defaultExportDirectory();
+    if (!outputDirectory) throw new Error('Project output directory is unavailable.');
+    const request = {
+      projectId: project.id,
+      outputDirectory,
+      reportName: project.reportTitle || project.displayName,
+      outputKind: elements.exportKind.value,
+    };
+    state.export.jobId = null;
+    state.export.snapshot = null;
+    state.export.status = 'running';
+    renderExportControls();
+    const started = await window.pitchingApp.startExport(request);
+    if (!started?.jobId) throw new Error('Export bridge returned no job id.');
+    state.export.jobId = started.jobId;
+    setExportSnapshot(started);
+    await monitorExportJob(started.jobId);
+  } catch (error) {
+    state.export.jobId = null;
+    setExportSnapshot({ status: 'failed', error: { message: error.message } });
+  }
+}
+
+async function cancelReportExport() {
+  const jobId = state.export.jobId;
+  if (!jobId || !['running', 'cancelling'].includes(state.export.status)) return;
+  try {
+    setExportSnapshot(await window.pitchingApp.cancelExport(jobId));
+  } catch (error) {
+    setExportSnapshot({ status: 'failed', error: { message: `Cancel failed: ${error.message}` } });
+  }
+}
+
+async function retryReportExport() {
+  const jobId = state.export.jobId;
+  if (!jobId || !['failed', 'cancelled'].includes(state.export.status)) return;
+  try {
+    const started = await window.pitchingApp.retryExport(jobId);
+    state.export.jobId = started.jobId;
+    setExportSnapshot(started);
+    await monitorExportJob(started.jobId);
+  } catch (error) {
+    setExportSnapshot({ status: 'failed', error: { message: `Retry failed: ${error.message}` } });
+  }
+}
+
 function renderProjects() {
   elements.projectList.innerHTML = state.projects.map((project) => `
     <button class="project-card ${project.id === state.activeProject?.id ? 'is-active' : ''}" data-project-id="${escapeHtml(project.id)}" type="button">
@@ -1357,6 +1480,7 @@ function renderPreviewBlock(block) {
 function renderPreview() {
   const project = state.activeProject;
   if (!project) {
+    renderExportControls();
     elements.preview.innerHTML = '<p class="muted">建立或開啟專案後，這裡會顯示報告預覽。</p>';
     return;
   }
@@ -1373,6 +1497,7 @@ function renderPreview() {
       }).join('')}
     </article>
   `;
+  renderExportControls();
 }
 
 async function refreshProjects() {
@@ -1600,6 +1725,9 @@ document.querySelectorAll('[data-close-dialog]').forEach((button) => {
 elements.saveProject.addEventListener('click', () => {
   void requestSave().catch(() => {});
 });
+elements.exportReport.addEventListener('click', () => { void startReportExport(); });
+elements.exportCancel.addEventListener('click', () => { void cancelReportExport(); });
+elements.exportRetry.addEventListener('click', () => { void retryReportExport(); });
 
 elements.importText.addEventListener('click', () => { void requestTextImport(); });
 elements.importMedia.addEventListener('click', () => { void importMedia(); });
@@ -1679,6 +1807,7 @@ window.pitchingApp.onBeforeClose(() => flushPendingChanges());
 (async function bootstrap() {
   try {
     const info = await window.pitchingApp.getAppInfo();
+    state.projectRoot = info.projectRoot;
     elements.rootPath.textContent = info.projectRoot;
     await refreshProjects();
     renderEditor();

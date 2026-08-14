@@ -123,8 +123,16 @@
           <div class="panel-heading"><div><p class="eyebrow">PREVIEW</p><h2>報告預覽</h2></div><span class="status-pill status-planned">Renderer-only · Export seam</span></div>
           <div id="preview" class="preview-surface"></div>
           <div class="preview-export-actions">
-            <button id="export-report" class="button button-secondary" type="button" disabled aria-label="Export report (planned)">Export (planned)</button>
+            <label for="export-kind">Output</label>
+            <select id="export-kind" disabled>
+              <option value="folder">Folder</option>
+              <option value="zip">ZIP</option>
+            </select>
+            <button id="export-report" class="button button-secondary" type="button" disabled aria-label="Export report">Export report</button>
+            <button id="export-cancel" class="button button-secondary" type="button" hidden>Cancel</button>
+            <button id="export-retry" class="button button-secondary" type="button" hidden>Retry</button>
           </div>
+          <p id="export-status" class="export-status hint" role="status">Export is unavailable until a project is open.</p>
         </section>
       </section>
     </main>

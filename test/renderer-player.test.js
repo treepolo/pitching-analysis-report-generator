@@ -18,6 +18,11 @@ test('renderer player UI exposes block-local controls and honest capability seam
     'comparison-right-video',
     'comparison-left-fullscreen',
     'comparison-right-fullscreen',
+    'export-kind',
+    'export-report',
+    'export-cancel',
+    'export-retry',
+    'export-status',
   ]) {
     assert.match(indexHtml, new RegExp(`id="${id}"`, 'u'));
   }
@@ -28,6 +33,12 @@ test('renderer player UI exposes block-local controls and honest capability seam
   assert.match(renderer, /Explicit frame mode/u);
   assert.match(renderer, /requestFullscreen/u);
   assert.match(styles, /#comparison-player\[data-layout="stacked"\]/u);
+  assert.match(renderer, /startExport\(request\)/u);
+  assert.match(renderer, /getExportStatus\(jobId\)/u);
+  assert.match(renderer, /cancelExport\(jobId\)/u);
+  assert.match(renderer, /retryExport\(jobId\)/u);
+  assert.match(renderer, /await flushPendingChanges\(\)/u);
+  assert.match(renderer, /outputKind: elements\.exportKind\.value/u);
 });
 
 test('renderer source never constructs a media URL from a filesystem path', () => {
