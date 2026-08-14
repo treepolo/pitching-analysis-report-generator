@@ -1,5 +1,7 @@
 'use strict';
 
+const { constants: fsConstants, createReadStream } = require('node:fs');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
@@ -22,6 +24,7 @@ const {
   detectMediaType,
   normalizeMediaMetadata,
   normalizeReference,
+  safeOutputFileName,
 } = require('./contract');
 
 const INGEST_SCHEMA_VERSION = 1;
@@ -95,6 +98,48 @@ function normalizeProjectRoot(projectRoot) {
     throw new MediaIngestError('Project root is required', 'PROJECT_ROOT_REQUIRED');
   }
   return path.resolve(projectRoot);
+}
+
+function hashFile(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    const stream = createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.once('error', reject);
+    stream.once('end', () => resolve(hash.digest('hex')));
+  });
+}
+
+async function assertProjectTargetSafe(projectRoot, targetPath) {
+  const root = normalizeProjectRoot(projectRoot);
+  let current = path.resolve(targetPath);
+  if (!isPathInside(root, current) || current === root) {
+    throw new MediaPathPolicyError('Media target is outside the project root', 'PATH_OUTSIDE_PROJECT_ROOT');
+  }
+  while (true) {
+    let stats;
+    try {
+      stats = await fs.lstat(current);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw new MediaPathPolicyError('Media target cannot be inspected', 'TARGET_UNAVAILABLE');
+      }
+      if (current === root) return;
+      const parent = path.dirname(current);
+      if (parent === current) return;
+      current = parent;
+      continue;
+    }
+    if (stats.isSymbolicLink()) {
+      throw new MediaPathPolicyError('Media target must not contain a symbolic link', 'TARGET_SYMLINK_NOT_ALLOWED');
+    }
+    const realCurrent = await fs.realpath(current).catch(() => null);
+    if (!realCurrent || !isPathInside(root, realCurrent)) {
+      throw new MediaPathPolicyError('Media target resolves outside the project root', 'REALPATH_OUTSIDE_PROJECT_ROOT');
+    }
+    if (current === root) return;
+    return;
+  }
 }
 
 function toByteBuffer(value) {
@@ -574,6 +619,131 @@ function createMediaIngestRequest(input) {
   };
 }
 
+/**
+ * Copy an external regular file into the project-local original area. The
+ * external source is read only; the returned asset keeps a project-relative
+ * source reference plus a checksum, while transient provenance deliberately
+ * omits the external absolute path.
+ */
+async function copyMediaSourceIntoProject(input) {
+  requireRecord(input, 'Media copy input');
+  const projectRoot = normalizeProjectRoot(input.projectRoot);
+  const projectId = normalizeIdentifier(input.projectId, 'projectId');
+  const assetId = normalizeIdentifier(input.assetId ?? input.id, 'assetId');
+  if (typeof input.sourcePath !== 'string' || input.sourcePath.trim() === '') {
+    throw new MediaIngestError('sourcePath is required', 'SOURCE_PATH_REQUIRED');
+  }
+
+  const sourceCandidate = path.resolve(input.sourcePath);
+  let sourceStats;
+  try {
+    sourceStats = await fs.lstat(sourceCandidate);
+  } catch {
+    throw new MediaIngestError('Media source is unavailable', 'MEDIA_PATH_NOT_FOUND');
+  }
+  if (sourceStats.isSymbolicLink()) {
+    throw new MediaIngestError('Media source symlinks are not allowed', 'MEDIA_SYMLINK_NOT_ALLOWED');
+  }
+  if (!sourceStats.isFile()) {
+    throw new MediaIngestError('Media source must be a regular file', 'MEDIA_FILE_REQUIRED');
+  }
+  const sourcePath = await fs.realpath(sourceCandidate).catch(() => {
+    throw new MediaIngestError('Media source cannot be resolved safely', 'MEDIA_PATH_UNRESOLVED');
+  });
+
+  const displayName = normalizeInputText(
+    input.displayName ?? path.basename(sourcePath),
+    'displayName',
+    { required: true },
+  );
+  const detected = detectMediaType({
+    fileName: path.basename(sourcePath),
+    mimeType: input.mimeType ?? null,
+  });
+  const safeFileName = safeOutputFileName(displayName, detected.extension);
+  const destinationRelativePath = normalizeProjectRelativePath(
+    input.destinationRelativePath ?? `media/original/${assetId}-${safeFileName}`,
+    'destinationRelativePath',
+  );
+  if (!destinationRelativePath.startsWith('media/original/')) {
+    throw new MediaIngestError(
+      'Copied media must be stored under media/original',
+      'MEDIA_DESTINATION_POLICY',
+    );
+  }
+  const destinationPath = resolveProjectRelativePath(projectRoot, destinationRelativePath);
+  if (path.resolve(sourcePath) === path.resolve(destinationPath)) {
+    throw new MediaIngestError('Source and destination must be different', 'REFERENCE_COLLISION');
+  }
+  await assertProjectTargetSafe(projectRoot, destinationPath);
+
+  const sourceChecksumBefore = await hashFile(sourcePath).catch(() => {
+    throw new MediaIngestError('Media source checksum could not be read', 'SOURCE_CHECKSUM_FAILED');
+  });
+  let copied = false;
+  try {
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+    await assertProjectTargetSafe(projectRoot, destinationPath);
+    await fs.copyFile(sourcePath, destinationPath, fsConstants.COPYFILE_EXCL);
+    copied = true;
+
+    const [sourceChecksumAfter, destinationChecksum] = await Promise.all([
+      hashFile(sourcePath),
+      hashFile(destinationPath),
+    ]);
+    if (sourceChecksumBefore !== sourceChecksumAfter || sourceChecksumAfter !== destinationChecksum) {
+      throw new MediaIngestError(
+        'Media source changed during copy; original was not registered',
+        'SOURCE_CHANGED_DURING_COPY',
+      );
+    }
+
+    const destinationStat = await fs.stat(destinationPath);
+    const bytes = await readMediaHeader(destinationPath);
+    const inspection = inspectMediaSource({
+      fileName: displayName,
+      mimeType: input.mimeType ?? detected.mimeType,
+      bytes,
+      byteSize: destinationStat.size,
+    });
+    const sourceReference = createSourceReference({
+      relativePath: destinationRelativePath,
+      byteSize: destinationStat.size,
+      checksumSha256: destinationChecksum,
+      mediaType: inspection.mimeType ?? detected.mimeType,
+    });
+    const asset = registerMediaAsset({
+      id: assetId,
+      projectId,
+      displayName,
+      sourceReference,
+      inspection,
+      derived: { safeFileName, referenceCount: 0 },
+    });
+    return {
+      asset,
+      destinationRelativePath,
+      destinationPath,
+      inspection,
+      provenance: {
+        kind: 'copied-original',
+        sourceFileName: path.basename(sourcePath),
+        sourceByteSize: sourceStats.size,
+        sourceChecksumSha256: sourceChecksumAfter,
+        copiedAt: new Date().toISOString(),
+        originalPreserved: true,
+      },
+    };
+  } catch (error) {
+    if (copied) await fs.rm(destinationPath, { force: true }).catch(() => {});
+    if (error instanceof MediaIngestError) throw error;
+    if (error?.code === 'EEXIST') {
+      throw new MediaIngestError('Media destination already exists', 'MEDIA_DESTINATION_EXISTS');
+    }
+    throw new MediaIngestError('Media source could not be copied', 'MEDIA_COPY_FAILED');
+  }
+}
+
 async function realpathOrThrow(candidate, fieldName) {
   try {
     return await fs.realpath(candidate);
@@ -691,6 +861,7 @@ async function ingestMediaSource(input, options = {}) {
 
 module.exports = Object.freeze({
   DEFAULT_HEADER_BYTES,
+  copyMediaSourceIntoProject,
   INGEST_SCHEMA_VERSION,
   INSPECTION_SCHEMA_VERSION,
   MAX_HEADER_BYTES,

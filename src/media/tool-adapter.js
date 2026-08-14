@@ -1,5 +1,8 @@
 'use strict';
 
+const { createReadStream } = require('node:fs');
+const { spawn: defaultSpawn } = require('node:child_process');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
@@ -93,7 +96,7 @@ function cloneJson(value) {
 
 function normalizeCommand(value, fieldName) {
   if (typeof value !== 'string' || value.length === 0 || CONTROL_CHARACTER_PATTERN.test(value)
-    || !SAFE_COMMAND_PATTERN.test(value)) {
+    || (path.isAbsolute(value) ? value.length > 1000 : !SAFE_COMMAND_PATTERN.test(value))) {
     throw new MediaToolAdapterError(`${fieldName} is not a safe command name`, 'COMMAND_INVALID');
   }
   return value;
@@ -236,6 +239,117 @@ function normalizeRunnerResult(value) {
     stdout: normalizeOutputText(value.stdout, 'stdout'),
     stderr: normalizeOutputText(value.stderr, 'stderr'),
   };
+}
+
+/**
+ * Run a media tool through the OS process boundary without a shell. This is
+ * opt-in: tests and embedders can keep using the injected runner seam, while
+ * the desktop shell can supply this runner for real ffprobe/FFmpeg execution.
+ */
+function createLocalMediaToolRunner(input = {}) {
+  requireRecord(input, 'Local media runner input');
+  const spawnImpl = input.spawnImpl ?? defaultSpawn;
+  if (typeof spawnImpl !== 'function') {
+    throw new MediaToolAdapterError('spawnImpl must be a function', 'SPAWN_INVALID');
+  }
+  const maxOutputBytes = input.maxOutputBytes ?? 8 * 1024 * 1024;
+  if (!Number.isInteger(maxOutputBytes) || maxOutputBytes < 1024 || maxOutputBytes > 64 * 1024 * 1024) {
+    throw new MediaToolAdapterError('maxOutputBytes is invalid', 'OUTPUT_LIMIT_INVALID');
+  }
+
+  return ({ command, args = [], cwd, env, signal } = {}) => {
+    if (typeof command !== 'string' || command.length === 0 || CONTROL_CHARACTER_PATTERN.test(command)) {
+      return Promise.reject(new MediaToolAdapterError('command is invalid', 'COMMAND_INVALID'));
+    }
+    if (!Array.isArray(args) || args.some((arg) => typeof arg !== 'string')) {
+      return Promise.reject(new MediaToolAdapterError('args must be strings', 'ARGS_INVALID'));
+    }
+    return new Promise((resolve, reject) => {
+      let child;
+      let settled = false;
+      let stdout = '';
+      let stderr = '';
+
+      const cleanup = () => {
+        if (signal) signal.removeEventListener('abort', onAbort);
+      };
+      const settleResolve = (value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      };
+      const settleReject = (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+      const append = (field, value) => {
+        const text = Buffer.isBuffer(value) || value instanceof Uint8Array
+          ? Buffer.from(value).toString('utf8')
+          : String(value);
+        const next = field === 'stdout' ? stdout + text : stderr + text;
+        if (Buffer.byteLength(next, 'utf8') > maxOutputBytes) {
+          const error = new Error('Media tool output exceeded the configured limit');
+          error.code = 'OUTPUT_LIMIT_EXCEEDED';
+          if (child && typeof child.kill === 'function') child.kill();
+          settleReject(error);
+          return;
+        }
+        if (field === 'stdout') stdout = next;
+        else stderr = next;
+      };
+      const onAbort = () => {
+        if (child && typeof child.kill === 'function') child.kill();
+        const error = new Error('Media tool execution was cancelled');
+        error.name = 'AbortError';
+        error.code = 'ABORT_ERR';
+        settleReject(error);
+      };
+
+      if (signal?.aborted) {
+        onAbort();
+        return;
+      }
+
+      try {
+        child = spawnImpl(command, [...args], {
+          cwd,
+          env,
+          shell: false,
+          windowsHide: true,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch (error) {
+        settleReject(error);
+        return;
+      }
+      if (!child || typeof child.once !== 'function') {
+        settleReject(new MediaToolAdapterError('spawnImpl did not return a child process', 'SPAWN_RESULT_INVALID'));
+        return;
+      }
+      child.stdout?.on('data', (value) => append('stdout', value));
+      child.stderr?.on('data', (value) => append('stderr', value));
+      child.once('error', settleReject);
+      child.once('close', (code, signalName) => {
+        settleResolve({
+          exitCode: Number.isInteger(code) ? code : -1,
+          stdout,
+          stderr: signalName ? `${stderr}\nterminated:${signalName}`.trim() : stderr,
+        });
+      });
+      if (signal) signal.addEventListener('abort', onAbort, { once: true });
+    });
+  };
+}
+
+function createLocalMediaToolAdapter(input = {}) {
+  requireRecord(input, 'Local media adapter input');
+  const runner = input.runner === undefined
+    ? createLocalMediaToolRunner(input)
+    : input.runner;
+  return createMediaToolAdapter({ ...input, runner });
 }
 
 /**
@@ -707,13 +821,100 @@ function explicitVerification(value) {
   };
 }
 
-async function normalizeWithFfmpeg(adapter, input, { signal, verifyOutput } = {}) {
+function hashFile(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    const stream = createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.once('error', reject);
+    stream.once('end', () => resolve(hash.digest('hex')));
+  });
+}
+
+/**
+ * Verify a normalized target with the same injected ffprobe boundary used for
+ * inspection. A successful process exit alone is never enough: the output
+ * must exist inside the project, be probeable, and be directly playable.
+ */
+async function verifyNormalizedOutputWithFfprobe(adapter, input, { signal, now = () => new Date().toISOString() } = {}) {
+  requireRecord(input, 'Normalized verification input');
+  const normalizedReference = createNormalizedReference(input.normalizedReference);
+  const sourceInput = {
+    projectRoot: input.projectRoot,
+    sourceReference: normalizedReference.relativePath,
+    sourcePath: input.targetPath ?? resolveProjectRelativePath(input.projectRoot, normalizedReference.relativePath),
+  };
+  let source;
+  try {
+    source = await resolveExecutionSourceLocation(sourceInput);
+  } catch (error) {
+    return {
+      verified: false,
+      reason: 'normalized-output-unavailable',
+      errorCode: error?.code ?? 'TARGET_UNAVAILABLE',
+    };
+  }
+  const stats = await fs.stat(source.sourcePath).catch(() => null);
+  if (!stats) {
+    return { verified: false, reason: 'normalized-output-unavailable', errorCode: 'TARGET_UNAVAILABLE' };
+  }
+  if (!stats?.isFile()) {
+    return { verified: false, reason: 'normalized-output-not-a-file', errorCode: 'TARGET_NOT_A_FILE' };
+  }
+  const inspection = await inspectWithFfprobe(adapter, {
+    ...sourceInput,
+    sourcePath: source.sourcePath,
+    byteSize: stats.size,
+  }, { signal });
+  if (inspection.status !== MEDIA_OPERATION_STATUS.SUCCEEDED
+    || inspection.inspectionStatus !== INSPECTION_STATUS.INSPECTED
+    || inspection.compatibility !== COMPATIBILITY.DIRECT
+    || inspection.playability !== PLAYABILITY.PLAYABLE) {
+    return {
+      verified: false,
+      reason: 'normalized-output-not-direct-playable',
+      errorCode: inspection.status,
+      inspection,
+    };
+  }
+  let checksumSha256;
+  try {
+    checksumSha256 = await hashFile(source.sourcePath);
+  } catch (error) {
+    return {
+      verified: false,
+      reason: 'normalized-output-checksum-failed',
+      errorCode: error?.code ?? 'CHECKSUM_FAILED',
+      inspection,
+    };
+  }
+  return {
+    verified: true,
+    verifiedAt: now(),
+    checksumSha256,
+    metadata: {
+      ...inspection.metadata,
+      byteSize: stats.size,
+    },
+    inspection,
+  };
+}
+
+async function normalizeWithFfmpeg(adapter, input, {
+  signal,
+  verifyOutput,
+  prepareTargetDirectory = false,
+} = {}) {
   if (!adapter || typeof adapter.run !== 'function') {
     throw new MediaToolAdapterError('A media tool adapter is required', 'ADAPTER_REQUIRED');
   }
   const source = await resolveExecutionSourceLocation(input);
   const target = createNormalizedCopyTarget({ ...input, sourcePath: source.sourcePath });
   await assertNormalizationTargetSafe(target);
+  if (prepareTargetDirectory === true) {
+    await fs.mkdir(path.dirname(target.targetPath), { recursive: true });
+    await assertNormalizationTargetSafe(target);
+  }
   const command = buildFfmpegCommand({ ...input, sourcePath: source.sourcePath });
   const execution = await adapter.run({
     tool: MEDIA_TOOL_KIND.FFMPEG,
@@ -872,7 +1073,11 @@ async function runNormalizationJobWithAdapter(input, { signal, now = () => new D
     realPath: input.realPath,
     assetId: input.assetId ?? current.assetId,
     targetRelativePath: input.targetRelativePath,
-  }, { signal, verifyOutput: input.verifyOutput });
+  }, {
+    signal,
+    verifyOutput: input.verifyOutput,
+    prepareTargetDirectory: input.prepareTargetDirectory === true,
+  });
   if (normalization.status === MEDIA_OPERATION_STATUS.CANCELLED || signal?.aborted) {
     current = abortJob(current, now);
     return result();
@@ -905,10 +1110,13 @@ module.exports = Object.freeze({
   MediaToolAdapterError,
   buildFfmpegCommand,
   buildFfprobeCommand,
+  createLocalMediaToolAdapter,
+  createLocalMediaToolRunner,
   createMediaToolAdapter,
   createNormalizedCopyTarget,
   inspectWithFfprobe,
   normalizeWithFfmpeg,
   parseFfprobeOutput,
   runNormalizationJobWithAdapter,
+  verifyNormalizedOutputWithFfprobe,
 });
