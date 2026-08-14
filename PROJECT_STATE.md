@@ -1,18 +1,24 @@
 # Current Project State
 
-## Latest Wave 8D Integrator gate (current, 2026-08-15)
+## Current Wave 9A/B/C Integrator gate (2026-08-15)
+
+- Actual product tip is `7f8b0ea118d1f5539527149dd912dfdc0e4aa212` on `worker/desktop-vertical-slice`, with lane commits `13a1678abf328ffd7b0c2a1f298fef80c9e091ee` (media readiness diagnostics), `7f8b0ea118d1f5539527149dd912dfdc0e4aa212` (sync edge hardening), and `580dd02690f33f693e21c5623a6351f1c91d85b4` (ZIP ancestor-symlink safety) after prior tip `f5af09adf10370fd1eecf2ad19eedf7a65dc7c96`.
+- Fresh regression evidence: `npm test` reports 111 tests, 110 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip; 34 current JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/private scan pass.
+- Real ffprobe/FFmpeg execution, exported `file://` runtime, real video/player/sync/drift runtime, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
+
+## Historical Wave 8D Integrator gate (superseded, 2026-08-15)
 
 - Product integration checkpoint: `edeaa95a4ebb682e29fadf26d4dc161c49d19499` on `worker/desktop-vertical-slice`; ancestry includes `5e8b652` media capability discovery, `f478197` export path safety, `7b15f4d` sync hardening, and `edeaa95` honest FFmpeg progress boundaries. This provenance update is a docs-only checkpoint following that product tip.
 - Fresh regression evidence: `npm test` reports 108 tests, 107 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip; 34 current JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/private scan pass.
 - Missing real ffprobe/FFmpeg execution evidence, exported `file://` runtime evidence, real video/player/sync/drift runtime, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`.
 
-## Latest legacy-player cleanup gate (current, 2026-08-15)
+## Historical legacy-player cleanup gate (superseded, 2026-08-15)
 
 - Current HEAD is `cea6472b120fa81be51f03c02162ec0ff7dd6e72` on `worker/desktop-vertical-slice`; it follows the renderer integration checkpoint and removes unreachable legacy global-player helpers without changing HTML/CSS or domain contracts. Origin matches this HEAD and the worktree is clean.
 - Regression evidence remains 98 npm tests / 97 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip, 34 JavaScript syntax checks, focused renderer tests 2 pass, and `git diff --check` pass. The legacy global element scan is clean.
 - No product requirement is `VERIFIED`; Electron `file://`, real media/FFmpeg/player/sync, native picker, responsive human evidence, and AT-A through AT-G remain incomplete.
 
-## Latest Integrator renderer gate (current, 2026-08-15)
+## Historical Integrator renderer gate (superseded, 2026-08-15)
 
 - Current integrated checkpoint: `e65240b6aeabd099af8bb24d56d0af7bb75dd82a` on `worker/desktop-vertical-slice`; ancestry includes the UI redesign crash-recovery guide `2db74bb`, document CSS `05f442e`, document HTML `c4915ff`, and renderer inline-player change `e65240b`. Origin is the configured private repository and `git ls-remote` matches the local HEAD; worktree is clean.
 - Renderer behavior now boots without requiring legacy `#media-library`, `#player-panel`, `#preview`, `#section-list`, or static player controls; video blocks render inline in `#block-canvas`. Partial-DOM guards cover startup/error, block-canvas delegation, import/save, export, and inline player controls. This is implementation evidence, not product acceptance.
@@ -27,7 +33,7 @@
 - Dependency graph: Report Model/Editor defines block schema and persistence; Media Pipeline supplies project-local asset metadata/status; Playback/Sync consumes block-local video configuration; Renderer/Export derives the referenced set and portable output; Shell/QA owns security, recovery, and acceptance gates.
 - This is a planning decision only. Existing implementation evidence does not mark any requirement `VERIFIED`.
 
-## Wave 5 serial integration provenance (current, 2026-08-14)
+## Historical Wave 5 serial integration provenance (2026-08-14)
 
 - Code checkpoint before this docs reconciliation: `d9541b812e9853f2e9b4a08dddad742c293caeb3` on `worker/desktop-vertical-slice`; picker bridge commit `bd9d8ee` is in its ancestry, origin matched, and the worktree was clean.
 - Native export-folder contract reviewed: trusted main IPC opens an `openDirectory` dialog, validates the selected directory through project-root realpath containment, preload returns a safe string or `null`, and renderer preserves a project-safe default when no folder is selected.
@@ -36,7 +42,7 @@
 - The renderer now displays only a safe folder label, keeps selected output separate from the project default, and does not start a job on picker cancellation. No requirement is `VERIFIED`.
 - Remaining blockers: real video/FFmpeg, actual player/sync/drift, native dialog/human folder-picker evidence, exported folder/ZIP browser `file://`, responsive human evidence, and AT-A through AT-G.
 
-## Latest current provenance (2026-08-14, Wave 4 serial gate)
+## Historical current provenance snapshot (2026-08-14, Wave 4 serial gate)
 
 - Current code checkpoint before this docs reconciliation: `4ba8704421c75d1b57a98afecd2e3340f4e9fc86` on `worker/desktop-vertical-slice`; origin is `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matched, and the worktree was clean.
 - Integrated ancestry includes `93ffb61` block editor, `56f7159` media lifecycle, `646df8a` block-local sync, `121d857` referenced-video-only export, `4f83eb3` parallel governance, `d31244b` player runtime, `dad97d0` media timing/tool seam, `21a1bd4` sync hardening, `2278320` export bridge, and `4ba8704` export UI.
