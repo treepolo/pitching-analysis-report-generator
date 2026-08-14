@@ -1,6 +1,8 @@
 'use strict';
 
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+if (process.env.PITCHING_DISABLE_GPU === '1') app.disableHardwareAcceleration();
+
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -26,8 +28,6 @@ const closeGuards = new WeakMap();
 if (!isPathInside(APP_ROOT, PROJECT_ROOT)) {
   throw new Error('PITCHING_PROJECT_ROOT must stay inside the application project root');
 }
-
-if (isSmokeMode) app.disableHardwareAcceleration();
 
 const projectStore = createProjectStore(PROJECT_ROOT, { boundaryRoot: APP_ROOT });
 

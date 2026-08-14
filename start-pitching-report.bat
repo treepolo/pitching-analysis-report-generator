@@ -10,6 +10,7 @@ if not exist "node_modules\electron\package.json" (
   endlocal & exit /b 1
 )
 
+set "PITCHING_DISABLE_GPU=1"
 call npm start -- --disable-gpu
 set "exitCode=%ERRORLEVEL%"
 if not "%exitCode%"=="0" (
