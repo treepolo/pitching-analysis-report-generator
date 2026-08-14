@@ -1,0 +1,39 @@
+# Project governance
+.worktrees/
+.backups/
+.tmp/
+
+# Local project data and generated delivery artifacts
+data/
+projects/
+output/
+logs/
+reports/
+exports/
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.zip
+*.7z
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+
+# Tool/build output
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.idea/
+.vscode/
+Thumbs.db
+Desktop.ini
