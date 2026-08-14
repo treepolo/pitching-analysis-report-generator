@@ -19,8 +19,10 @@ const {
   createMediaToolAdapter,
   createNormalizationJob,
   createNormalizedCopyTarget,
+  discoverLocalMediaTools,
   inspectWithFfprobe,
   normalizeWithFfmpeg,
+  probeMediaToolVersion,
   registerMediaAsset,
   retryNormalizationJob,
   runNormalizationJobWithAdapter,
@@ -61,6 +63,57 @@ function sourceInput(overrides = {}) {
     ...overrides,
   };
 }
+
+test('discovers ffprobe and FFmpeg versions without claiming media support', async () => {
+  const calls = [];
+  const discovery = await discoverLocalMediaTools({
+    runner: async ({ tool, args }) => {
+      calls.push({ tool, args });
+      return {
+        exitCode: 0,
+        stdout: `${tool} version 7.0.0-test\nconfiguration: fixture`,
+        stderr: '',
+      };
+    },
+  });
+
+  assert.equal(discovery.allAvailable, true);
+  assert.equal(discovery.ffprobe.available, true);
+  assert.equal(discovery.ffprobe.version, '7.0.0-test');
+  assert.equal(discovery.ffmpeg.available, true);
+  assert.equal(discovery.ffmpeg.version, '7.0.0-test');
+  assert.deepEqual(calls.map((call) => call.args), [['-version'], ['-version']]);
+  assert.equal(Object.hasOwn(discovery.ffprobe, 'mediaInspection'), false);
+});
+
+test('keeps malformed version output and missing tools explicit', async () => {
+  const malformed = await probeMediaToolVersion(
+    createMediaToolAdapter({ runner: async () => ({ exitCode: 0, stdout: 'not a tool version', stderr: '' }) }),
+    MEDIA_TOOL_KIND.FFPROBE,
+  );
+  assert.equal(malformed.status, MEDIA_OPERATION_STATUS.MALFORMED_OUTPUT);
+  assert.equal(malformed.available, false);
+  assert.equal(malformed.errorCode, 'VERSION_OUTPUT_INVALID');
+
+  const missing = await discoverLocalMediaTools({
+    ffprobeCommand: 'wave8a-ffprobe-does-not-exist',
+    ffmpegCommand: 'wave8a-ffmpeg-does-not-exist',
+  });
+  assert.equal(missing.allAvailable, false);
+  assert.equal(missing.ffprobe.status, MEDIA_TOOL_STATUS.TOOL_MISSING);
+  assert.equal(missing.ffmpeg.status, MEDIA_TOOL_STATUS.TOOL_MISSING);
+  assert.equal(missing.ffprobe.available, false);
+  assert.equal(missing.ffmpeg.available, false);
+
+  const controller = new AbortController();
+  controller.abort();
+  const cancelled = await discoverLocalMediaTools({
+    runner: async () => ({ exitCode: 0, stdout: 'ffprobe version should not run', stderr: '' }),
+  }, { signal: controller.signal });
+  assert.equal(cancelled.ffprobe.status, MEDIA_TOOL_STATUS.CANCELLED);
+  assert.equal(cancelled.ffmpeg.status, MEDIA_TOOL_STATUS.CANCELLED);
+  assert.equal(cancelled.allAvailable, false);
+});
 
 test('adapter exposes missing and process-failure states without claiming inspection success', async () => {
   const missing = await inspectWithFfprobe(

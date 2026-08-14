@@ -468,6 +468,84 @@ function createMediaToolAdapter(input = {}) {
   });
 }
 
+function parseToolVersion(tool, output) {
+  const executableName = tool === MEDIA_TOOL_KIND.FFPROBE ? 'ffprobe' : 'ffmpeg';
+  const match = new RegExp(`^${executableName}\\s+version\\s+([^\\s]+)`, 'imu').exec(output);
+  return match?.[1] ?? null;
+}
+
+/**
+ * Probe only the external tool capability boundary. A version response proves
+ * that a command is executable, not that any particular media file is valid
+ * or playable; real-media inspection remains owned by inspectWithFfprobe.
+ */
+async function probeMediaToolVersion(adapter, tool, { signal } = {}) {
+  if (!adapter || typeof adapter.run !== 'function') {
+    throw new MediaToolAdapterError('A media tool adapter is required', 'ADAPTER_REQUIRED');
+  }
+  if (!Object.values(MEDIA_TOOL_KIND).includes(tool)) {
+    throw new MediaToolAdapterError('tool kind is invalid', 'TOOL_KIND_INVALID');
+  }
+
+  const execution = await adapter.run({ tool, args: ['-version'], signal });
+  const base = {
+    tool,
+    command: execution.command ?? null,
+    toolStatus: execution.status ?? null,
+    status: execution.status ?? MEDIA_OPERATION_STATUS.PROCESS_FAILED,
+    available: false,
+    version: null,
+    exitCode: Number.isInteger(execution.exitCode) ? execution.exitCode : null,
+    errorCode: execution.errorCode ?? null,
+  };
+  if (execution.status !== MEDIA_TOOL_STATUS.AVAILABLE) {
+    return {
+      ...base,
+      reason: execution.status ?? 'tool-status-unknown',
+    };
+  }
+
+  const output = [normalizeOutputText(execution.stdout, 'version stdout'), normalizeOutputText(execution.stderr, 'version stderr')]
+    .filter((value) => value.length > 0)
+    .join('\n');
+  const version = parseToolVersion(tool, output);
+  if (version === null) {
+    return {
+      ...base,
+      status: MEDIA_OPERATION_STATUS.MALFORMED_OUTPUT,
+      errorCode: 'VERSION_OUTPUT_INVALID',
+      reason: 'version output did not identify the requested tool',
+    };
+  }
+  return {
+    ...base,
+    status: MEDIA_TOOL_STATUS.AVAILABLE,
+    available: true,
+    version,
+    evidence: 'version-command',
+    errorCode: null,
+    reason: null,
+  };
+}
+
+/**
+ * Discover local ffprobe/FFmpeg executability without claiming media support.
+ * The injected adapter keeps this deterministic in tests and lets the shell
+ * surface unavailable tools before starting a long normalization job.
+ */
+async function discoverLocalMediaTools(input = {}, { signal } = {}) {
+  requireRecord(input, 'Local media discovery input');
+  const adapter = input.adapter ?? createLocalMediaToolAdapter(input.toolOptions ?? input);
+  const ffprobe = await probeMediaToolVersion(adapter, MEDIA_TOOL_KIND.FFPROBE, { signal });
+  const ffmpeg = await probeMediaToolVersion(adapter, MEDIA_TOOL_KIND.FFMPEG, { signal });
+  return {
+    schemaVersion: 1,
+    allAvailable: ffprobe.available && ffmpeg.available,
+    ffprobe,
+    ffmpeg,
+  };
+}
+
 function buildFfprobeCommand(input) {
   const source = normalizeSourceLocation(input);
   const command = normalizeCommand(input.ffprobeCommand ?? 'ffprobe', 'ffprobeCommand');
@@ -1156,9 +1234,11 @@ module.exports = Object.freeze({
   createLocalMediaToolRunner,
   createMediaToolAdapter,
   createNormalizedCopyTarget,
+  discoverLocalMediaTools,
   inspectWithFfprobe,
   normalizeWithFfmpeg,
   parseFfprobeOutput,
+  probeMediaToolVersion,
   runNormalizationJobWithAdapter,
   runNormalizationJobWithLocalTools,
   verifyNormalizedOutputWithFfprobe,
