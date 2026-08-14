@@ -268,10 +268,11 @@ test('frame capability cannot upgrade a time-only start anchor into exact-frame 
     duration: 3,
     timing: cfr(30, 90, 3),
     capability: true,
-    frameAware: true,
+    mode: SYNC_MODE.FRAME,
   });
   assert.equal(mapped.precision, PRECISION.TIME_BASED);
   assert.equal(mapped.resolution, FRAME_STEP_RESOLUTION.TIME_ONLY);
+  assert.equal(mapped.fallback, true);
   assert.equal(mapped.frameIndex, null);
   assert.equal(mapped.targetTime, 1.5);
 });
@@ -318,6 +319,85 @@ test('time-mode playback advances one shared elapsed-time playhead at the relati
   assert.equal(advanced.startAnchors.right, null);
 });
 
+test('shared time playhead stays deterministic over long playback and keeps block-local anchors', () => {
+  const leftAnchor = anchor({
+    comparisonBlockId: 'comparison-long-play',
+    observedTime: 10,
+    observedFrameIndex: 300,
+    timingSnapshot: cfr(30, 300000, 10000),
+  });
+  const rightAnchor = anchor({
+    comparisonBlockId: 'comparison-long-play',
+    side: 'right',
+    mediaAssetId: 'asset-right',
+    observedTime: 20,
+    observedFrameIndex: 1200,
+    timingSnapshot: cfr(60, 600000, 10000),
+  });
+  let state = createComparisonSyncState({
+    comparisonBlockId: 'comparison-long-play',
+    startAnchors: { left: leftAnchor, right: rightAnchor },
+    playback: {
+      relativeTime: 0,
+      playbackRate: 1.25,
+      status: PLAYER_STATUS.PLAYING,
+    },
+  });
+
+  const tickCount = 36_000;
+  for (let tick = 0; tick < tickCount; tick += 1) {
+    state = advancePlaybackRelationship(state, 0.1);
+  }
+
+  assert.ok(Math.abs(state.playback.relativeTime - 4500) < 1e-9);
+  const mapped = mapComparisonSyncState(state, {
+    left: { timing: cfr(30, 300000, 10000), duration: 10000, capability: true },
+    right: { timing: cfr(60, 600000, 10000), duration: 10000, capability: true },
+  });
+  assert.equal(mapped.effectiveMode, SYNC_MODE.TIME);
+  assert.equal(mapped.resolution, FRAME_STEP_RESOLUTION.TIME_ONLY);
+  assert.equal(mapped.sides.left.targetTime, 4510);
+  assert.equal(mapped.sides.right.targetTime, 4520);
+  assert.equal(mapped.sides.left.frameIndex, null);
+  assert.equal(mapped.sides.right.frameIndex, null);
+
+  const longPlayDrift = planDriftCorrection({
+    currentTime: 43_200,
+    targetTime: 43_200.1,
+    baseRate: 1,
+    state: PLAYER_STATUS.PLAYING,
+  });
+  assert.equal(longPlayDrift.action, DRIFT_ACTION.RATE_NUDGE);
+  assert.ok(Math.abs(longPlayDrift.rateAdjustment - 0.05) < 1e-12);
+
+  const otherBlock = createComparisonSyncState({
+    comparisonBlockId: 'comparison-other',
+    startAnchors: {
+      left: anchor({
+        comparisonBlockId: 'comparison-other',
+        observedTime: 100,
+        timingSnapshot: cfr(30, 9000, 300),
+      }),
+      right: anchor({
+        comparisonBlockId: 'comparison-other',
+        side: 'right',
+        mediaAssetId: 'asset-right',
+        observedTime: 200,
+        timingSnapshot: cfr(60, 18000, 300),
+      }),
+    },
+    playback: { relativeTime: 0.5 },
+  });
+  const otherMapped = mapComparisonSyncState(otherBlock, {
+    left: { timing: cfr(30, 900, 3), duration: 3 },
+    right: { timing: cfr(60, 1800, 3), duration: 3 },
+  });
+  assert.equal(otherMapped.sides.left.targetTime, 3);
+  assert.equal(otherMapped.sides.right.targetTime, 3);
+  assert.equal(state.comparisonBlockId, 'comparison-long-play');
+  assert.equal(state.startAnchors.left.observedTime, 10);
+});
+
 test('explicit frame mode exposes per-source fallback instead of claiming frame precision', () => {
   const state = createComparisonSyncState({
     comparisonBlockId: 'comparison-1',
@@ -357,6 +437,53 @@ test('explicit frame mode exposes per-source fallback instead of claiming frame 
   assert.deepEqual(missing.missingSides, ['left', 'right']);
 });
 
+test('frame mapping reads capability from each source player and falls back independently', () => {
+  const state = createComparisonSyncState({
+    comparisonBlockId: 'comparison-player-capability',
+    startAnchors: {
+      left: anchor({
+        comparisonBlockId: 'comparison-player-capability',
+        observedTime: 1,
+      }),
+      right: anchor({
+        comparisonBlockId: 'comparison-player-capability',
+        side: 'right',
+        mediaAssetId: 'asset-right',
+        observedTime: 2,
+        observedFrameIndex: 60,
+        timingSnapshot: cfr(60, 180, 3),
+      }),
+    },
+    playback: { mode: SYNC_MODE.FRAME, relativeTime: 0.5 },
+  });
+  const mapped = mapComparisonSyncState(state, {
+    left: {
+      player: {
+        blockId: 'comparison-player-capability-left',
+        comparisonBlockId: 'comparison-player-capability',
+        side: 'left',
+        mediaAssetId: 'asset-left',
+        duration: 3,
+        timing: cfr(30, 90, 3),
+        capability: { supportsFrameStep: true },
+      },
+    },
+    right: {
+      timing: cfr(60, 180, 3),
+      duration: 3,
+      capability: false,
+    },
+  });
+
+  assert.equal(mapped.sides.left.resolution, FRAME_STEP_RESOLUTION.EXACT_FRAME);
+  assert.equal(mapped.sides.left.frameIndex, 45);
+  assert.equal(mapped.sides.right.resolution, FRAME_STEP_RESOLUTION.TIME_ONLY);
+  assert.equal(mapped.sides.right.frameIndex, null);
+  assert.equal(mapped.resolution, FRAME_STEP_RESOLUTION.TIME_ONLY);
+  assert.equal(mapped.effectiveMode, SYNC_MODE.TIME);
+  assert.equal(mapped.fallback, true);
+});
+
 test('relative t=0 maps each side from its own anchor time, not a shared frame number', () => {
   const leftAnchor = anchor({
     side: 'left',
@@ -386,7 +513,7 @@ test('relative t=0 maps each side from its own anchor time, not a shared frame n
       timing: cfr(60, 1800, 30),
       capability: { supportsFrameStep: true },
     },
-  }, 0.5);
+  }, 0.5, { mode: SYNC_MODE.FRAME });
 
   assert.equal(aligned.precision, PRECISION.FRAME_AWARE);
   assert.equal(aligned.resolution, FRAME_STEP_RESOLUTION.EXACT_FRAME);
@@ -407,6 +534,41 @@ test('relative t=0 maps each side from its own anchor time, not a shared frame n
   assert.equal(timeOnly.resolution, FRAME_STEP_RESOLUTION.TIME_ONLY);
 });
 
+test('low-level comparison alignment defaults to time mode and requires explicit frame mode', () => {
+  const leftAnchor = anchor({
+    observedTime: 10,
+    observedFrameIndex: 300,
+    timingSnapshot: cfr(30, 900, 30),
+  });
+  const rightAnchor = anchor({
+    side: 'right',
+    mediaAssetId: 'asset-right',
+    observedTime: 20,
+    observedFrameIndex: 1200,
+    timingSnapshot: cfr(60, 1800, 30),
+  });
+  const sides = {
+    left: { anchor: leftAnchor, duration: 30, timing: cfr(30, 900, 30), capability: true },
+    right: { anchor: rightAnchor, duration: 30, timing: cfr(60, 1800, 30), capability: true },
+  };
+
+  const defaultAlignment = alignComparisonAtRelativeTime(sides, 0.5);
+  assert.equal(defaultAlignment.requestedMode, SYNC_MODE.TIME);
+  assert.equal(defaultAlignment.effectiveMode, SYNC_MODE.TIME);
+  assert.equal(defaultAlignment.resolution, FRAME_STEP_RESOLUTION.TIME_ONLY);
+  assert.equal(defaultAlignment.sides.left.frameIndex, null);
+  assert.equal(defaultAlignment.sides.right.frameIndex, null);
+
+  const frameAlignment = alignComparisonAtRelativeTime(sides, 0.5, {
+    mode: SYNC_MODE.FRAME,
+  });
+  assert.equal(frameAlignment.requestedMode, SYNC_MODE.FRAME);
+  assert.equal(frameAlignment.effectiveMode, SYNC_MODE.FRAME);
+  assert.equal(frameAlignment.resolution, FRAME_STEP_RESOLUTION.EXACT_FRAME);
+  assert.equal(frameAlignment.sides.left.frameIndex, 315);
+  assert.equal(frameAlignment.sides.right.frameIndex, 1230);
+});
+
 test('VFR alignment uses presentation timestamps when frame-aware timing is available', () => {
   const vfrAnchor = anchor({
     side: 'left',
@@ -419,6 +581,7 @@ test('VFR alignment uses presentation timestamps when frame-aware timing is avai
     duration: 0.3,
     timing: vfr([0, 0.04, 0.095, 0.17, 0.24], 0.3),
     capability: { frameStep: true },
+    mode: SYNC_MODE.FRAME,
   });
 
   assert.ok(Math.abs(mapping.targetTime - 0.15) < 1e-12);
@@ -569,7 +732,7 @@ test('comparison drift uses frame-resolved playback targets independently per si
   const aligned = alignComparisonAtRelativeTime({
     left: { anchor: leftAnchor, duration: 3, timing: cfr(30, 90, 3), capability: true },
     right: { anchor: rightAnchor, duration: 3, timing: cfr(60, 180, 3), capability: true },
-  }, 0.5);
+  }, 0.5, { mode: SYNC_MODE.FRAME });
 
   const leftPlayer = createPlayerBlock({
     blockId: 'comparison-1-left',
@@ -578,7 +741,10 @@ test('comparison drift uses frame-resolved playback targets independently per si
     timing: cfr(30, 90, 3),
     anchor: leftAnchor,
   });
-  const result = seekPlayerToRelativeTime(leftPlayer, 0.5, { frameAware: true });
+  const result = seekPlayerToRelativeTime(leftPlayer, 0.5, {
+    mode: SYNC_MODE.FRAME,
+    capability: true,
+  });
   assert.equal(result.player.currentTime, 1.5);
   assert.equal(result.alignment.frameIndex, 45);
   assert.equal(aligned.sides.right.playbackTime, 2.5);

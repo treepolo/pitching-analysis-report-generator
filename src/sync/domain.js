@@ -97,6 +97,14 @@ function requireId(value, name) {
   return value;
 }
 
+function normalizeSyncMode(mode, name = 'sync mode') {
+  const normalized = mode ?? SYNC_MODE.TIME;
+  if (![SYNC_MODE.TIME, SYNC_MODE.FRAME].includes(normalized)) {
+    throw new SyncDomainError(`${name} must be time or frame`);
+  }
+  return normalized;
+}
+
 function requireFinite(value, name, minimum = -Infinity) {
   if (!Number.isFinite(value) || value < minimum) {
     const suffix = minimum !== -Infinity ? ` >= ${minimum}` : '';
@@ -718,6 +726,7 @@ function advancePlayer(player, deltaSeconds) {
 function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
   const anchor = createSyncAnchor(anchorInput);
   requireFinite(relativeTime, 'relativeTime');
+  const requestedMode = normalizeSyncMode(options.mode, 'anchor mapping mode');
   const duration = options.duration ?? anchor.timingSnapshot.duration;
   const timing = normalizeTimingMetadata(options.timing ?? anchor.timingSnapshot, duration);
   const requestedTime = anchor.observedTime + relativeTime;
@@ -725,12 +734,14 @@ function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
   const capabilityStatus = frameStepCapabilityStatus(options.capability);
   const anchorHasFrameEvidence = anchor.precision === PRECISION.FRAME_AWARE
     && Number.isInteger(anchor.observedFrameIndex);
-  const frameAwareRequested = anchorHasFrameEvidence
-    && capabilityStatus !== CAPABILITY_STATUS.UNSUPPORTED
-    && (options.precision === PRECISION.FRAME_AWARE
-      || options.frameAware === true
-      || supportsFrameStep(options.capability));
-  let resolution = resolutionForTiming(timing, capabilityStatus);
+  const frameAwareRequested = requestedMode === SYNC_MODE.FRAME
+    && anchorHasFrameEvidence
+    && capabilityStatus === CAPABILITY_STATUS.AVAILABLE;
+  let resolution = requestedMode === SYNC_MODE.TIME
+    ? (timing.kind === TIMING_KIND.UNKNOWN
+      ? FRAME_STEP_RESOLUTION.UNKNOWN
+      : FRAME_STEP_RESOLUTION.TIME_ONLY)
+    : resolutionForTiming(timing, capabilityStatus);
   let frameIndex = null;
   let frameTime = null;
   if (frameAwareRequested && timingHasFrameMapping(timing)) {
@@ -742,6 +753,8 @@ function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
   return {
     side: anchor.side,
     comparisonBlockId: anchor.comparisonBlockId,
+    mode: requestedMode,
+    requestedMode,
     relativeTime,
     anchorTime: anchor.observedTime,
     requestedTime,
@@ -752,6 +765,8 @@ function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
     precision: precisionForResolution(resolution),
     resolution,
     capabilityStatus,
+    fallback: requestedMode === SYNC_MODE.FRAME
+      && resolution !== FRAME_STEP_RESOLUTION.EXACT_FRAME,
     clamped: Math.abs(requestedTime - targetTime) > EPSILON,
   };
 }
@@ -780,6 +795,7 @@ function overallResolution(results) {
 function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
   requireRecord(sides, 'comparison sides');
   requireFinite(relativeTime, 'relativeTime');
+  const requestedMode = normalizeSyncMode(options.mode, 'comparison alignment mode');
   const sideNames = ['left', 'right'];
   const alignedSides = {};
   for (const side of sideNames) {
@@ -788,6 +804,7 @@ function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
     const anchor = entry.anchor ?? entry;
     alignedSides[side] = mapAnchorToRelativeTime(anchor, relativeTime, {
       ...options,
+      mode: requestedMode,
       duration: entry.duration ?? options.duration,
       timing: entry.timing ?? options.timings?.[side],
       capability: entry.capability ?? options.capabilities?.[side],
@@ -796,21 +813,24 @@ function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
   if (alignedSides.left.comparisonBlockId !== alignedSides.right.comparisonBlockId) {
     throw new SyncDomainError('comparison anchors must belong to the same comparison block');
   }
+  const resolution = overallResolution(Object.values(alignedSides));
   return {
     comparisonBlockId: alignedSides.left.comparisonBlockId,
+    mode: requestedMode,
+    requestedMode,
+    effectiveMode: effectiveModeForResolution(requestedMode, resolution),
     relativeTime,
     precision: overallPrecision(Object.values(alignedSides)),
-    resolution: overallResolution(Object.values(alignedSides)),
+    resolution,
+    fallback: requestedMode === SYNC_MODE.FRAME
+      && resolution !== FRAME_STEP_RESOLUTION.EXACT_FRAME,
     sides: alignedSides,
   };
 }
 
 function createPlaybackRelationship(input = {}) {
   requireRecord(input, 'playback relationship');
-  const mode = input.mode ?? SYNC_MODE.TIME;
-  if (![SYNC_MODE.TIME, SYNC_MODE.FRAME].includes(mode)) {
-    throw new SyncDomainError('playback relationship.mode must be time or frame');
-  }
+  const mode = normalizeSyncMode(input.mode, 'playback relationship.mode');
   const relativeTime = input.relativeTime === undefined
     ? 0
     : requireFinite(input.relativeTime, 'playback relationship.relativeTime', 0);
@@ -948,7 +968,10 @@ function mapComparisonSyncState(stateInput, sources) {
     const player = source.player ? createPlayerBlock(source.player) : null;
     const timing = source.timing ?? player?.timing ?? state.startAnchors[side].timingSnapshot;
     const duration = source.duration ?? player?.duration;
-    const capability = source.capability;
+    const capability = source.capability
+      ?? source.frameStepCapability
+      ?? player?.capability
+      ?? player?.frameStepCapability;
     const anchor = state.startAnchors[side];
     if (source.mediaAssetId !== undefined && source.mediaAssetId !== anchor.mediaAssetId) {
       throw new SyncDomainError(`comparison sync source ${side} asset does not match its anchor`);
@@ -967,8 +990,8 @@ function mapComparisonSyncState(stateInput, sources) {
     const mapping = mapAnchorToRelativeTime(anchor, state.playback.relativeTime, {
       duration,
       timing,
-      capability: frameModeRequested ? capability : false,
-      frameAware: frameModeRequested && supportsFrameStep(capability),
+      capability,
+      mode: requestedMode,
     });
     sides[side] = {
       ...mapping,
