@@ -2,11 +2,12 @@
 
 ## Latest current provenance (2026-08-14)
 
-- Current Git state: `fd2f68798097116375ace0372c57f6a8ae137e05` on `worker/desktop-vertical-slice`; worktree clean; no remote configured and no push evidence.
-- `fd2f687` is the latest responsive/runtime QA revision. Its smoke-only gate covered desktop and narrow control visibility/overflow and kept exported-folder/ZIP Electron `file://` unavailable as an explicit result; production launch security was unchanged.
-- The existing `65 pass / 1 skip` `npm test`, 29 JavaScript syntax checks, and app Electron smoke are previous-worker evidence. Fresh read-only QA reproduced only 18 pure tests.
+- Current Git state: `5bbd845551c00a31867aa300c2df643481acfeb1` on `worker/desktop-vertical-slice`; origin is configured at `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches, and the worktree is clean.
+- Startup provenance: `dfef829` normalized the Windows launcher to ASCII/CRLF label/goto syntax; `5bbd845` added opt-in `disable-gpu`/`in-process-gpu` switches and `app.disableHardwareAcceleration()` before app ready.
+- Exact launch verification kept `cmd.exe /d /c call start-pitching-report.bat` alive for more than 16 seconds without GPU fatal; `node --check src/main.js` and `git diff --check` passed. This does not establish full product acceptance.
+- The existing `65 pass / 1 skip` `npm test`, 29 JavaScript syntax checks, and earlier app Electron smoke remain previous-worker evidence. Fresh read-only QA reproduced only 18 pure tests.
 - QA gate: `CONDITIONAL FAIL / IN_PROGRESS`. No requirement may be marked `VERIFIED`.
-- Remaining blockers: Electron exported `file://` runtime unavailable; real video/FFmpeg evidence unavailable; responsive human evidence and AT-A through AT-G incomplete; GitHub Private is `AWAITING_USER_SETUP`.
+- Remaining blockers: real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G remain incomplete. GitHub Private remote is configured, but requirements remain unverified.
 
 目前狀態：**Implementation in progress**。`bc0e004` 是歷史 Desktop project persistence/editor/preview baseline；Shell/Report Model hardening 在 `35c21a430b5c7a16ea065d542fec71a02c47b81b`，app-facing/player checkpoint 在 `d941b5c`，目前 media/sync/export integration checkpoint 是 `fcaa4a6`。沒有任何完整產品 requirement 可僅因程式存在而標 `VERIFIED`。
 

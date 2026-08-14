@@ -2,11 +2,12 @@
 
 ## Latest current provenance (2026-08-14)
 
-- Current Git state: `fd2f68798097116375ace0372c57f6a8ae137e05` on `worker/desktop-vertical-slice`; worktree clean; no remote configured and no push evidence.
-- Latest revision: `fd2f687 test: add responsive desktop smoke gate`. Responsive desktop/narrow smoke evidence exists, while exported-folder/ZIP Electron `file://` remains unavailable; this does not change any requirement row to `VERIFIED`.
-- Evidence provenance: 29 JavaScript `node --check` results, the existing `65 pass / 1 skip` `npm test`, and app Electron smoke are previous-worker evidence. Fresh read-only QA reproduced only 18 pure tests.
+- Current Git state: `5bbd845551c00a31867aa300c2df643481acfeb1` on `worker/desktop-vertical-slice`; origin is configured at `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches, and the worktree is clean.
+- Latest startup revisions: `dfef829` normalized the Windows launcher to ASCII/CRLF label/goto syntax; `5bbd845` added opt-in `disable-gpu`/`in-process-gpu` switches and `app.disableHardwareAcceleration()` before app ready.
+- Exact launch verification kept the batch-launched Electron process alive for more than 16 seconds without GPU fatal; `node --check src/main.js` and `git diff --check` passed. These results do not change any requirement row to `VERIFIED`.
+- Evidence provenance: 29 JavaScript `node --check` results, the existing `65 pass / 1 skip` `npm test`, and earlier app Electron smoke are previous-worker evidence. Fresh read-only QA reproduced only 18 pure tests.
 - QA gate: `CONDITIONAL FAIL / IN_PROGRESS`.
-- Unresolved evidence: real video/FFmpeg, exported `file://` runtime, responsive human evidence, and AT-A through AT-G. GitHub Private remains `AWAITING_USER_SETUP`.
+- Unresolved evidence: real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G. GitHub Private remote is configured; no requirement is `VERIFIED`.
 
 目前狀態：**Phase 1/2 planning + implementation in progress**。本矩陣是 Requirement → Artifact → Test/Acceptance → Evidence → Status 的唯一追蹤入口。`fcaa4a6` 已提供部分 implementation/unit/fixture evidence，但沒有任何 requirement 因此改標 `VERIFIED`，也沒有 real-media、browser/file:// pass 或真人 evidence。
 

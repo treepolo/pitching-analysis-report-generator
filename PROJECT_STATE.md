@@ -2,11 +2,12 @@
 
 ## Latest current provenance (2026-08-14)
 
-- Current Git state: `fd2f68798097116375ace0372c57f6a8ae137e05` on `worker/desktop-vertical-slice`; worktree clean; no remote configured and no push evidence.
-- Latest app/runtime QA revision: `fd2f687 test: add responsive desktop smoke gate`. It added the smoke-only desktop/narrow responsive gate and preserved the exported-folder/ZIP `file://` runtime result as unavailable; it did not alter production launch security.
-- Evidence provenance: the existing `65 pass / 1 skip` `npm test`, 29 JavaScript `node --check` results, and app Electron smoke output are previous-worker evidence at the `fd2f687` checkpoint, not fresh read-only QA evidence for this docs task.
+- Current Git state: `5bbd845551c00a31867aa300c2df643481acfeb1` on `worker/desktop-vertical-slice`; origin is `https://github.com/treepolo/pitching-analysis-report-generator.git`, and the remote branch SHA matches the local checkpoint; worktree clean.
+- Latest startup revisions: `dfef829 fix: normalize Windows launcher batch syntax` converted the launcher to ASCII/CRLF label/goto syntax; `5bbd845 fix: harden opt-in GPU startup fallback` added opt-in `disable-gpu`/`in-process-gpu` switches plus `app.disableHardwareAcceleration()` before app ready.
+- Exact launch evidence: `cmd.exe /d /c call start-pitching-report.bat` kept Electron running for more than 16 seconds without the GPU fatal; `node --check src/main.js` and `git diff --check` passed. This is runtime evidence for the opt-in launch path, not full product acceptance.
+- Evidence provenance: the existing `65 pass / 1 skip` `npm test`, 29 JavaScript `node --check` results, and earlier app Electron smoke output remain previous-worker evidence; no requirement is `VERIFIED`.
 - Fresh read-only QA reproduced only 18 pure tests. QA gate remains `CONDITIONAL FAIL / IN_PROGRESS`; no requirement is `VERIFIED`.
-- Remaining blockers: exported Electron `file://` runtime unavailable, real video/FFmpeg evidence unavailable, responsive human evidence and AT-A through AT-G incomplete. GitHub Private setup remains `AWAITING_USER_SETUP`.
+- Remaining blockers: real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G remain incomplete. GitHub Private setup is no longer awaiting remote creation, but all product requirements remain conservative and unverified.
 
 這是本專案跨 Session / Agent 延續所需的最小 current state。治理方向以目前提供的 Layer 1 / Layer 2 為準；不要把本文件擴張成工程 SOP。
 
