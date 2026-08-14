@@ -9,6 +9,7 @@ const state = {
   saveQueued: false,
   dirty: false,
   revision: 0,
+  pendingTextImport: null,
 };
 
 const elements = {
@@ -22,6 +23,17 @@ const elements = {
   sectionTitle: document.querySelector('#section-title'),
   sectionContent: document.querySelector('#section-content'),
   preview: document.querySelector('#preview'),
+  mediaLibrary: document.querySelector('#media-library'),
+  mediaList: document.querySelector('#media-list'),
+  mediaStatus: document.querySelector('#media-status'),
+  importMedia: document.querySelector('#import-media'),
+  importText: document.querySelector('#import-text'),
+  importTextDialog: document.querySelector('#import-text-dialog'),
+  importTextName: document.querySelector('#import-text-name'),
+  importTextPreview: document.querySelector('#import-text-preview'),
+  importTextError: document.querySelector('#import-text-error'),
+  cancelImportText: document.querySelector('#cancel-import-text'),
+  confirmImportText: document.querySelector('#confirm-import-text'),
   newProjectForm: document.querySelector('#new-project-form'),
   newProjectName: document.querySelector('#new-project-name'),
   newProjectDialog: document.querySelector('#new-project-dialog'),
@@ -59,6 +71,55 @@ function editableTextBlockFor(section) {
   const block = { id: `${section.id}-text`, type: 'rich-text', content: '' };
   section.blocks.push(block);
   return block;
+}
+
+function referenceId(value) {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && typeof value.id === 'string') return value.id;
+  if (value && typeof value === 'object' && typeof value.mediaAssetId === 'string') return value.mediaAssetId;
+  return null;
+}
+
+function mediaAssetFor(assetId) {
+  return state.activeProject?.media?.find((asset) => asset?.id === assetId) || null;
+}
+
+function mediaStatusLabel(asset) {
+  if (!asset) return '找不到此專案媒體';
+  const lifecycle = asset.lifecycleStatus || asset.status || 'unknown';
+  const compatibility = asset.compatibility || 'unknown';
+  return `狀態：${lifecycle} · 相容性：${compatibility}`;
+}
+
+function renderMediaLibrary() {
+  const project = state.activeProject;
+  elements.mediaLibrary.hidden = !project;
+  elements.importMedia.disabled = !project;
+  elements.importText.disabled = !project;
+  if (!project) {
+    elements.mediaList.innerHTML = '';
+    elements.mediaStatus.textContent = '尚未載入媒體。';
+    return;
+  }
+
+  const media = Array.isArray(project.media) ? project.media : [];
+  elements.mediaStatus.textContent = media.length === 0
+    ? '目前沒有專案媒體；匯入後會先以 discovered/unknown 狀態保存，等待後續 inspect pipeline。'
+    : `${media.length} 個媒體 asset；目前只顯示 domain status，不宣稱可播放或 metadata 已完成。`;
+  elements.mediaList.innerHTML = media.length === 0
+    ? '<p class="empty-state">尚未匯入圖片或影片。</p>'
+    : media.map((asset) => `
+      <article class="media-card">
+        <div>
+          <div class="media-card-title">${escapeHtml(asset.displayName || asset.id || '未命名媒體')}</div>
+          <p class="media-card-meta">${escapeHtml(mediaStatusLabel(asset))} · ${escapeHtml(asset.mediaKind || 'unknown')}</p>
+        </div>
+        <div class="media-card-actions"><button class="button button-secondary" data-remove-media="${escapeHtml(asset.id)}" type="button">移除</button></div>
+      </article>
+    `).join('');
+  elements.mediaList.querySelectorAll('[data-remove-media]').forEach((button) => {
+    button.addEventListener('click', () => { void removeMedia(button.dataset.removeMedia); });
+  });
 }
 
 function cloneProject(project) {
@@ -109,6 +170,7 @@ function renderEditor({ preserveForm = false } = {}) {
   elements.editorEmpty.hidden = Boolean(project);
   elements.editor.hidden = !project;
   elements.saveProject.disabled = !project;
+  renderMediaLibrary();
   if (!project) return;
 
   elements.projectTitle.textContent = project.displayName;
@@ -132,6 +194,39 @@ function renderEditor({ preserveForm = false } = {}) {
   }
 }
 
+function previewMediaReference(value, role = '媒體') {
+  const assetId = referenceId(value);
+  const asset = assetId ? mediaAssetFor(assetId) : null;
+  const title = asset?.displayName || assetId || `${role} reference missing`;
+  return `<div class="preview-media-placeholder" data-asset-id="${escapeHtml(assetId || '')}">`
+    + `<strong>${escapeHtml(title)}</strong>`
+    + `<span>${escapeHtml(mediaStatusLabel(asset))}</span>`
+    + '<small>Renderer-only media seam；實際播放與 metadata inspect 留待後續 slice。</small>'
+    + '</div>';
+}
+
+function renderPreviewBlock(block) {
+  const type = typeof block?.type === 'string' ? block.type.toLowerCase() : 'unknown';
+  if (type === 'rich-text' || type === 'text') {
+    return `<p>${escapeHtml(block.content || '') || '<span class="muted">尚未填寫</span>'}</p>`;
+  }
+  if (type === 'heading' || type === 'subheading') {
+    return `<h4>${escapeHtml(block.label || block.title || block.content || '')}</h4>`;
+  }
+  if (type === 'image' || type === 'imageblock' || type === 'photo') {
+    return `<div class="preview-block"><strong>${escapeHtml(block.caption || block.alt || '圖片')}</strong>${previewMediaReference(block.mediaAssetId || block.imageAssetId || block.assetRef, '圖片')}</div>`;
+  }
+  if (type === 'singlevideo' || type === 'video' || type === 'video-block') {
+    return `<div class="preview-block"><strong>${escapeHtml(block.label || '單影片')}</strong>${previewMediaReference(block.mediaAssetId || block.videoAssetId || block.assetRef, '影片')}</div>`;
+  }
+  if (type === 'comparisonvideo' || type === 'comparison-video' || type === 'comparison') {
+    const left = block.left || block.sides?.left || block.leftAssetId;
+    const right = block.right || block.sides?.right || block.rightAssetId;
+    return `<div class="preview-block"><strong>${escapeHtml(block.label || '兩影片比較')}</strong><div class="preview-comparison">${previewMediaReference(left, '左側媒體')}${previewMediaReference(right, '右側媒體')}</div></div>`;
+  }
+  return block.content ? `<p>${escapeHtml(block.content)}</p>` : '';
+}
+
 function renderPreview() {
   const project = state.activeProject;
   if (!project) {
@@ -143,11 +238,11 @@ function renderPreview() {
   elements.preview.innerHTML = `
     <article class="report-preview">
       <p class="eyebrow">投球動作分析</p>
-      <h2>${escapeHtml(reportDocument.title)}</h2>
+      <h2>${escapeHtml(reportDocument.title || '投球動作分析報告')}</h2>
       ${reportDocument.sections.map((section) => {
-      const text = textBlockFor(section)?.content || '';
         const heading = section.title ? `<h3>${escapeHtml(section.title)}</h3>` : '';
-        return `<section>${heading}<p>${escapeHtml(text) || '<span class="muted">尚未填寫</span>'}</p></section>`;
+        const blocks = section.blocks.map(renderPreviewBlock).join('');
+        return `<section>${heading}${blocks || '<p><span class="muted">尚未填寫</span></p>'}</section>`;
       }).join('')}
     </article>
   `;
@@ -250,6 +345,100 @@ async function openProject(projectId) {
   }
 }
 
+function resetTextImportDialog() {
+  state.pendingTextImport = null;
+  elements.importTextName.textContent = '—';
+  elements.importTextPreview.textContent = '';
+  elements.importTextError.textContent = '';
+  elements.importTextError.hidden = true;
+}
+
+async function requestTextImport() {
+  if (!state.activeProject) return;
+  setError('');
+  try {
+    const imported = await window.pitchingApp.pickTextFile();
+    if (!imported) return;
+    state.pendingTextImport = imported;
+    elements.importTextName.textContent = imported.fileName;
+    elements.importTextPreview.textContent = imported.content;
+    elements.importTextError.textContent = '';
+    elements.importTextError.hidden = true;
+    elements.importTextDialog.showModal();
+  } catch (error) {
+    setSaveState('匯入失敗', 'error');
+    setError(`讀取文字檔失敗：${error.message}`);
+  }
+}
+
+async function confirmTextImport() {
+  const imported = state.pendingTextImport;
+  const project = state.activeProject;
+  if (!imported || !project || !state.selectedSectionId) return;
+  elements.confirmImportText.disabled = true;
+  try {
+    const saved = await window.pitchingApp.insertTextBlock({
+      projectId: project.id,
+      sectionId: state.selectedSectionId,
+      fileName: imported.fileName,
+      content: imported.content,
+    });
+    state.activeProject = saved;
+    state.dirty = false;
+    state.revision = 0;
+    elements.importTextDialog.close();
+    resetTextImportDialog();
+    renderProjects();
+    renderEditor();
+    renderPreview();
+    setSaveState('文字已匯入並儲存', 'saved');
+  } catch (error) {
+    elements.importTextError.textContent = `匯入失敗：${error.message}`;
+    elements.importTextError.hidden = false;
+    setError(`匯入文字失敗：${error.message}`);
+  } finally {
+    elements.confirmImportText.disabled = false;
+  }
+}
+
+async function importMedia() {
+  if (!state.activeProject) return;
+  setError('');
+  try {
+    const saved = await window.pitchingApp.pickMediaFiles(state.activeProject.id);
+    if (!saved) return;
+    state.activeProject = saved;
+    state.dirty = false;
+    state.revision = 0;
+    renderProjects();
+    renderEditor();
+    renderPreview();
+    setSaveState('媒體已登錄；等待 inspect', 'saved');
+  } catch (error) {
+    setSaveState('媒體匯入失敗', 'error');
+    setError(`媒體匯入失敗：${error.message}`);
+  }
+}
+
+async function removeMedia(assetId) {
+  if (!state.activeProject || !assetId) return;
+  if (!window.confirm('確定從此專案移除這個媒體 asset？')) return;
+  setError('');
+  try {
+    const saved = await window.pitchingApp.removeMedia(state.activeProject.id, assetId);
+    state.activeProject = saved;
+    state.dirty = false;
+    state.revision = 0;
+    renderProjects();
+    renderEditor();
+    renderPreview();
+    setSaveState('媒體已移除並儲存', 'saved');
+  } catch (error) {
+    setSaveState('媒體移除失敗', 'error');
+    setError(`媒體移除失敗：${error.message}`);
+  }
+}
+
 elements.newProjectForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   setError('');
@@ -283,6 +472,14 @@ document.querySelectorAll('[data-close-dialog]').forEach((button) => {
 elements.saveProject.addEventListener('click', () => {
   void requestSave().catch(() => {});
 });
+
+elements.importText.addEventListener('click', () => { void requestTextImport(); });
+elements.importMedia.addEventListener('click', () => { void importMedia(); });
+elements.cancelImportText.addEventListener('click', () => {
+  elements.importTextDialog.close();
+  resetTextImportDialog();
+});
+elements.confirmImportText.addEventListener('click', () => { void confirmTextImport(); });
 
 elements.sectionTitle.addEventListener('input', () => {
   const section = activeSection();

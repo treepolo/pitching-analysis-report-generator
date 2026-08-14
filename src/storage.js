@@ -3,14 +3,25 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const {
+  COMPATIBILITY,
+  ASSET_LIFECYCLE_STATUS,
+  createMediaAsset,
+  detectMediaType,
+  normalizeProjectRelativePath,
+  safeOutputFileName,
+} = require('./media');
 
 const PROJECT_ID_PATTERN = /^[a-z0-9-]{1,80}$/u;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
+const TEXT_CONTENT_CONTROL_PATTERN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
 const MAX_SECTIONS = 50;
 const MAX_BLOCKS_PER_SECTION = 50;
 const MAX_SECTION_TITLE_LENGTH = 160;
 const MAX_CONTENT_LENGTH = 500_000;
 const MAX_MEDIA_ITEMS = 500;
+const MAX_TEXT_IMPORT_BYTES = MAX_CONTENT_LENGTH * 4 + 3;
+const TEXT_IMPORT_EXTENSIONS = new Set(['.txt', '.md']);
 const SUPPORTED_BLOCK_TYPES = new Set([
   'rich-text',
   'text',
@@ -32,6 +43,27 @@ const PROJECT_FIELDS = new Set([
   'media',
   'exportSettings',
   'recoveryMetadata',
+]);
+const MEDIA_REFERENCE_KEYS = new Set([
+  'assetId',
+  'assetIds',
+  'assetRef',
+  'assetRefs',
+  'mediaAssetId',
+  'mediaAssetIds',
+  'imageAssetId',
+  'videoAssetId',
+  'posterAssetId',
+  'posterImageAssetId',
+  'leftAssetId',
+  'rightAssetId',
+  'firstAssetId',
+  'secondAssetId',
+  'leftMediaAssetId',
+  'rightMediaAssetId',
+  'firstMediaAssetId',
+  'secondMediaAssetId',
+  'videoAssetIds',
 ]);
 
 function isPlainRecord(value) {
@@ -83,7 +115,69 @@ function safeSectionTitle(value) {
 
 function safeContent(value) {
   if (value === null || value === undefined) return '';
-  return safeText(value, 'Section content', MAX_CONTENT_LENGTH, { allowEmpty: true });
+  if (typeof value !== 'string') throw new Error('Section content must be text');
+  if (TEXT_CONTENT_CONTROL_PATTERN.test(value)) throw new Error('Section content contains a control character');
+  if (value.length > MAX_CONTENT_LENGTH) throw new Error('Section content is too long');
+  return value;
+}
+
+function safeTextImportFileName(value) {
+  if (typeof value !== 'string' || value.length === 0 || CONTROL_CHARACTER_PATTERN.test(value)) {
+    throw new Error('Text import filename is invalid');
+  }
+  const normalized = value.replaceAll('\\', '/');
+  const fileName = normalized.slice(normalized.lastIndexOf('/') + 1);
+  if (!fileName || fileName === '.' || fileName === '..' || fileName.length > 255) {
+    throw new Error('Text import filename is invalid');
+  }
+  const extension = path.extname(fileName).toLowerCase();
+  if (!TEXT_IMPORT_EXTENSIONS.has(extension)) {
+    throw new Error('Only .txt and .md files can be imported');
+  }
+  return fileName;
+}
+
+function normalizeTextImport(fileName, content) {
+  const safeFileName = safeTextImportFileName(fileName);
+  if (typeof content !== 'string') throw new Error('Text import content is invalid');
+  const withoutBom = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+  if (withoutBom.length === 0 || withoutBom.trim().length === 0) {
+    throw new Error('Text import file is empty');
+  }
+  return {
+    fileName: safeFileName,
+    content: safeContent(withoutBom),
+  };
+}
+
+async function readTextImportFile(filePath) {
+  if (typeof filePath !== 'string' || filePath.trim() === '' || CONTROL_CHARACTER_PATTERN.test(filePath)) {
+    throw new Error('Text import file is invalid');
+  }
+  const absolutePath = path.resolve(filePath);
+  safeTextImportFileName(path.basename(absolutePath));
+  let stats;
+  try {
+    stats = await fs.lstat(absolutePath);
+  } catch {
+    throw new Error('Text import file is unavailable');
+  }
+  if (stats.isSymbolicLink() || !stats.isFile()) throw new Error('Text import file is not a regular file');
+  if (stats.size === 0) throw new Error('Text import file is empty');
+  if (stats.size > MAX_TEXT_IMPORT_BYTES) throw new Error('Text import file is too large');
+
+  let content;
+  try {
+    const bytes = await fs.readFile(absolutePath);
+    content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch (error) {
+    if (error instanceof TypeError || error?.name === 'TypeError') {
+      throw new Error('Text import file must be valid UTF-8');
+    }
+    if (error?.message?.startsWith('Text import')) throw error;
+    throw new Error('Text import file could not be read');
+  }
+  return normalizeTextImport(path.basename(absolutePath), content);
 }
 
 function safeBlockId(value) {
@@ -167,6 +261,99 @@ function normalizeMedia(value) {
     if (!isPlainRecord(item)) throw new Error(`Media metadata item ${index + 1} is invalid`);
     return cloneJson(item);
   });
+}
+
+function mediaReferenceMatches(value, assetId) {
+  if (typeof value === 'string') return value === assetId;
+  if (Array.isArray(value)) return value.some((entry) => mediaReferenceMatches(entry, assetId));
+  if (!isPlainRecord(value)) return false;
+  if (typeof value.id === 'string' && value.id === assetId) return true;
+  return Object.values(value).some((entry) => mediaReferenceMatches(entry, assetId));
+}
+
+function hasMediaReference(value, assetId) {
+  if (Array.isArray(value)) return value.some((entry) => hasMediaReference(entry, assetId));
+  if (!isPlainRecord(value)) return false;
+  return Object.entries(value).some(([key, entry]) => (
+    (MEDIA_REFERENCE_KEYS.has(key) && mediaReferenceMatches(entry, assetId))
+      || hasMediaReference(entry, assetId)
+  ));
+}
+
+function resolveStoredMediaPath(projectRoot, projectId, relativePath) {
+  let normalized;
+  try {
+    normalized = normalizeProjectRelativePath(relativePath, 'media source path');
+  } catch {
+    throw new Error('Media source path is invalid');
+  }
+  const projectRootPath = path.resolve(projectRoot);
+  const mediaRoot = path.join(projectDirectory(projectRootPath, projectId), 'media');
+  const target = path.resolve(projectRootPath, ...normalized.split('/'));
+  if (!isPathInside(mediaRoot, target) || target === mediaRoot) {
+    throw new Error('Media source path escapes the project media directory');
+  }
+  return target;
+}
+
+async function registerMediaSource(projectRoot, projectId, sourcePath) {
+  if (typeof sourcePath !== 'string' || sourcePath.trim() === '' || CONTROL_CHARACTER_PATTERN.test(sourcePath)) {
+    throw new Error('Media source path is invalid');
+  }
+  const absoluteSource = path.resolve(sourcePath);
+  let sourceStats;
+  try {
+    sourceStats = await fs.lstat(absoluteSource);
+  } catch {
+    throw new Error('Media source is unavailable');
+  }
+  if (sourceStats.isSymbolicLink() || !sourceStats.isFile()) {
+    throw new Error('Media source must be a regular file');
+  }
+
+  const fileName = path.basename(absoluteSource);
+  const detected = detectMediaType({ fileName });
+  const assetId = `asset-${crypto.randomUUID()}`;
+  const safeFileName = safeOutputFileName(fileName, detected.extension);
+  const relativePath = `projects/${projectId}/media/original/${assetId}-${safeFileName}`;
+  const destination = resolveStoredMediaPath(projectRoot, projectId, relativePath);
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  try {
+    await fs.copyFile(absoluteSource, destination);
+  } catch (error) {
+    throw new Error(error?.code === 'EEXIST' ? 'Media destination already exists' : 'Media source could not be copied');
+  }
+
+  try {
+    const asset = createMediaAsset({
+      id: assetId,
+      projectId,
+      displayName: fileName,
+      fileName,
+      mediaKind: detected.kind,
+      mediaType: detected.mimeType,
+      sourceReference: {
+        relativePath,
+        byteSize: sourceStats.size,
+        checksumSha256: null,
+        mediaType: detected.mimeType,
+      },
+      metadata: {
+        fileName,
+        extension: detected.extension,
+        mimeType: detected.mimeType,
+        byteSize: sourceStats.size,
+        frameTiming: 'unknown',
+      },
+      compatibility: detected.compatibilityHint ?? COMPATIBILITY.UNKNOWN,
+      lifecycleStatus: ASSET_LIFECYCLE_STATUS.DISCOVERED,
+      derived: { safeFileName, referenceCount: 0 },
+    });
+    return { asset, destination };
+  } catch (error) {
+    await fs.rm(destination, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 function normalizeExportSettings(value, projectRoot) {
@@ -420,6 +607,92 @@ function createProjectStore(projectRoot, { boundaryRoot = null } = {}) {
     return opened;
   }
 
+  async function insertTextBlock(projectId, importPayload) {
+    const id = safeProjectId(projectId);
+    if (!isPlainRecord(importPayload)) throw new Error('Text import payload is invalid');
+    const imported = normalizeTextImport(importPayload.fileName, importPayload.content);
+    const current = await readProject(id);
+    const sectionId = safeProjectId(importPayload.sectionId || current.sections[0]?.id);
+    if (!current.sections.some((section) => section.id === sectionId)) {
+      throw new Error('Text import section does not exist');
+    }
+    const sections = current.sections.map((section) => {
+      if (section.id !== sectionId) return section;
+      const existingBlockIndex = section.blocks.findIndex((block) => (
+        block.type === 'rich-text' || block.type === 'text'
+      ));
+      if (existingBlockIndex === -1) {
+        return {
+          ...section,
+          blocks: [...section.blocks, {
+            id: `import-${crypto.randomUUID()}`,
+            type: 'rich-text',
+            content: imported.content,
+          }],
+        };
+      }
+      const blocks = section.blocks.map((block, index) => index === existingBlockIndex
+        ? {
+          ...block,
+          content: block.content ? `${block.content}\n\n${imported.content}` : imported.content,
+        }
+        : block);
+      return { ...section, blocks };
+    });
+    return saveProject({ id, sections });
+  }
+
+  async function registerMediaFiles(projectId, sourcePaths) {
+    const id = safeProjectId(projectId);
+    if (!Array.isArray(sourcePaths) || sourcePaths.length === 0 || sourcePaths.length > 50) {
+      throw new Error('Media source selection is invalid');
+    }
+    const current = await readProject(id);
+    const staged = [];
+    try {
+      for (const sourcePath of sourcePaths) {
+        staged.push(await registerMediaSource(root, id, sourcePath));
+      }
+      const saved = await saveProject({
+        id,
+        media: [...current.media, ...staged.map(({ asset }) => asset)],
+      });
+      return saved;
+    } catch (error) {
+      await Promise.all(staged.map(({ destination }) => fs.rm(destination, { force: true }).catch(() => {})));
+      throw error;
+    }
+  }
+
+  async function removeMediaAsset(projectId, assetId) {
+    const id = safeProjectId(projectId);
+    if (typeof assetId !== 'string' || assetId.length === 0) throw new Error('Media asset id is invalid');
+    const current = await readProject(id);
+    const asset = current.media.find((item) => isPlainRecord(item) && item.id === assetId);
+    if (!asset) throw new Error('Media asset was not found');
+    if (hasMediaReference(current.sections, assetId)) {
+      throw new Error('Media asset is referenced by a report block');
+    }
+
+    const saved = await saveProject({
+      id,
+      media: current.media.filter((item) => item.id !== assetId),
+    });
+    const relativePath = asset.sourceReference?.relativePath;
+    if (typeof relativePath === 'string') {
+      const sourcePath = resolveStoredMediaPath(root, id, relativePath);
+      let stats = null;
+      try {
+        stats = await fs.lstat(sourcePath);
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw new Error('Media source cleanup failed');
+      }
+      if (stats?.isSymbolicLink()) throw new Error('Media source cleanup refused a symlink');
+      if (stats?.isFile()) await fs.rm(sourcePath, { force: true });
+    }
+    return saved;
+  }
+
   async function saveProject(payload) {
     if (!isPlainRecord(payload)) throw new Error('Invalid project payload');
     const id = safeProjectId(payload.id);
@@ -460,6 +733,10 @@ function createProjectStore(projectRoot, { boundaryRoot = null } = {}) {
     openProject,
     readProject,
     saveProject,
+    insertTextBlock,
+    registerMediaFiles,
+    removeMediaAsset,
+    readTextImportFile,
   });
 }
 
@@ -467,7 +744,9 @@ module.exports = {
   createProjectStore,
   isPathInside,
   normalizeProjectRecord,
+  normalizeTextImport,
   projectDirectory,
+  readTextImportFile,
   safeDisplayName,
   safeProjectId,
   validateProjectRoot,

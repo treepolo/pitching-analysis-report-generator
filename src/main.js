@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -66,6 +66,42 @@ function registerIpc() {
   ipcMain.handle('project:save', (event, project) => {
     assertTrustedSender(event);
     return projectStore.saveProject(project);
+  });
+  ipcMain.handle('project:pick-text', async (event) => {
+    const senderWindow = assertTrustedSender(event);
+    const result = await dialog.showOpenDialog(senderWindow, {
+      title: '匯入文字檔案',
+      properties: ['openFile'],
+      filters: [{ name: 'Text / Markdown', extensions: ['txt', 'md'] }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return projectStore.readTextImportFile(result.filePaths[0]);
+  });
+  ipcMain.handle('project:insert-text', (event, payload) => {
+    assertTrustedSender(event);
+    return projectStore.insertTextBlock(payload?.projectId, payload);
+  });
+  ipcMain.handle('media:list', async (event, projectId) => {
+    assertTrustedSender(event);
+    const project = await projectStore.readProject(projectId);
+    return project.media;
+  });
+  ipcMain.handle('media:pick', async (event, projectId) => {
+    const senderWindow = assertTrustedSender(event);
+    const result = await dialog.showOpenDialog(senderWindow, {
+      title: '匯入圖片或影片',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Supported media', extensions: ['mp4', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'bmp', 'tif', 'tiff', 'svg', 'ico'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return projectStore.registerMediaFiles(projectId, result.filePaths);
+  });
+  ipcMain.handle('media:remove', (event, payload) => {
+    assertTrustedSender(event);
+    return projectStore.removeMediaAsset(payload?.projectId, payload?.assetId);
   });
   ipcMain.handle('app:info', (event) => {
     assertTrustedSender(event);
@@ -238,6 +274,22 @@ async function runElectronSmoke() {
         if (explicitlySaved.sections[0].title !== 'Explicit saved section') throw new Error('explicit section title did not persist');
         if (explicitlySaved.sections[0].blocks[0].content !== 'Saved through explicit save') throw new Error('explicit section content did not persist');
 
+        const imported = await window.pitchingApp.insertTextBlock({
+          projectId: createdId,
+          sectionId: 'summary',
+          fileName: 'smoke-notes.md',
+          content: '# Imported notes\\n\\nText import persisted through the app bridge.',
+        });
+        if (!imported.sections[1].blocks[0].content.includes('Text import persisted through the app bridge.')) {
+          throw new Error('text import did not update the report model');
+        }
+        const importedReopened = await window.pitchingApp.openProject(createdId);
+        if (!importedReopened.sections[1].blocks[0].content.includes('Text import persisted through the app bridge.')) {
+          throw new Error('text import did not survive immediate reopen');
+        }
+        const listedMedia = await window.pitchingApp.listMedia(createdId);
+        if (!Array.isArray(listedMedia) || listedMedia.length !== 0) throw new Error('empty media library did not list safely');
+
         sectionTitle.value = 'Close flush section';
         sectionTitle.dispatchEvent(new Event('input', { bubbles: true }));
         sectionContent.value = 'Saved while closing the application';
@@ -257,6 +309,8 @@ async function runElectronSmoke() {
           projectFile: info.projectsRoot + '/' + createdId + '/project.json',
           autosaveVerified: true,
           explicitSaveVerified: true,
+          textImportVerified: true,
+          mediaListVerified: true,
           bridgeSecurityVerified: true,
           invalidProjectRejected,
         };
@@ -276,7 +330,6 @@ async function runElectronSmoke() {
     if (reopened.sections[0].blocks[0].content !== 'Saved while closing the application') {
       throw new Error('project did not reopen with the close-flushed content');
     }
-
     const payloadSnapshot = await window.webContents.executeJavaScript(`
       (async () => {
         const project = await window.pitchingApp.openProject(${JSON.stringify(result.projectId)});

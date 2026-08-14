@@ -24,6 +24,7 @@ h3 { margin-bottom: 7px; font-size: 15px; }
 .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 24px rgba(32, 45, 60, .05); }
 .sidebar { min-height: calc(100vh - 130px); padding: 17px; display: flex; flex-direction: column; }
 .panel-heading, .editor-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.editor-header-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .project-list, .section-list { display: grid; gap: 8px; }
 .project-list { margin-top: 17px; }
 .project-card, .section-item { width: 100%; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--ink); text-align: left; }
@@ -45,6 +46,15 @@ code { word-break: break-all; }
 .section-item { padding: 10px; display: flex; justify-content: space-between; gap: 8px; }
 .section-item small { color: var(--muted); }
 .section-editor { display: grid; gap: 8px; align-content: start; }
+.media-panel { padding: 20px; }
+.media-list { display: grid; gap: 8px; margin-top: 14px; }
+.media-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfe; }
+.media-card-title { min-width: 0; overflow-wrap: anywhere; font-weight: 750; }
+.media-card-meta { margin: 2px 0 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.media-card-actions { display: flex; align-items: center; gap: 8px; }
+.media-card-actions .button { padding: 6px 9px; font-size: 12px; }
+.import-preview { max-height: 300px; margin: 0; padding: 12px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 9px; background: #fbfcfe; color: var(--ink); font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.dialog-card > .app-error { margin: 0; }
 label { font-size: 12px; font-weight: 750; }
 input, textarea { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 10px 11px; color: var(--ink); background: #fff; outline: none; }
 input:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-soft); }
@@ -69,7 +79,13 @@ dialog::backdrop { background: rgba(17, 24, 39, .32); }
 
 @media (max-width: 620px) {
   .topbar { padding: 16px; }
+  .topbar-actions { width: 100%; justify-content: space-between; }
   .app-grid { padding: 12px; }
   .editor-grid { grid-template-columns: 1fr; }
   .editor-layout, .preview-panel { padding: 15px; }
+  .media-panel { padding: 15px; }
+  .editor-header, .panel-heading { align-items: flex-start; flex-direction: column; }
+  .editor-header-actions { width: 100%; justify-content: flex-start; }
+  .media-card { grid-template-columns: 1fr; }
+  .media-card-actions { justify-content: flex-start; }
 }

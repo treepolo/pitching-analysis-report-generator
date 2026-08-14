@@ -114,6 +114,87 @@ test('preserves media metadata and export settings as future vertical-slice seam
   assert.deepEqual(partialSave.futureReportExtension, { sourceRevision: 3, owner: 'report-model' });
 });
 
+test('previews strict UTF-8 txt/md imports and persists imported content across reopen', async () => {
+  const created = await store.createProject('Text import test');
+  const textPath = path.join(testRoot, 'incoming-notes.md');
+  await fs.writeFile(textPath, '\ufeff# 投球摘要\n\n肩線在釋球點略早開。', 'utf8');
+
+  const imported = await store.readTextImportFile(textPath);
+  assert.deepEqual(imported, {
+    fileName: 'incoming-notes.md',
+    content: '# 投球摘要\n\n肩線在釋球點略早開。',
+  });
+  const saved = await store.insertTextBlock(created.id, {
+    sectionId: 'summary',
+    ...imported,
+  });
+  assert.match(saved.sections[1].blocks[0].content, /肩線在釋球點略早開/u);
+
+  const reopened = await store.openProject(created.id);
+  assert.match(reopened.sections[1].blocks[0].content, /# 投球摘要/u);
+  assert.match(reopened.sections[1].blocks[0].content, /肩線在釋球點略早開/u);
+});
+
+test('rejects unsafe, empty, and invalid-UTF-8 text imports without creating a blank block', async () => {
+  const created = await store.createProject('Text import errors');
+  const emptyPath = path.join(testRoot, 'empty.txt');
+  const invalidPath = path.join(testRoot, 'invalid.md');
+  await fs.writeFile(emptyPath, Buffer.alloc(0));
+  await fs.writeFile(invalidPath, Buffer.from([0xc3, 0x28]));
+
+  await assert.rejects(store.readTextImportFile(path.join(testRoot, 'notes.pdf')), /Only \.txt and \.md/iu);
+  await assert.rejects(store.readTextImportFile(emptyPath), /empty/iu);
+  await assert.rejects(store.readTextImportFile(invalidPath), /valid UTF-8/iu);
+  await assert.rejects(
+    store.insertTextBlock(created.id, { sectionId: 'summary', fileName: 'blank.md', content: '   ' }),
+    /empty/iu,
+  );
+  const reopened = await store.openProject(created.id);
+  assert.equal(reopened.sections[1].blocks[0].content, '');
+});
+
+test('registers project-local media with explicit unknown/discovered status and removes it safely', async () => {
+  const created = await store.createProject('Media register test');
+  const sourcePath = path.join(testRoot, 'fixture-frame.png');
+  await fs.writeFile(sourcePath, Buffer.from('not-a-private-media-fixture'));
+
+  const registered = await store.registerMediaFiles(created.id, [sourcePath]);
+  assert.equal(registered.media.length, 1);
+  const asset = registered.media[0];
+  assert.equal(asset.projectId, created.id);
+  assert.equal(asset.lifecycleStatus, 'discovered');
+  assert.equal(asset.metadata.frameTiming, 'unknown');
+  assert.equal(asset.metadata.width, null);
+  assert.equal(asset.metadata.height, null);
+  assert.match(asset.sourceReference.relativePath, new RegExp(`^projects/${created.id}/media/original/`, 'u'));
+  assert.doesNotMatch(JSON.stringify(asset), new RegExp(testRoot.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+  assert.equal(await fs.stat(path.join(testRoot, asset.sourceReference.relativePath)).then((stats) => stats.isFile()), true);
+
+  const reopened = await store.openProject(created.id);
+  assert.equal(reopened.media[0].id, asset.id);
+  const removed = await store.removeMediaAsset(created.id, asset.id);
+  assert.deepEqual(removed.media, []);
+  await assert.rejects(fs.stat(path.join(testRoot, asset.sourceReference.relativePath)), /ENOENT/iu);
+});
+
+test('protects media assets referenced by report blocks from removal', async () => {
+  const created = await store.createProject('Media reference protection');
+  const sourcePath = path.join(testRoot, 'referenced-frame.png');
+  await fs.writeFile(sourcePath, Buffer.from('fixture'));
+  const registered = await store.registerMediaFiles(created.id, [sourcePath]);
+  const snapshot = await store.openProject(created.id);
+  snapshot.sections[0].blocks.push({
+    id: 'image-reference',
+    type: 'image',
+    mediaAssetId: registered.media[0].id,
+  });
+  await store.saveProject(snapshot);
+  await assert.rejects(
+    store.removeMediaAsset(created.id, registered.media[0].id),
+    /referenced by a report block/iu,
+  );
+});
+
 test('rejects traversal ids before accessing project paths', async () => {
   assert.throws(() => projectDirectory(testRoot, '../outside'), /Invalid project id/);
   assert.equal(isPathInside(store.projectsRoot, path.join(testRoot, 'outside')), false);

@@ -43,7 +43,7 @@
         <div id="editor" class="editor-layout panel" hidden>
           <div class="editor-header">
             <div><p class="eyebrow">EDITOR</p><h2 id="project-title">—</h2><p id="project-meta" class="muted">—</p></div>
-            <span class="status-pill">Local-first</span>
+            <div class="editor-header-actions"><button id="import-text" class="button button-secondary" type="button" disabled>匯入 .txt / .md</button><span class="status-pill">Local-first</span></div>
           </div>
           <div class="editor-grid">
             <nav id="section-list" class="section-list" aria-label="報告章節"></nav>
@@ -57,8 +57,14 @@
           </div>
         </div>
 
+        <section id="media-library" class="media-panel panel" hidden>
+          <div class="panel-heading"><div><p class="eyebrow">MEDIA LIBRARY</p><h2>專案媒體</h2></div><button id="import-media" class="button button-secondary" type="button" disabled>匯入圖片 / 影片</button></div>
+          <p id="media-status" class="hint">尚未載入媒體。</p>
+          <div id="media-list" class="media-list"></div>
+        </section>
+
         <section class="preview-panel panel">
-          <div class="panel-heading"><div><p class="eyebrow">PREVIEW</p><h2>報告預覽</h2></div><span class="status-pill status-planned">Renderer-only preview</span></div>
+          <div class="panel-heading"><div><p class="eyebrow">PREVIEW</p><h2>報告預覽</h2></div><span class="status-pill status-planned">Renderer-only · Export seam</span></div>
           <div id="preview" class="preview-surface"></div>
         </section>
       </section>
@@ -72,6 +78,16 @@
         <input id="new-project-name" name="displayName" required maxlength="120" placeholder="例如：王小明｜投球動作分析" />
         <div class="dialog-actions"><button type="button" data-close-dialog class="button button-secondary">取消</button><button type="submit" class="button button-primary">建立</button></div>
       </form>
+    </dialog>
+    <dialog id="import-text-dialog">
+      <div class="dialog-card">
+        <p class="eyebrow">TEXT IMPORT PREVIEW</p>
+        <h2>確認匯入文字</h2>
+        <p id="import-text-name" class="muted">—</p>
+        <pre id="import-text-preview" class="import-preview"></pre>
+        <p id="import-text-error" class="app-error" role="alert" hidden></p>
+        <div class="dialog-actions"><button id="cancel-import-text" type="button" class="button button-secondary">取消</button><button id="confirm-import-text" type="button" class="button button-primary">匯入到目前 section</button></div>
+      </div>
     </dialog>
     <script src="./report-contract.js"></script>
     <script src="./renderer.js"></script>
