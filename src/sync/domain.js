@@ -711,7 +711,10 @@ function advancePlayer(player, deltaSeconds) {
   let nextStatus = current.status;
 
   if (current.loop && current.loop.enabled) {
-    if (proposed < current.loop.start || proposed >= current.loop.end) {
+    const crossedLoopBoundary = signedDelta > 0
+      ? proposed >= current.loop.end
+      : signedDelta < 0 && proposed <= current.loop.start;
+    if (crossedLoopBoundary) {
       nextTime = wrapLoopTime(proposed, current.loop, signedDelta >= 0 ? 1 : -1);
     }
   } else {
@@ -802,13 +805,17 @@ function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
     if (!isRecord(sides[side])) throw new SyncDomainError(`comparison side ${side} is required`);
     const entry = sides[side];
     const anchor = entry.anchor ?? entry;
-    alignedSides[side] = mapAnchorToRelativeTime(anchor, relativeTime, {
+    const mapping = mapAnchorToRelativeTime(anchor, relativeTime, {
       ...options,
       mode: requestedMode,
       duration: entry.duration ?? options.duration,
       timing: entry.timing ?? options.timings?.[side],
       capability: entry.capability ?? options.capabilities?.[side],
     });
+    if (mapping.side !== side) {
+      throw new SyncDomainError(`comparison anchor for ${side} must declare side ${side}`);
+    }
+    alignedSides[side] = mapping;
   }
   if (alignedSides.left.comparisonBlockId !== alignedSides.right.comparisonBlockId) {
     throw new SyncDomainError('comparison anchors must belong to the same comparison block');

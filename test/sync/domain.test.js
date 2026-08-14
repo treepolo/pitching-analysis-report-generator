@@ -77,6 +77,31 @@ test('player state, loop and anchor are block-local and transitions do not mutat
   assert.deepEqual(player.loop, { enabled: true, start: 1, end: 2 });
 });
 
+test('loop boundaries wrap deterministically in both directions without zero-step movement', () => {
+  const reverseBoundary = createPlayerBlock({
+    blockId: 'comparison-loop-left',
+    mediaAssetId: 'asset-left',
+    duration: 3,
+    currentTime: 1.5,
+    status: PLAYER_STATUS.PLAYING,
+    loop: { enabled: true, start: 1, end: 2 },
+  });
+  const reverseWrapped = advancePlayer(reverseBoundary, -0.5);
+  assert.equal(reverseWrapped.currentTime, 2);
+
+  const multiWrap = advancePlayer(reverseBoundary, 2.75);
+  assert.equal(multiWrap.currentTime, 1.25);
+
+  const atEnd = createPlayerBlock({
+    blockId: 'comparison-loop-right',
+    mediaAssetId: 'asset-right',
+    duration: 3,
+    currentTime: 2,
+    loop: { enabled: true, start: 1, end: 2 },
+  });
+  assert.equal(advancePlayer(atEnd, 0).currentTime, 2);
+});
+
 test('anchor capture derives time-only or exact-frame evidence without synthesizing frames', () => {
   const player = createPlayerBlock({
     blockId: 'comparison-1-left',
@@ -567,6 +592,83 @@ test('low-level comparison alignment defaults to time mode and requires explicit
   assert.equal(frameAlignment.resolution, FRAME_STEP_RESOLUTION.EXACT_FRAME);
   assert.equal(frameAlignment.sides.left.frameIndex, 315);
   assert.equal(frameAlignment.sides.right.frameIndex, 1230);
+});
+
+test('comparison alignment rejects anchors assigned to the opposite block-local side', () => {
+  const leftAnchor = anchor({
+    side: 'left',
+    observedTime: 1,
+    timingSnapshot: cfr(30, 90, 3),
+  });
+  const rightAnchor = anchor({
+    side: 'right',
+    mediaAssetId: 'asset-right',
+    observedTime: 2,
+    timingSnapshot: cfr(60, 180, 3),
+  });
+
+  assert.throws(
+    () => alignComparisonAtRelativeTime({
+      left: { anchor: rightAnchor, duration: 3, timing: rightAnchor.timingSnapshot },
+      right: { anchor: leftAnchor, duration: 3, timing: leftAnchor.timingSnapshot },
+    }, 0.5),
+    /comparison anchor for left must declare side left/,
+  );
+});
+
+test('time-mode comparison mapping uses shared elapsed time across CFR and VFR sources', () => {
+  const state = createComparisonSyncState({
+    comparisonBlockId: 'comparison-mixed-timebases',
+    startAnchors: {
+      left: anchor({
+        comparisonBlockId: 'comparison-mixed-timebases',
+        side: 'left',
+        observedTime: 1.25,
+        observedFrameIndex: 38,
+        timingSnapshot: cfr(30, 60, 2),
+      }),
+      right: anchor({
+        comparisonBlockId: 'comparison-mixed-timebases',
+        side: 'right',
+        mediaAssetId: 'asset-right',
+        observedTime: 0.8,
+        observedFrameIndex: null,
+        precision: PRECISION.TIME_BASED,
+        timingSnapshot: vfr([0, 0.31, 0.8, 1.17, 1.49], 1.5),
+      }),
+    },
+    playback: { relativeTime: 0.5 },
+  });
+
+  const mapped = mapComparisonSyncState(state, {
+    left: { timing: cfr(30, 60, 2), duration: 2, capability: true },
+    right: {
+      timing: vfr([0, 0.31, 0.8, 1.17, 1.49], 1.5),
+      duration: 1.5,
+      capability: true,
+    },
+  });
+  assert.equal(mapped.effectiveMode, SYNC_MODE.TIME);
+  assert.equal(mapped.resolution, FRAME_STEP_RESOLUTION.TIME_ONLY);
+  assert.equal(mapped.sides.left.targetTime, 1.75);
+  assert.equal(mapped.sides.right.targetTime, 1.3);
+  assert.equal(mapped.sides.left.frameIndex, null);
+  assert.equal(mapped.sides.right.frameIndex, null);
+
+  const clamped = mapComparisonSyncState(
+    setPlaybackRelationship(state, { relativeTime: 2 }),
+    {
+      left: { timing: cfr(30, 60, 2), duration: 2 },
+      right: {
+        timing: vfr([0, 0.31, 0.8, 1.17, 1.49], 1.5),
+        duration: 1.5,
+      },
+    },
+  );
+  assert.equal(clamped.sides.left.targetTime, 2);
+  assert.equal(clamped.sides.right.targetTime, 1.5);
+  assert.equal(clamped.sides.left.clamped, true);
+  assert.equal(clamped.sides.right.clamped, true);
 });
 
 test('VFR alignment uses presentation timestamps when frame-aware timing is available', () => {
