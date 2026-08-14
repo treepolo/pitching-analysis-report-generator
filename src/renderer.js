@@ -19,6 +19,7 @@ const state = {
     directoryNotice: '',
     pollTimer: null,
   },
+  inlineGeneration: 0,
   player: {
     selectedBlockId: null,
     runtime: null,
@@ -28,8 +29,9 @@ const state = {
 };
 
 const elements = {
-  projectList: document.querySelector('#project-list'),
-  projectEmpty: document.querySelector('#project-empty'),
+  projectList: document.querySelector('#project-list, #project-picker'),
+  projectPicker: document.querySelector('#project-picker, #project-list'),
+  documentCommandBar: document.querySelector('#document-command-bar, .document-command-bar'),
   editorEmpty: document.querySelector('#editor-empty'),
   editor: document.querySelector('#editor'),
   projectTitle: document.querySelector('#project-title'),
@@ -40,63 +42,7 @@ const elements = {
   addEditorComparisonVideo: document.querySelector('#add-editor-comparison-video'),
   blockEditorStatus: document.querySelector('#block-editor-status'),
   blockCanvas: document.querySelector('#block-canvas'),
-  sectionList: document.querySelector('#section-list'),
-  sectionTitle: document.querySelector('#section-title'),
-  sectionContent: document.querySelector('#section-content'),
-  preview: document.querySelector('#preview'),
-  mediaLibrary: document.querySelector('#media-library'),
-  mediaList: document.querySelector('#media-list'),
-  mediaStatus: document.querySelector('#media-status'),
   importMedia: document.querySelector('#import-media'),
-  playerPanel: document.querySelector('#player-panel'),
-  playerCapability: document.querySelector('#player-capability'),
-  playerStatus: document.querySelector('#player-status'),
-  playerBlockSelect: document.querySelector('#player-block-select'),
-  addSingleVideo: document.querySelector('#add-single-video'),
-  addComparisonVideo: document.querySelector('#add-comparison-video'),
-  playerEmpty: document.querySelector('#player-empty'),
-  singlePlayer: document.querySelector('#single-player'),
-  singleVideo: document.querySelector('#single-video'),
-  singleFullscreen: document.querySelector('#single-fullscreen'),
-  singleVideoStatus: document.querySelector('#single-video-status'),
-  singlePlay: document.querySelector('#single-play'),
-  singlePause: document.querySelector('#single-pause'),
-  singlePrev: document.querySelector('#single-prev'),
-  singleNext: document.querySelector('#single-next'),
-  singleSeek: document.querySelector('#single-seek'),
-  singleTime: document.querySelector('#single-time'),
-  singleRate: document.querySelector('#single-rate'),
-  singleLoop: document.querySelector('#single-loop'),
-  singleAnchor: document.querySelector('#single-anchor'),
-  singleSyncStatus: document.querySelector('#single-sync-status'),
-  comparisonPlayer: document.querySelector('#comparison-player'),
-  comparisonPlay: document.querySelector('#comparison-play'),
-  comparisonPause: document.querySelector('#comparison-pause'),
-  comparisonRate: document.querySelector('#comparison-rate'),
-  comparisonAlignZero: document.querySelector('#comparison-align-zero'),
-  comparisonSyncStatus: document.querySelector('#comparison-sync-status'),
-  comparisonLeftVideo: document.querySelector('#comparison-left-video'),
-  comparisonLeftFullscreen: document.querySelector('#comparison-left-fullscreen'),
-  comparisonLeftVideoStatus: document.querySelector('#comparison-left-video-status'),
-  comparisonLeftPlay: document.querySelector('#comparison-left-play'),
-  comparisonLeftPause: document.querySelector('#comparison-left-pause'),
-  comparisonLeftPrev: document.querySelector('#comparison-left-prev'),
-  comparisonLeftNext: document.querySelector('#comparison-left-next'),
-  comparisonLeftSeek: document.querySelector('#comparison-left-seek'),
-  comparisonLeftTime: document.querySelector('#comparison-left-time'),
-  comparisonLeftLoop: document.querySelector('#comparison-left-loop'),
-  comparisonLeftAnchor: document.querySelector('#comparison-left-anchor'),
-  comparisonRightVideo: document.querySelector('#comparison-right-video'),
-  comparisonRightFullscreen: document.querySelector('#comparison-right-fullscreen'),
-  comparisonRightVideoStatus: document.querySelector('#comparison-right-video-status'),
-  comparisonRightPlay: document.querySelector('#comparison-right-play'),
-  comparisonRightPause: document.querySelector('#comparison-right-pause'),
-  comparisonRightPrev: document.querySelector('#comparison-right-prev'),
-  comparisonRightNext: document.querySelector('#comparison-right-next'),
-  comparisonRightSeek: document.querySelector('#comparison-right-seek'),
-  comparisonRightTime: document.querySelector('#comparison-right-time'),
-  comparisonRightLoop: document.querySelector('#comparison-right-loop'),
-  comparisonRightAnchor: document.querySelector('#comparison-right-anchor'),
   importText: document.querySelector('#import-text'),
   importTextDialog: document.querySelector('#import-text-dialog'),
   importTextName: document.querySelector('#import-text-name'),
@@ -169,34 +115,7 @@ function mediaStatusLabel(asset) {
 }
 
 function renderMediaLibrary() {
-  const project = state.activeProject;
-  elements.mediaLibrary.hidden = !project;
-  elements.importMedia.disabled = !project;
-  elements.importText.disabled = !project;
-  if (!project) {
-    elements.mediaList.innerHTML = '';
-    elements.mediaStatus.textContent = '尚未載入媒體。';
-    return;
-  }
-
-  const media = Array.isArray(project.media) ? project.media : [];
-  elements.mediaStatus.textContent = media.length === 0
-    ? '目前沒有專案媒體；匯入後會先以 discovered/unknown 狀態保存，等待後續 inspect pipeline。'
-    : `${media.length} 個媒體 asset；目前只顯示 domain status，不宣稱可播放或 metadata 已完成。`;
-  elements.mediaList.innerHTML = media.length === 0
-    ? '<p class="empty-state">尚未匯入圖片或影片。</p>'
-    : media.map((asset) => `
-      <article class="media-card">
-        <div>
-          <div class="media-card-title">${escapeHtml(asset.displayName || asset.id || '未命名媒體')}</div>
-          <p class="media-card-meta">${escapeHtml(mediaStatusLabel(asset))} · ${escapeHtml(asset.mediaKind || 'unknown')}</p>
-        </div>
-        <div class="media-card-actions"><button class="button button-secondary" data-remove-media="${escapeHtml(asset.id)}" type="button">移除</button></div>
-      </article>
-    `).join('');
-  elements.mediaList.querySelectorAll('[data-remove-media]').forEach((button) => {
-    button.addEventListener('click', () => { void removeMedia(button.dataset.removeMedia); });
-  });
+  // Media is consumed by inline video cards, never by a permanent panel.
 }
 
 function playerBlockType(block) {
@@ -988,58 +907,7 @@ function activatePlayerBlock(entry) {
 }
 
 function renderPlayer() {
-  const project = state.activeProject;
-  elements.playerPanel.hidden = !project;
-  if (!project) {
-    state.player.selectedBlockId = null;
-    clearPlayerRuntime();
-    elements.playerEmpty.textContent = '尚未載入影片；請先開啟專案。';
-    elements.playerEmpty.hidden = false;
-    elements.playerBlockSelect.innerHTML = '<option value="">尚未建立 player block</option>';
-    elements.playerBlockSelect.disabled = true;
-    elements.addSingleVideo.disabled = true;
-    elements.addComparisonVideo.disabled = true;
-    return;
-  }
-  const entries = playerBlockEntries(project);
-  const videos = videoAssetsForProject(project);
-  elements.addSingleVideo.disabled = videos.length === 0;
-  elements.addComparisonVideo.disabled = videos.length < 2;
-  elements.playerBlockSelect.innerHTML = entries.length > 0
-    ? entries.map((entry) => `<option value="${escapeHtml(entry.block.id)}">${escapeHtml(entry.block.label || `${playerBlockType(entry.block) === 'comparisonvideo' ? '兩影片比較' : '單影片'} · ${entry.block.id}`)}</option>`).join('')
-    : '<option value="">尚未建立 player block</option>';
-  const selectedEntry = entries.find((entry) => entry.block.id === state.player.selectedBlockId) || entries[0];
-  if (!selectedEntry) {
-    state.player.selectedBlockId = null;
-    clearPlayerRuntime();
-    elements.playerBlockSelect.disabled = true;
-    elements.playerEmpty.hidden = false;
-    elements.playerEmpty.textContent = videos.length === 0
-      ? '目前專案沒有影片；請先從 Media Library 匯入。未載入影片。'
-      : '尚未建立 player block；可新增單影片或兩影片比較。';
-    renderPlayerStatus(null);
-    return;
-  }
-  state.player.selectedBlockId = selectedEntry.block.id;
-  elements.playerBlockSelect.disabled = false;
-  elements.playerBlockSelect.value = selectedEntry.block.id;
-  elements.playerEmpty.hidden = true;
-  if (!state.player.runtime || state.player.runtime.blockId !== selectedEntry.block.id) {
-    activatePlayerBlock(selectedEntry);
-    return;
-  }
-  state.player.runtime.block = selectedEntry.block;
-  state.player.runtime.syncMode = selectedEntry.block.sync?.mode === 'frame' ? 'frame' : 'time';
-  elements.comparisonPlayer.dataset.layout = selectedEntry.block.layout === 'stacked' ? 'stacked' : 'side-by-side';
-  Object.keys(state.player.runtime.sides).forEach((side) => {
-    state.player.runtime.sides[side].anchor = playerAnchorFor(selectedEntry.block, side);
-    state.player.runtime.sides[side].segment = playerSegmentFor(
-      selectedEntry.block,
-      side,
-      state.player.runtime.sides[side].duration,
-    );
-  });
-  renderPlayerControls();
+  if (state.activeProject) renderBlockCanvas();
 }
 
 function cloneProject(project) {
@@ -1047,11 +915,13 @@ function cloneProject(project) {
 }
 
 function setError(message) {
+  if (!elements.appError) return;
   elements.appError.textContent = message ? String(message) : '';
   elements.appError.hidden = !message;
 }
 
 function setSaveState(value, stateName = '') {
+  if (!elements.saveState) return;
   elements.saveState.textContent = value;
   elements.saveState.dataset.state = stateName;
 }
@@ -1129,45 +999,65 @@ function renderExportControls() {
   const snapshot = exportState.snapshot;
   const running = exportState.status === 'running' || exportState.status === 'cancelling';
   const pickerAvailable = Boolean(exportDirectoryPicker());
-  elements.chooseExportDirectory.disabled = !project || running || !pickerAvailable;
-  elements.exportKind.disabled = !project || running;
-  elements.exportReport.disabled = !project || running;
-  elements.exportCancel.hidden = !running;
-  elements.exportRetry.hidden = !exportState.jobId || !snapshot || !['failed', 'cancelled'].includes(exportState.status);
-  elements.exportStatus.dataset.state = exportState.status;
+  if (elements.chooseExportDirectory) elements.chooseExportDirectory.disabled = !project || running || !pickerAvailable;
+  if (elements.exportKind) elements.exportKind.disabled = !project || running;
+  if (elements.exportReport) elements.exportReport.disabled = !project || running;
+  if (elements.exportCancel) elements.exportCancel.hidden = !running;
+  if (elements.exportRetry) {
+    elements.exportRetry.hidden = !exportState.jobId || !snapshot || !['failed', 'cancelled'].includes(exportState.status);
+  }
+  if (elements.exportStatus) elements.exportStatus.dataset.state = exportState.status;
   if (!project) {
-    elements.exportDirectoryStatus.textContent = 'Open a project to choose an output folder.';
-    elements.exportStatus.textContent = 'Export is unavailable until a project is open.';
+    if (elements.exportDirectoryStatus) elements.exportDirectoryStatus.textContent = 'Open a project to choose an output folder.';
+    if (elements.exportStatus) elements.exportStatus.textContent = 'Export is unavailable until a project is open.';
   } else if (exportState.outputDirectory) {
-    elements.exportDirectoryStatus.textContent = exportState.directoryNotice
-      || `Selected folder: ${displaySafeDirectoryLabel(exportState.outputDirectory)}`;
+    if (elements.exportDirectoryStatus) {
+      elements.exportDirectoryStatus.textContent = exportState.directoryNotice
+        || `Selected folder: ${displaySafeDirectoryLabel(exportState.outputDirectory)}`;
+    }
   } else if (exportState.status === 'running') {
-    elements.exportDirectoryStatus.textContent = `Using project default: ${displaySafeDirectoryLabel(defaultExportDirectory())}`;
-    elements.exportStatus.textContent = 'Export running; referenced assets are being copied into a self-contained output.';
+    if (elements.exportDirectoryStatus) {
+      elements.exportDirectoryStatus.textContent = `Using project default: ${displaySafeDirectoryLabel(defaultExportDirectory())}`;
+    }
+    if (elements.exportStatus) {
+      elements.exportStatus.textContent = 'Export running; referenced assets are being copied into a self-contained output.';
+    }
   } else if (exportState.directoryNotice) {
-    elements.exportDirectoryStatus.textContent = exportState.directoryNotice;
+    if (elements.exportDirectoryStatus) elements.exportDirectoryStatus.textContent = exportState.directoryNotice;
   } else if (!pickerAvailable) {
-    elements.exportDirectoryStatus.textContent = 'Folder picker unavailable; using the project default.';
+    if (elements.exportDirectoryStatus) {
+      elements.exportDirectoryStatus.textContent = 'Folder picker unavailable; using the project default.';
+    }
   } else {
-    elements.exportDirectoryStatus.textContent = `Using project default: ${displaySafeDirectoryLabel(defaultExportDirectory())}`;
+    if (elements.exportDirectoryStatus) {
+      elements.exportDirectoryStatus.textContent = `Using project default: ${displaySafeDirectoryLabel(defaultExportDirectory())}`;
+    }
   }
   if (!project) {
     return;
   }
   if (exportState.status === 'running') {
-    elements.exportStatus.textContent = 'Export running; referenced assets are being copied into a self-contained output.';
+    if (elements.exportStatus) {
+      elements.exportStatus.textContent = 'Export running; referenced assets are being copied into a self-contained output.';
+    }
   } else if (exportState.status === 'cancelling') {
-    elements.exportStatus.textContent = 'Cancelling export; waiting for cleanup.';
+    if (elements.exportStatus) elements.exportStatus.textContent = 'Cancelling export; waiting for cleanup.';
   } else if (exportState.status === 'completed') {
-    elements.exportStatus.textContent = exportResultLabel(snapshot);
+    if (elements.exportStatus) elements.exportStatus.textContent = exportResultLabel(snapshot);
   } else if (exportState.status === 'failed') {
-    elements.exportStatus.textContent = `Export failed: ${snapshot?.error?.message || 'unknown error'}`;
+    if (elements.exportStatus) {
+      elements.exportStatus.textContent = `Export failed: ${snapshot?.error?.message || 'unknown error'}`;
+    }
   } else if (exportState.status === 'cancelled') {
-    elements.exportStatus.textContent = `Export cancelled: ${snapshot?.error?.message || 'no output was created'}`;
+    if (elements.exportStatus) {
+      elements.exportStatus.textContent = `Export cancelled: ${snapshot?.error?.message || 'no output was created'}`;
+    }
   } else {
-    elements.exportStatus.textContent = exportState.outputDirectory
-      ? `Exports use the selected folder: ${displaySafeDirectoryLabel(exportState.outputDirectory)}.`
-      : `Exports use ${defaultExportDirectory() || 'the project output folder'}.`;
+    if (elements.exportStatus) {
+      elements.exportStatus.textContent = exportState.outputDirectory
+        ? `Exports use the selected folder: ${displaySafeDirectoryLabel(exportState.outputDirectory)}.`
+        : `Exports use ${defaultExportDirectory() || 'the project output folder'}.`;
+    }
   }
 }
 
@@ -1202,7 +1092,7 @@ async function startReportExport() {
       projectId: project.id,
       outputDirectory,
       reportName: project.reportTitle || project.displayName,
-      outputKind: elements.exportKind.value,
+      outputKind: elements.exportKind?.value || 'folder',
     };
     state.export.jobId = null;
     state.export.snapshot = null;
@@ -1243,14 +1133,21 @@ async function retryReportExport() {
 }
 
 function renderProjects() {
-  elements.projectList.innerHTML = state.projects.map((project) => `
-    <button class="project-card ${project.id === state.activeProject?.id ? 'is-active' : ''}" data-project-id="${escapeHtml(project.id)}" type="button">
-      <span class="project-card-title">${escapeHtml(project.displayName)}</span>
-      <span class="project-card-meta">${project.sectionCount} 個 section · ${escapeHtml(formatDate(project.updatedAt))}</span>
-    </button>
-  `).join('');
-  elements.projectEmpty.hidden = state.projects.length !== 0;
-  elements.projectList.querySelectorAll('[data-project-id]').forEach((button) => {
+  const control = elements.projectList || elements.projectPicker;
+  if (!control) return;
+  if (control.tagName === 'SELECT') {
+    control.innerHTML = state.projects.length > 0
+      ? state.projects.map((project) => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.displayName)}</option>`).join('')
+      : '<option value="">No documents yet</option>';
+    control.disabled = state.projects.length === 0;
+    if (state.activeProject) control.value = state.activeProject.id;
+    return;
+  }
+  control.innerHTML = state.projects.map((project) => `
+    <button class="project-card" data-project-id="${escapeHtml(project.id)}" type="button">
+      <span>${escapeHtml(project.displayName)}</span><small>${project.sectionCount} sections</small>
+    </button>`).join('');
+  control.querySelectorAll('[data-project-id]').forEach((button) => {
     button.addEventListener('click', () => { void openProject(button.dataset.projectId); });
   });
 }
@@ -1327,21 +1224,196 @@ function renderVideoBlockEditor(block) {
     </div>`;
 }
 
+function renderInlineVideoSide(block, side) {
+  const config = playerSideConfig(block, side);
+  const label = side === 'left' ? 'Left source' : side === 'right' ? 'Right source' : 'Video source';
+  return `
+    <div class="inline-video-side" data-inline-side="${side}">
+      <h3>${label}</h3>
+      <div class="inline-video-frame"><video data-inline-video playsinline preload="metadata"></video></div>
+      <p class="inline-video-status" data-inline-status role="status">Not loaded; select a project-local asset.</p>
+      <div class="inline-video-controls">
+        <button class="button button-quiet" type="button" data-inline-action="play">Play</button>
+        <button class="button button-quiet" type="button" data-inline-action="pause">Pause</button>
+        <input class="inline-video-seek" data-inline-seek type="range" min="0" max="0" step="0.001" value="0" disabled aria-label="${label} seek" />
+        <output class="inline-video-time" data-inline-time>0.00s</output>
+        <button class="button button-quiet" type="button" data-inline-action="fullscreen">Fullscreen</button>
+      </div>
+    </div>`;
+}
+
+function renderInlineVideoBlock(section, block) {
+  const comparison = block.type === 'comparisonVideo';
+  const layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
+  const sides = comparison ? `${renderInlineVideoSide(block, 'left')}${renderInlineVideoSide(block, 'right')}` : renderInlineVideoSide(block, 'single');
+  const syncMode = block.sync?.mode === 'frame' ? 'Explicit frame mode' : 'Shared elapsed-time sync';
+  return `
+    <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block>
+      <header class="inline-video-header">
+        <div class="inline-video-title"><strong>${escapeHtml(block.label || (comparison ? 'Comparison video' : 'Video block'))}</strong><span>${comparison ? `${syncMode} · ${layout}` : 'Single source · project-local media'}</span></div>
+        <div class="inline-video-actions">
+          <button class="button button-quiet" type="button" data-inline-action="open">Open controls</button>
+          <button class="button button-secondary" type="button" data-inline-action="play-all">Play</button>
+          <button class="button button-quiet" type="button" data-inline-action="pause-all">Pause</button>
+          ${comparison ? '<button class="button button-quiet" type="button" data-inline-action="align-zero">Align 0s</button>' : ''}
+        </div>
+      </header>
+      <div class="inline-video-grid" data-layout="${layout}">${sides}</div>
+      <details class="inline-video-details"><summary>Block settings</summary>${renderVideoBlockEditor(block)}</details>
+    </article>`;
+}
+
+function setInlineVideoStatus(sideElement, message, stateName = '') {
+  const status = sideElement?.querySelector('[data-inline-status]');
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.state = stateName;
+}
+
+function updateInlineVideoTime(sideElement) {
+  const video = sideElement?.querySelector('[data-inline-video]');
+  const seek = sideElement?.querySelector('[data-inline-seek]');
+  const time = sideElement?.querySelector('[data-inline-time]');
+  if (!video || !seek || !time) return;
+  const duration = Number.isFinite(video.duration) ? video.duration : 0;
+  seek.max = String(duration);
+  seek.value = String(Math.min(Number(video.currentTime) || 0, duration));
+  seek.disabled = duration <= 0;
+  time.textContent = `${(Number(video.currentTime) || 0).toFixed(2)}s${duration > 0 ? ` / ${duration.toFixed(2)}s` : ''}`;
+}
+
+async function loadInlineVideoSide(card, block, side, generation) {
+  const sideElement = card.querySelector(`[data-inline-side="${side}"]`);
+  const video = sideElement?.querySelector('[data-inline-video]');
+  if (!sideElement || !video || generation !== state.inlineGeneration) return;
+  const assetId = playerAssetIdFor(block, side);
+  const asset = mediaAssetFor(assetId);
+  if (!assetId || !asset) {
+    setInlineVideoStatus(sideElement, 'No project-local asset selected.', 'pending');
+    return;
+  }
+  if (asset.lifecycleStatus === 'missing' || ['unsupported', 'unplayable'].includes(asset.compatibility)) {
+    setInlineVideoStatus(sideElement, 'This asset is unavailable or unsupported.', 'error');
+    return;
+  }
+  if (asset.compatibility === 'needs-normalization' && !asset.normalizedReference) {
+    setInlineVideoStatus(sideElement, 'Metadata is pending normalization; playback is unavailable.', 'pending');
+    return;
+  }
+  setInlineVideoStatus(sideElement, 'Loading project-local media…', 'pending');
+  try {
+    const source = await window.pitchingApp.resolveMediaSource(state.activeProject.id, assetId);
+    if (generation !== state.inlineGeneration || !card.isConnected) return;
+    video.src = source.sourceUrl;
+    video.playbackRate = Number(playerSideConfig(block, side).playback?.rate) || 1;
+    video.onloadedmetadata = () => {
+      setInlineVideoStatus(sideElement, 'Ready; real media source loaded.', 'loaded');
+      updateInlineVideoTime(sideElement);
+    };
+    video.ontimeupdate = () => updateInlineVideoTime(sideElement);
+    video.onerror = () => setInlineVideoStatus(sideElement, 'Media could not be played by this runtime.', 'error');
+    video.load();
+  } catch {
+    setInlineVideoStatus(sideElement, 'Media source could not be resolved safely.', 'error');
+  }
+}
+
+function hydrateInlineVideoCards() {
+  if (!elements.blockCanvas || !state.activeProject) return;
+  const generation = ++state.inlineGeneration;
+  elements.blockCanvas.querySelectorAll('[data-inline-video-block]').forEach((card) => {
+    const entry = blockForEditorCard(card);
+    if (!entry.block) return;
+    const sides = entry.block.type === 'comparisonVideo' ? ['left', 'right'] : ['single'];
+    sides.forEach((side) => { void loadInlineVideoSide(card, entry.block, side, generation); });
+  });
+}
+
+async function playInlineCard(card) {
+  const videos = [...card.querySelectorAll('[data-inline-video]')];
+  const ready = videos.filter((video) => video.readyState > 0 && video.src);
+  if (ready.length === 0) {
+    card.querySelectorAll('[data-inline-side]').forEach((side) => setInlineVideoStatus(side, 'Playback unavailable until a playable source is loaded.', 'pending'));
+    return;
+  }
+  try {
+    await Promise.all(ready.map((video) => video.play()));
+  } catch {
+    card.querySelectorAll('[data-inline-side]').forEach((side) => setInlineVideoStatus(side, 'Playback was blocked or unavailable.', 'error'));
+  }
+}
+
+async function alignInlineComparison(card) {
+  const entry = blockForEditorCard(card);
+  const leftElement = card.querySelector('[data-inline-side="left"]');
+  const rightElement = card.querySelector('[data-inline-side="right"]');
+  const leftVideo = leftElement?.querySelector('[data-inline-video]');
+  const rightVideo = rightElement?.querySelector('[data-inline-video]');
+  const left = playerSideConfig(entry.block, 'left');
+  const right = playerSideConfig(entry.block, 'right');
+  if (!entry.block || !leftVideo || !rightVideo || !leftVideo.src || !rightVideo.src || !left.anchor || !right.anchor) {
+    setInlineVideoStatus(leftElement, 'Both sources need loaded media and separate anchors.', 'pending');
+    return;
+  }
+  try {
+    const alignment = await window.pitchingApp.sync.alignComparisonAtRelativeTime({
+      left: { anchor: left.anchor, duration: leftVideo.duration, timing: playerTimingForAsset(mediaAssetFor(playerAssetIdFor(entry.block, 'left')), leftVideo.duration), capability: { supportsFrameStep: typeof leftVideo.seekToNextFrame === 'function' } },
+      right: { anchor: right.anchor, duration: rightVideo.duration, timing: playerTimingForAsset(mediaAssetFor(playerAssetIdFor(entry.block, 'right')), rightVideo.duration), capability: { supportsFrameStep: typeof rightVideo.seekToNextFrame === 'function' } },
+    }, 0);
+    leftVideo.currentTime = alignment.sides.left.playbackTime;
+    rightVideo.currentTime = alignment.sides.right.playbackTime;
+    setInlineVideoStatus(leftElement, `Aligned at 0s (${alignment.precision}).`, 'loaded');
+    setInlineVideoStatus(rightElement, `Aligned at 0s (${alignment.precision}).`, 'loaded');
+  } catch {
+    setInlineVideoStatus(leftElement, 'Comparison alignment is unavailable for these sources.', 'error');
+  }
+}
+
+function handleInlineVideoEvent(event) {
+  const target = event.target;
+  const card = target.closest('[data-inline-video-block]');
+  if (!card) return false;
+  const sideElement = target.closest('[data-inline-side]');
+  const video = sideElement?.querySelector('[data-inline-video]');
+  if (target.matches('[data-inline-seek]') && video) {
+    video.currentTime = Number(target.value) || 0;
+    updateInlineVideoTime(sideElement);
+    return true;
+  }
+  const action = target.closest('[data-inline-action]')?.dataset.inlineAction;
+  if (!action) return false;
+  if (action === 'open') {
+    const details = card.querySelector('details');
+    if (details) details.open = true;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else if (action === 'play-all') {
+    void playInlineCard(card);
+  } else if (action === 'pause-all') {
+    card.querySelectorAll('[data-inline-video]').forEach((item) => item.pause());
+  } else if (action === 'play' && video) {
+    void video.play().catch(() => setInlineVideoStatus(sideElement, 'Playback was blocked or unavailable.', 'error'));
+  } else if (action === 'pause' && video) {
+    video.pause();
+  } else if (action === 'fullscreen' && video && typeof video.requestFullscreen === 'function') {
+    void video.requestFullscreen().catch(() => {});
+  } else if (action === 'align-zero') {
+    void alignInlineComparison(card);
+  }
+  return true;
+}
+
 function renderBlockEditor(section, block, index) {
   const typeLabel = block.type === 'comparisonVideo' ? 'Comparison video' : block.type === 'singleVideo' ? 'Single video' : 'Text';
-  const playerAction = block.type === 'singleVideo' || block.type === 'comparisonVideo'
-    ? `<button class="button button-secondary" type="button" data-block-action="open-player">Open player</button>`
-    : '';
   const body = block.type === 'rich-text' || block.type === 'text'
     ? `<label class="block-text-editor">Text <textarea rows="5" data-block-field="content">${escapeHtml(block.content || '')}</textarea></label>`
     : (block.type === 'singleVideo' || block.type === 'comparisonVideo')
-      ? renderVideoBlockEditor(block)
+      ? renderInlineVideoBlock(section, block)
       : `<p class="hint">Unsupported block type: ${escapeHtml(block.type || 'unknown')}</p>`;
   return `
     <article class="content-block-card" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}">
       <header class="content-block-header">
         <strong>${typeLabel}</strong>
-        <div class="content-block-actions">${playerAction}
+        <div class="content-block-actions">
           <button class="icon-button" type="button" data-block-action="move-up" aria-label="Move block up">↑</button>
           <button class="icon-button" type="button" data-block-action="move-down" aria-label="Move block down">↓</button>
           <button class="button button-secondary" type="button" data-block-action="delete">Delete</button>
@@ -1353,12 +1425,11 @@ function renderBlockEditor(section, block, index) {
 
 function renderBlockCanvas() {
   const project = state.activeProject;
-  elements.blockSectionTarget.disabled = !project;
-  elements.addTextBlock.disabled = !project;
-  elements.addEditorSingleVideo.disabled = !project;
-  elements.addEditorComparisonVideo.disabled = !project;
+  [elements.blockSectionTarget, elements.addTextBlock, elements.addEditorSingleVideo, elements.addEditorComparisonVideo]
+    .filter(Boolean)
+    .forEach((element) => { element.disabled = !project; });
+  if (!elements.blockCanvas) return;
   if (!project) {
-    elements.blockSectionTarget.innerHTML = '';
     elements.blockCanvas.innerHTML = '<p class="empty-state">Open a project to edit blocks.</p>';
     return;
   }
@@ -1366,10 +1437,14 @@ function renderBlockCanvas() {
   if (!project.sections.some((section) => section.id === state.selectedSectionId)) {
     state.selectedSectionId = project.sections[0]?.id || null;
   }
-  elements.blockSectionTarget.innerHTML = project.sections.map((section) => (
-    `<option value="${escapeHtml(section.id)}"${section.id === state.selectedSectionId ? ' selected' : ''}>${escapeHtml(section.title || 'Untitled section')}</option>`
-  )).join('');
-  elements.blockEditorStatus.textContent = `${project.sections.reduce((count, section) => count + section.blocks.length, 0)} blocks in long-form document`;
+  if (elements.blockSectionTarget) {
+    elements.blockSectionTarget.innerHTML = project.sections.map((section) => (
+      `<option value="${escapeHtml(section.id)}"${section.id === state.selectedSectionId ? ' selected' : ''}>${escapeHtml(section.title || 'Untitled section')}</option>`
+    )).join('');
+  }
+  if (elements.blockEditorStatus) {
+    elements.blockEditorStatus.textContent = `${project.sections.reduce((count, section) => count + section.blocks.length, 0)} blocks in long-form document`;
+  }
   elements.blockCanvas.innerHTML = project.sections.map((section) => `
     <section class="block-section ${section.id === state.selectedSectionId ? 'is-target' : ''}" data-section-id="${escapeHtml(section.id)}">
       <header class="block-section-header">
@@ -1378,22 +1453,11 @@ function renderBlockCanvas() {
       </header>
       <div class="block-list">${section.blocks.map((block, index) => renderBlockEditor(section, block, index)).join('')}</div>
     </section>`).join('');
+  hydrateInlineVideoCards();
 }
 
 function renderSectionList() {
-  const project = state.activeProject;
-  elements.sectionList.innerHTML = project.sections.map((section) => `
-    <button class="section-item ${section.id === state.selectedSectionId ? 'is-active' : ''}" data-section-id="${escapeHtml(section.id)}" type="button">
-      <span>${escapeHtml(section.title || '未命名 section')}</span><small>${section.blocks.length} blocks</small>
-    </button>
-  `).join('');
-  elements.sectionList.querySelectorAll('[data-section-id]').forEach((button) => {
-    button.addEventListener('click', () => {
-      state.selectedSectionId = button.dataset.sectionId;
-      renderEditor();
-      renderPreview();
-    });
-  });
+  // Sections are presented in document order inside the block canvas.
 }
 
 function setEditorPath(target, pathValue, value) {
@@ -1438,13 +1502,15 @@ function convertVideoBlockMode(block, mode) {
 
 function handleBlockEditorEvent(event) {
   const target = event.target;
+  if (target.closest('[data-inline-video-block]') && (target.matches('[data-inline-seek]') || target.closest('[data-inline-action]'))) {
+    handleInlineVideoEvent(event);
+    return;
+  }
   const card = target.closest('[data-block-id]');
   if (target.matches('[data-section-title]')) {
     const section = state.activeProject?.sections.find((item) => item.id === target.closest('[data-section-id]')?.dataset.sectionId);
     if (!section) return;
     section.title = target.value;
-    renderSectionList();
-    renderPreview();
     scheduleSave();
     return;
   }
@@ -1455,21 +1521,17 @@ function handleBlockEditorEvent(event) {
   if (target.matches('[data-block-mode]')) {
     convertVideoBlockMode(block, target.value);
     renderBlockCanvas();
-    renderPlayer();
-    renderPreview();
     scheduleSave();
     return;
   }
   if (target.matches('[data-block-field="content"]')) {
     block.content = target.value;
-    renderPreview();
     scheduleSave();
     return;
   }
   if (target.matches('[data-block-path]')) {
     setEditorPath(block, target.dataset.blockPath, editorControlValue(target));
-    renderPreview();
-    renderPlayer();
+    if (event.type !== 'input' || target.type !== 'text') renderBlockCanvas();
     scheduleSave();
     return;
   }
@@ -1477,50 +1539,26 @@ function handleBlockEditorEvent(event) {
   const action = target.closest('[data-block-action]')?.dataset.blockAction;
   if (!action) return;
   const index = section.blocks.findIndex((item) => item.id === block.id);
-  if (action === 'open-player') {
-    state.player.selectedBlockId = block.id;
-    renderPlayer();
-    document.querySelector('#player-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    return;
-  }
   if (action === 'delete') section.blocks.splice(index, 1);
   if (action === 'move-up' && index > 0) [section.blocks[index - 1], section.blocks[index]] = [section.blocks[index], section.blocks[index - 1]];
   if (action === 'move-down' && index >= 0 && index < section.blocks.length - 1) [section.blocks[index], section.blocks[index + 1]] = [section.blocks[index + 1], section.blocks[index]];
   renderBlockCanvas();
-  renderPlayer();
-  renderPreview();
   scheduleSave();
 }
 
-function renderEditor({ preserveForm = false } = {}) {
+function renderEditor() {
   const project = state.activeProject;
-  elements.editorEmpty.hidden = Boolean(project);
-  elements.editor.hidden = !project;
-  elements.saveProject.disabled = !project;
-  renderMediaLibrary();
-  renderPlayer();
+  if (elements.editorEmpty) elements.editorEmpty.hidden = Boolean(project);
+  if (elements.editor) elements.editor.hidden = !project;
+  if (elements.saveProject) elements.saveProject.disabled = !project;
+  if (elements.importText) elements.importText.disabled = !project;
+  if (elements.importMedia) elements.importMedia.disabled = !project;
   renderBlockCanvas();
+  renderExportControls();
   if (!project) return;
 
-  elements.projectTitle.textContent = project.displayName;
-  elements.projectMeta.textContent = `已儲存於專案資料夾 · ${formatDate(project.updatedAt)}`;
-  renderSectionList();
-
-  const section = activeSection();
-  if (!section) {
-    elements.sectionTitle.value = '';
-    elements.sectionContent.value = '';
-    elements.sectionTitle.disabled = true;
-    elements.sectionContent.disabled = true;
-    return;
-  }
-
-  elements.sectionTitle.disabled = false;
-  elements.sectionContent.disabled = false;
-  if (!preserveForm) {
-    elements.sectionTitle.value = section.title;
-    elements.sectionContent.value = textBlockFor(section)?.content || '';
-  }
+  if (elements.projectTitle) elements.projectTitle.textContent = project.displayName;
+  if (elements.projectMeta) elements.projectMeta.textContent = `Local-first document · ${formatDate(project.updatedAt)}`;
 }
 
 function previewMediaReference(value, role = '媒體') {
@@ -1557,25 +1595,6 @@ function renderPreviewBlock(block) {
 }
 
 function renderPreview() {
-  const project = state.activeProject;
-  if (!project) {
-    renderExportControls();
-    elements.preview.innerHTML = '<p class="muted">建立或開啟專案後，這裡會顯示報告預覽。</p>';
-    return;
-  }
-
-  const reportDocument = window.pitchingReportContract.toReportDocument(project);
-  elements.preview.innerHTML = `
-    <article class="report-preview">
-      <p class="eyebrow">投球動作分析</p>
-      <h2>${escapeHtml(reportDocument.title || '投球動作分析報告')}</h2>
-      ${reportDocument.sections.map((section) => {
-        const heading = section.title ? `<h3>${escapeHtml(section.title)}</h3>` : '';
-        const blocks = section.blocks.map(renderPreviewBlock).join('');
-        return `<section>${heading}${blocks || '<p><span class="muted">尚未填寫</span></p>'}</section>`;
-      }).join('')}
-    </article>
-  `;
   renderExportControls();
 }
 
@@ -1680,10 +1699,12 @@ async function openProject(projectId) {
 
 function resetTextImportDialog() {
   state.pendingTextImport = null;
-  elements.importTextName.textContent = '—';
-  elements.importTextPreview.textContent = '';
-  elements.importTextError.textContent = '';
-  elements.importTextError.hidden = true;
+  if (elements.importTextName) elements.importTextName.textContent = '—';
+  if (elements.importTextPreview) elements.importTextPreview.textContent = '';
+  if (elements.importTextError) {
+    elements.importTextError.textContent = '';
+    elements.importTextError.hidden = true;
+  }
 }
 
 async function requestTextImport() {
@@ -1693,11 +1714,13 @@ async function requestTextImport() {
     const imported = await window.pitchingApp.pickTextFile();
     if (!imported) return;
     state.pendingTextImport = imported;
-    elements.importTextName.textContent = imported.fileName;
-    elements.importTextPreview.textContent = imported.content;
-    elements.importTextError.textContent = '';
-    elements.importTextError.hidden = true;
-    elements.importTextDialog.showModal();
+    if (elements.importTextName) elements.importTextName.textContent = imported.fileName;
+    if (elements.importTextPreview) elements.importTextPreview.textContent = imported.content;
+    if (elements.importTextError) {
+      elements.importTextError.textContent = '';
+      elements.importTextError.hidden = true;
+    }
+    elements.importTextDialog?.showModal();
   } catch (error) {
     setSaveState('匯入失敗', 'error');
     setError(`讀取文字檔失敗：${error.message}`);
@@ -1707,8 +1730,8 @@ async function requestTextImport() {
 async function confirmTextImport() {
   const imported = state.pendingTextImport;
   const project = state.activeProject;
-  if (!imported || !project || !state.selectedSectionId) return;
-  elements.confirmImportText.disabled = true;
+  if (!imported || !project || !state.selectedSectionId || !window.pitchingApp?.insertTextBlock) return;
+  if (elements.confirmImportText) elements.confirmImportText.disabled = true;
   try {
     const saved = await window.pitchingApp.insertTextBlock({
       projectId: project.id,
@@ -1719,18 +1742,20 @@ async function confirmTextImport() {
     state.activeProject = saved;
     state.dirty = false;
     state.revision = 0;
-    elements.importTextDialog.close();
+    elements.importTextDialog?.close();
     resetTextImportDialog();
     renderProjects();
     renderEditor();
     renderPreview();
     setSaveState('文字已匯入並儲存', 'saved');
   } catch (error) {
-    elements.importTextError.textContent = `匯入失敗：${error.message}`;
-    elements.importTextError.hidden = false;
+    if (elements.importTextError) {
+      elements.importTextError.textContent = `匯入失敗：${error.message}`;
+      elements.importTextError.hidden = false;
+    }
     setError(`匯入文字失敗：${error.message}`);
   } finally {
-    elements.confirmImportText.disabled = false;
+    if (elements.confirmImportText) elements.confirmImportText.disabled = false;
   }
 }
 
@@ -1772,129 +1797,85 @@ async function removeMedia(assetId) {
   }
 }
 
-elements.newProjectForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
+if (elements.newProjectForm) {
+  elements.newProjectForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    setError('');
+    try {
+      if (state.activeProject && state.dirty) await requestSave();
+      const project = await window.pitchingApp.createProject(elements.newProjectName?.value || '');
+      elements.newProjectDialog?.close();
+      elements.newProjectForm.reset();
+      await refreshProjects();
+      await openProject(project.id);
+    } catch (error) {
+      setSaveState('建立失敗', 'error');
+      setError(`建立專案失敗：${error.message}`);
+    }
+  });
+}
+
+document.querySelector('#new-project')?.addEventListener('click', () => {
   setError('');
-  try {
-    if (state.activeProject && state.dirty) await requestSave();
-    const project = await window.pitchingApp.createProject(elements.newProjectName.value);
-    elements.newProjectDialog.close();
-    elements.newProjectForm.reset();
-    await refreshProjects();
-    await openProject(project.id);
-  } catch (error) {
-    setSaveState('建立失敗', 'error');
-    setError(`建立專案失敗：${error.message}`);
-  }
+  if (elements.newProjectDialog && !elements.newProjectDialog.open) elements.newProjectDialog.showModal();
+  elements.newProjectName?.focus();
 });
 
-document.querySelector('#new-project').addEventListener('click', () => {
-  setError('');
-  if (!elements.newProjectDialog.open) elements.newProjectDialog.showModal();
-  elements.newProjectName.focus();
-});
-
-document.querySelector('#empty-new-project').addEventListener('click', () => {
-  document.querySelector('#new-project').click();
+document.querySelector('#empty-new-project')?.addEventListener('click', () => {
+  document.querySelector('#new-project')?.click();
 });
 
 document.querySelectorAll('[data-close-dialog]').forEach((button) => {
-  button.addEventListener('click', () => elements.newProjectDialog.close());
+  button.addEventListener('click', () => elements.newProjectDialog?.close());
 });
 
-elements.saveProject.addEventListener('click', () => {
+elements.projectPicker?.addEventListener('change', () => {
+  if (elements.projectPicker.value) void openProject(elements.projectPicker.value);
+});
+elements.saveProject?.addEventListener('click', () => {
   void requestSave().catch(() => {});
 });
-elements.chooseExportDirectory.addEventListener('click', () => { void chooseExportDirectory(); });
-elements.exportReport.addEventListener('click', () => { void startReportExport(); });
-elements.exportCancel.addEventListener('click', () => { void cancelReportExport(); });
-elements.exportRetry.addEventListener('click', () => { void retryReportExport(); });
+elements.chooseExportDirectory?.addEventListener('click', () => { void chooseExportDirectory(); });
+elements.exportReport?.addEventListener('click', () => { void startReportExport(); });
+elements.exportCancel?.addEventListener('click', () => { void cancelReportExport(); });
+elements.exportRetry?.addEventListener('click', () => { void retryReportExport(); });
 
-elements.importText.addEventListener('click', () => { void requestTextImport(); });
-elements.importMedia.addEventListener('click', () => { void importMedia(); });
-elements.cancelImportText.addEventListener('click', () => {
-  elements.importTextDialog.close();
+elements.importText?.addEventListener('click', () => { void requestTextImport(); });
+elements.importMedia?.addEventListener('click', () => { void importMedia(); });
+elements.cancelImportText?.addEventListener('click', () => {
+  elements.importTextDialog?.close();
   resetTextImportDialog();
 });
-elements.confirmImportText.addEventListener('click', () => { void confirmTextImport(); });
+elements.confirmImportText?.addEventListener('click', () => { void confirmTextImport(); });
 
-elements.playerBlockSelect.addEventListener('change', () => {
-  state.player.selectedBlockId = elements.playerBlockSelect.value || null;
-  renderPlayer();
-});
-elements.addSingleVideo.addEventListener('click', addSingleVideoBlock);
-elements.addComparisonVideo.addEventListener('click', addComparisonVideoBlock);
-elements.blockSectionTarget.addEventListener('change', () => {
+elements.blockSectionTarget?.addEventListener('change', () => {
   state.selectedSectionId = elements.blockSectionTarget.value || null;
   renderBlockCanvas();
 });
-elements.addTextBlock.addEventListener('click', addTextBlock);
-elements.addEditorSingleVideo.addEventListener('click', () => addSingleVideoBlock({ allowEmpty: true }));
-elements.addEditorComparisonVideo.addEventListener('click', () => addComparisonVideoBlock({ allowEmpty: true }));
-elements.blockCanvas.addEventListener('input', handleBlockEditorEvent);
-elements.blockCanvas.addEventListener('change', handleBlockEditorEvent);
-elements.blockCanvas.addEventListener('click', handleBlockEditorEvent);
-elements.singlePlay.addEventListener('click', () => { void playPlayerSide('single'); });
-elements.singlePause.addEventListener('click', () => pausePlayerSide('single'));
-elements.singlePrev.addEventListener('click', () => { void stepPlayerSide('single', -1); });
-elements.singleNext.addEventListener('click', () => { void stepPlayerSide('single', 1); });
-elements.singleSeek.addEventListener('input', () => setPlayerSeek('single', elements.singleSeek.value));
-elements.singleRate.addEventListener('change', () => { void setPlayerRate('single', elements.singleRate.value).catch(() => {}); });
-elements.singleLoop.addEventListener('change', () => { void setPlayerLoop('single', elements.singleLoop.checked); });
-elements.singleAnchor.addEventListener('click', () => { void capturePlayerAnchor('single'); });
-elements.singleFullscreen.addEventListener('click', () => { void togglePlayerFullscreen('single'); });
+elements.addTextBlock?.addEventListener('click', addTextBlock);
+elements.addEditorSingleVideo?.addEventListener('click', () => addSingleVideoBlock({ allowEmpty: true }));
+elements.addEditorComparisonVideo?.addEventListener('click', () => addComparisonVideoBlock({ allowEmpty: true }));
+elements.blockCanvas?.addEventListener('input', handleBlockEditorEvent);
+elements.blockCanvas?.addEventListener('change', handleBlockEditorEvent);
+elements.blockCanvas?.addEventListener('click', handleBlockEditorEvent);
 
-elements.comparisonPlay.addEventListener('click', () => { void playComparison(); });
-elements.comparisonPause.addEventListener('click', pauseComparison);
-elements.comparisonRate.addEventListener('change', () => { void setPlayerRate('left', elements.comparisonRate.value).catch(() => {}); });
-elements.comparisonAlignZero.addEventListener('click', () => { void alignComparisonAt(0); });
-elements.comparisonLeftPlay.addEventListener('click', () => { void playPlayerSide('left'); });
-elements.comparisonLeftPause.addEventListener('click', () => pausePlayerSide('left'));
-elements.comparisonLeftPrev.addEventListener('click', () => { void stepPlayerSide('left', -1); });
-elements.comparisonLeftNext.addEventListener('click', () => { void stepPlayerSide('left', 1); });
-elements.comparisonLeftSeek.addEventListener('input', () => setPlayerSeek('left', elements.comparisonLeftSeek.value));
-elements.comparisonLeftLoop.addEventListener('change', () => { void setPlayerLoop('left', elements.comparisonLeftLoop.checked); });
-elements.comparisonLeftAnchor.addEventListener('click', () => { void capturePlayerAnchor('left'); });
-elements.comparisonLeftFullscreen.addEventListener('click', () => { void togglePlayerFullscreen('left'); });
-elements.comparisonRightPlay.addEventListener('click', () => { void playPlayerSide('right'); });
-elements.comparisonRightPause.addEventListener('click', () => pausePlayerSide('right'));
-elements.comparisonRightPrev.addEventListener('click', () => { void stepPlayerSide('right', -1); });
-elements.comparisonRightNext.addEventListener('click', () => { void stepPlayerSide('right', 1); });
-elements.comparisonRightSeek.addEventListener('input', () => setPlayerSeek('right', elements.comparisonRightSeek.value));
-elements.comparisonRightLoop.addEventListener('change', () => { void setPlayerLoop('right', elements.comparisonRightLoop.checked); });
-elements.comparisonRightAnchor.addEventListener('click', () => { void capturePlayerAnchor('right'); });
-elements.comparisonRightFullscreen.addEventListener('click', () => { void togglePlayerFullscreen('right'); });
-document.addEventListener('fullscreenchange', () => { if (state.player.runtime) renderPlayerControls(); });
-
-elements.sectionTitle.addEventListener('input', () => {
-  const section = activeSection();
-  if (!section) return;
-  section.title = elements.sectionTitle.value;
-  renderSectionList();
-  renderPreview();
-  scheduleSave();
-});
-
-elements.sectionContent.addEventListener('input', () => {
-  const section = activeSection();
-  if (!section) return;
-  editableTextBlockFor(section).content = elements.sectionContent.value;
-  renderPreview();
-  scheduleSave();
-});
-
-window.pitchingApp.onBeforeClose(() => flushPendingChanges());
+if (typeof window.pitchingApp?.onBeforeClose === 'function') {
+  window.pitchingApp.onBeforeClose(() => flushPendingChanges());
+}
 
 (async function bootstrap() {
   try {
+    if (!window.pitchingApp || typeof window.pitchingApp.getAppInfo !== 'function') {
+      throw new Error('Renderer bridge unavailable');
+    }
     const info = await window.pitchingApp.getAppInfo();
     state.projectRoot = info.projectRoot;
-    elements.rootPath.textContent = info.projectRoot;
+    if (elements.rootPath) elements.rootPath.textContent = info.projectRoot;
     await refreshProjects();
     renderEditor();
     renderPreview();
   } catch (error) {
-    elements.rootPath.textContent = '無法讀取';
+    if (elements.rootPath) elements.rootPath.textContent = '無法讀取';
     setSaveState('啟動失敗', 'error');
     setError(`應用程式啟動失敗：${error.message}`);
   }

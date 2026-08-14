@@ -81,8 +81,13 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /cancelExport\(jobId\)/u);
   assert.match(renderer, /retryExport\(jobId\)/u);
   assert.match(renderer, /await flushPendingChanges\(\)/u);
-  assert.match(renderer, /outputKind: elements\.exportKind\.value/u);
+  assert.match(renderer, /outputKind: elements\.exportKind\?\.value \|\| 'folder'/u);
   assert.match(renderer, /state\.export\.outputDirectory \|\| defaultExportDirectory\(\)/u);
+  assert.match(renderer, /data-inline-video-block/u);
+  assert.match(renderer, /elements\.blockCanvas\?\.addEventListener\('click'/u);
+  assert.match(renderer, /Renderer bridge unavailable/u);
+  assert.match(renderer, /elements\.appError\) return/u);
+  assert.doesNotMatch(renderer, /elements\.(mediaLibrary|playerPanel|preview|sectionList)\s*=|document\.querySelector\('#(?:media-library|player-panel|preview|section-list)'\)/u);
   assert.match(styles, /\.export-directory-status/u);
 });
 
