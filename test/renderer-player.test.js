@@ -69,8 +69,8 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(indexHtml, /id="document-command-bar"[\s\S]*id="project-list"[\s\S]*id="save-project"[\s\S]*id="export-report"/u);
   assert.match(indexHtml, /<div id="block-canvas"[^>]*aria-label="Long-form document blocks"/u);
   assert.doesNotMatch(indexHtml, /<video\b/u);
-  assert.match(renderer, /resolveMediaSource\(state\.activeProject\.id, sideState\.assetId\)/u);
-  assert.match(renderer, /syncMode === 'time'/u);
+  assert.match(renderer, /resolveMediaSource\(state\.activeProject\.id, assetId\)/u);
+  assert.match(renderer, /data-block-path="sync\.mode"/u);
   assert.match(renderer, /Explicit frame mode/u);
   assert.match(renderer, /requestFullscreen/u);
   assert.match(renderer, /startExport\(request\)/u);
@@ -94,5 +94,5 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
 test('renderer source never constructs a media URL from a filesystem path', () => {
   assert.doesNotMatch(renderer, /path\.(join|resolve|normalize)\(/u);
   assert.doesNotMatch(renderer, /file:\/\//u);
-  assert.match(renderer, /sideState\.video\.src = source\.sourceUrl/u);
+  assert.match(renderer, /video\.src = source\.sourceUrl/u);
 });
