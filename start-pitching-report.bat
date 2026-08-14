@@ -1,43 +1,48 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 
 cd /d "%~dp0"
-where npm >nul 2>&1
-if errorlevel 1 (
-  echo [ERROR] npm was not found on PATH.
-  echo 請先安裝 Node.js/npm，再重新啟動。
-  pause
-  endlocal & exit /b 2
-)
 
-if not exist "node_modules\electron\package.json" (
-  echo [INFO] Electron dependency is missing. Installing dependencies...
-  echo 正在安裝 Electron 依賴，請稍候...
-  call npm install
-  set "installExitCode=!ERRORLEVEL!"
-  if not "!installExitCode!"=="0" (
-    echo [ERROR] npm install failed. Exit code: !installExitCode!
-    echo npm install 失敗，請檢查上方錯誤訊息。
-    pause
-    endlocal & exit /b !installExitCode!
-  )
-)
+where npm.cmd >nul 2>&1
+if errorlevel 1 goto npm_missing
 
-if not exist "node_modules\electron\package.json" (
-  echo [錯誤] 找不到 Electron 依賴。
-  echo [ERROR] Electron dependency was not found.
-  echo 請先執行 npm install，再重新啟動。
-  echo Please run npm install first, then start the application again.
-  pause
-  endlocal & exit /b 1
-)
+if exist "node_modules\electron\package.json" goto start_app
 
+echo [INFO] Electron dependency not found. Installing dependencies...
+call npm.cmd install
+if errorlevel 1 goto install_failed
+if not exist "node_modules\electron\package.json" goto install_incomplete
+
+:start_app
 set "PITCHING_DISABLE_GPU=1"
-call npm start -- --disable-gpu
+call npm.cmd start -- --disable-gpu
+if errorlevel 1 goto start_failed
+endlocal
+exit /b 0
+
+:npm_missing
+echo [ERROR] npm.cmd was not found on PATH.
+echo Please install Node.js and npm, then try again.
+pause
+endlocal
+exit /b 1
+
+:install_failed
 set "exitCode=%ERRORLEVEL%"
-if not "%exitCode%"=="0" (
-  echo [ERROR] Electron failed to start. Exit code: %exitCode%
-  echo 啟動失敗，請查看上方錯誤訊息。
-  pause
-)
-endlocal & exit /b %exitCode%
+echo [ERROR] npm.cmd install failed. Exit code: %exitCode%
+pause
+endlocal
+exit /b %exitCode%
+
+:install_incomplete
+echo [ERROR] npm install completed but Electron is still missing.
+pause
+endlocal
+exit /b 1
+
+:start_failed
+set "exitCode=%ERRORLEVEL%"
+echo [ERROR] Electron failed to start. Exit code: %exitCode%
+pause
+endlocal
+exit /b %exitCode%
