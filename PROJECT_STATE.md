@@ -19,22 +19,25 @@
 
 - Branch：`worker/desktop-vertical-slice`。
 - Shell/Report Model implementation handoff commit：`35c21a430b5c7a16ea065d542fec71a02c47b81b fix: harden report shell persistence boundaries`。
-- `bc0e004 feat: add desktop project vertical slice` 是本次 hardening 的 implementation baseline；本次 provenance reconciliation 另有 docs-only commit。
+- `bc0e004 feat: add desktop project vertical slice` 是歷史 implementation baseline；`f678f2e2c1d6601623a08241dc4789b52b426ccc` 是前一個 provenance reconciliation，並非目前整合 HEAD。
+- 目前 code integration checkpoint：`00cae62 chore: integrate media sync export slices`，已整合 `src/media/**`、`src/sync/**`、`src/export/**` 及對應 tests；三個 slice 仍只代表可驗證的 contract/domain/export seam，不代表完整產品驗收。
 - Recoverable pre-retrofit tag：`checkpoint/pre-governance-retrofit-2026-08-14`。
-- Tracked implementation files 在上述 commit 後無未提交修改；目前另有其他 owner 尚未整合的 untracked `src/export/`、`src/media/`、`src/sync/` 與對應 tests，本 worker 未修改、未 stage、未 commit。
+- 整合 checkpoint 後 tracked implementation files 無未提交修改，原先三個 owner 的 untracked slice 已納入 `00cae62`；私人素材、generated report、ZIP 與 `.tmp` artifacts 未進 Git。
 - 本地 checkpoint 可回復被刪除的舊治理檔案。
 
 ## Implemented slice
 
-目前已有 Electron shell、隔離的 preload/IPC、project list/create/open/save、project-root persistence、autosave/explicit save/close flush/reopen、最小 section editor、renderer-only report contract/preview，以及 storage/report-contract tests 與 smoke script。這些是已存在的 implementation，不等於所有 requirement 已驗證。
+目前已有 Electron shell、隔離的 preload/IPC、project list/create/open/save、project-root persistence、autosave/explicit save/close flush/reopen、最小 section editor、renderer-only report contract/preview；另已整合 media contract/path policy、pure sync domain，以及帶 allowlist、project-root realpath/symlink boundary、folder/ZIP fixture seam 的 export slice。這些是 implementation 與 automated evidence，不等於所有 requirement 已驗證。
 
 ## Not yet complete or not yet verified
 
 - `.txt`/`.md` import、Media Library、圖片/影片 metadata 與 normalization。
 - Single Video、Comparison Video、sync anchor、逐幀、不同 FPS/VFR 與 drift correction。
-- self-contained report folder、offline `file://`、ZIP/完整交付包、export consumer。
+- self-contained report folder、offline `file://`、ZIP/完整交付包與 export consumer 仍未完成產品驗收；目前僅有 fixture-based folder/ZIP seam，沒有 real-media/browser/file:// evidence。
+- 真實 media ingest/metadata/normalization、FFmpeg、實際 player/anchor/sync 與長片 drift correction 仍未完成。
 - responsive 與 Scenario A–G 真人驗收。
 - IPC sender/source-frame hardening 與 symlink realpath containment 已在 `35c21a4` 有 focused tests/smoke evidence；完整產品 persistence/recovery acceptance 仍未完成。
+- `00cae62` 的整合 evidence：37 個 `npm test`、24 個 JS `node --check`、package/lock consistency、`git diff --check`，以及 Electron smoke（含 autosave、explicit save、payload schema、close flush、reopen、bridge security、invalid project rejection）。
 - 沒有 requirement 可只因程式存在而標 `VERIFIED`。
 
 ## Execution

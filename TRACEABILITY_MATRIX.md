@@ -1,6 +1,13 @@
 # Traceability Matrix
 
-目前狀態：**Phase 1/2 planning**。本矩陣是 Requirement → Artifact → Test/Acceptance → Evidence → Status 的唯一追蹤入口。現階段沒有 implementation 或真人 evidence。
+目前狀態：**Phase 1/2 planning + implementation in progress**。本矩陣是 Requirement → Artifact → Test/Acceptance → Evidence → Status 的唯一追蹤入口。`00cae62` 已提供部分 implementation/unit/fixture evidence，但沒有任何 requirement 因此改標 `VERIFIED`，也沒有 real-media、browser/file:// 或真人 evidence。
+
+## Current integration checkpoint
+
+- Revision：`00cae62 chore: integrate media sync export slices`。
+- Integrated scope：media contract/path policy、pure sync domain、shared report-contract allowlist parity、export renderer/layout/ZIP seam，以及 project-root realpath/symlink boundary tests。
+- Evidence：37 個 `npm test`、24 個 JS `node --check`、package/lock consistency、`git diff --check`、Electron smoke（含 close flush/reopen 與 bridge security）。
+- Remaining product scope：import/media ingest、real metadata/FFmpeg、browser player/anchors/sync、offline `file://`/human acceptance、完整 AT-A～G；所有 requirement rows 維持原狀。
 
 | Requirement | Canonical artifact / owner | Test / acceptance | Evidence required | Status |
 |---|---|---|---|---|
