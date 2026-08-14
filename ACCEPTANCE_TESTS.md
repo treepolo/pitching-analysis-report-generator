@@ -1,5 +1,14 @@
 # Acceptance Tests
 
+## Canonical acceptance additions for the block editor (2026-08-14)
+
+These checks supersede any assumption that the former fixed-form editor is acceptable; they are planned evidence, not executed evidence.
+
+- Long-form editor: create many text blocks and many independent video blocks, reorder/remove them, reopen, and confirm focused text editing features without a fixed-form compatibility path.
+- Video blocks: independently choose one asset or a pair, switch single/comparison and side-by-side/stacked layout, and preserve per-block in/out/playback settings.
+- Block-local sync: verify time-mode elapsed-time alignment with source-local timebase/FPS, separate explicit frame mode, source-valid frame stepping, and independent anchors across repeated asset use.
+- Referenced export: a report with unused Media Library assets exports only video-block-referenced copies; originals remain byte-preserved and folder/ZIP contain the same referenced set.
+
 目前狀態：**Phase 1/2 planning**。本文件定義 automated、interaction、visual、offline、recovery、security 與真人驗收的 exit criteria；目前沒有 implementation、影片 fixture、generated report 或真人 evidence。
 
 ## 1. Evidence and status rules

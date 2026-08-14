@@ -1,5 +1,12 @@
 # User Flows
 
+## Canonical workflow decision: block-based long-form editing (2026-08-14)
+
+- Supersede the former fixed-form editor flow; do not expose it as a compatibility mode.
+- The editor opens a long-form canvas where the user inserts, edits, reorders, and removes independent text and video blocks. A video block chooses one asset or a pair and owns its layout, playback segment/settings, and block-local sync configuration.
+- Comparison mode offers side-by-side or stacked layout. Time-based sync uses shared elapsed time and each source's own timebase/FPS; frame mode is explicit and separate.
+- Export derives the referenced asset set from video blocks only, copies those assets into the self-contained folder/ZIP, and never copies unused Media Library assets or mutates originals.
+
 目前狀態：**Phase 1/2 planning**；Architecture 與 GitHub visibility 尚未 human-approved。需求細節見 `PRODUCT_REQUIREMENTS.md`；資料邊界見 `DATA_MODEL.md`；輸出規格見 `REPORT_OUTPUT_SPEC.md`。
 
 ## 1. 導航與工作區

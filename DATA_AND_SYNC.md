@@ -1,5 +1,12 @@
 # Data and Sync Contract
 
+## Canonical block-local sync decision (2026-08-14)
+
+- Sync configuration belongs to each comparison video block instance, never to a shared form or global MediaAsset record.
+- Default time mode uses a shared elapsed-time playhead and maps each source through its own timebase/FPS and anchor time. It must not map 60fps and 30fps sources one-to-one by raw frame index.
+- Explicit frame-based mode is a separate capability. Frame stepping uses each source's valid timestamps/frame timebase; when unavailable, the contract remains time-based/unknown and exposes the limitation.
+- Start anchors identify an event and are separate from the playback relationship. Per-block in/out and playback settings remain independent across repeated uses of the same asset.
+
 目前狀態：**Phase 1/2 planning**。本文件定義比較影片的同步語意、anchor 邊界、frame/time precision 與 fallback；不可在未有人類架構核准前假定特定 browser API 或 FFmpeg 實作。
 
 ## 1. 同步核心語意

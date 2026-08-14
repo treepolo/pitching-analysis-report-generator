@@ -1,5 +1,15 @@
 # Product Requirements
 
+## Canonical scope decision: block-based long-form editor and referenced-media export (2026-08-14)
+
+This decision supersedes the earlier fixed-form/editor UI configuration. The old visible workflow is historical only and must not remain as an in-product compatibility mode.
+
+- The canonical report is a long-form document made of many ordered text blocks and many independent video blocks. Text-editor features are limited to the content needs of those text blocks; video players are inserted as blocks.
+- Each video block independently selects one asset or an asset pair, supports single/comparison mode, side-by-side or stacked presentation, and owns its playback segment, in/out range, labels, and playback settings.
+- Comparison sync is block-local: time mode uses a shared elapsed-time playhead with each source's own timebase/FPS; explicit frame mode is separate; anchors are separate from playback relationship; frame stepping uses each source's valid timestamps/timebase.
+- Export produces `report.html` plus copies of only the media assets referenced by video blocks. Unused Media Library assets are excluded, originals remain untouched, and folder/ZIP outputs are self-contained and offline-capable.
+- This is a planning/scope decision. No requirement status is changed to `VERIFIED` by this text update.
+
 目前狀態：**Phase 1/2 planning**；Architecture 與 GitHub visibility 尚未 human-approved。需求 ID 是本專案的穩定 contract；任何實作、測試、驗收與 status 更新都必須回寫 `TRACEABILITY_MATRIX.md` 與 `IMPLEMENTATION_STATUS.md`。
 
 ## 1. 產品目的與成功條件
@@ -65,6 +75,8 @@
 | GIT-003 | baseline/handoff/integration/acceptance/release checkpoint 有 push/secret scan 規則；force push 禁止。 | policy review，不能捏造 push evidence。 | NOT_STARTED |
 | QA-001 | Scenario A–G 覆蓋完整流程、offline、重複 asset、不同 FPS、VFR、responsive、error recovery。 | `ACCEPTANCE_TESTS.md` 的 exit criteria。 | NOT_STARTED |
 | QA-002 | unit/integration/E2E/visual/真人驗收 evidence 分層；fixture 不冒充真人；無 evidence 不可 VERIFIED。 | `TRACEABILITY_MATRIX.md` 與 status audit。 | NOT_STARTED |
+| EDIT-004 | Canonical editor is a block-based long-form canvas; the former fixed-form workflow is not a product mode. | many text/video blocks, reorder, reopen, and focused text editing evidence | NOT_STARTED |
+| EXPORT-004 | Export includes only assets referenced by video blocks and copies them without mutating originals. | referenced-set, unused-asset exclusion, folder/ZIP parity evidence | NOT_STARTED |
 
 ## 5. Deferred / not in scope
 

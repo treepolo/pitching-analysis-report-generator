@@ -1,5 +1,12 @@
 # Media Pipeline
 
+## Canonical media/export boundary (2026-08-14)
+
+- Media Library assets are reusable project-local source records; video blocks, not the library, decide whether an asset is used in a report.
+- Export must traverse the canonical block document and copy only assets referenced by single/comparison video blocks. Unused library assets are never included by default.
+- Original/source files are read-only from export's perspective. Export copies are separate self-contained artifacts with project-relative references; normalization and export must not overwrite originals.
+- Missing, unsupported, unverified, or unplayable referenced assets remain explicit blockers. Unreferenced assets do not become export blockers merely because they are present in the library.
+
 目前狀態：**Phase 1/2 planning**。本文件定義媒體匯入、檢查、正規化與恢復；FFmpeg、native codec tooling 與 application shell 依 Architecture checkpoint 決定。
 
 ## 1. Pipeline stages

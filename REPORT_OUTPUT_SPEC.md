@@ -1,5 +1,12 @@
 # Report Output Specification
 
+## Canonical output decision: referenced media only (2026-08-14)
+
+- The canonical source is the block-based long-form report document. `report.html` and its output renderer must preserve text blocks and independent single/comparison video blocks without editor-only state.
+- Before staging, export computes the set of MediaAsset IDs referenced by video blocks. The folder and ZIP contain copies of only that set; unused Media Library assets are excluded.
+- Originals remain untouched. Output copies live under the self-contained export tree with portable relative paths; the same referenced set and content must be used for folder and ZIP variants.
+- A missing/invalid referenced asset blocks export. An unused asset is not included and is not a reason to fail an otherwise valid report.
+
 目前狀態：**Phase 1/2 planning**。本文件是 editor、preview 與 export 共用的 report renderer/data contract；它不代表已有 implementation 或 file:// evidence。
 
 ## 1. Renderer contract

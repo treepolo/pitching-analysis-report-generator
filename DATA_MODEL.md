@@ -1,5 +1,13 @@
 # Data Model
 
+## Canonical model decision: block document and derived export references (2026-08-14)
+
+- `ReportProject` is a long-form ordered document. Sections/regions, where retained for navigation, contain ordered `ContentBlock` instances; the former fixed-form field layout is not canonical and is not a compatibility mode.
+- `ContentBlock` is the editing unit. A project may contain many independent text blocks and video blocks. Each video block owns its single/comparison selection, layout, in/out/playback settings, and block-local sync data.
+- `MediaAsset` remains project-scoped reusable source metadata. It never owns block-specific anchors, playback state, or export inclusion state.
+- Export derives `referencedAssetIds` by traversing video blocks in a read-only snapshot. Only those assets receive export copies; originals and unused library assets are untouched and excluded.
+- This model decision changes the canonical target only; migration, persistence, and acceptance remain implementation work and are not verified here.
+
 目前狀態：**Phase 2 planning**。Desktop architecture 與 project-root storage direction 已由使用者確認；本文件定義 renderer、editor、media、sync 與 export 共用的語意模型，實際 storage adapter 仍待 implementation。
 
 ## 1. Canonical entities

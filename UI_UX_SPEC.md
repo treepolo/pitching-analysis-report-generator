@@ -1,5 +1,14 @@
 # UI / UX Specification
 
+## Canonical UI/UX decision: block-based long-form editor (2026-08-14)
+
+The previous fixed-form/editor configuration is superseded and must not remain as a visible compatibility workflow.
+
+- The primary Editor surface is a long-form block canvas, not a fixed report form. Users can add, edit, reorder, duplicate, and remove many text blocks and many independent video blocks.
+- Text blocks expose only necessary text-editor features. Video blocks expose asset selection, single/comparison mode, side-by-side or stacked layout, per-block in/out/playback settings, and explicit state when media is unavailable.
+- Comparison controls and sync configuration belong to the block instance. Time mode uses shared elapsed time and source-local timebases/FPS; frame mode and frame stepping are explicit capabilities, never raw cross-source frame-index mapping.
+- Preview and export consume the same canonical block document. Export UI must communicate that only video-block-referenced assets are copied; unused library assets and originals remain outside the output.
+
 目前狀態：**Phase 1/2 planning**。本文件把產品需求轉成可驗收的互動與資訊架構；產生器採 local browser application 或 desktop application 尚未由使用者核准，故不指定不可逆的 framework 或 shell。
 
 ## 1. UX 目標與約束

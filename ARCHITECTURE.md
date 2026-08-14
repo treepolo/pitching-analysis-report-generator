@@ -1,5 +1,21 @@
 # Architecture Decision Package
 
+## Architecture decision: block-based report document (2026-08-14)
+
+The product architecture now treats the block-based long-form editor as canonical and supersedes the former fixed-form/editor configuration. The old UI may remain in Git history but must not be exposed as a compatibility mode.
+
+- Report Model/Editor owns an ordered block document with many text blocks and independent video blocks.
+- Media Pipeline owns project-local asset records and safe metadata/normalization states; it does not decide export inclusion globally.
+- Playback/Sync owns per-video-block single/comparison playback, in/out settings, source-local time/frame semantics, and block-local anchors.
+- Renderer/Export traverses video blocks, copies only referenced assets into self-contained folder/ZIP outputs, and never mutates originals or includes unused library assets.
+- Shell owns the project-root boundary, IPC/security, persistence/recovery, and job orchestration around these contracts.
+
+### Dependency graph and implementation order
+
+`Report Model/Editor block schema` → `MediaAsset references` → `Playback/Sync block runtime` → `Renderer/Preview contract` → `Referenced-set Export folder/ZIP` → `QA/human acceptance`.
+
+Each downstream owner must consume the upstream canonical contract; no owner may reintroduce fixed-form UI or infer export inclusion from the whole Media Library.
+
 目前狀態：**Phase 2 planning / ARCHITECTURE APPROVED BY USER（2026-08-14）**。使用者已選擇 Desktop application。本文件的高層架構 checkpoint 已解除；shell/framework、native media strategy 與 packaging 仍採可替換的 implementation decision，不得擴大產品 scope。
 
 ## 1. Product drivers

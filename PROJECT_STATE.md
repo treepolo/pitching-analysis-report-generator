@@ -1,5 +1,13 @@
 # Current Project State
 
+## Canonical scope/architecture decision (2026-08-14)
+
+- The former fixed-form/editor UI is superseded. It must not remain as an in-product compatibility mode; the canonical UI is a block-based long-form editor.
+- The canonical document contains many text blocks and independent video blocks. Each video block owns one/pair asset selection, single/comparison mode, layout, in/out/playback settings, and block-local sync.
+- Export copies only assets referenced by video blocks into self-contained folder/ZIP outputs; unused Media Library assets are excluded and originals remain untouched.
+- Dependency graph: Report Model/Editor defines block schema and persistence; Media Pipeline supplies project-local asset metadata/status; Playback/Sync consumes block-local video configuration; Renderer/Export derives the referenced set and portable output; Shell/QA owns security, recovery, and acceptance gates.
+- This is a planning decision only. Existing implementation evidence does not mark any requirement `VERIFIED`.
+
 ## Latest current provenance (2026-08-14)
 
 - Current Git state: `5bbd845551c00a31867aa300c2df643481acfeb1` on `worker/desktop-vertical-slice`; origin is `https://github.com/treepolo/pitching-analysis-report-generator.git`, and the remote branch SHA matches the local checkpoint; worktree clean.

@@ -1,5 +1,11 @@
 # Traceability Matrix
 
+## Canonical scope/architecture decision (2026-08-14)
+
+- The former fixed-form editor is superseded and is not a product compatibility mode. The canonical target is a block-based long-form editor with many text blocks and independent single/comparison video blocks.
+- Export inclusion is derived from video-block references only; unused Media Library assets are excluded and originals remain untouched.
+- The new target is planning scope only. Existing rows remain conservative and no requirement is `VERIFIED`.
+
 ## Latest current provenance (2026-08-14)
 
 - Current Git state: `5bbd845551c00a31867aa300c2df643481acfeb1` on `worker/desktop-vertical-slice`; origin is configured at `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches, and the worktree is clean.
@@ -61,6 +67,9 @@
 | GIT-003 | PROJECT_STATE | checkpoint/final gate | push, scan and no-force-push evidence | NOT_STARTED |
 | QA-001 | ACCEPTANCE_TESTS | AT-A through AT-G | complete scenario evidence | NOT_STARTED |
 | QA-002 | ACCEPTANCE_TESTS、TRACEABILITY_MATRIX | final gate | layered test/evidence/status audit | NOT_STARTED |
+
+| EDIT-004 | PRODUCT_REQUIREMENTS、UI_UX_SPEC、DATA_MODEL / Report Model | planned block-editor acceptance | many text/video blocks, reorder, reopen, focused text editing | NOT_STARTED |
+| EXPORT-004 | PRODUCT_REQUIREMENTS、REPORT_OUTPUT_SPEC、MEDIA_PIPELINE / Renderer + Export | planned referenced-set acceptance | unused-asset exclusion, original preservation, folder/ZIP parity | NOT_STARTED |
 
 ## Status audit rules
 

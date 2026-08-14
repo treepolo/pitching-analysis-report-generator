@@ -1,5 +1,12 @@
 # Desktop Vertical Slice Scope
 
+## Canonical scope supersession (2026-08-14)
+
+- The current fixed-form/minimal section editor is a historical implementation slice only. It is not the canonical product UI and must not be preserved as a compatibility mode.
+- The next canonical editor target is a block-based long-form canvas with many text blocks and independent single/comparison video blocks. Shared storage/security facts remain valid, but the editor/model/renderer owners must realign their implementation boundaries to this target.
+- Export target is `report.html` plus only video-block-referenced copied assets in a portable folder and ZIP; originals and unused Media Library assets remain out of the output.
+- This is a scope decision, not implementation evidence. Existing vertical-slice tests and runtime seams do not establish completion of the new target.
+
 這份文件是本輪 implementation handoff note，不改寫 canonical planning files 的 requirement status，也不把任何尚未有相稱 evidence 的需求標成 `VERIFIED`。
 
 目前可驗證的 slice：
