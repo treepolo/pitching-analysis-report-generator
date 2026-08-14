@@ -8,16 +8,23 @@
 
 ## Latest current provenance (2026-08-14)
 
-- Current Git state: `5bbd845551c00a31867aa300c2df643481acfeb1` on `worker/desktop-vertical-slice`; origin is configured at `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches, and the worktree is clean.
+- Current Git state: `4f83eb3161b2b54f3200f5c814cc2e973908c8b9` on `worker/desktop-vertical-slice`; origin is configured at `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches, and the worktree is clean.
 - Latest startup revisions: `dfef829` normalized the Windows launcher to ASCII/CRLF label/goto syntax; `5bbd845` added opt-in `disable-gpu`/`in-process-gpu` switches and `app.disableHardwareAcceleration()` before app ready.
 - Exact launch verification kept the batch-launched Electron process alive for more than 16 seconds without GPU fatal; `node --check src/main.js` and `git diff --check` passed. These results do not change any requirement row to `VERIFIED`.
-- Evidence provenance: 29 JavaScript `node --check` results, the existing `65 pass / 1 skip` `npm test`, and earlier app Electron smoke are previous-worker evidence. Fresh read-only QA reproduced only 18 pure tests.
+- Evidence provenance: Wave 2 regression reports 82 tests, 81 pass, 1 explicit Electron `file://` runtime skip, 0 failures; 30 JavaScript `node --check`; package/lock consistency; `git diff --check`; Electron smoke with block-editor/persistence/reopen/security gates; and referenced-video-only export tests. The `file://` runtime skip is unavailable evidence, not a pass.
 - QA gate: `CONDITIONAL FAIL / IN_PROGRESS`.
-- Unresolved evidence: real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G. GitHub Private remote is configured; no requirement is `VERIFIED`.
+- Integrated ancestry: `93ffb61` block editor, `56f7159` media lifecycle, `646df8a` block-local sync modes, `121d857` referenced-video-only export, and `4f83eb3` governance protocol. Unresolved evidence remains real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G. GitHub Private remote is configured and verified; no requirement is `VERIFIED`.
 
 目前狀態：**Phase 1/2 planning + implementation in progress**。本矩陣是 Requirement → Artifact → Test/Acceptance → Evidence → Status 的唯一追蹤入口。`fcaa4a6` 已提供部分 implementation/unit/fixture evidence，但沒有任何 requirement 因此改標 `VERIFIED`，也沒有 real-media、browser/file:// pass 或真人 evidence。
 
 ## Current integration checkpoint
+
+The historical checkpoint text below is superseded by this current Wave 2 reconciliation:
+
+- Revision: `4f83eb3161b2b54f3200f5c814cc2e973908c8b9` (`docs: define safe parallel development protocol`) after serial integration of `93ffb61`, `56f7159`, `646df8a`, and `121d857`.
+- Integrated scope: canonical block editor/report model, project-local media lifecycle, block-local sync semantics, report-contract allowlist parity, referenced-video-only export traversal, path/symlink guards, and deterministic folder/ZIP seams.
+- Evidence: 82 tests / 81 pass / 1 explicit Electron `file://` skip / 0 fail; 30 JS syntax checks; package/lock consistency; `git diff --check`; Electron smoke block-editor/persistence/reopen/security gates; and export referenced-set tests. The exported `file://` runtime remains unavailable.
+- Remaining product scope: real metadata/FFmpeg, actual player/anchors/sync runtime, exported folder/ZIP `file://` evidence, responsive human acceptance, and AT-A through AT-G. Requirement rows remain conservative and not `VERIFIED`.
 
 - Revision：`fcaa4a6 feat: integrate media tools and export runtime seams`（承接 app-facing/player checkpoint：`d941b5c`）。
 - Integrated scope：media contract/tool adapter/path and symlink checks、pure sync/player seam、shared report-contract allowlist parity、export renderer/layout/ZIP/atomic extraction/runtime-smoke seam，以及 project-root boundary tests。

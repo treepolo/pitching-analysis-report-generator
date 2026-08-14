@@ -10,12 +10,13 @@
 
 ## Latest current provenance (2026-08-14)
 
-- Current Git state: `5bbd845551c00a31867aa300c2df643481acfeb1` on `worker/desktop-vertical-slice`; origin is `https://github.com/treepolo/pitching-analysis-report-generator.git`, and the remote branch SHA matches the local checkpoint; worktree clean.
+- Current Git state: `4f83eb3161b2b54f3200f5c814cc2e973908c8b9` on `worker/desktop-vertical-slice`; origin is `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches the local checkpoint, and the worktree is clean.
 - Latest startup revisions: `dfef829 fix: normalize Windows launcher batch syntax` converted the launcher to ASCII/CRLF label/goto syntax; `5bbd845 fix: harden opt-in GPU startup fallback` added opt-in `disable-gpu`/`in-process-gpu` switches plus `app.disableHardwareAcceleration()` before app ready.
 - Exact launch evidence: `cmd.exe /d /c call start-pitching-report.bat` kept Electron running for more than 16 seconds without the GPU fatal; `node --check src/main.js` and `git diff --check` passed. This is runtime evidence for the opt-in launch path, not full product acceptance.
-- Evidence provenance: the existing `65 pass / 1 skip` `npm test`, 29 JavaScript `node --check` results, and earlier app Electron smoke output remain previous-worker evidence; no requirement is `VERIFIED`.
-- Fresh read-only QA reproduced only 18 pure tests. QA gate remains `CONDITIONAL FAIL / IN_PROGRESS`; no requirement is `VERIFIED`.
-- Remaining blockers: real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G remain incomplete. GitHub Private setup is no longer awaiting remote creation, but all product requirements remain conservative and unverified.
+- Wave 2 integration provenance: ancestry includes `93ffb61` block editor, `56f7159` media lifecycle, `646df8a` block-local sync modes, `121d857` referenced-video-only export, and `4f83eb3` parallel governance protocol. The latest checkpoint was pushed and verified with `git ls-remote`.
+- Current evidence: `npm test` reports 82 tests, 81 pass, 1 explicit Electron `file://` runtime skip, and 0 failures; 30 JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, Electron smoke, block-editor UI, persistence/reopen, bridge security, and referenced-asset export checks pass. The Electron exported `file://` runtime remains unavailable and is not treated as pass.
+- QA gate remains `CONDITIONAL FAIL / IN_PROGRESS`; no requirement is `VERIFIED`.
+- Remaining blockers: real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G remain incomplete. GitHub Private origin is configured and verified, but all product requirements remain conservative and unverified.
 
 這是本專案跨 Session / Agent 延續所需的最小 current state。治理方向以目前提供的 Layer 1 / Layer 2 為準；不要把本文件擴張成工程 SOP。
 

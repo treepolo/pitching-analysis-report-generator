@@ -9,16 +9,30 @@
 
 ## Latest current provenance (2026-08-14)
 
-- Current Git state: `5bbd845551c00a31867aa300c2df643481acfeb1` on `worker/desktop-vertical-slice`; origin is configured at `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches, and the worktree is clean.
+- Current Git state: `4f83eb3161b2b54f3200f5c814cc2e973908c8b9` on `worker/desktop-vertical-slice`; origin is configured at `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matches, and the worktree is clean.
 - Startup provenance: `dfef829` normalized the Windows launcher to ASCII/CRLF label/goto syntax; `5bbd845` added opt-in `disable-gpu`/`in-process-gpu` switches and `app.disableHardwareAcceleration()` before app ready.
 - Exact launch verification kept `cmd.exe /d /c call start-pitching-report.bat` alive for more than 16 seconds without GPU fatal; `node --check src/main.js` and `git diff --check` passed. This does not establish full product acceptance.
-- The existing `65 pass / 1 skip` `npm test`, 29 JavaScript syntax checks, and earlier app Electron smoke remain previous-worker evidence. Fresh read-only QA reproduced only 18 pure tests.
+- Wave 2 integrated ancestry: `93ffb61` block editor, `56f7159` media lifecycle, `646df8a` block-local sync modes, `121d857` referenced-video-only export, and `4f83eb3` parallel governance protocol.
+- Current regression evidence: `npm test` 82 total / 81 pass / 1 explicit Electron `file://` runtime skip / 0 fail; 30 JavaScript `node --check`; package/lock consistency; `git diff --check`; Electron smoke with block-editor, persistence/reopen, bridge-security, and responsive-gate assertions; and referenced-asset export tests. The exported `file://` runtime skip remains unavailable evidence, not a pass.
 - QA gate: `CONDITIONAL FAIL / IN_PROGRESS`. No requirement may be marked `VERIFIED`.
-- Remaining blockers: real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G remain incomplete. GitHub Private remote is configured, but requirements remain unverified.
+- Remaining blockers: real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G remain incomplete. GitHub Private remote is configured and verified, but requirements remain unverified.
 
 目前狀態：**Implementation in progress**。`bc0e004` 是歷史 Desktop project persistence/editor/preview baseline；Shell/Report Model hardening 在 `35c21a430b5c7a16ea065d542fec71a02c47b81b`，app-facing/player checkpoint 在 `d941b5c`，目前 media/sync/export integration checkpoint 是 `fcaa4a6`。沒有任何完整產品 requirement 可僅因程式存在而標 `VERIFIED`。
 
-## Current gates
+## Wave 2 integration gate override (current)
+
+The rows below contain historical checkpoints; this override is the current source for Wave 2 status. The integrated checkpoint is `4f83eb3161b2b54f3200f5c814cc2e973908c8b9` and origin/branch match it.
+
+| Gate | Current status | Current evidence |
+|---|---|---|
+| Desktop block-editor vertical slice | IN_PROGRESS | `93ffb61` app shell/report model/renderer, `56f7159` media lifecycle, `646df8a` block-local sync, `121d857` referenced-video-only export. |
+| Regression and contract checks | IN_PROGRESS | 82 tests / 81 pass / 1 explicit Electron `file://` skip / 0 fail; 30 JS syntax checks; package/lock consistency; diff check; smoke and referenced-set tests. |
+| Media/player/sync/export | IN_PROGRESS | Pure seams and security/path checks integrated; real media/FFmpeg, actual player/sync runtime, and exported `file://` runtime remain incomplete or unavailable. |
+| GitHub Private remote | CONFIGURED | `origin` is configured and `git ls-remote` matches local HEAD `4f83eb3`. |
+
+No requirement is `VERIFIED`. Human responsive evidence and AT-A through AT-G remain pending.
+
+## Historical gates (superseded by the Wave 2 integration gate override above)
 
 | Gate | Status | Evidence |
 |---|---|---|
