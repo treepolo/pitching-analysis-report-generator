@@ -18,9 +18,11 @@
 ## Current repository
 
 - Branch：`worker/desktop-vertical-slice`。
-- HEAD：`bc0e004 feat: add desktop project vertical slice`。
+- Shell/Report Model implementation handoff commit：`35c21a430b5c7a16ea065d542fec71a02c47b81b fix: harden report shell persistence boundaries`。
+- `bc0e004 feat: add desktop project vertical slice` 是本次 hardening 的 implementation baseline；本次 provenance reconciliation 另有 docs-only commit。
 - Recoverable pre-retrofit tag：`checkpoint/pre-governance-retrofit-2026-08-14`。
-- Local worktree 在治理換軌前為 clean；本地 checkpoint 可回復被刪除的舊治理檔案。
+- Tracked implementation files 在上述 commit 後無未提交修改；目前另有其他 owner 尚未整合的 untracked `src/export/`、`src/media/`、`src/sync/` 與對應 tests，本 worker 未修改、未 stage、未 commit。
+- 本地 checkpoint 可回復被刪除的舊治理檔案。
 
 ## Implemented slice
 
@@ -32,7 +34,7 @@
 - Single Video、Comparison Video、sync anchor、逐幀、不同 FPS/VFR 與 drift correction。
 - self-contained report folder、offline `file://`、ZIP/完整交付包、export consumer。
 - responsive 與 Scenario A–G 真人驗收。
-- IPC sender/source-frame hardening、symlink realpath containment、完整 persistence/recovery evidence 仍需 QA/implementation verification。
+- IPC sender/source-frame hardening 與 symlink realpath containment 已在 `35c21a4` 有 focused tests/smoke evidence；完整產品 persistence/recovery acceptance 仍未完成。
 - 沒有 requirement 可只因程式存在而標 `VERIFIED`。
 
 ## Execution
