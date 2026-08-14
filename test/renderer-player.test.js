@@ -10,14 +10,26 @@ const indexHtml = fs.readFileSync(path.join(repositoryRoot, 'src', 'index.html')
 const renderer = fs.readFileSync(path.join(repositoryRoot, 'src', 'renderer.js'), 'utf8');
 const styles = fs.readFileSync(path.join(repositoryRoot, 'src', 'styles.css'), 'utf8');
 
-test('renderer player UI exposes block-local controls and honest capability seams', () => {
+test('document shell exposes the frozen block-editor DOM contract', () => {
   for (const id of [
-    'single-video',
-    'single-fullscreen',
-    'comparison-left-video',
-    'comparison-right-video',
-    'comparison-left-fullscreen',
-    'comparison-right-fullscreen',
+    'document-command-bar',
+    'project-list',
+    'project-empty',
+    'editor-empty',
+    'editor',
+    'project-title',
+    'project-meta',
+    'block-canvas',
+    'block-section-target',
+    'add-text-block',
+    'add-editor-single-video',
+    'add-editor-comparison-video',
+    'import-text',
+    'import-media',
+    'save-project',
+    'save-state',
+    'root-path',
+    'app-error',
     'choose-export-directory',
     'export-directory-status',
     'export-kind',
@@ -25,16 +37,42 @@ test('renderer player UI exposes block-local controls and honest capability seam
     'export-cancel',
     'export-retry',
     'export-status',
+    'new-project',
+    'empty-new-project',
+    'new-project-dialog',
+    'new-project-form',
+    'new-project-name',
+    'import-text-dialog',
+    'import-text-name',
+    'import-text-preview',
+    'import-text-error',
+    'cancel-import-text',
+    'confirm-import-text',
   ]) {
     assert.match(indexHtml, new RegExp(`id="${id}"`, 'u'));
   }
-  assert.match(renderer, /data-block-action="open-player"/u);
+
+  for (const legacyId of ['media-library', 'player-panel', 'preview', 'section-list', 'project-picker']) {
+    assert.doesNotMatch(indexHtml, new RegExp(`id="${legacyId}"`, 'u'));
+  }
+  for (const legacyClass of [
+    'editor-grid',
+    'sidebar',
+    'topbar',
+    'media-panel',
+    'player-panel',
+    'preview-panel',
+  ]) {
+    assert.doesNotMatch(indexHtml, new RegExp(`class="(?:[^"]*\\s)?${legacyClass}(?:\\s|")`, 'u'));
+  }
+
+  assert.match(indexHtml, /id="document-command-bar"[\s\S]*id="project-list"[\s\S]*id="save-project"[\s\S]*id="export-report"/u);
+  assert.match(indexHtml, /<div id="block-canvas"[^>]*aria-label="Long-form document blocks"/u);
+  assert.doesNotMatch(indexHtml, /<video\b/u);
   assert.match(renderer, /resolveMediaSource\(state\.activeProject\.id, sideState\.assetId\)/u);
-  assert.match(renderer, /playerSegmentFor\(block, side, duration = null\)/u);
   assert.match(renderer, /syncMode === 'time'/u);
   assert.match(renderer, /Explicit frame mode/u);
   assert.match(renderer, /requestFullscreen/u);
-  assert.match(styles, /#comparison-player\[data-layout="stacked"\]/u);
   assert.match(renderer, /startExport\(request\)/u);
   assert.match(renderer, /pickExportDirectory/u);
   assert.match(renderer, /normalizeExportDirectoryPick/u);

@@ -4,160 +4,117 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' file:; object-src 'none'; base-uri 'none'; form-action 'self'" />
-    <title>投球動作分析報告產生器</title>
+    <title>投球分析報告</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">DESKTOP WORKSPACE</p>
-        <h1>投球動作分析報告產生器</h1>
-      </div>
-      <div class="topbar-actions">
-        <span id="save-state" class="save-state">尚未開啟專案</span>
-        <button id="save-project" class="button button-secondary" type="button" disabled>儲存</button>
+  <body class="document-app">
+    <header class="document-topbar">
+      <div class="brand-lockup">
+        <p class="eyebrow">PITCHING REPORT</p>
+        <span class="brand-name">Long-form studio</span>
       </div>
     </header>
 
     <p id="app-error" class="app-error" role="alert" hidden></p>
 
-    <main class="app-grid">
-      <aside class="sidebar panel">
-        <div class="panel-heading">
-          <div><p class="eyebrow">PROJECTS</p><h2>分析專案</h2></div>
-          <button id="new-project" class="icon-button" title="建立新專案">＋</button>
-        </div>
-        <div id="project-list" class="project-list"></div>
-        <p id="project-empty" class="empty-state">還沒有專案。<br />先建立一份報告開始。</p>
-        <p class="root-path-label">資料位置<br /><code id="root-path">讀取中…</code></p>
-      </aside>
-
-      <section class="workspace">
-        <div id="editor-empty" class="empty-workspace panel">
-          <p class="eyebrow">START HERE</p>
-          <h2>建立一份投球分析報告</h2>
-          <p>先保存可持續編輯的專案，之後再加入媒體、比較影片與同步點。</p>
-          <button id="empty-new-project" class="button button-primary" type="button">建立新專案</button>
+    <main class="document-shell">
+      <div id="document-command-bar" class="document-command-bar" role="toolbar" aria-label="Document commands">
+        <div class="command-group command-project-group">
+          <details class="project-control">
+            <summary>Documents</summary>
+            <div id="project-list" class="project-list" role="listbox" aria-label="Open document list"></div>
+            <p id="project-empty" class="empty-state">No documents yet.</p>
+          </details>
+          <button id="new-project" class="button button-secondary" type="button">New</button>
         </div>
 
-        <div id="editor" class="editor-layout panel" hidden>
-          <div class="editor-header">
-            <div><p class="eyebrow">EDITOR</p><h2 id="project-title">—</h2><p id="project-meta" class="muted">—</p></div>
-            <div class="editor-header-actions"><button id="import-text" class="button button-secondary" type="button" disabled>匯入 .txt / .md</button><span class="status-pill">Local-first</span></div>
-          </div>
-          <div class="block-editor-toolbar" aria-label="Block editor actions">
-            <label for="block-section-target">Section</label>
+        <div class="command-group command-block-group">
+          <label class="compact-control" for="block-section-target">Section
             <select id="block-section-target" disabled></select>
-            <button id="add-text-block" class="button button-secondary" type="button" disabled>Add text block</button>
-            <button id="add-editor-single-video" class="button button-secondary" type="button" disabled>Add single-video block</button>
-            <button id="add-editor-comparison-video" class="button button-secondary" type="button" disabled>Add comparison block</button>
-            <span id="block-editor-status" class="hint">Long-form block canvas</span>
-          </div>
-          <div id="block-canvas" class="block-canvas" aria-live="polite"></div>
-          <div class="editor-grid" hidden>
-            <nav id="section-list" class="section-list" aria-label="報告章節"></nav>
-            <div class="section-editor">
-              <label for="section-title">章節名稱</label>
-              <input id="section-title" type="text" />
-              <label for="section-content">分析內容</label>
-              <textarea id="section-content" rows="14" placeholder="在這裡撰寫分析內容…"></textarea>
-              <p class="hint">目前 slice 只支援文字編輯、保存與 renderer-only preview；媒體、同步與完整 export 將在後續切片接入。</p>
-            </div>
-          </div>
+          </label>
+          <button id="import-text" class="button button-quiet" type="button" disabled>Import .txt / .md</button>
+          <button id="import-media" class="button button-quiet" type="button" disabled>Import media</button>
+          <button id="add-text-block" class="button button-quiet" type="button" disabled>+ Text</button>
+          <button id="add-editor-single-video" class="button button-quiet" type="button" disabled>+ Video</button>
+          <button id="add-editor-comparison-video" class="button button-quiet" type="button" disabled>+ Compare</button>
         </div>
 
-    <section id="media-library" class="media-panel panel" hidden>
-      <div class="panel-heading"><div><p class="eyebrow">MEDIA LIBRARY</p><h2>專案媒體</h2></div><button id="import-media" class="button button-secondary" type="button" disabled>匯入圖片 / 影片</button></div>
-      <p id="media-status" class="hint">尚未載入媒體。</p>
-      <div id="media-list" class="media-list"></div>
-    </section>
+        <div class="command-group command-save-group">
+          <span id="save-state" class="save-state">Ready</span>
+          <button id="save-project" class="button button-primary" type="button" disabled>Save</button>
+        </div>
 
-        <section id="player-panel" class="player-panel panel" hidden>
-          <div class="panel-heading"><div><p class="eyebrow">PLAYBACK / SYNC</p><h2>影片播放器與同步</h2></div><span id="player-capability" class="status-pill status-planned">尚未載入影片</span></div>
-          <p id="player-status" class="hint" role="status">尚未載入影片；請先匯入專案媒體。</p>
-          <div class="player-block-toolbar">
-            <label for="player-block-select">Player block</label>
-            <select id="player-block-select" disabled><option value="">尚未建立 player block</option></select>
-            <button id="add-single-video" class="button button-secondary" type="button" disabled>新增單影片</button>
-            <button id="add-comparison-video" class="button button-secondary" type="button" disabled>新增兩影片比較</button>
-          </div>
-          <p id="player-empty" class="player-empty">沒有可播放影片；不會以 fixture 或假資料冒充載入成功。</p>
-
-          <div id="single-player" class="player-runtime" hidden>
-            <div class="player-video-frame"><video id="single-video" playsinline preload="metadata"></video><button id="single-fullscreen" class="video-fullscreen-button" type="button" disabled>Fullscreen</button></div>
-            <p id="single-video-status" class="player-video-status" role="status">尚未載入來源。</p>
-            <div class="player-controls" data-player-side="single">
-              <button id="single-play" class="button button-secondary" type="button" disabled>播放</button>
-              <button id="single-pause" class="button button-secondary" type="button" disabled>暫停</button>
-              <button id="single-prev" class="button button-secondary" type="button" disabled>上一幀</button>
-              <button id="single-next" class="button button-secondary" type="button" disabled>下一幀</button>
-              <label class="player-range-label" for="single-seek">Seek <input id="single-seek" type="range" min="0" max="0" step="0.001" value="0" disabled /></label>
-              <output id="single-time" class="player-time">0.00s</output>
-              <label for="single-rate">速度</label><select id="single-rate" disabled><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>
-              <label class="checkbox-label"><input id="single-loop" type="checkbox" disabled /> 循環</label>
-              <button id="single-anchor" class="button button-primary" type="button" disabled>設為同步點</button>
-            </div>
-            <p id="single-sync-status" class="hint">單影片 anchor 會保存於此 block；精度依實際播放器能力顯示。</p>
-          </div>
-
-          <div id="comparison-player" class="player-runtime" hidden>
-            <div class="comparison-runtime-grid">
-              <article class="comparison-side" data-comparison-side="left">
-                <h3>左側影片</h3><div class="player-video-frame"><video id="comparison-left-video" playsinline preload="metadata"></video></div>
-                <p id="comparison-left-video-status" class="player-video-status" role="status">尚未載入來源。</p>
-                <div class="player-controls player-controls-compact"><button id="comparison-left-play" class="button button-secondary" type="button" disabled>播放</button><button id="comparison-left-pause" class="button button-secondary" type="button" disabled>暫停</button><button id="comparison-left-prev" class="button button-secondary" type="button" disabled>上一幀</button><button id="comparison-left-next" class="button button-secondary" type="button" disabled>下一幀</button><label class="player-range-label" for="comparison-left-seek">Seek <input id="comparison-left-seek" type="range" min="0" max="0" step="0.001" value="0" disabled /></label><output id="comparison-left-time" class="player-time">0.00s</output><label class="checkbox-label"><input id="comparison-left-loop" type="checkbox" disabled /> 循環</label><button id="comparison-left-anchor" class="button button-primary" type="button" disabled>設左側同步點</button></div>
-              </article>
-              <article class="comparison-side" data-comparison-side="right">
-                <h3>右側影片</h3><div class="player-video-frame"><video id="comparison-right-video" playsinline preload="metadata"></video></div>
-                <p id="comparison-right-video-status" class="player-video-status" role="status">尚未載入來源。</p>
-                <div class="player-controls player-controls-compact"><button id="comparison-right-play" class="button button-secondary" type="button" disabled>播放</button><button id="comparison-right-pause" class="button button-secondary" type="button" disabled>暫停</button><button id="comparison-right-prev" class="button button-secondary" type="button" disabled>上一幀</button><button id="comparison-right-next" class="button button-secondary" type="button" disabled>下一幀</button><label class="player-range-label" for="comparison-right-seek">Seek <input id="comparison-right-seek" type="range" min="0" max="0" step="0.001" value="0" disabled /></label><output id="comparison-right-time" class="player-time">0.00s</output><label class="checkbox-label"><input id="comparison-right-loop" type="checkbox" disabled /> 循環</label><button id="comparison-right-anchor" class="button button-primary" type="button" disabled>設右側同步點</button></div>
-              </article>
-            </div>
-            <div class="comparison-fullscreen-actions"><button id="comparison-left-fullscreen" class="button button-secondary" type="button" disabled>Fullscreen left</button><button id="comparison-right-fullscreen" class="button button-secondary" type="button" disabled>Fullscreen right</button></div>
-            <div class="comparison-actions"><button id="comparison-play" class="button button-secondary" type="button" disabled>同步播放</button><button id="comparison-pause" class="button button-secondary" type="button" disabled>同步暫停</button><label for="comparison-rate">同步速度</label><select id="comparison-rate" disabled><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><button id="comparison-align-zero" class="button button-primary" type="button" disabled>回到相對時間 0</button></div>
-            <p id="comparison-sync-status" class="hint">兩側都設定同步點後，seek 會依 relative time 對齊；沒有 anchor 時只揭露 unknown，不會假裝已同步。</p>
-          </div>
-        </section>
-
-        <section class="preview-panel panel">
-          <div class="panel-heading"><div><p class="eyebrow">PREVIEW</p><h2>報告預覽</h2></div><span class="status-pill status-planned">Renderer-only · Export seam</span></div>
-          <div id="preview" class="preview-surface"></div>
-          <div class="preview-export-actions">
-            <button id="choose-export-directory" class="button button-secondary" type="button" disabled>Choose output folder</button>
-            <label for="export-kind">Output</label>
+        <div class="command-group export-command-group">
+          <button id="choose-export-directory" class="button button-quiet" type="button" disabled>Choose folder</button>
+          <label class="compact-control" for="export-kind">Export
             <select id="export-kind" disabled>
               <option value="folder">Folder</option>
               <option value="zip">ZIP</option>
             </select>
-            <button id="export-report" class="button button-secondary" type="button" disabled aria-label="Export report">Export report</button>
-            <button id="export-cancel" class="button button-secondary" type="button" hidden>Cancel</button>
-            <button id="export-retry" class="button button-secondary" type="button" hidden>Retry</button>
+          </label>
+          <button id="export-report" class="button button-secondary" type="button" disabled>Export</button>
+          <button id="export-cancel" class="button button-quiet" type="button" hidden>Cancel</button>
+          <button id="export-retry" class="button button-quiet" type="button" hidden>Retry</button>
+        </div>
+      </div>
+
+      <section id="editor-empty" class="empty-document" aria-live="polite">
+        <p class="eyebrow">YOUR REPORT</p>
+        <h1>Start with a blank page.</h1>
+        <p>Create a report, then write directly into text blocks and place video cards wherever the story needs them.</p>
+        <button id="empty-new-project" class="button button-primary" type="button">Create document</button>
+      </section>
+
+      <section id="editor" class="document-editor" hidden>
+        <header class="document-header">
+          <div>
+            <p class="eyebrow">REPORT DOCUMENT</p>
+            <h1 id="project-title">Untitled report</h1>
+            <p id="project-meta" class="document-meta">Local-first document</p>
           </div>
-          <p id="export-directory-status" class="export-directory-status hint" role="status">Project output folder is the default.</p>
-          <p id="export-status" class="export-status hint" role="status">Export is unavailable until a project is open.</p>
-        </section>
+          <div class="document-header-meta">
+            <span id="block-editor-status" class="document-count">0 blocks</span>
+            <span class="status-pill">Local-first</span>
+          </div>
+        </header>
+
+        <div class="document-status-row">
+          <span id="root-path" class="document-root">Project root</span>
+          <span id="export-directory-status" class="export-directory-status" role="status">Project output folder is the default.</span>
+          <span id="export-status" class="export-status" role="status">Exports are ready when a document is open.</span>
+        </div>
+
+        <div id="block-canvas" class="document-canvas" aria-live="polite" aria-label="Long-form document blocks"></div>
       </section>
     </main>
 
     <dialog id="new-project-dialog">
       <form id="new-project-form" method="dialog" class="dialog-card">
-        <p class="eyebrow">NEW PROJECT</p>
-        <h2>建立分析專案</h2>
-        <label for="new-project-name">報告顯示名稱</label>
-        <input id="new-project-name" name="displayName" required maxlength="120" placeholder="例如：王小明｜投球動作分析" />
-        <div class="dialog-actions"><button type="button" data-close-dialog class="button button-secondary">取消</button><button type="submit" class="button button-primary">建立</button></div>
+        <p class="eyebrow">NEW DOCUMENT</p>
+        <h2>Create a report</h2>
+        <label for="new-project-name">Document name</label>
+        <input id="new-project-name" name="displayName" required maxlength="120" placeholder="Pitch review" />
+        <div class="dialog-actions">
+          <button type="button" data-close-dialog class="button button-quiet">Cancel</button>
+          <button type="submit" class="button button-primary">Create</button>
+        </div>
       </form>
     </dialog>
+
     <dialog id="import-text-dialog">
       <div class="dialog-card">
-        <p class="eyebrow">TEXT IMPORT PREVIEW</p>
-        <h2>確認匯入文字</h2>
+        <p class="eyebrow">TEXT IMPORT</p>
+        <h2>Review imported text</h2>
         <p id="import-text-name" class="muted">—</p>
         <pre id="import-text-preview" class="import-preview"></pre>
         <p id="import-text-error" class="app-error" role="alert" hidden></p>
-        <div class="dialog-actions"><button id="cancel-import-text" type="button" class="button button-secondary">取消</button><button id="confirm-import-text" type="button" class="button button-primary">匯入到目前 section</button></div>
+        <div class="dialog-actions">
+          <button id="cancel-import-text" type="button" class="button button-quiet">Cancel</button>
+          <button id="confirm-import-text" type="button" class="button button-primary">Insert block</button>
+        </div>
       </div>
     </dialog>
+
     <script src="./report-contract.js"></script>
     <script src="./renderer.js"></script>
   </body>
