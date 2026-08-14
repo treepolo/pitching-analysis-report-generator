@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'" />
+    <title>投球動作分析報告產生器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">DESKTOP WORKSPACE</p>
+        <h1>投球動作分析報告產生器</h1>
+      </div>
+      <div class="topbar-actions">
+        <span id="save-state" class="save-state">尚未開啟專案</span>
+        <button id="save-project" class="button button-secondary" type="button" disabled>儲存</button>
+      </div>
+    </header>
+
+    <p id="app-error" class="app-error" role="alert" hidden></p>
+
+    <main class="app-grid">
+      <aside class="sidebar panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">PROJECTS</p><h2>分析專案</h2></div>
+          <button id="new-project" class="icon-button" title="建立新專案">＋</button>
+        </div>
+        <div id="project-list" class="project-list"></div>
+        <p id="project-empty" class="empty-state">還沒有專案。<br />先建立一份報告開始。</p>
+        <p class="root-path-label">資料位置<br /><code id="root-path">讀取中…</code></p>
+      </aside>
+
+      <section class="workspace">
+        <div id="editor-empty" class="empty-workspace panel">
+          <p class="eyebrow">START HERE</p>
+          <h2>建立一份投球分析報告</h2>
+          <p>先保存可持續編輯的專案，之後再加入媒體、比較影片與同步點。</p>
+          <button id="empty-new-project" class="button button-primary" type="button">建立新專案</button>
+        </div>
+
+        <div id="editor" class="editor-layout panel" hidden>
+          <div class="editor-header">
+            <div><p class="eyebrow">EDITOR</p><h2 id="project-title">—</h2><p id="project-meta" class="muted">—</p></div>
+            <span class="status-pill">Local-first</span>
+          </div>
+          <div class="editor-grid">
+            <nav id="section-list" class="section-list" aria-label="報告章節"></nav>
+            <div class="section-editor">
+              <label for="section-title">章節名稱</label>
+              <input id="section-title" type="text" />
+              <label for="section-content">分析內容</label>
+              <textarea id="section-content" rows="14" placeholder="在這裡撰寫分析內容…"></textarea>
+              <p class="hint">目前 slice 只支援文字編輯、保存與 renderer-only preview；媒體、同步與完整 export 將在後續切片接入。</p>
+            </div>
+          </div>
+        </div>
+
+        <section class="preview-panel panel">
+          <div class="panel-heading"><div><p class="eyebrow">PREVIEW</p><h2>報告預覽</h2></div><span class="status-pill status-planned">Renderer-only preview</span></div>
+          <div id="preview" class="preview-surface"></div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="new-project-dialog">
+      <form id="new-project-form" method="dialog" class="dialog-card">
+        <p class="eyebrow">NEW PROJECT</p>
+        <h2>建立分析專案</h2>
+        <label for="new-project-name">報告顯示名稱</label>
+        <input id="new-project-name" name="displayName" required maxlength="120" placeholder="例如：王小明｜投球動作分析" />
+        <div class="dialog-actions"><button type="button" data-close-dialog class="button button-secondary">取消</button><button type="submit" class="button button-primary">建立</button></div>
+      </form>
+    </dialog>
+    <script src="./report-contract.js"></script>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

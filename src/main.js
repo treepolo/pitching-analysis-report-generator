@@ -1,0 +1,329 @@
+'use strict';
+
+const { app, BrowserWindow, ipcMain } = require('electron');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const {
+  createProjectStore,
+  isPathInside,
+  validateProjectRoot,
+} = require('./storage');
+
+const APP_ROOT = path.resolve(app.getAppPath());
+const configuredProjectRoot = process.env.PITCHING_PROJECT_ROOT;
+const isSmokeMode = process.env.PITCHING_SMOKE === '1' || process.argv.includes('--smoke');
+const smokeProjectRoot = isSmokeMode && !configuredProjectRoot
+  ? path.join(APP_ROOT, '.tmp', `electron-smoke-${process.pid}`)
+  : null;
+const PROJECT_ROOT = configuredProjectRoot
+  ? path.resolve(configuredProjectRoot)
+  : smokeProjectRoot || APP_ROOT;
+const APP_ENTRY_URL = pathToFileURL(path.join(__dirname, 'index.html')).href;
+const closeGuards = new WeakMap();
+
+if (!isPathInside(APP_ROOT, PROJECT_ROOT)) {
+  throw new Error('PITCHING_PROJECT_ROOT must stay inside the application project root');
+}
+
+if (isSmokeMode) app.disableHardwareAcceleration();
+
+const projectStore = createProjectStore(PROJECT_ROOT, { boundaryRoot: APP_ROOT });
+
+function assertTrustedSender(event) {
+  const sender = event?.sender;
+  const senderFrame = event?.senderFrame;
+  const senderWindow = sender ? BrowserWindow.fromWebContents(sender) : null;
+  if (!sender || sender.isDestroyed() || !senderWindow || senderWindow.isDestroyed()) {
+    throw new Error('Untrusted IPC sender');
+  }
+  if (!senderFrame || senderFrame !== sender.mainFrame || senderFrame.url !== APP_ENTRY_URL) {
+    throw new Error('Untrusted IPC frame');
+  }
+  return senderWindow;
+}
+
+function registerIpc() {
+  ipcMain.handle('project:list', (event) => {
+    assertTrustedSender(event);
+    return projectStore.listProjects();
+  });
+  ipcMain.handle('project:create', (event, displayName) => {
+    assertTrustedSender(event);
+    return projectStore.createProject(displayName);
+  });
+  ipcMain.handle('project:open', (event, projectId) => {
+    assertTrustedSender(event);
+    return projectStore.openProject(projectId);
+  });
+  ipcMain.handle('project:save', (event, project) => {
+    assertTrustedSender(event);
+    return projectStore.saveProject(project);
+  });
+  ipcMain.handle('app:info', (event) => {
+    assertTrustedSender(event);
+    return {
+      projectRoot: projectStore.root,
+      projectsRoot: projectStore.projectsRoot,
+    };
+  });
+  ipcMain.on('app:close-ready', (event) => {
+    try {
+      const senderWindow = assertTrustedSender(event);
+      const guard = closeGuards.get(senderWindow);
+      if (!guard) return;
+      guard.allowClose = true;
+      senderWindow.close();
+    } catch {
+      // Ignore untrusted close signals; the guarded window remains open.
+    }
+  });
+  ipcMain.on('app:close-failed', (event) => {
+    try {
+      const senderWindow = assertTrustedSender(event);
+      const guard = closeGuards.get(senderWindow);
+      if (guard) guard.requestPending = false;
+    } catch {
+      // Ignore untrusted close signals; the guarded window remains open.
+    }
+  });
+}
+
+function browserWindowOptions() {
+  return {
+    width: 1280,
+    height: 820,
+    minWidth: 880,
+    minHeight: 600,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  };
+}
+
+function createWindow({ show = true } = {}) {
+  const window = new BrowserWindow({ ...browserWindowOptions(), show });
+  closeGuards.set(window, { allowClose: false, requestPending: false });
+  window.setMenuBarVisibility(false);
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event, navigationUrl) => {
+    if (navigationUrl !== APP_ENTRY_URL) event.preventDefault();
+  });
+  window.on('close', (event) => {
+    const guard = closeGuards.get(window);
+    if (!guard || guard.allowClose) return;
+    if (window.webContents.isDestroyed() || window.webContents.isLoading()) {
+      guard.allowClose = true;
+      return;
+    }
+    event.preventDefault();
+    if (!guard.requestPending) {
+      guard.requestPending = true;
+      window.webContents.send('app:flush-before-close');
+    }
+  });
+  if (isSmokeMode) {
+    window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+      console.error(`[electron-smoke] did-fail-load ${errorCode} ${errorDescription} ${validatedURL}`);
+    });
+    window.webContents.on('render-process-gone', (_event, details) => {
+      console.error(`[electron-smoke] render-process-gone ${JSON.stringify(details)}`);
+    });
+    window.webContents.on('console-message', (_event, _level, message, line, sourceId) => {
+      console.log(`[electron-smoke] console ${sourceId}:${line} ${message}`);
+    });
+  }
+  window.loadPromise = window.loadFile(path.join(__dirname, 'index.html'));
+  return window;
+}
+
+function closeWindowAndWait(window) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('window did not finish close flush'));
+    }, 10_000);
+    window.once('closed', () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+    window.close();
+  });
+}
+
+async function runElectronSmoke() {
+  let window = createWindow({ show: false });
+  try {
+    await window.loadPromise;
+    const smokeName = `Electron smoke ${Date.now()}`;
+    const smokeScript = `
+      (async () => {
+        const expectedRoot = ${JSON.stringify(PROJECT_ROOT)};
+        const displayName = ${JSON.stringify(smokeName)};
+        const info = await window.pitchingApp.getAppInfo();
+        if (typeof window.pitchingApp !== 'object' || typeof require !== 'undefined' || typeof process !== 'undefined') {
+          throw new Error('renderer bridge is not isolated');
+        }
+        if (info.projectRoot !== expectedRoot) throw new Error('project root mismatch');
+
+        const waitFor = async (predicate, message) => {
+          for (let attempt = 0; attempt < 40; attempt += 1) {
+            if (predicate()) return;
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          throw new Error(message);
+        };
+
+        document.querySelector('#new-project').click();
+        const nameField = document.querySelector('#new-project-name');
+        const form = document.querySelector('#new-project-form');
+        if (!nameField || !form) throw new Error('new project form is missing');
+        nameField.value = displayName;
+        form.requestSubmit();
+        await waitFor(
+          () => document.querySelectorAll('[data-project-id]').length === 1,
+          'created project is not listed in the renderer',
+        );
+
+        const projectButton = document.querySelector('[data-project-id]');
+        const createdId = projectButton && projectButton.dataset.projectId;
+        if (!createdId) throw new Error('created project id is missing from the project list');
+        await waitFor(
+          () => document.querySelector('.project-card.is-active')?.dataset.projectId === createdId
+            && !document.querySelector('#section-title').disabled,
+          'created project did not open in the renderer',
+        );
+
+        const listed = await window.pitchingApp.listProjects();
+        if (!listed.some((project) => project.id === createdId)) throw new Error('created project is not listed');
+
+        const opened = await window.pitchingApp.openProject(createdId);
+        opened.sections[0].title = 'Smoke section';
+        opened.sections[0].blocks[0].content = 'Saved through Electron IPC';
+        await window.pitchingApp.saveProject(opened);
+
+        const sectionTitle = document.querySelector('#section-title');
+        const sectionContent = document.querySelector('#section-content');
+        if (!sectionTitle || !sectionContent) throw new Error('editor fields are missing');
+        sectionTitle.value = 'Autosaved section';
+        sectionTitle.dispatchEvent(new Event('input', { bubbles: true }));
+        sectionContent.value = 'Saved through renderer autosave';
+        sectionContent.dispatchEvent(new Event('input', { bubbles: true }));
+        await waitFor(
+          () => document.querySelector('#save-state')?.dataset.state === 'dirty',
+          'renderer did not mark the project dirty',
+        );
+        await waitFor(
+          () => document.querySelector('#save-state')?.textContent === '已儲存',
+          'renderer autosave did not finish',
+        );
+
+        const autosaved = await window.pitchingApp.openProject(createdId);
+        if (autosaved.sections[0].title !== 'Autosaved section') throw new Error('autosaved section title did not persist');
+        if (autosaved.sections[0].blocks[0].content !== 'Saved through renderer autosave') throw new Error('autosaved section content did not persist');
+
+        const explicitSnapshot = await window.pitchingApp.openProject(createdId);
+        explicitSnapshot.sections[0].title = 'Explicit saved section';
+        explicitSnapshot.sections[0].blocks[0].content = 'Saved through explicit save';
+        await window.pitchingApp.saveProject(explicitSnapshot);
+
+        const explicitlySaved = await window.pitchingApp.openProject(createdId);
+        if (explicitlySaved.sections[0].title !== 'Explicit saved section') throw new Error('explicit section title did not persist');
+        if (explicitlySaved.sections[0].blocks[0].content !== 'Saved through explicit save') throw new Error('explicit section content did not persist');
+
+        sectionTitle.value = 'Close flush section';
+        sectionTitle.dispatchEvent(new Event('input', { bubbles: true }));
+        sectionContent.value = 'Saved while closing the application';
+        sectionContent.dispatchEvent(new Event('input', { bubbles: true }));
+        await waitFor(
+          () => document.querySelector('#save-state')?.dataset.state === 'dirty',
+          'renderer did not mark close-flush changes dirty',
+        );
+
+        let invalidProjectRejected = false;
+        try { await window.pitchingApp.openProject('../outside'); } catch { invalidProjectRejected = true; }
+        if (!invalidProjectRejected) throw new Error('invalid project id was accepted');
+
+        return {
+          projectId: createdId,
+          projectRoot: info.projectRoot,
+          projectFile: info.projectsRoot + '/' + createdId + '/project.json',
+          autosaveVerified: true,
+          explicitSaveVerified: true,
+          bridgeSecurityVerified: true,
+          invalidProjectRejected,
+        };
+      })()
+    `;
+    const result = await window.webContents.executeJavaScript(smokeScript, true);
+    await closeWindowAndWait(window);
+
+    window = createWindow({ show: false });
+    await window.loadPromise;
+    const reopened = await window.webContents.executeJavaScript(`
+      window.pitchingApp.openProject(${JSON.stringify(result.projectId)})
+    `, true);
+    if (reopened.sections[0].title !== 'Close flush section') {
+      throw new Error('project did not reopen with the close-flushed title');
+    }
+    if (reopened.sections[0].blocks[0].content !== 'Saved while closing the application') {
+      throw new Error('project did not reopen with the close-flushed content');
+    }
+
+    const projectFile = path.join(projectStore.projectDirectory(result.projectId), 'project.json');
+    const projectFileStat = await fs.stat(projectFile);
+    if (!projectFileStat.isFile() || !isPathInside(projectStore.projectsRoot, projectFile)) {
+      throw new Error('project file escaped the projects boundary');
+    }
+    return { ...result, closeFlushVerified: true, reopenVerified: true };
+  } finally {
+    if (!window.isDestroyed()) window.destroy();
+  }
+}
+
+app.whenReady().then(async () => {
+  try {
+    await validateProjectRoot(PROJECT_ROOT, APP_ROOT);
+  } catch (error) {
+    console.error(`[app] invalid project root: ${error.message}`);
+    if (smokeProjectRoot) await fs.rm(smokeProjectRoot, { recursive: true, force: true }).catch(() => {});
+    process.exitCode = 1;
+    process.exit(1);
+    return;
+  }
+
+  registerIpc();
+
+  if (isSmokeMode) {
+    let exitCode = 0;
+    try {
+      const result = await runElectronSmoke();
+      console.log(`[electron-smoke] ${JSON.stringify(result)}`);
+    } catch (error) {
+      console.error(`[electron-smoke] ${error.message}`);
+      exitCode = 1;
+    } finally {
+      if (smokeProjectRoot) {
+        try {
+          await fs.rm(smokeProjectRoot, { recursive: true, force: true });
+        } catch (error) {
+          console.error(`[electron-smoke] cleanup failed: ${error.message}`);
+          exitCode = 1;
+        }
+      }
+      process.exitCode = exitCode;
+      process.exit(exitCode);
+    }
+    return;
+  }
+
+  createWindow();
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
