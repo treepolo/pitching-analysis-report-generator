@@ -78,6 +78,7 @@ test('exports a self-contained folder and deterministic ZIP seam without leaking
         displayName: 'pitch clip.mp4',
       },
       { id: 'frame', kind: 'image', data: Buffer.from('image-fixture-content'), displayName: 'release frame.png' },
+      { id: 'unused', kind: 'video', data: Buffer.from('unused-fixture-content'), displayName: 'unused.mp4' },
     ],
   });
 
@@ -85,34 +86,39 @@ test('exports a self-contained folder and deterministic ZIP seam without leaking
   assert.equal(result.validation.valid, true);
   assert.equal(result.validation.assetCount, 2);
   assert.equal(result.validation.fileUrlValidation.valid, true);
+  assert.equal(result.validation.fileUrlValidation.htmlFileName, 'report.html');
+  assert.match(result.validation.fileUrlValidation.htmlFileUrl, /^file:\/\//u);
   assert.match(result.validation.fileUrlValidation.indexFileUrl, /^file:\/\//u);
   assert.equal(result.validation.manifestValidation.valid, true);
   assert.ok(result.zipPath);
   assert.equal(result.zip.parity.valid, true);
-  assert.equal(await fs.stat(path.join(result.folderPath, 'index.html')).then((stats) => stats.isFile()), true);
+  assert.equal(await fs.stat(path.join(result.folderPath, 'report.html')).then((stats) => stats.isFile()), true);
   assert.equal(await fs.stat(path.join(result.folderPath, 'videos')).then((stats) => stats.isDirectory()), true);
   assert.equal(await fs.stat(path.join(result.folderPath, 'images')).then((stats) => stats.isDirectory()), true);
 
-  const indexHtml = await fs.readFile(path.join(result.folderPath, 'index.html'), 'utf8');
-  assert.match(indexHtml, /videos\/pitch-clip\.mp4/u);
-  assert.match(indexHtml, /images\/release-frame\.png/u);
+  const reportHtml = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
+  assert.match(reportHtml, /videos\/pitch-clip\.mp4/u);
+  assert.match(reportHtml, /images\/release-frame\.png/u);
+  assert.doesNotMatch(reportHtml, /unused\.mp4/u);
   const manifestText = await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8');
   assert.doesNotMatch(manifestText, new RegExp(sourceVideo.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
   const manifest = JSON.parse(manifestText);
   assert.equal(manifest.validation.valid, true);
   assert.equal(manifest.assets.length, 2);
-  assert.equal(manifest.files.some((file) => file.relativePath === 'index.html'), true);
+  assert.equal(manifest.files.some((file) => file.relativePath === 'report.html'), true);
+  assert.equal(manifest.assets.some((asset) => asset.id === 'unused'), false);
 
   const sourceVideoAfter = await fs.readFile(sourceVideo);
   assert.deepEqual(sourceVideoAfter, sourceVideoBefore);
 
   const zipBuffer = await fs.readFile(result.zipPath);
   const zipEntries = readZipEntries(zipBuffer);
-  assert.equal(zipEntries.has('index.html'), true);
+  assert.equal(zipEntries.has('report.html'), true);
   assert.equal(zipEntries.has('export-manifest.json'), true);
   assert.equal(zipEntries.has('videos/pitch-clip.mp4'), true);
   assert.equal(zipEntries.has('images/release-frame.png'), true);
-  assert.deepEqual(zipEntries.get('index.html'), Buffer.from(indexHtml));
+  assert.equal(zipEntries.has('videos/unused.mp4'), false);
+  assert.deepEqual(zipEntries.get('report.html'), Buffer.from(reportHtml));
   assert.deepEqual(zipEntries.get('videos/pitch-clip.mp4'), sourceVideoBefore);
 });
 
@@ -136,6 +142,28 @@ test('does not create a final folder when a referenced asset is missing', async 
   assert.deepEqual(entries, []);
 });
 
+test('ignores unused library descriptors, including invalid source paths', async () => {
+  const outputRoot = path.join(testRoot, 'unused-descriptor-output');
+  const result = await exportReport({
+    projectRoot: testRoot,
+    outputDirectory: outputRoot,
+    reportName: 'Used asset only',
+    reportDocument: {
+      schemaVersion: 1,
+      title: 'Used asset only',
+      sections: [{ blocks: [{ type: 'singleVideo', mediaAssetId: 'used' }] }],
+    },
+    assets: [
+      { id: 'used', kind: 'video', data: Buffer.from('used-video'), displayName: 'used.mp4' },
+      { id: 'unused', kind: 'video', sourcePath: 'https://example.test/private.mp4' },
+    ],
+  });
+
+  assert.deepEqual(result.manifest.assets.map((asset) => asset.id), ['used']);
+  assert.equal(await fs.stat(path.join(result.folderPath, 'videos', 'used.mp4')).then((stats) => stats.isFile()), true);
+  await assert.rejects(fs.stat(path.join(result.folderPath, 'videos', 'private.mp4')), /ENOENT/u);
+});
+
 test('keeps repeated folder and ZIP exports byte-identical for the same canonical document', async () => {
   const reportDocument = {
     schemaVersion: 1,
@@ -145,14 +173,14 @@ test('keeps repeated folder and ZIP exports byte-identical for the same canonica
       blocks: [{ type: 'rich-text', content: 'Stable output' }],
     }, {
       title: 'Frame',
-      blocks: [{ type: 'image', imageAssetId: 'frame', alt: 'Stable frame' }],
+      blocks: [{ type: 'singleVideo', mediaAssetId: 'frame', label: 'Stable frame' }],
     }],
   };
   const assets = [{
     id: 'frame',
-    kind: 'image',
+    kind: 'video',
     data: Buffer.from('stable-image-fixture'),
-    displayName: 'stable frame.png',
+    displayName: 'stable-frame.mp4',
   }];
   const first = await exportReport({
     projectRoot: testRoot,
@@ -184,7 +212,7 @@ test('rejects source assets outside the project root before export', async () =>
       reportDocument: {
         schemaVersion: 1,
         title: 'Outside source report',
-        sections: [{ blocks: [{ type: 'image', mediaAssetId: 'outside' }] }],
+        sections: [{ blocks: [{ type: 'singleVideo', mediaAssetId: 'outside' }] }],
       },
       assets: [{ id: 'outside', kind: 'image', sourcePath: path.join(repositoryRoot, 'package.json') }],
     }),
@@ -208,7 +236,7 @@ test('rejects absolute and external source references before staging', async () 
         reportDocument: {
           schemaVersion: 1,
           title: `${name} source report`,
-          sections: [{ blocks: [{ type: 'image', imageAssetId: name }] }],
+          sections: [{ blocks: [{ type: 'singleVideo', mediaAssetId: name }] }],
         },
         assets: [{ id: name, kind: 'image', sourcePath }],
       }),
@@ -238,9 +266,9 @@ test('rejects symlink source assets when the platform permits symlink creation',
       reportDocument: {
         schemaVersion: 1,
         title: 'Symlink source report',
-        sections: [{ blocks: [{ type: 'image', mediaAssetId: 'linked' }] }],
+        sections: [{ blocks: [{ type: 'singleVideo', mediaAssetId: 'linked' }] }],
       },
-      assets: [{ id: 'linked', kind: 'image', sourcePath: symlinkPath }],
+      assets: [{ id: 'linked', kind: 'video', sourcePath: symlinkPath }],
     }),
     (error) => error instanceof ExportValidationError && /symlink|project-relative|outside the project root/i.test(error.message),
   );

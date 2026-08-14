@@ -2,7 +2,7 @@
 
 const {
   ExportValidationError,
-  validateReportAssetReferences,
+  validateReferencedVideoAssetReferences,
 } = require('./asset-paths');
 const { toReportDocument } = require('../report-contract');
 
@@ -214,7 +214,7 @@ function renderStyles() {
 function renderReportHtml(reportDocument, { assetManifest = [] } = {}) {
   assertReportDocument(reportDocument);
   const safeReportDocument = toReportDocument(reportDocument);
-  const { manifest } = validateReportAssetReferences(safeReportDocument, assetManifest);
+  const { manifest } = validateReferencedVideoAssetReferences(safeReportDocument, assetManifest);
   const byId = new Map(manifest.map((asset) => [asset.id, asset]));
   const title = typeof safeReportDocument.title === 'string' && safeReportDocument.title.length > 0
     ? safeReportDocument.title

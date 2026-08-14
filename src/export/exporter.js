@@ -6,11 +6,13 @@ const path = require('node:path');
 const {
   ASSET_ROOTS,
   ExportValidationError,
+  collectReferencedVideoAssetIds,
   inferAssetKind,
   normalizeAssetKind,
   normalizeRelativeAssetPath,
   safeAssetFilename,
   safeReportName,
+  validateReferencedVideoAssetReferences,
 } = require('./asset-paths');
 const { validateExportLayout } = require('./layout-validator');
 const { renderReportHtml } = require('./report-renderer');
@@ -168,11 +170,14 @@ function uniqueGeneratedPath(kind, filename, usedPaths) {
   }
 }
 
-function prepareAssetDescriptors(assets) {
+function prepareAssetDescriptors(assets, { referencedAssetIds = null } = {}) {
   if (!Array.isArray(assets)) throw new ExportValidationError('Export assets must be an array');
+  const selectedAssets = referencedAssetIds === null
+    ? assets
+    : assets.filter((asset) => asset && typeof asset === 'object' && referencedAssetIds.has(asset.id));
   const ids = new Set();
   const usedPaths = new Set();
-  return assets.map((asset, index) => {
+  return selectedAssets.map((asset, index) => {
     if (asset === null || typeof asset !== 'object' || Array.isArray(asset)) {
       throw new ExportValidationError(`Export asset ${index} must be an object`);
     }
@@ -279,7 +284,7 @@ function rendererManifest(stagedAssets) {
   }));
 }
 
-function exportManifest({ reportDocument, safeName, stagedAssets, html }) {
+function exportManifest({ reportDocument, safeName, stagedAssets, html, reportFileName = 'report.html' }) {
   return {
     format: 'pitching-analysis-report-export',
     schemaVersion: 1,
@@ -299,7 +304,7 @@ function exportManifest({ reportDocument, safeName, stagedAssets, html }) {
     })),
     files: [
       {
-        relativePath: 'index.html',
+        relativePath: reportFileName,
         byteLength: Buffer.byteLength(html),
         sha256: sha256(Buffer.from(html)),
       },
@@ -334,6 +339,7 @@ async function exportReport({
   }
   const { lexicalRoot: projectRootLexical, realRoot: projectRootReal } = await resolveProjectRoots(projectRoot);
   const safeReportDocument = toReportDocument(reportDocument);
+  const referencedAssetIds = new Set(collectReferencedVideoAssetIds(safeReportDocument));
   const outputRoot = path.resolve(outputDirectory);
   await assertContainedPath({
     lexicalRoot: projectRootLexical,
@@ -369,12 +375,13 @@ async function exportReport({
   }
   const temporaryRoot = await fs.mkdtemp(path.join(outputRoot, '.report-export-'));
   const stagingPath = path.join(temporaryRoot, safeName);
+  const reportFileName = 'report.html';
   let moved = false;
   let zipCreatedPath = null;
   try {
     await fs.mkdir(path.join(stagingPath, 'videos'), { recursive: true });
     await fs.mkdir(path.join(stagingPath, 'images'), { recursive: true });
-    const preparedAssets = prepareAssetDescriptors(assets);
+    const preparedAssets = prepareAssetDescriptors(assets, { referencedAssetIds });
     const stagedAssets = [];
     for (const asset of preparedAssets) {
       stagedAssets.push(await stageAsset(asset, stagingPath, {
@@ -383,9 +390,17 @@ async function exportReport({
       }));
     }
 
-    const html = renderReportHtml(safeReportDocument, { assetManifest: rendererManifest(stagedAssets) });
-    await fs.writeFile(path.join(stagingPath, 'index.html'), html, 'utf8');
-    const manifest = exportManifest({ reportDocument: safeReportDocument, safeName, stagedAssets, html });
+    const stagedManifest = rendererManifest(stagedAssets);
+    validateReferencedVideoAssetReferences(safeReportDocument, stagedManifest);
+    const html = renderReportHtml(safeReportDocument, { assetManifest: stagedManifest });
+    await fs.writeFile(path.join(stagingPath, reportFileName), html, 'utf8');
+    const manifest = exportManifest({
+      reportDocument: safeReportDocument,
+      safeName,
+      stagedAssets,
+      html,
+      reportFileName,
+    });
     await writeJson(path.join(stagingPath, 'export-manifest.json'), manifest);
 
     await fs.rename(stagingPath, folderPath);
@@ -393,10 +408,11 @@ async function exportReport({
     await fs.rm(temporaryRoot, { recursive: true, force: true });
 
     const validation = await validateExportLayout(folderPath, {
-      assetManifest: rendererManifest(stagedAssets),
+      assetManifest: stagedManifest,
       html,
       requireAllManifestAssetsUsed: false,
       verifyManifest: true,
+      htmlFileName: reportFileName,
     });
     manifest.validation = {
       valid: validation.valid,

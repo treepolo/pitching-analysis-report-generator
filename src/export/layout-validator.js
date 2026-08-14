@@ -81,6 +81,25 @@ function fileUrlForRelativePath(outputDirectory, relativePath) {
   return pathToFileURL(absoluteAssetPath(outputRoot, normalized)).href;
 }
 
+async function resolveHtmlFile(outputRoot, htmlFileName) {
+  const candidates = htmlFileName
+    ? [normalizeRelativeAssetPath(htmlFileName, { allowRootFile: true })]
+    : ['report.html', 'index.html'];
+  for (const relativePath of candidates) {
+    const candidate = absoluteAssetPath(outputRoot, relativePath);
+    try {
+      await fs.lstat(candidate);
+      return { path: candidate, relativePath };
+    } catch (error) {
+      if (error.code !== 'ENOENT' || htmlFileName) throw error;
+    }
+  }
+  return {
+    path: absoluteAssetPath(outputRoot, candidates[0]),
+    relativePath: candidates[0],
+  };
+}
+
 async function assertRealPathContained(rootPath, candidatePath, description) {
   let rootRealPath;
   let candidateRealPath;
@@ -189,11 +208,12 @@ async function validateExportManifest(outputDirectory, { manifestFileName = 'exp
 async function validateFileUrlContract(outputDirectory, {
   assetManifest = [],
   html,
+  htmlFileName,
 } = {}) {
   const outputRoot = path.resolve(outputDirectory);
-  const indexPath = path.join(outputRoot, 'index.html');
-  await assertFile(indexPath, 'Export index.html', outputRoot);
-  const renderedHtml = html === undefined ? await fs.readFile(indexPath, 'utf8') : html;
+  const htmlFile = await resolveHtmlFile(outputRoot, htmlFileName);
+  await assertFile(htmlFile.path, `Export ${htmlFile.relativePath}`, outputRoot);
+  const renderedHtml = html === undefined ? await fs.readFile(htmlFile.path, 'utf8') : html;
   const references = validateRelativeAssetPaths(renderedHtml);
   const manifest = normalizeAssetManifest(assetManifest);
   const byPath = new Map(manifest.map((asset) => [asset.relativePath, asset]));
@@ -208,7 +228,9 @@ async function validateFileUrlContract(outputDirectory, {
   }
   return {
     valid: true,
-    indexFileUrl: fileUrlForRelativePath(outputRoot, 'index.html'),
+    htmlFileName: htmlFile.relativePath,
+    htmlFileUrl: fileUrlForRelativePath(outputRoot, htmlFile.relativePath),
+    indexFileUrl: fileUrlForRelativePath(outputRoot, htmlFile.relativePath),
     assetFileUrls,
     networkIsolation: validateNetworkIsolation(renderedHtml),
   };
@@ -217,13 +239,15 @@ async function validateFileUrlContract(outputDirectory, {
 async function validateExportLayout(outputDirectory, {
   assetManifest = [],
   html,
+  htmlFileName,
   requireAllManifestAssetsUsed = false,
   verifyManifest = false,
 } = {}) {
   const outputRoot = path.resolve(outputDirectory);
   await assertDirectory(outputRoot, 'Export directory');
-  const indexPath = path.join(outputRoot, 'index.html');
-  await assertFile(indexPath, 'Export index.html', outputRoot);
+  const htmlFile = await resolveHtmlFile(outputRoot, htmlFileName);
+  const indexPath = htmlFile.path;
+  await assertFile(indexPath, `Export ${htmlFile.relativePath}`, outputRoot);
   await assertDirectory(path.join(outputRoot, 'videos'), 'Export videos directory', outputRoot);
   await assertDirectory(path.join(outputRoot, 'images'), 'Export images directory', outputRoot);
 
@@ -258,6 +282,7 @@ async function validateExportLayout(outputDirectory, {
   const fileUrlValidation = await validateFileUrlContract(outputRoot, {
     assetManifest: manifest,
     html: renderedHtml,
+    htmlFileName: htmlFile.relativePath,
   });
   const manifestValidation = verifyManifest
     ? await validateExportManifest(outputRoot)
@@ -266,6 +291,7 @@ async function validateExportLayout(outputDirectory, {
   return {
     valid: true,
     indexPath,
+    htmlFileName: htmlFile.relativePath,
     assetCount: manifest.length,
     referencedAssetCount: referencedPaths.size,
     references,

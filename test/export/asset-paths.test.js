@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
   ExportValidationError,
+  collectReferencedVideoAssetIds,
+  collectReferencedVideoAssetReferences,
   collectReportAssetReferences,
   normalizeAssetManifest,
   normalizeRelativeAssetPath,
@@ -63,6 +65,32 @@ test('normalizes a manifest and discovers media, poster, and comparison referenc
   ]);
   assert.deepEqual(validated.manifest.map((asset) => asset.kind), ['video', 'image', 'video']);
   assert.deepEqual(normalizeAssetManifest(validated.manifest), validated.manifest);
+});
+
+test('collects only assets referenced by canonical video blocks', () => {
+  const document = {
+    sections: [{
+      blocks: [
+        { type: 'rich-text', content: 'text' },
+        { type: 'image', imageAssetId: 'unused-image' },
+        {
+          type: 'singleVideo',
+          mediaAssetId: 'pitch',
+          posterAssetId: 'poster',
+        },
+        {
+          type: 'comparisonVideo',
+          left: { mediaAssetId: 'left' },
+          right: { mediaAssetId: 'right' },
+        },
+      ],
+    }],
+  };
+  assert.deepEqual(collectReferencedVideoAssetIds(document), ['pitch', 'poster', 'left', 'right']);
+  assert.deepEqual(
+    collectReferencedVideoAssetReferences(document).map((reference) => reference.id),
+    ['pitch', 'poster', 'left', 'right'],
+  );
 });
 
 test('reports missing asset ids as an export blocker with reference details', () => {

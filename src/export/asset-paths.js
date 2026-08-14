@@ -142,6 +142,32 @@ function collectReportAssetReferences(reportDocument) {
   return references;
 }
 
+const VIDEO_BLOCK_TYPES = new Set(['singleVideo', 'comparisonVideo']);
+
+function videoReferenceDocument(reportDocument) {
+  return {
+    sections: Array.isArray(reportDocument?.sections)
+      ? reportDocument.sections.map((section) => ({
+        blocks: Array.isArray(section?.blocks)
+          ? section.blocks.filter((block) => VIDEO_BLOCK_TYPES.has(block?.type))
+          : [],
+      }))
+      : [],
+  };
+}
+
+function collectReferencedVideoAssetReferences(reportDocument) {
+  return collectReportAssetReferences(videoReferenceDocument(reportDocument));
+}
+
+function collectReferencedVideoAssetIds(reportDocument) {
+  return [...new Set(
+    collectReferencedVideoAssetReferences(reportDocument)
+      .map((reference) => reference.id)
+      .filter((id) => typeof id === 'string' && id.length > 0),
+  )];
+}
+
 function normalizeAssetManifest(assetManifest = []) {
   if (!Array.isArray(assetManifest)) {
     throw new ExportValidationError('Asset manifest must be an array');
@@ -202,10 +228,17 @@ function validateReportAssetReferences(reportDocument, assetManifest = []) {
   return { manifest, references };
 }
 
+function validateReferencedVideoAssetReferences(reportDocument, assetManifest = []) {
+  const videoDocument = videoReferenceDocument(reportDocument);
+  return validateReportAssetReferences(videoDocument, assetManifest);
+}
+
 module.exports = {
   ASSET_ROOTS,
   ExportValidationError,
   collectReportAssetReferences,
+  collectReferencedVideoAssetIds,
+  collectReferencedVideoAssetReferences,
   inferAssetKind,
   normalizeAssetKind,
   normalizeAssetManifest,
@@ -214,4 +247,5 @@ module.exports = {
   safeReportName,
   sanitizePortableName,
   validateReportAssetReferences,
+  validateReferencedVideoAssetReferences,
 };

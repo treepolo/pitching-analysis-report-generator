@@ -237,12 +237,15 @@ async function runLocalFileRuntimeSmoke({
     throw new ExportValidationError('Runtime smoke folderPath is required');
   }
   const resolvedFolder = path.resolve(folderPath);
+  const reportPath = path.join(resolvedFolder, 'report.html');
   const indexPath = path.join(resolvedFolder, 'index.html');
-  const indexStats = await fs.stat(indexPath).catch(() => null);
+  const reportStats = await fs.stat(reportPath).catch(() => null);
+  const indexStats = reportStats?.isFile() ? reportStats : await fs.stat(indexPath).catch(() => null);
+  const htmlPath = reportStats?.isFile() ? reportPath : indexPath;
   if (!indexStats?.isFile()) {
-    throw new ExportValidationError(`Runtime smoke index.html is unavailable: ${indexPath}`);
+    throw new ExportValidationError(`Runtime smoke report HTML is unavailable: ${reportPath}`);
   }
-  const fileUrl = pathToFileURL(indexPath).href;
+  const fileUrl = pathToFileURL(htmlPath).href;
   const resolvedElectron = await resolveElectronPath(electronPath);
   if (!resolvedElectron) {
     return {
