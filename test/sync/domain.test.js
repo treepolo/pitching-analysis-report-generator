@@ -23,6 +23,7 @@ const {
   mapComparisonSyncState,
   planDriftCorrection,
   planFrameStep,
+  seekPlayer,
   seekPlayerToRelativeTime,
   setPlaybackRelationship,
   setPlayerLoop,
@@ -100,6 +101,38 @@ test('loop boundaries wrap deterministically in both directions without zero-ste
     loop: { enabled: true, start: 1, end: 2 },
   });
   assert.equal(advancePlayer(atEnd, 0).currentTime, 2);
+
+  const outsideLoop = createPlayerBlock({
+    blockId: 'comparison-loop-outside',
+    mediaAssetId: 'asset-outside',
+    duration: 3,
+    currentTime: 0.25,
+    loop: { enabled: true, start: 1, end: 2 },
+  });
+  assert.equal(advancePlayer(outsideLoop, 0.1).currentTime, 1.1);
+});
+
+test('non-loop player seeks and advances clamp to duration without mutating the source', () => {
+  const player = createPlayerBlock({
+    blockId: 'single-video-clamp',
+    mediaAssetId: 'asset-clamp',
+    duration: 3,
+    currentTime: -1,
+    status: PLAYER_STATUS.PLAYING,
+  });
+  assert.equal(player.currentTime, 0);
+
+  const sought = seekPlayer(player, 4);
+  assert.equal(sought.currentTime, 3);
+  assert.equal(player.currentTime, 0);
+
+  const forwardEnded = advancePlayer({ ...player, currentTime: 2.9 }, 0.5);
+  assert.equal(forwardEnded.currentTime, 3);
+  assert.equal(forwardEnded.status, PLAYER_STATUS.ENDED);
+
+  const reverseEnded = advancePlayer({ ...player, currentTime: 0.1 }, -0.5);
+  assert.equal(reverseEnded.currentTime, 0);
+  assert.equal(reverseEnded.status, PLAYER_STATUS.ENDED);
 });
 
 test('anchor capture derives time-only or exact-frame evidence without synthesizing frames', () => {
@@ -695,6 +728,17 @@ test('VFR alignment uses presentation timestamps when frame-aware timing is avai
 });
 
 test('frame stepping reports exact frame mode only when capability and timing support it', () => {
+  assert.throws(
+    () => planFrameStep({
+      timing: cfr(30, 90, 3),
+      duration: 3,
+      currentTime: 1,
+      direction: 0,
+      capability: true,
+    }),
+    /frame step direction must be 1 or -1/,
+  );
+
   const exact = planFrameStep({
     timing: cfr(30, 90, 3),
     duration: 3,
@@ -708,6 +752,17 @@ test('frame stepping reports exact frame mode only when capability and timing su
   assert.equal(exact.capabilityStatus, CAPABILITY_STATUS.AVAILABLE);
   assert.equal(exact.exact, true);
   assert.equal(exact.targetTime, 1.0333333333333334);
+
+  const reverseExact = planFrameStep({
+    timing: cfr(30, 90, 3),
+    duration: 3,
+    currentTime: 1,
+    direction: -1,
+    capability: true,
+  });
+  assert.equal(reverseExact.action, 'seek');
+  assert.equal(reverseExact.frameIndex, 29);
+  assert.equal(reverseExact.targetTime, 29 / 30);
 
   const durationFromTiming = planFrameStep({
     timing: cfr(30, 90, 3),
@@ -744,6 +799,26 @@ test('frame stepping reports exact frame mode only when capability and timing su
   assert.equal(vfrFallback.exact, false);
   assert.equal(vfrFallback.reason, 'frame-timing-unavailable');
   assert.equal(vfrFallback.stepSource, 'timing-metadata');
+
+  const explicitUnknownFallback = planFrameStep({
+    timing: { kind: TIMING_KIND.UNKNOWN },
+    duration: 2,
+    currentTime: 1,
+    direction: -1,
+    fallbackStepSeconds: 0.2,
+  });
+  assert.equal(explicitUnknownFallback.targetTime, 0.8);
+  assert.equal(explicitUnknownFallback.stepSeconds, 0.2);
+  assert.throws(
+    () => planFrameStep({
+      timing: { kind: TIMING_KIND.UNKNOWN },
+      duration: 2,
+      currentTime: 1,
+      direction: 1,
+      fallbackStepSeconds: -0.2,
+    }),
+    /fallbackStepSeconds must be a finite number >= 0/,
+  );
 });
 
 test('unknown timing stays explicitly unknown instead of claiming frame precision', () => {
@@ -815,6 +890,25 @@ test('drift policy nudges small drift, seeks large drift, and holds unsafe state
   });
   assert.equal(stalled.action, DRIFT_ACTION.ERROR);
   assert.equal(stalled.recoverable, true);
+
+  const reverseNudge = planDriftCorrection({
+    currentTime: 10.1,
+    targetTime: 10,
+    baseRate: 1,
+    state: PLAYER_STATUS.PLAYING,
+  });
+  assert.equal(reverseNudge.action, DRIFT_ACTION.RATE_NUDGE);
+  assert.ok(Math.abs(reverseNudge.rateAdjustment + 0.05) < 1e-12);
+  assert.ok(Math.abs(reverseNudge.playbackRate - 0.95) < 1e-12);
+
+  assert.throws(
+    () => planDriftCorrection({
+      currentTime: 10,
+      targetTime: 10.1,
+      state: 'unknown-player-state',
+    }),
+    /drift correction state is invalid/,
+  );
 });
 
 test('comparison drift uses frame-resolved playback targets independently per side', () => {

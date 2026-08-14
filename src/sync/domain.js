@@ -307,6 +307,9 @@ function frameDurationForTiming(timingInput, options = {}) {
 
 function estimateFallbackStep(timingInput, currentTime, direction, duration, fallbackStepSeconds) {
   const timing = normalizeTimingMetadata(timingInput, duration);
+  const configuredFallbackStep = fallbackStepSeconds === undefined
+    ? DEFAULT_FALLBACK_STEP_SECONDS
+    : requireFinite(fallbackStepSeconds, 'fallbackStepSeconds', 0);
   if (timing.kind === TIMING_KIND.VFR && Array.isArray(timing.frameTimes)
       && timing.frameTimes.length > 1) {
     const currentFrame = timeToFrame(timing, currentTime, { duration }).frameIndex;
@@ -321,7 +324,7 @@ function estimateFallbackStep(timingInput, currentTime, direction, duration, fal
   const derived = frameDurationForTiming(timing, { duration });
   if (derived !== undefined) return { seconds: derived, source: 'timing-metadata' };
   return {
-    seconds: fallbackStepSeconds ?? DEFAULT_FALLBACK_STEP_SECONDS,
+    seconds: configuredFallbackStep,
     source: 'default-time-based-fallback',
   };
 }
@@ -706,14 +709,20 @@ function advancePlayer(player, deltaSeconds) {
   const current = createPlayerBlock(player);
   requireFinite(deltaSeconds, 'deltaSeconds');
   const signedDelta = deltaSeconds * current.playbackRate;
-  const proposed = current.currentTime + signedDelta;
+  let proposed = current.currentTime + signedDelta;
   let nextTime = proposed;
   let nextStatus = current.status;
 
   if (current.loop && current.loop.enabled) {
-    const crossedLoopBoundary = signedDelta > 0
+    const outsideLoop = current.currentTime < current.loop.start
+      || current.currentTime > current.loop.end;
+    if (outsideLoop && signedDelta !== 0) {
+      const loopEntryTime = signedDelta > 0 ? current.loop.start : current.loop.end;
+      proposed = loopEntryTime + signedDelta;
+    }
+    const crossedLoopBoundary = (outsideLoop && signedDelta !== 0) || (signedDelta > 0
       ? proposed >= current.loop.end
-      : signedDelta < 0 && proposed <= current.loop.start;
+      : signedDelta < 0 && proposed <= current.loop.start);
     if (crossedLoopBoundary) {
       nextTime = wrapLoopTime(proposed, current.loop, signedDelta >= 0 ? 1 : -1);
     }
@@ -1162,6 +1171,9 @@ function planDriftCorrection(input, policy = DEFAULT_DRIFT_CORRECTION_POLICY) {
     ? 1
     : requireFinite(input.baseRate, 'baseRate', Number.MIN_VALUE);
   const state = input.state ?? PLAYER_STATUS.PLAYING;
+  if (!Object.values(PLAYER_STATUS).includes(state)) {
+    throw new SyncDomainError('drift correction state is invalid');
+  }
   const visible = input.visible !== false && input.visibility !== 'hidden';
   const common = {
     currentTime,
