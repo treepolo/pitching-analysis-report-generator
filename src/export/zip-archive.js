@@ -163,6 +163,15 @@ async function extractZipArchive(zipPath, targetDirectory) {
 
   const parentPath = path.dirname(targetPath);
   await fs.mkdir(parentPath, { recursive: true });
+  let realParentPath;
+  try {
+    realParentPath = await fs.realpath(parentPath);
+  } catch (error) {
+    throw new ExportValidationError(`ZIP extraction parent is unavailable: ${parentPath}`, { cause: error });
+  }
+  if (path.resolve(realParentPath) !== path.resolve(parentPath)) {
+    throw new ExportValidationError(`ZIP extraction parent must not contain a symbolic link: ${parentPath}`);
+  }
   const temporaryPath = await fs.mkdtemp(path.join(
     parentPath,
     `.${path.basename(targetPath)}.${process.pid}.extract-`,

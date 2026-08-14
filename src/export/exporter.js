@@ -114,6 +114,10 @@ function referencePath(value) {
   return null;
 }
 
+function portableAssetPathKey(relativePath) {
+  return relativePath.normalize('NFC').toLocaleLowerCase('en-US');
+}
+
 function descriptorSourcePath(asset) {
   for (const value of [
     asset.normalizedReference,
@@ -172,7 +176,7 @@ function uniqueGeneratedPath(kind, filename, usedPaths) {
   while (true) {
     const candidateName = suffix === 0 ? filename : `${stem}-${suffix + 1}${extension}`;
     const candidate = normalizeRelativeAssetPath(`${root}/${candidateName}`, { kind });
-    if (!usedPaths.has(candidate)) return candidate;
+    if (!usedPaths.has(portableAssetPathKey(candidate))) return candidate;
     suffix += 1;
   }
 }
@@ -219,9 +223,10 @@ function prepareAssetDescriptors(assets, { referencedAssetIds = null } = {}) {
     const relativePath = requestedPath
       ? normalizeRelativeAssetPath(requestedPath, { kind })
       : uniqueGeneratedPath(kind, filename, usedPaths);
-    if (usedPaths.has(relativePath)) throw new ExportValidationError(`Duplicate export asset path: ${relativePath}`);
+    const pathKey = portableAssetPathKey(relativePath);
+    if (usedPaths.has(pathKey)) throw new ExportValidationError(`Duplicate export asset path: ${relativePath}`);
     ids.add(asset.id);
-    usedPaths.add(relativePath);
+    usedPaths.add(pathKey);
     return {
       id: asset.id,
       kind,

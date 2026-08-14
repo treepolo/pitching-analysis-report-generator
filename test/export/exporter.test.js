@@ -164,6 +164,15 @@ test('ignores unused library descriptors, including invalid source paths', async
   await assert.rejects(fs.stat(path.join(result.folderPath, 'videos', 'private.mp4')), /ENOENT/u);
 });
 
+test('generates portable unique filenames for case-insensitive name collisions', () => {
+  const { prepareAssetDescriptors } = require('../../src/export/exporter');
+  const descriptors = prepareAssetDescriptors([
+    { id: 'first', kind: 'video', data: Buffer.from('first'), displayName: 'Clip.mp4' },
+    { id: 'second', kind: 'video', data: Buffer.from('second'), displayName: 'clip.mp4' },
+  ]);
+  assert.deepEqual(descriptors.map((asset) => asset.relativePath), ['videos/Clip.mp4', 'videos/clip-2.mp4']);
+});
+
 test('honors cancellation before staging and leaves no partial export', async () => {
   const outputRoot = path.join(testRoot, 'cancelled-output');
   const controller = new AbortController();

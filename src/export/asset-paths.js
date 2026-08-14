@@ -67,6 +67,10 @@ function normalizeRelativeAssetPath(value, { kind = null, allowRootFile = false 
   return normalized;
 }
 
+function portableAssetPathKey(relativePath) {
+  return relativePath.normalize('NFC').toLocaleLowerCase('en-US');
+}
+
 function sanitizePortableName(value, fallback = 'report', maxLength = 80) {
   let name = typeof value === 'string' ? value.normalize('NFKC') : '';
   name = name
@@ -192,10 +196,11 @@ function normalizeAssetManifest(assetManifest = []) {
       throw new ExportValidationError(`Asset manifest entry ${index} has no supported kind`);
     }
     const relativePath = normalizeRelativeAssetPath(relativePathValue, { kind });
+    const pathKey = portableAssetPathKey(relativePath);
     if (ids.has(asset.id)) throw new ExportValidationError(`Duplicate asset id: ${asset.id}`);
-    if (paths.has(relativePath)) throw new ExportValidationError(`Duplicate asset path: ${relativePath}`);
+    if (paths.has(pathKey)) throw new ExportValidationError(`Duplicate asset path: ${relativePath}`);
     ids.add(asset.id);
-    paths.add(relativePath);
+    paths.add(pathKey);
 
     return {
       id: asset.id,

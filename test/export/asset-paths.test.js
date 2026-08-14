@@ -35,6 +35,16 @@ test('accepts safe export-local paths and rejects traversal, absolute, and exter
   );
 });
 
+test('rejects export manifest paths that collide on case-insensitive filesystems', () => {
+  assert.throws(
+    () => normalizeAssetManifest([
+      { id: 'first', kind: 'video', relativePath: 'videos/Clip.mp4' },
+      { id: 'second', kind: 'video', relativePath: 'videos/clip.mp4' },
+    ]),
+    (error) => error instanceof ExportValidationError && /duplicate asset path/i.test(error.message),
+  );
+});
+
 test('normalizes a manifest and discovers media, poster, and comparison references', () => {
   const document = {
     schemaVersion: 1,

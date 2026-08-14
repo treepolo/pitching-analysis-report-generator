@@ -155,6 +155,30 @@ test('extracts only into a fresh target and cleans atomic staging after a bad ar
   assert.deepEqual(leftovers, []);
 });
 
+test('rejects extraction through a symbolic-link parent when supported', async (t) => {
+  const outsideRoot = path.join(testRoot, 'extract-parent-outside');
+  const linkedParent = path.join(testRoot, 'extract-parent-link');
+  const target = path.join(linkedParent, 'target');
+  const archivePath = path.join(testRoot, 'extract-parent.zip');
+  await fs.mkdir(outsideRoot, { recursive: true });
+  await fs.writeFile(path.join(outsideRoot, 'report.html'), '<p>outside</p>', 'utf8');
+  await fs.writeFile(archivePath, Buffer.from('not a zip archive'));
+  try {
+    await fs.symlink(outsideRoot, linkedParent, 'junction');
+  } catch (error) {
+    if (['EPERM', 'EACCES', 'ENOSYS'].includes(error.code)) {
+      t.skip(`symlink creation unavailable: ${error.code}`);
+      return;
+    }
+    throw error;
+  }
+  await assert.rejects(
+    extractZipArchive(archivePath, target),
+    (error) => error instanceof ExportValidationError && /symbolic link|zip archive/i.test(error.message),
+  );
+  assert.equal(await fs.lstat(target).catch((error) => error.code), 'ENOENT');
+});
+
 test('cleans temporary staging after an atomic export failure and permits recovery', async () => {
   const outputRoot = path.join(testRoot, 'recovery-output');
   await assert.rejects(
