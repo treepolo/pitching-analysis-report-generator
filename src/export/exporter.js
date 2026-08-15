@@ -54,6 +54,51 @@ function isPathInsideOrEqual(rootPath, candidatePath) {
     || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
 }
 
+function collisionSafeReportName(baseName, collisionIndex) {
+  if (collisionIndex === 1) return baseName;
+  const suffix = `-${collisionIndex}`;
+  const stemLength = Math.max(1, 80 - suffix.length);
+  const stem = baseName.slice(0, stemLength).replace(/[. ]+$/u, '') || 'report';
+  return `${stem}${suffix}`;
+}
+
+function collisionSafeZipPath(zipPath, collisionIndex) {
+  const resolvedPath = path.resolve(zipPath);
+  if (collisionIndex === 1) return resolvedPath;
+  const parsed = path.parse(resolvedPath);
+  return path.join(parsed.dir, `${parsed.name}-${collisionIndex}${parsed.ext}`);
+}
+
+async function resolveOutputTargets({
+  outputRoot,
+  baseName,
+  shouldKeepFolder,
+  shouldCreateZip,
+  zipPath,
+}) {
+  for (let collisionIndex = 1; ; collisionIndex += 1) {
+    const safeName = collisionSafeReportName(baseName, collisionIndex);
+    const folderPath = path.join(outputRoot, safeName);
+    const candidateZipPath = zipPath
+      ? collisionSafeZipPath(zipPath, collisionIndex)
+      : path.join(outputRoot, `${safeName}_offline.zip`);
+    if (!isPathInsideOrEqual(outputRoot, folderPath) || !isPathInsideOrEqual(outputRoot, candidateZipPath)) {
+      throw new ExportValidationError('Export targets must stay inside outputDirectory');
+    }
+    if (candidateZipPath === outputRoot) throw new ExportValidationError('ZIP target must be a file path');
+
+    const folderCollision = shouldKeepFolder && await pathExists(folderPath);
+    const zipCollision = shouldCreateZip && await pathExists(candidateZipPath);
+    if (!folderCollision && !zipCollision) {
+      return {
+        safeName,
+        folderPath,
+        resolvedZipPath: candidateZipPath,
+      };
+    }
+  }
+}
+
 async function realpathNearestExisting(targetPath) {
   let current = path.resolve(targetPath);
   while (true) {
@@ -383,21 +428,16 @@ async function exportReport({
   if (!outputAncestorStats.isDirectory()) {
     throw new ExportValidationError('Export outputDirectory parent must be a directory');
   }
-  const safeName = safeReportName(reportName ?? safeReportDocument.title);
   const shouldKeepFolder = outputKind !== 'zip';
-  const folderPath = path.join(outputRoot, safeName);
   const shouldCreateZip = createZip === true || outputKind === 'zip' || outputKind === 'both';
-  const resolvedZipPath = path.resolve(zipPath || path.join(outputRoot, `${safeName}_offline.zip`));
-  if (!isPathInsideOrEqual(outputRoot, folderPath) || !isPathInsideOrEqual(outputRoot, resolvedZipPath)) {
-    throw new ExportValidationError('Export targets must stay inside outputDirectory');
-  }
-  if (resolvedZipPath === outputRoot) throw new ExportValidationError('ZIP target must be a file path');
-  if (shouldKeepFolder && await pathExists(folderPath)) {
-    throw new ExportValidationError(`Export folder already exists: ${folderPath}`);
-  }
-  if (shouldCreateZip && await pathExists(resolvedZipPath)) {
-    throw new ExportValidationError(`ZIP target already exists: ${resolvedZipPath}`);
-  }
+  const outputTargets = await resolveOutputTargets({
+    outputRoot,
+    baseName: safeReportName(reportName ?? safeReportDocument.title),
+    shouldKeepFolder,
+    shouldCreateZip,
+    zipPath,
+  });
+  const { safeName, folderPath, resolvedZipPath } = outputTargets;
 
   await fs.mkdir(outputRoot, { recursive: true });
   const realOutputRoot = await fs.realpath(outputRoot);

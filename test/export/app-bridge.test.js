@@ -330,9 +330,70 @@ test('exports ZIP after folder without overwriting the folder and preserves ZIP-
     outputKind: 'zip',
   });
   const duplicateZipCompleted = await duplicateZipController.wait(duplicateZipStarted.jobId);
-  assert.equal(duplicateZipCompleted.status, 'failed');
-  assert.equal(duplicateZipCompleted.error.code, 'EXPORT_VALIDATION_FAILED');
-  assert.match(duplicateZipCompleted.error.message, /ZIP target already exists/iu);
+  assert.equal(duplicateZipCompleted.status, 'completed');
+  assert.equal(duplicateZipCompleted.result.safeName, 'Sequence text-2');
+  assert.equal(duplicateZipCompleted.result.manifest.report.safeName, 'Sequence text-2');
+  assert.match(duplicateZipCompleted.result.zipPath, /Sequence text-2_offline\.zip$/u);
+  assert.equal(await fs.stat(zipFirstCompleted.result.zipPath).then((stats) => stats.isFile()), true);
+});
+
+test('reruns folder, ZIP, and both exports with collision-free names without overwriting prior outputs', async () => {
+  const cases = [
+    { outputKind: 'folder', name: 'Repeat folder' },
+    { outputKind: 'zip', name: 'Repeat ZIP' },
+    { outputKind: 'both', name: 'Repeat both' },
+  ];
+
+  for (const entry of cases) {
+    const outputDirectory = path.join(testRoot, `rerun-${entry.outputKind}`);
+    const requestBase = {
+      projectId: 'project-1',
+      projectRoot: testRoot,
+      reportDocument: {
+        schemaVersion: 1,
+        title: entry.name,
+        sections: [{ blocks: [{ type: 'rich-text', content: `first ${entry.name}` }] }],
+      },
+      assets: [],
+      outputDirectory,
+      reportName: entry.name,
+      outputKind: entry.outputKind,
+    };
+    const controller = new ExportJobController({ exporter: exportReport });
+    const first = await controller.start(requestBase);
+    const firstCompleted = await controller.wait(first.jobId);
+    assert.equal(firstCompleted.status, 'completed', `${entry.outputKind} first export failed`);
+    const firstFolderPath = firstCompleted.result.folderPath;
+    const firstZipPath = firstCompleted.result.zipPath;
+    const second = await controller.start(requestBase);
+    const secondCompleted = await controller.wait(second.jobId);
+
+    assert.equal(secondCompleted.status, 'completed', `${entry.outputKind} rerun failed`);
+    assert.equal(secondCompleted.result.safeName, `${entry.name}-2`);
+    assert.equal(secondCompleted.result.manifest.report.safeName, `${entry.name}-2`);
+    if (firstFolderPath) {
+      assert.notEqual(secondCompleted.result.folderPath, firstFolderPath);
+      assert.equal(await fs.stat(firstFolderPath).then((stats) => stats.isDirectory()), true);
+    } else {
+      assert.equal(secondCompleted.result.folderPath, null);
+    }
+    if (firstZipPath) {
+      assert.notEqual(secondCompleted.result.zipPath, firstZipPath);
+      assert.equal(await fs.stat(firstZipPath).then((stats) => stats.isFile()), true);
+    } else {
+      assert.equal(secondCompleted.result.zipPath, null);
+    }
+    if (secondCompleted.result.folderPath) {
+      assert.equal(await fs.stat(secondCompleted.result.folderPath).then((stats) => stats.isDirectory()), true);
+    }
+    if (secondCompleted.result.zipPath) {
+      assert.equal(await fs.stat(secondCompleted.result.zipPath).then((stats) => stats.isFile()), true);
+    }
+    assert.deepEqual(
+      (await fs.readdir(outputDirectory)).filter((name) => name.startsWith('.report-export-')),
+      [],
+    );
+  }
 });
 
 test('exposes running, failure, retry, and completion states with a stable job id contract', async () => {
