@@ -1,6 +1,13 @@
 # Traceability Matrix
 
-## Current Wave 13C Integrator gate (2026-08-15)
+## Current Wave 15C provenance integration (2026-08-15)
+
+- Current implementation checkpoint is `12283a429d3da786e105dc53a2e587566321bef3` on `worker/desktop-vertical-slice`; the ZIP staging repair is `12283a4`, followed by this docs-only provenance update.
+- Export evidence now covers the folder→ZIP same-output-root sequence: ZIP-only uses unique staging and cleans it without modifying the previously successful folder; folder collision safety remains; existing ZIP targets produce explicit `EXPORT_VALIDATION_FAILED` and are not overwritten. ZIP→folder remains supported with both outputs preserved.
+- Fresh scoped evidence is 33/33 export/bridge/layout tests passing, including text-only and mixed/video fixtures, staging cleanup, referenced-only asset traversal, and original preservation; fourteen export JavaScript files pass `node --check`; diff-check and scoped artifact/credential scans pass.
+- Electron/file:// and human acceptance were not run and remain unavailable evidence. Real MP4/FFmpeg/player/sync/drift, native picker interaction, responsive human acceptance, and AT-A through AT-G remain unresolved. Requirement rows remain conservative and none are `VERIFIED`.
+
+## Historical Wave 13C Integrator gate (superseded, 2026-08-15)
 
 - Current implementation tip is `c3d136b3cf148a82924d2a6942e9de53f2731a27` on `worker/desktop-vertical-slice`; it is the formal same-content follow-up to `811ac54`, with `722f094` providing safe external output-directory handling. The worktree was clean before this docs-only reconciliation.
 - Export destination evidence: absolute external output directories are accepted only with existing-directory and no-symlink-ancestor checks. Project-local source/media containment, ZIP target containment, referenced-video-only traversal, and originals preservation remain unchanged. Renderer evidence: allowlisted export/picker error codes and localized reasons are displayed without exposing arbitrary error text.

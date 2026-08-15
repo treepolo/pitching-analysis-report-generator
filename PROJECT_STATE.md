@@ -1,6 +1,13 @@
 # Current Project State
 
-## Current Wave 13C Integrator gate (2026-08-15)
+## Current Wave 15C provenance integration (2026-08-15)
+
+- Current implementation checkpoint is `12283a429d3da786e105dc53a2e587566321bef3` on `worker/desktop-vertical-slice`; this docs-only reconciliation follows the ZIP staging repair commit `12283a4`.
+- The repaired sequence is folder export followed by ZIP export using the same output root and report name. `outputKind=zip` now builds the report in a unique temporary staging folder, archives that staging tree, cleans it after success, and preserves an existing successful final folder. `outputKind=folder` retains final-folder collision safety; an existing ZIP remains a safe `EXPORT_VALIDATION_FAILED` error and is never overwritten.
+- Fresh export evidence: 33/33 scoped export/bridge/layout tests pass, including text-only and mixed/video folder-to-ZIP and ZIP-to-folder sequences, staging cleanup, ZIP collision behavior, referenced-only assets, and original preservation. Fourteen export JavaScript files pass `node --check`; `git diff --check` and scoped artifact/credential scans pass.
+- Electron/file:// runtime and human acceptance were not run in this gate and remain unavailable evidence, not passes. Real MP4/FFmpeg execution, real player/sync/drift, native picker interaction, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
+
+## Historical Wave 13C Integrator gate (superseded, 2026-08-15)
 
 - Current implementation tip is `c3d136b3cf148a82924d2a6942e9de53f2731a27` on `worker/desktop-vertical-slice`; it is the formal same-content follow-up to `811ac54` for renderer export/picker diagnostics. The preceding export fix is `722f094`, and the worktree is clean before this docs-only checkpoint.
 - `722f094` only changes output-destination policy: an absolute, existing-or-creatable directory outside the project root is allowed when its existing ancestors are directories with no symbolic links. Project-local media/source containment, ZIP target containment, realpath checks, referenced-only traversal, and original preservation remain enforced. `c3d136b` only adds user-visible allowlisted error codes/reasons and focused renderer assertions; no export/domain source was changed by that commit.

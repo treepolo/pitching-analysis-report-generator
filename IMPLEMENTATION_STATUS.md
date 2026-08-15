@@ -1,6 +1,13 @@
 # Implementation Status
 
-## Current Wave 13C Integrator gate (2026-08-15)
+## Current Wave 15C provenance integration (2026-08-15)
+
+- Current implementation checkpoint is `12283a429d3da786e105dc53a2e587566321bef3` on `worker/desktop-vertical-slice`; this docs-only checkpoint follows `fix: repair zip export validation` (`12283a4`).
+- Root cause was final-folder collision when a ZIP job followed a successful folder job with the same output root/report name. ZIP-only jobs now use a unique output-root staging folder, create the ZIP from that staging tree, clean staging, and leave the existing folder untouched. Folder-only jobs still reject an existing final folder, and existing ZIP targets still fail with `EXPORT_VALIDATION_FAILED` rather than being overwritten.
+- Scoped evidence is 33/33 export/bridge/layout tests passing, covering text-only and mixed/video folder→ZIP, ZIP→folder, staging cleanup, explicit ZIP collision errors, referenced-only traversal, and original preservation. Fourteen export JavaScript files pass `node --check`; `git diff --check` and scoped artifact/credential scans pass.
+- Electron/file:// runtime was not started and remains unavailable/skip evidence, not a pass. Real media/FFmpeg, player/sync/drift, native picker, responsive human evidence, and AT-A through AT-G remain pending. No requirement may be marked `VERIFIED`.
+
+## Historical Wave 13C Integrator gate (superseded, 2026-08-15)
 
 - Current implementation tip is `c3d136b3cf148a82924d2a6942e9de53f2731a27` on `worker/desktop-vertical-slice`; `c3d136b` is the formal same-content follow-up to `811ac54`, with `722f094` as the preceding safe external-output fix. This section is reconciled by a docs-only checkpoint; the worktree was clean before documentation edits.
 - Export policy now permits a user-selected absolute output directory outside the project root only when its existing ancestors are directories without symbolic links. Source media remains project-root-contained through lexical/realpath checks; ZIP targets remain inside the selected output root; referenced-only assets and untouched originals are preserved.
