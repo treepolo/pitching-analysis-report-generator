@@ -28,7 +28,7 @@ test('editor redraws preserve the active control focus and text selection', () =
   assert.match(renderer, /function restoreBlockEditorFocus\(snapshot\)/u);
   assert.match(renderer, /target\.focus\(\{ preventScroll: true \}\)/u);
   assert.match(renderer, /target\.setSelectionRange\(/u);
-  assert.match(renderer, /renderBlockCanvas\(\{ preserveFocus: true \}\)/u);
+  assert.match(renderer, /renderBlockCanvas\(\{ preserveFocus: true, allowFocusedSelect: true \}\)/u);
 });
 
 test('text input and video settings keep persistence without input-time redraw', () => {
@@ -46,7 +46,39 @@ test('text input and video settings keep persistence without input-time redraw',
     "if (target.matches('[data-block-path]'))",
     "if (event.type !== 'click') return;",
   );
+  assert.match(pathHandler, /if \(!\['input', 'change'\]\.includes\(event\.type\)\) return;/u);
   assert.match(pathHandler, /setEditorPath\(block, target\.dataset\.blockPath, editorControlValue\(target\)\)/u);
-  assert.match(pathHandler, /if \(event\.type !== 'input'\) renderBlockCanvas\(\{ preserveFocus: true \}\)/u);
+  assert.match(pathHandler, /patchInlineVideoCard\(card, block\)/u);
+  assert.match(pathHandler, /target\.dataset\.blockPath\.endsWith\('mediaAssetId'\)/u);
+  assert.match(pathHandler, /hydrateInlineVideoCards\(\)/u);
+  assert.doesNotMatch(pathHandler, /renderBlockCanvas\s*\(/u);
   assert.match(pathHandler, /scheduleSave\(\)/u);
+});
+
+test('native select interaction never replaces the active block canvas', () => {
+  const canvasRenderer = functionSlice(renderer, 'function renderBlockCanvas(', 'function setEditorPath(');
+  assert.match(renderer, /function isFocusedBlockSelect\(\)/u);
+  assert.match(canvasRenderer, /if \(isFocusedBlockSelect\(\) && !allowFocusedSelect\)/u);
+  assert.match(canvasRenderer, /state\.blockCanvasRenderQueued = true;/u);
+  assert.match(canvasRenderer, /state\.blockCanvasRenderQueued = false;/u);
+  assert.match(canvasRenderer, /elements\.blockCanvas\.innerHTML\s*=/u);
+  assert.match(renderer, /function flushQueuedBlockCanvasRender\(\)/u);
+  assert.match(renderer, /elements\.blockCanvas\?\.addEventListener\('focusout', \(\) =>/u);
+
+  const modeHandler = functionSlice(
+    renderer,
+    "if (target.matches('[data-block-mode]'))",
+    "if (target.matches('[data-block-field=\"content\"]'))",
+  );
+  assert.match(modeHandler, /if \(event\.type !== 'change'\) return;/u);
+  assert.match(modeHandler, /allowFocusedSelect: true/u);
+});
+
+test('text block markup has one clear editable content label', () => {
+  const blockEditor = functionSlice(renderer, 'function renderBlockEditor(', 'function captureBlockEditorFocus()');
+  assert.match(blockEditor, /const headerLabel = typeLabel \? `<strong>\$\{typeLabel\}<\/strong>` : '';/u);
+  assert.match(blockEditor, /block\.type === 'singleVideo' \? '單一影片' : '';/u);
+  assert.match(blockEditor, /文字內容 <textarea[^>]*data-block-field="content"/u);
+  assert.match(blockEditor, /<header class="content-block-header">[\s\S]*\$\{headerLabel\}/u);
+  assert.doesNotMatch(blockEditor, /const typeLabel = displayBlockType/u);
 });

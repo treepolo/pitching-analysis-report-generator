@@ -20,6 +20,7 @@ const state = {
     pollTimer: null,
   },
   inlineGeneration: 0,
+  blockCanvasRenderQueued: false,
   player: {
     selectedBlockId: null,
     runtime: null,
@@ -788,17 +789,33 @@ function handleInlineVideoEvent(event) {
   return true;
 }
 
+function patchInlineVideoCard(card, block) {
+  if (!card || !block || !card.matches('[data-inline-video-block]')) return;
+  const comparison = block.type === 'comparisonVideo';
+  const layout = block.layout === 'stacked' ? '堆疊' : '並排';
+  const syncMode = block.sync?.mode === 'frame' ? '明確影格模式' : '共用經過時間同步';
+  const title = card.querySelector('.inline-video-title strong');
+  const summary = card.querySelector('.inline-video-title span');
+  const grid = card.querySelector('.inline-video-grid');
+  if (title) title.textContent = block.label || (comparison ? '影片比較' : '影片區塊');
+  if (summary) summary.textContent = comparison ? `${syncMode} · ${layout}` : '單一來源 · 專案內媒體';
+  if (grid) grid.dataset.layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
+}
+
 function renderBlockEditor(section, block, index) {
-  const typeLabel = displayBlockType(block.type);
+  const typeLabel = block.type === 'comparisonVideo'
+    ? '影片比較'
+    : block.type === 'singleVideo' ? '單一影片' : '';
+  const headerLabel = typeLabel ? `<strong>${typeLabel}</strong>` : '';
   const body = block.type === 'rich-text' || block.type === 'text'
-    ? `<label class="block-text-editor">文字 <textarea rows="5" data-block-field="content">${escapeHtml(block.content || '')}</textarea></label>`
+    ? `<label class="block-text-editor">文字內容 <textarea rows="5" data-block-field="content">${escapeHtml(block.content || '')}</textarea></label>`
     : (block.type === 'singleVideo' || block.type === 'comparisonVideo')
       ? renderInlineVideoBlock(section, block)
       : `<p class="hint">不支援的區塊類型：${displayBlockType(block.type)}</p>`;
   return `
     <article class="content-block-card" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}">
       <header class="content-block-header">
-        <strong>${typeLabel}</strong>
+        ${headerLabel}
         <div class="content-block-actions">
           <button class="icon-button" type="button" data-block-action="move-up" aria-label="將區塊上移">↑</button>
           <button class="icon-button" type="button" data-block-action="move-down" aria-label="將區塊下移">↓</button>
@@ -860,7 +877,23 @@ function restoreBlockEditorFocus(snapshot) {
   }
 }
 
-function renderBlockCanvas({ preserveFocus = false } = {}) {
+function isFocusedBlockSelect() {
+  return Boolean(elements.blockCanvas?.contains(document.activeElement)
+    && document.activeElement?.matches('select'));
+}
+
+function flushQueuedBlockCanvasRender() {
+  if (!state.blockCanvasRenderQueued || isFocusedBlockSelect()) return;
+  state.blockCanvasRenderQueued = false;
+  renderBlockCanvas();
+}
+
+function renderBlockCanvas({ preserveFocus = false, allowFocusedSelect = false } = {}) {
+  if (isFocusedBlockSelect() && !allowFocusedSelect) {
+    state.blockCanvasRenderQueued = true;
+    return;
+  }
+  state.blockCanvasRenderQueued = false;
   const focusSnapshot = preserveFocus ? captureBlockEditorFocus() : null;
   const project = state.activeProject;
   [elements.blockSectionTarget, elements.addTextBlock, elements.addEditorSingleVideo, elements.addEditorComparisonVideo]
@@ -943,6 +976,7 @@ function handleBlockEditorEvent(event) {
   }
   const card = target.closest('[data-block-id]');
   if (target.matches('[data-section-title]')) {
+    if (!['input', 'change'].includes(event.type)) return;
     const section = state.activeProject?.sections.find((item) => item.id === target.closest('[data-section-id]')?.dataset.sectionId);
     if (!section) return;
     section.title = target.value;
@@ -954,19 +988,25 @@ function handleBlockEditorEvent(event) {
   if (!section || !block) return;
 
   if (target.matches('[data-block-mode]')) {
+    if (event.type !== 'change') return;
     convertVideoBlockMode(block, target.value);
-    renderBlockCanvas({ preserveFocus: true });
+    renderBlockCanvas({ preserveFocus: true, allowFocusedSelect: true });
     scheduleSave();
     return;
   }
   if (target.matches('[data-block-field="content"]')) {
+    if (!['input', 'change'].includes(event.type)) return;
     block.content = target.value;
     scheduleSave();
     return;
   }
   if (target.matches('[data-block-path]')) {
+    if (!['input', 'change'].includes(event.type)) return;
     setEditorPath(block, target.dataset.blockPath, editorControlValue(target));
-    if (event.type !== 'input') renderBlockCanvas({ preserveFocus: true });
+    patchInlineVideoCard(card, block);
+    if (event.type === 'change' && target.dataset.blockPath.endsWith('mediaAssetId')) {
+      hydrateInlineVideoCards();
+    }
     scheduleSave();
     return;
   }
@@ -1291,6 +1331,9 @@ elements.addEditorComparisonVideo?.addEventListener('click', () => addComparison
 elements.blockCanvas?.addEventListener('input', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('change', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('click', handleBlockEditorEvent);
+elements.blockCanvas?.addEventListener('focusout', () => {
+  setTimeout(flushQueuedBlockCanvasRender, 0);
+});
 
 if (typeof window.pitchingApp?.onBeforeClose === 'function') {
   window.pitchingApp.onBeforeClose(() => flushPendingChanges());
