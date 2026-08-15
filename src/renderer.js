@@ -809,7 +809,59 @@ function renderBlockEditor(section, block, index) {
     </article>`;
 }
 
-function renderBlockCanvas() {
+function captureBlockEditorFocus() {
+  const active = document.activeElement;
+  if (!active || !elements.blockCanvas?.contains(active)) return null;
+  const card = active.closest('[data-block-id]');
+  const section = active.closest('[data-section-id]');
+  if (!card && !section) return null;
+  return {
+    sectionId: card?.dataset.sectionId || section?.dataset.sectionId || '',
+    blockId: card?.dataset.blockId || '',
+    blockPath: active.dataset.blockPath || '',
+    blockMode: active.matches('[data-block-mode]'),
+    sectionTitle: active.matches('[data-section-title]'),
+    value: typeof active.value === 'string' ? active.value : null,
+    selectionStart: Number.isInteger(active.selectionStart) ? active.selectionStart : null,
+    selectionEnd: Number.isInteger(active.selectionEnd) ? active.selectionEnd : null,
+    selectionDirection: active.selectionDirection || 'none',
+  };
+}
+
+function restoreBlockEditorFocus(snapshot) {
+  if (!snapshot) return;
+  let target = null;
+  if (snapshot.sectionTitle) {
+    target = [...elements.blockCanvas.querySelectorAll('[data-section-title]')]
+      .find((item) => item.closest('[data-section-id]')?.dataset.sectionId === snapshot.sectionId);
+  } else {
+    const card = [...elements.blockCanvas.querySelectorAll('[data-block-id]')]
+      .find((item) => item.dataset.blockId === snapshot.blockId && item.dataset.sectionId === snapshot.sectionId);
+    if (card) {
+      target = snapshot.blockMode
+        ? card.querySelector('[data-block-mode]')
+        : [...card.querySelectorAll('[data-block-path]')]
+          .find((item) => item.dataset.blockPath === snapshot.blockPath);
+    }
+  }
+  if (!target) return;
+  if (target.tagName === 'SELECT' && snapshot.value !== null
+    && [...target.options].some((option) => option.value === snapshot.value)) {
+    target.value = snapshot.value;
+  }
+  target.focus({ preventScroll: true });
+  if (snapshot.selectionStart !== null && snapshot.selectionEnd !== null
+    && typeof target.setSelectionRange === 'function') {
+    try {
+      target.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd, snapshot.selectionDirection);
+    } catch {
+      // Number inputs and select controls do not expose a text selection range.
+    }
+  }
+}
+
+function renderBlockCanvas({ preserveFocus = false } = {}) {
+  const focusSnapshot = preserveFocus ? captureBlockEditorFocus() : null;
   const project = state.activeProject;
   [elements.blockSectionTarget, elements.addTextBlock, elements.addEditorSingleVideo, elements.addEditorComparisonVideo]
     .filter(Boolean)
@@ -840,6 +892,7 @@ function renderBlockCanvas() {
       <div class="block-list">${section.blocks.map((block, index) => renderBlockEditor(section, block, index)).join('')}</div>
     </section>`).join('');
   hydrateInlineVideoCards();
+  restoreBlockEditorFocus(focusSnapshot);
 }
 
 function setEditorPath(target, pathValue, value) {
@@ -902,7 +955,7 @@ function handleBlockEditorEvent(event) {
 
   if (target.matches('[data-block-mode]')) {
     convertVideoBlockMode(block, target.value);
-    renderBlockCanvas();
+    renderBlockCanvas({ preserveFocus: true });
     scheduleSave();
     return;
   }
@@ -913,7 +966,7 @@ function handleBlockEditorEvent(event) {
   }
   if (target.matches('[data-block-path]')) {
     setEditorPath(block, target.dataset.blockPath, editorControlValue(target));
-    if (event.type !== 'input' || target.type !== 'text') renderBlockCanvas();
+    if (event.type !== 'input') renderBlockCanvas({ preserveFocus: true });
     scheduleSave();
     return;
   }
@@ -1004,7 +1057,6 @@ async function persistActiveProject() {
         state.activeProject = saved;
         state.dirty = false;
         renderProjects();
-        renderPlayer();
         renderPreview();
         setSaveState('已儲存', 'saved');
       } else {
