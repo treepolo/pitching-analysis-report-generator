@@ -1,6 +1,13 @@
 # Traceability Matrix
 
-## Current Wave 15C provenance integration (2026-08-15)
+## Current Wave 16E provenance integration (2026-08-15)
+
+- Current implementation tip is `df2d429e3910e6950cf00022ec6b8213e7dab03f` on `worker/desktop-vertical-slice`, with `f9f355b` sync contract tests and `df2d429` media cancellation cleanup; local/origin HEAD matched before this docs-only update.
+- Wave 16A media evidence records local `ffmpeg`/`ffprobe` version `9.0.1`, ignored MP4 fixture normalization, 46 progress events, original preservation, and cancellation cleanup. The media worker's process-close fix is covered by 34/34 scoped media tests; fixtures/evidence are non-tracked.
+- Wave 16B evidence records 26/26 synthetic sync contract tests and worker-reported 127 npm pass / 1 Electron skip. This is contract evidence only and must not be promoted to real player, browser, or human acceptance.
+- Requirement rows remain conservative and none are `VERIFIED`. Real Electron/file://, real player/sync/drift, responsive human acceptance, native/human checkpoints, and AT-A through AT-G remain unresolved.
+
+## Historical Wave 15C provenance integration (superseded, 2026-08-15)
 
 - Current implementation checkpoint is `12283a429d3da786e105dc53a2e587566321bef3` on `worker/desktop-vertical-slice`; the ZIP staging repair is `12283a4`, followed by this docs-only provenance update.
 - Export evidence now covers the folder→ZIP same-output-root sequence: ZIP-only uses unique staging and cleans it without modifying the previously successful folder; folder collision safety remains; existing ZIP targets produce explicit `EXPORT_VALIDATION_FAILED` and are not overwritten. ZIP→folder remains supported with both outputs preserved.

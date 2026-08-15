@@ -1,6 +1,13 @@
 # Implementation Status
 
-## Current Wave 15C provenance integration (2026-08-15)
+## Current Wave 16E provenance integration (2026-08-15)
+
+- Current implementation tip is `df2d429e3910e6950cf00022ec6b8213e7dab03f` on `worker/desktop-vertical-slice`; it includes sync contract test commit `f9f355b` and media process-close cleanup commit `df2d429`. This is a docs-only reconciliation; source and tests are unchanged here.
+- Wave 16A recorded real local tool evidence: `ffmpeg`/`ffprobe` `9.0.1`, ignored project-local MP4 normalization, 46 progress events, preserved originals, and cancellation cleanup. This evidence is bounded to local fixtures/tools and is not product-wide media acceptance.
+- Wave 16B recorded 26/26 synthetic sync contract tests and worker-reported `npm test` 127 pass / 1 explicit Electron skip. The synthetic sync contract does not verify a real player, frame drift, browser `file://`, or human behavior.
+- Fresh media checks are 34/34 scoped tests passing and 8 media JavaScript syntax checks, with diff-check pass. Electron/file:// runtime, real player/sync/drift, responsive human evidence, and AT-A through AT-G remain pending or unavailable. No requirement may be marked `VERIFIED`.
+
+## Historical Wave 15C provenance integration (superseded, 2026-08-15)
 
 - Current implementation checkpoint is `12283a429d3da786e105dc53a2e587566321bef3` on `worker/desktop-vertical-slice`; this docs-only checkpoint follows `fix: repair zip export validation` (`12283a4`).
 - Root cause was final-folder collision when a ZIP job followed a successful folder job with the same output root/report name. ZIP-only jobs now use a unique output-root staging folder, create the ZIP from that staging tree, clean staging, and leave the existing folder untouched. Folder-only jobs still reject an existing final folder, and existing ZIP targets still fail with `EXPORT_VALIDATION_FAILED` rather than being overwritten.

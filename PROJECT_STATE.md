@@ -1,6 +1,13 @@
 # Current Project State
 
-## Current Wave 15C provenance integration (2026-08-15)
+## Current Wave 16E provenance integration (2026-08-15)
+
+- Current implementation tip is `df2d429e3910e6950cf00022ec6b8213e7dab03f` on `worker/desktop-vertical-slice`, with `f9f355b` sync contract coverage and `df2d429` media cancellation cleanup in its ancestry; local and origin HEAD match before this docs-only checkpoint.
+- Wave 16A worker evidence records local `ffmpeg`/`ffprobe` `9.0.1` processing of ignored project-local MP4 fixtures, normalization with 46 progress events, original preservation, and cancellation cleanup. The media cancellation implementation waits for child-process close before rejecting, avoiding Windows cleanup races; the fixture media and evidence remain outside Git.
+- Wave 16B worker evidence records `f9f355b` synthetic public sync contract coverage: 26/26 focused sync tests and a worker-reported 127 npm tests passing with 1 explicit Electron skip. These are synthetic/worker evidence, not real player or browser acceptance.
+- Fresh media scoped checks pass: 34/34 media tests, 8 media JavaScript `node --check` files, and `git diff --check`; no source/test changes are included in this documentation checkpoint. Real Electron/file:// runtime, real player/sync/drift, human responsive evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
+
+## Historical Wave 15C provenance integration (superseded, 2026-08-15)
 
 - Current implementation checkpoint is `12283a429d3da786e105dc53a2e587566321bef3` on `worker/desktop-vertical-slice`; this docs-only reconciliation follows the ZIP staging repair commit `12283a4`.
 - The repaired sequence is folder export followed by ZIP export using the same output root and report name. `outputKind=zip` now builds the report in a unique temporary staging folder, archives that staging tree, cleans it after success, and preserves an existing successful final folder. `outputKind=folder` retains final-folder collision safety; an existing ZIP remains a safe `EXPORT_VALIDATION_FAILED` error and is never overwritten.
