@@ -35,6 +35,11 @@ const SYNC_MODE = Object.freeze({
   UNKNOWN: 'unknown',
 });
 
+const SYNC_MASTER_SIDE = Object.freeze({
+  LEFT: 'left',
+  RIGHT: 'right',
+});
+
 const TIMING_KIND = Object.freeze({
   CFR: 'cfr',
   VFR: 'vfr',
@@ -128,6 +133,38 @@ function clampMediaTime(time, duration) {
   return duration === undefined || duration === null
     ? lowerBounded
     : clamp(lowerBounded, 0, duration);
+}
+
+function normalizeBindingSegment(segment, name = 'binding segment') {
+  if (segment === undefined || segment === null) {
+    return { in: 0, out: null };
+  }
+  requireRecord(segment, name);
+  const start = segment.in ?? segment.start ?? 0;
+  const end = segment.out ?? segment.end ?? null;
+  requireFinite(start, `${name}.in`, 0);
+  if (end !== null) requireFinite(end, `${name}.out`, 0);
+  if (end !== null && end <= start) {
+    throw new SyncDomainError(`${name}.out must be greater than ${name}.in`);
+  }
+  return { in: start, out: end };
+}
+
+function clampToBindingSegment(time, segment, duration) {
+  if (!segment) return clampMediaTime(time, duration);
+  const durationClamped = clampMediaTime(time, duration);
+  const upperBound = segment.out ?? duration;
+  const lowerBound = segment.in ?? 0;
+  if (upperBound === undefined || upperBound === null) {
+    return duration === undefined || duration === null
+      ? Math.max(lowerBound, durationClamped)
+      : Math.min(duration, Math.max(lowerBound, durationClamped));
+  }
+  const boundedUpper = duration === undefined || duration === null
+    ? upperBound
+    : Math.min(upperBound, duration);
+  const boundedLower = Math.min(lowerBound, boundedUpper);
+  return clamp(durationClamped, boundedLower, Math.max(boundedLower, boundedUpper));
 }
 
 function assertValid(validation, context) {
@@ -495,6 +532,64 @@ function createSyncAnchor(input) {
   return anchor;
 }
 
+function createSyncBinding(input = {}) {
+  requireRecord(input, 'sync binding');
+  const mode = normalizeSyncMode(input.mode ?? SYNC_MODE.TIME, 'sync binding.mode');
+  const masterSide = input.masterSide ?? input.clockSide ?? SYNC_MASTER_SIDE.LEFT;
+  if (![SYNC_MASTER_SIDE.LEFT, SYNC_MASTER_SIDE.RIGHT].includes(masterSide)) {
+    throw new SyncDomainError('sync binding.masterSide must be left or right');
+  }
+  const playbackRate = input.playbackRate ?? input.rate ?? 1;
+  requireFinite(playbackRate, 'sync binding.playbackRate', Number.MIN_VALUE);
+  const fallbackPrecision = input.fallbackPrecision ?? PRECISION.UNKNOWN;
+  if (![PRECISION.FRAME_AWARE, PRECISION.TIME_BASED, PRECISION.UNKNOWN].includes(fallbackPrecision)) {
+    throw new SyncDomainError('sync binding.fallbackPrecision is invalid');
+  }
+
+  const rawAnchors = input.anchors ?? {};
+  requireRecord(rawAnchors, 'sync binding.anchors');
+  const anchors = { left: null, right: null };
+  for (const side of ['left', 'right']) {
+    const rawAnchor = rawAnchors[side];
+    if (rawAnchor === undefined || rawAnchor === null) continue;
+    requireRecord(rawAnchor, `sync binding.anchors.${side}`);
+    const anchor = createSyncAnchor({
+      ...cloneValue(rawAnchor),
+      side: rawAnchor.side ?? side,
+    });
+    assertValid(validateSyncAnchor(anchor, { side }), `sync binding ${side} anchor`);
+    anchors[side] = anchor;
+  }
+
+  const rawSides = input.sides ?? {};
+  requireRecord(rawSides, 'sync binding.sides');
+  const rawOffsets = input.offsets ?? {};
+  requireRecord(rawOffsets, 'sync binding.offsets');
+  const sides = {};
+  for (const side of ['left', 'right']) {
+    const sideInput = rawSides[side] ?? {
+      offsetSeconds: rawOffsets[side],
+    };
+    requireRecord(sideInput, `sync binding.sides.${side}`);
+    const offsetSeconds = sideInput.offsetSeconds ?? sideInput.offset ?? 0;
+    requireFinite(offsetSeconds, `sync binding.sides.${side}.offsetSeconds`);
+    sides[side] = {
+      segment: normalizeBindingSegment(sideInput.segment, `sync binding.sides.${side}.segment`),
+      offsetSeconds,
+    };
+  }
+
+  return {
+    enabled: input.enabled === true,
+    masterSide,
+    mode,
+    playbackRate,
+    fallbackPrecision,
+    anchors,
+    sides,
+  };
+}
+
 /**
  * Capture an anchor from a block-local player snapshot.  Frame precision is
  * only claimed when an observed frame index is explicitly supplied together
@@ -741,8 +836,13 @@ function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
   const requestedMode = normalizeSyncMode(options.mode, 'anchor mapping mode');
   const duration = options.duration ?? anchor.timingSnapshot.duration;
   const timing = normalizeTimingMetadata(options.timing ?? anchor.timingSnapshot, duration);
-  const requestedTime = anchor.observedTime + relativeTime;
-  const targetTime = clampMediaTime(requestedTime, duration);
+  const offsetSeconds = options.offsetSeconds ?? options.offset ?? 0;
+  requireFinite(offsetSeconds, 'mapping offsetSeconds');
+  const segment = options.segment === undefined || options.segment === null
+    ? null
+    : normalizeBindingSegment(options.segment);
+  const requestedTime = anchor.observedTime + relativeTime + offsetSeconds;
+  const targetTime = clampToBindingSegment(requestedTime, segment, duration);
   const capabilityStatus = frameStepCapabilityStatus(options.capability);
   const anchorHasFrameEvidence = anchor.precision === PRECISION.FRAME_AWARE
     && Number.isInteger(anchor.observedFrameIndex);
@@ -769,6 +869,8 @@ function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
     requestedMode,
     relativeTime,
     anchorTime: anchor.observedTime,
+    offsetSeconds,
+    segment,
     requestedTime,
     targetTime,
     playbackTime: frameTime ?? targetTime,
@@ -820,6 +922,8 @@ function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
       duration: entry.duration ?? options.duration,
       timing: entry.timing ?? options.timings?.[side],
       capability: entry.capability ?? options.capabilities?.[side],
+      segment: entry.segment ?? options.segments?.[side],
+      offsetSeconds: entry.offsetSeconds ?? options.offsets?.[side],
     });
     if (mapping.side !== side) {
       throw new SyncDomainError(`comparison anchor for ${side} must declare side ${side}`);
@@ -830,6 +934,7 @@ function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
     throw new SyncDomainError('comparison anchors must belong to the same comparison block');
   }
   const resolution = overallResolution(Object.values(alignedSides));
+  const fallbackPrecision = precisionForResolution(resolution);
   return {
     comparisonBlockId: alignedSides.left.comparisonBlockId,
     mode: requestedMode,
@@ -838,6 +943,7 @@ function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
     relativeTime,
     precision: overallPrecision(Object.values(alignedSides)),
     resolution,
+    fallbackPrecision,
     fallback: requestedMode === SYNC_MODE.FRAME
       && resolution !== FRAME_STEP_RESOLUTION.EXACT_FRAME,
     sides: alignedSides,
@@ -875,7 +981,9 @@ function createComparisonSyncState(input) {
     input.comparisonBlockId,
     'comparison sync state.comparisonBlockId',
   );
-  const rawAnchors = input.startAnchors ?? input.anchors ?? {};
+  const rawBinding = input.binding ?? {};
+  requireRecord(rawBinding, 'comparison sync state.binding');
+  const rawAnchors = rawBinding.anchors ?? input.startAnchors ?? input.anchors ?? {};
   requireRecord(rawAnchors, 'comparison sync state.startAnchors');
   const startAnchors = { left: null, right: null };
   for (const side of ['left', 'right']) {
@@ -893,10 +1001,27 @@ function createComparisonSyncState(input) {
     }), `comparison sync state ${side} anchor`);
     startAnchors[side] = anchor;
   }
+  const playbackInput = input.playback ?? {};
+  requireRecord(playbackInput, 'comparison sync state.playback');
+  const binding = createSyncBinding({
+    ...cloneValue(rawBinding),
+    mode: rawBinding.mode ?? playbackInput.mode ?? SYNC_MODE.TIME,
+    masterSide: rawBinding.masterSide ?? rawBinding.clockSide ?? playbackInput.clockSide,
+    playbackRate: rawBinding.playbackRate ?? rawBinding.rate ?? playbackInput.playbackRate,
+    anchors: startAnchors,
+    sides: rawBinding.sides ?? input.bindingSides ?? {},
+  });
+  const playback = createPlaybackRelationship({
+    ...cloneValue(playbackInput),
+    mode: binding.mode,
+    playbackRate: binding.playbackRate,
+    clockSide: binding.masterSide,
+  });
   return {
     comparisonBlockId,
     startAnchors,
-    playback: createPlaybackRelationship(input.playback ?? {}),
+    binding,
+    playback,
   };
 }
 
@@ -918,25 +1043,62 @@ function setSyncStartAnchor(stateInput, side, anchorInput) {
       side,
     }), `comparison sync state ${side} anchor`);
   }
-  return {
-    ...state,
-    startAnchors: {
-      ...state.startAnchors,
+  return setSyncBinding(state, {
+    anchors: {
+      ...state.binding.anchors,
       [side]: anchor,
     },
-  };
+  });
 }
 
 function clearSyncStartAnchor(stateInput, side) {
   return setSyncStartAnchor(stateInput, side, null);
 }
 
+function setSyncBinding(stateInput, patch) {
+  const state = createComparisonSyncState(stateInput);
+  requireRecord(patch, 'sync binding patch');
+  const binding = createSyncBinding({
+    ...cloneValue(state.binding),
+    ...cloneValue(patch),
+    anchors: patch.anchors ?? state.binding.anchors,
+    sides: patch.sides ?? state.binding.sides,
+  });
+  const playback = createPlaybackRelationship({
+    ...state.playback,
+    mode: binding.mode,
+    playbackRate: binding.playbackRate,
+    clockSide: binding.masterSide,
+  });
+  return {
+    ...state,
+    startAnchors: binding.anchors,
+    binding,
+    playback,
+  };
+}
+
 function setPlaybackRelationship(stateInput, patch) {
   const state = createComparisonSyncState(stateInput);
   requireRecord(patch, 'playback relationship patch');
+  const nextPlayback = createPlaybackRelationship({
+    ...state.playback,
+    ...cloneValue(patch),
+    clockSide: patch.clockSide ?? state.binding.masterSide,
+  });
+  const binding = createSyncBinding({
+    ...cloneValue(state.binding),
+    mode: nextPlayback.mode,
+    playbackRate: nextPlayback.playbackRate,
+    masterSide: nextPlayback.clockSide,
+    anchors: state.binding.anchors,
+    sides: state.binding.sides,
+  });
   return {
     ...state,
-    playback: createPlaybackRelationship({ ...state.playback, ...cloneValue(patch) }),
+    startAnchors: binding.anchors,
+    binding,
+    playback: nextPlayback,
   };
 }
 
@@ -971,6 +1133,8 @@ function mapComparisonSyncState(stateInput, sources) {
       effectiveMode: SYNC_MODE.UNKNOWN,
       relativeTime: state.playback.relativeTime,
       resolution: FRAME_STEP_RESOLUTION.UNKNOWN,
+      fallbackPrecision: PRECISION.UNKNOWN,
+      binding: state.binding,
       missingSides,
       repairAction: 'set-sync-start-anchors',
       sides: {},
@@ -1008,6 +1172,11 @@ function mapComparisonSyncState(stateInput, sources) {
       timing,
       capability,
       mode: requestedMode,
+      segment: source.segment ?? player?.segment ?? state.binding.sides[side].segment,
+      offsetSeconds: source.offsetSeconds
+        ?? source.offset
+        ?? player?.offsetSeconds
+        ?? state.binding.sides[side].offsetSeconds,
     });
     sides[side] = {
       ...mapping,
@@ -1016,6 +1185,7 @@ function mapComparisonSyncState(stateInput, sources) {
     };
   }
   const resolution = overallResolution(Object.values(sides));
+  const fallbackPrecision = precisionForResolution(resolution);
   return {
     valid: true,
     comparisonBlockId: state.comparisonBlockId,
@@ -1025,6 +1195,12 @@ function mapComparisonSyncState(stateInput, sources) {
     playbackRate: state.playback.playbackRate,
     status: state.playback.status,
     resolution,
+    fallbackPrecision,
+    binding: {
+      ...state.binding,
+      fallbackPrecision,
+      anchors: state.startAnchors,
+    },
     fallback: requestedMode === SYNC_MODE.FRAME
       && resolution !== FRAME_STEP_RESOLUTION.EXACT_FRAME,
     sides,
@@ -1275,6 +1451,7 @@ module.exports = Object.freeze({
   PLAYER_STATUS,
   PRECISION,
   SYNC_MODE,
+  SYNC_MASTER_SIDE,
   SyncDomainError,
   TIMING_KIND,
   advancePlayer,
@@ -1287,6 +1464,7 @@ module.exports = Object.freeze({
   createComparisonSyncState,
   createPlaybackRelationship,
   createPlayerBlock,
+  createSyncBinding,
   createSyncAnchor,
   estimateFallbackStep,
   frameDurationForTiming,
@@ -1305,6 +1483,7 @@ module.exports = Object.freeze({
   setPlayerAnchor,
   setPlayerLoop,
   setPlayerStatus,
+  setSyncBinding,
   setSyncStartAnchor,
   frameStepCapabilityStatus,
   supportsFrameStep,

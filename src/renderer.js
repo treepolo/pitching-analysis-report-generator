@@ -20,6 +20,7 @@ const state = {
     pollTimer: null,
   },
   inlineGeneration: 0,
+  inlineRuntimeByCard: new WeakMap(),
   blockCanvasRenderQueued: false,
   player: {
     selectedBlockId: null,
@@ -140,7 +141,10 @@ function displayStatus(value) {
 
 function displayPrecision(value) {
   const labels = {
+    'frame-aware': '可辨識影格',
+    'time-based': '時間同步',
     'exact-frame': '精確影格',
+    'time-only': '僅時間',
     exact: '精確',
     time: '時間',
     approximate: '約略',
@@ -265,6 +269,144 @@ function playerTimingForAsset(asset, duration) {
   return { kind: 'unknown', duration };
 }
 
+function inlineBindingSegment(config) {
+  const segment = config?.segment || {};
+  const start = Number.isFinite(Number(segment.in)) ? Number(segment.in) : 0;
+  const rawEnd = segment.out ?? null;
+  const end = rawEnd === null || rawEnd === '' || !Number.isFinite(Number(rawEnd))
+    ? null
+    : Number(rawEnd);
+  return { in: Math.max(0, start), out: end === null ? null : Math.max(0, end) };
+}
+
+function inlineBindingAnchor(block, side, rawAnchor) {
+  if (!rawAnchor || typeof rawAnchor !== 'object') return null;
+  const assetId = playerAssetIdFor(block, side);
+  const asset = mediaAssetFor(assetId);
+  const metadata = asset?.metadata || {};
+  const frameTiming = typeof metadata.frameTiming === 'string'
+    ? metadata.frameTiming.toLowerCase()
+    : '';
+  const kind = frameTiming === 'cfr' || frameTiming === 'vfr' ? frameTiming : 'unknown';
+  const fps = Number(metadata.fps);
+  const timingSnapshot = {
+    ...(rawAnchor.timingSnapshot
+      || (rawAnchor.timingMetadata?.isVfr === true ? { kind: 'vfr' } : { kind })),
+  };
+  if (kind === 'cfr' && Number.isFinite(fps) && fps > 0 && timingSnapshot.fps === undefined) {
+    timingSnapshot.fps = fps;
+  }
+  if (Number.isFinite(Number(metadata.duration)) && timingSnapshot.duration === undefined) {
+    timingSnapshot.duration = Number(metadata.duration);
+  }
+  const observedFrameIndex = rawAnchor.observedFrameIndex ?? rawAnchor.frameIndex ?? null;
+  const frameEvidence = Number.isInteger(observedFrameIndex)
+    && timingSnapshot.kind === 'cfr'
+    && Number.isFinite(Number(timingSnapshot.fps));
+  const precision = frameEvidence && rawAnchor.precision === 'frame-aware'
+    ? 'frame-aware'
+    : rawAnchor.precision === 'unknown' || timingSnapshot.kind === 'unknown'
+      ? 'unknown'
+      : 'time-based';
+  return {
+    ...rawAnchor,
+    comparisonBlockId: rawAnchor.comparisonBlockId || block.id,
+    side,
+    mediaAssetId: rawAnchor.mediaAssetId || assetId,
+    observedFrameIndex,
+    precision,
+    timingSnapshot,
+    capturedAt: rawAnchor.capturedAt || '1970-01-01T00:00:00.000Z',
+  };
+}
+
+function inlineBindingForBlock(block) {
+  const sync = block?.sync || {};
+  const stored = { ...(block?.binding || {}), ...(sync.binding || {}) };
+  const sides = {};
+  const anchors = {};
+  for (const side of ['left', 'right']) {
+    const config = playerSideConfig(block, side);
+    const storedSide = stored.sides?.[side] || {};
+    const segment = config.segment ?? storedSide.segment;
+    const offset = config.offsetSeconds
+      ?? config.offset
+      ?? storedSide.offsetSeconds
+      ?? stored.offsets?.[side];
+    sides[side] = {
+      segment: inlineBindingSegment(segment),
+      offsetSeconds: Number.isFinite(Number(offset))
+        ? Number(offset)
+        : 0,
+    };
+    anchors[side] = inlineBindingAnchor(block, side, config.anchor || stored.anchors?.[side]);
+  }
+  const mode = stored.mode === 'frame' || sync.mode === 'frame' ? 'frame' : 'time';
+  const masterSide = ['left', 'right'].includes(stored.masterSide ?? stored.clockSide)
+    ? (stored.masterSide ?? stored.clockSide)
+    : 'left';
+  const playbackRate = Number.isFinite(Number(stored.playbackRate))
+    ? Number(stored.playbackRate)
+    : Number(block?.playback?.rate) || Number(playerSideConfig(block, masterSide).playback?.rate) || 1;
+  return {
+    enabled: stored.enabled === true,
+    masterSide,
+    mode,
+    playbackRate,
+    fallbackPrecision: stored.fallbackPrecision || 'unknown',
+    anchors,
+    sides,
+  };
+}
+
+function persistInlineBinding(block, patch = {}) {
+  if (!block || block.type !== 'comparisonVideo') return inlineBindingForBlock(block);
+  const current = inlineBindingForBlock(block);
+  const next = {
+    ...current,
+    ...patch,
+    anchors: { ...current.anchors, ...(patch.anchors || {}) },
+    sides: {
+      left: { ...current.sides.left, ...(patch.sides?.left || {}) },
+      right: { ...current.sides.right, ...(patch.sides?.right || {}) },
+    },
+  };
+  const portableBinding = {
+    enabled: next.enabled,
+    masterSide: next.masterSide,
+    mode: next.mode,
+    anchors: { left: next.anchors.left, right: next.anchors.right },
+    offsets: {
+      left: next.sides.left.offsetSeconds,
+      right: next.sides.right.offsetSeconds,
+    },
+    fallbackPrecision: next.fallbackPrecision,
+    segmentRelation: 'independent',
+    loopRelation: 'independent',
+  };
+  block.binding = portableBinding;
+  block.sync = { ...(block.sync || {}), mode: next.mode, binding: next };
+  block.playback = { ...(block.playback || {}), rate: next.playbackRate };
+  for (const side of ['left', 'right']) {
+    const config = playerSideConfig(block, side);
+    config.segment = next.sides[side].segment;
+    config.offsetSeconds = next.sides[side].offsetSeconds;
+    if (next.anchors[side]) config.anchor = next.anchors[side];
+  }
+  return next;
+}
+
+function inlineBindingSummary(block) {
+  if (block?.type !== 'comparisonVideo') return '單一來源 · 專案內媒體';
+  const binding = inlineBindingForBlock(block);
+  const mode = binding.mode === 'frame' ? '明確影格模式' : '共用經過時間';
+  const master = binding.masterSide === 'right' ? '右側' : '左側';
+  const precision = displayPrecision(binding.fallbackPrecision);
+  return binding.enabled
+    ? `持續綁定 · 控制側：${master} · ${mode} · 精度：${precision}`
+    : `未啟用持續綁定 · ${mode} · 控制側：${master}`;
+}
+
 function makePlayerBlockId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -332,7 +474,32 @@ function addComparisonVideoBlock({ allowEmpty = false } = {}) {
     label: '影片比較',
     layout: 'side-by-side',
     playback: { rate: 1 },
-    sync: { mode: 'time', startAnchor: null },
+    sync: {
+      mode: 'time',
+      startAnchor: null,
+      binding: {
+        enabled: false,
+        masterSide: 'left',
+        mode: 'time',
+        playbackRate: 1,
+        fallbackPrecision: 'unknown',
+        anchors: { left: null, right: null },
+        sides: {
+          left: { segment: { in: 0, out: null }, offsetSeconds: 0 },
+          right: { segment: { in: 0, out: null }, offsetSeconds: 0 },
+        },
+      },
+    },
+    binding: {
+      enabled: false,
+      masterSide: 'left',
+      mode: 'time',
+      anchors: { left: null, right: null },
+      offsets: { left: 0, right: 0 },
+      fallbackPrecision: 'unknown',
+      segmentRelation: 'independent',
+      loopRelation: 'independent',
+    },
     left: {
       mediaAssetId: left?.id || null,
       label: left?.displayName || '左側影片',
@@ -622,6 +789,8 @@ function renderVideoSideEditor(block, side) {
   const config = comparison ? (block[side] || {}) : block;
   const prefix = comparison ? `${side}.` : '';
   const label = comparison ? (side === 'left' ? '左側來源' : '右側來源') : '影片來源';
+  const anchorTime = config.anchor?.observedTime;
+  const loop = config.loop || {};
   return `
     <fieldset class="video-side-config">
       <legend>${label}</legend>
@@ -632,14 +801,20 @@ function renderVideoSideEditor(block, side) {
       <div class="block-inline-fields">
         <label>起點 <input type="number" min="0" step="0.001" data-block-path="${prefix}segment.in" value="${editorValue(config.segment?.in)}" /></label>
         <label>終點 <input type="number" min="0" step="0.001" data-block-path="${prefix}segment.out" value="${editorValue(config.segment?.out)}" /></label>
+        <label>相對偏移（秒） <input type="number" step="0.001" data-block-path="${prefix}offsetSeconds" value="${editorValue(config.offsetSeconds || 0)}" /></label>
         <label>播放速度 <input type="number" min="0.1" max="8" step="0.1" data-block-path="${prefix}playback.rate" value="${editorValue(config.playback?.rate || 1)}" /></label>
-        <label>錨點（秒） <input type="number" min="0" step="0.001" data-block-path="${prefix}anchor.observedTime" value="${editorValue(config.anchor?.observedTime)}" /></label>
+        ${comparison ? `<label>同步錨點 <input type="number" min="0" step="0.001" data-inline-anchor-value="${side}" value="${editorValue(anchorTime)}" readonly aria-label="${label}同步錨點（由播放器位置取得）" /></label>` : ''}
+        <label>循環播放 <input type="checkbox" data-block-path="${prefix}loop.enabled"${loop.enabled === true ? ' checked' : ''} /></label>
+        <label>循環起點 <input type="number" min="0" step="0.001" data-block-path="${prefix}loop.start" value="${editorValue(loop.start)}" /></label>
+        <label>循環終點 <input type="number" min="0" step="0.001" data-block-path="${prefix}loop.end" value="${editorValue(loop.end)}" /></label>
       </div>
+      ${comparison ? `<button class="button button-quiet" type="button" data-inline-action="capture-anchor" data-inline-anchor-side="${side}">以目前${label}位置設定同步錨點</button>` : ''}
     </fieldset>`;
 }
 
 function renderVideoBlockEditor(block) {
   const comparison = block.type === 'comparisonVideo';
+  const binding = inlineBindingForBlock(block);
   return `
     <div class="block-config-grid">
       <label>模式
@@ -655,13 +830,22 @@ function renderVideoBlockEditor(block) {
           <option value="stacked"${block.layout === 'stacked' ? ' selected' : ''}>堆疊</option>
         </select>
       </label>
-      <label>同步模式
+      ${comparison ? `<label>綁定模式
         <select data-block-path="sync.mode">
-          <option value="time"${block.sync?.mode !== 'frame' ? ' selected' : ''}>時間／經過時間播放軸</option>
-          <option value="frame"${block.sync?.mode === 'frame' ? ' selected' : ''}>明確影格模式</option>
+          <option value="time"${binding.mode !== 'frame' ? ' selected' : ''}>時間／共用經過時間</option>
+          <option value="frame"${binding.mode === 'frame' ? ' selected' : ''}>明確影格（能力不足時降級）</option>
         </select>
       </label>
-      <label>同步起點錨點（秒） <input type="number" min="0" step="0.001" data-block-path="sync.startAnchor.observedTime" value="${editorValue(block.sync?.startAnchor?.observedTime)}" /></label>
+      <label>持續綁定
+        <input type="checkbox" data-block-path="sync.binding.enabled"${binding.enabled ? ' checked' : ''} aria-label="啟用持續雙側綁定" />
+      </label>
+      <label>控制側
+        <select data-block-path="sync.binding.masterSide">
+          <option value="left"${binding.masterSide === 'left' ? ' selected' : ''}>左側控制播放軸</option>
+          <option value="right"${binding.masterSide === 'right' ? ' selected' : ''}>右側控制播放軸</option>
+        </select>
+      </label>
+      <p class="inline-binding-status" data-inline-binding-status role="status">${escapeHtml(inlineBindingSummary(block))}</p>` : ''}
       <div class="video-side-configs">
         ${comparison ? `${renderVideoSideEditor(block, 'left')}${renderVideoSideEditor(block, 'right')}` : renderVideoSideEditor(block, 'single')}
       </div>
@@ -674,11 +858,13 @@ function renderInlineVideoSide(block, side) {
   return `
     <div class="inline-video-side" data-inline-side="${side}">
       <h3>${label}</h3>
-      <div class="inline-video-frame"><video data-inline-video playsinline preload="metadata"></video></div>
+      <div class="inline-video-frame"><video data-inline-video tabindex="0" playsinline preload="metadata"></video></div>
       <p class="inline-video-status" data-inline-status role="status">尚未載入；請選擇專案內資產。</p>
       <div class="inline-video-controls">
         <button class="button button-quiet" type="button" data-inline-action="play">播放</button>
         <button class="button button-quiet" type="button" data-inline-action="pause">暫停</button>
+        <button class="button button-quiet" type="button" data-inline-action="step-prev">上一幀</button>
+        <button class="button button-quiet" type="button" data-inline-action="step-next">下一幀</button>
         <input class="inline-video-seek" data-inline-seek type="range" min="0" max="0" step="0.001" value="0" disabled aria-label="${label}時間軸" />
         <output class="inline-video-time" data-inline-time>0.00s</output>
         <button class="button button-quiet" type="button" data-inline-action="fullscreen">全螢幕</button>
@@ -690,11 +876,11 @@ function renderInlineVideoBlock(section, block) {
   const comparison = block.type === 'comparisonVideo';
   const layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
   const sides = comparison ? `${renderInlineVideoSide(block, 'left')}${renderInlineVideoSide(block, 'right')}` : renderInlineVideoSide(block, 'single');
-  const syncMode = block.sync?.mode === 'frame' ? '明確影格模式' : '共用經過時間同步';
+  const syncMode = inlineBindingSummary(block);
   return `
     <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block>
       <header class="inline-video-header">
-        <div class="inline-video-title"><strong>${escapeHtml(block.label || (comparison ? '影片比較' : '影片區塊'))}</strong><span>${comparison ? `${syncMode} · ${layout === 'stacked' ? '堆疊' : '並排'}` : '單一來源 · 專案內媒體'}</span></div>
+        <div class="inline-video-title"><strong>${escapeHtml(block.label || (comparison ? '影片比較' : '影片區塊'))}</strong><span>${comparison ? `${escapeHtml(syncMode)} · ${layout === 'stacked' ? '堆疊' : '並排'}` : '單一來源 · 專案內媒體'}</span></div>
         <div class="inline-video-actions">
           <button class="button button-quiet" type="button" data-inline-action="open">開啟控制項</button>
           <button class="button button-secondary" type="button" data-inline-action="play-all">播放</button>
@@ -743,10 +929,302 @@ function safeInlineMediaSourceUrl(source) {
   return parsed.href;
 }
 
+function inlineRuntimeForCard(card) {
+  let runtime = state.inlineRuntimeByCard.get(card);
+  if (!runtime) {
+    runtime = {
+      guard: false,
+      syncQueued: false,
+      syncInFlight: false,
+      pendingSync: null,
+      lastPrecision: null,
+    };
+    state.inlineRuntimeByCard.set(card, runtime);
+  }
+  return runtime;
+}
+
+function scheduleInlineRuntimeTask(callback) {
+  if (typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(callback);
+    return;
+  }
+  setTimeout(callback, 0);
+}
+
+function inlineVideoForSide(card, side) {
+  return card?.querySelector(`[data-inline-side="${side}"] [data-inline-video]`) || null;
+}
+
+function inlineBindingSource(block, side, video) {
+  const binding = inlineBindingForBlock(block);
+  const asset = mediaAssetFor(playerAssetIdFor(block, side));
+  return {
+    anchor: binding.anchors[side],
+    duration: Number.isFinite(video?.duration) ? video.duration : undefined,
+    timing: playerTimingForAsset(asset, Number.isFinite(video?.duration) ? video.duration : undefined),
+    capability: { supportsFrameStep: typeof video?.seekToNextFrame === 'function' },
+    segment: binding.sides[side].segment,
+    offsetSeconds: binding.sides[side].offsetSeconds,
+  };
+}
+
+function setInlineBindingStatus(card, message, stateName = '') {
+  const status = card?.querySelector('[data-inline-binding-status]');
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.state = stateName;
+}
+
+function inlineRelativeTimeForSide(block, side, video) {
+  const binding = inlineBindingForBlock(block);
+  const anchor = binding.anchors[side];
+  if (!anchor || !video || !Number.isFinite(video.currentTime)) return null;
+  return Math.max(0, video.currentTime - anchor.observedTime - binding.sides[side].offsetSeconds);
+}
+
+function inlineAlignmentStatus(alignment, binding) {
+  if (binding.mode === 'frame' && alignment.fallback) {
+    return '持續綁定中；雙側不具精確影格能力，已降級為時間同步。';
+  }
+  if (alignment.effectiveMode === 'frame') return '持續綁定中；雙側精確影格。';
+  return `持續綁定中；${displayPrecision(alignment.fallbackPrecision || alignment.precision)}。`;
+}
+
+async function applyInlineBindingAtRelativeTime(card, block, relativeTime, { force = false } = {}) {
+  const binding = inlineBindingForBlock(block);
+  if (!binding.enabled || block.type !== 'comparisonVideo') return null;
+  if (!binding.anchors.left || !binding.anchors.right) {
+    setInlineBindingStatus(card, '持續綁定需要左右兩側同步錨點。', 'pending');
+    return null;
+  }
+  if (!window.pitchingApp?.sync?.alignComparisonAtRelativeTime) return null;
+  const leftVideo = inlineVideoForSide(card, 'left');
+  const rightVideo = inlineVideoForSide(card, 'right');
+  if (!leftVideo || !rightVideo) return null;
+  const runtime = inlineRuntimeForCard(card);
+  const previousGuard = runtime.guard;
+  runtime.guard = true;
+  try {
+    const alignment = await window.pitchingApp.sync.alignComparisonAtRelativeTime({
+      left: inlineBindingSource(block, 'left', leftVideo),
+      right: inlineBindingSource(block, 'right', rightVideo),
+    }, Math.max(0, relativeTime), { mode: binding.mode });
+    for (const side of ['left', 'right']) {
+      const video = inlineVideoForSide(card, side);
+      const targetTime = alignment.sides[side].playbackTime;
+      if (video && (force || Math.abs(video.currentTime - targetTime) > 0.02)) {
+        video.currentTime = targetTime;
+      }
+      if (video) video.playbackRate = binding.playbackRate;
+    }
+    if (binding.fallbackPrecision !== alignment.fallbackPrecision) {
+      persistInlineBinding(block, { fallbackPrecision: alignment.fallbackPrecision });
+      scheduleSave();
+    }
+    setInlineBindingStatus(card, inlineAlignmentStatus(alignment, binding), alignment.fallback ? 'fallback' : 'loaded');
+    return alignment;
+  } catch {
+    setInlineBindingStatus(card, '持續同步暫時無法解析，請檢查兩側媒體與錨點。', 'error');
+    return null;
+  } finally {
+    runtime.guard = previousGuard;
+  }
+}
+
+function queueInlineBindingSync(card, block, sourceSide, { force = false } = {}) {
+  const binding = inlineBindingForBlock(block);
+  if (!binding.enabled || block.type !== 'comparisonVideo') return;
+  const side = sourceSide === 'left' || sourceSide === 'right'
+    ? sourceSide
+    : binding.masterSide;
+  const video = inlineVideoForSide(card, side);
+  const relativeTime = inlineRelativeTimeForSide(block, side, video);
+  if (relativeTime === null) return;
+  const runtime = inlineRuntimeForCard(card);
+  runtime.pendingSync = { relativeTime, force };
+  if (runtime.syncQueued) return;
+  runtime.syncQueued = true;
+  scheduleInlineRuntimeTask(() => {
+    runtime.syncQueued = false;
+    if (runtime.syncInFlight || !runtime.pendingSync) return;
+    const pending = runtime.pendingSync;
+    runtime.pendingSync = null;
+    runtime.syncInFlight = true;
+    void applyInlineBindingAtRelativeTime(card, block, pending.relativeTime, pending)
+      .finally(() => {
+        runtime.syncInFlight = false;
+        if (runtime.pendingSync) queueInlineBindingSync(card, block, binding.masterSide);
+      });
+  });
+}
+
+function applyInlineSideSettings(card, block, side) {
+  const video = inlineVideoForSide(card, side);
+  if (!video) return;
+  const config = playerSideConfig(block, side);
+  const binding = inlineBindingForBlock(block);
+  video.loop = config.loop?.enabled === true;
+  video.playbackRate = binding.enabled && block.type === 'comparisonVideo'
+    ? binding.playbackRate
+    : Number(config.playback?.rate) || 1;
+}
+
+async function propagateInlinePlayback(card, action, sourceSide) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const binding = inlineBindingForBlock(block);
+  if (!block || block.type !== 'comparisonVideo' || !binding.enabled) return false;
+  const runtime = inlineRuntimeForCard(card);
+  runtime.guard = true;
+  try {
+    if (action === 'play') {
+      const controlSide = binding.masterSide;
+      const relativeTime = inlineRelativeTimeForSide(block, controlSide, inlineVideoForSide(card, controlSide));
+      if (relativeTime !== null) {
+        await applyInlineBindingAtRelativeTime(card, block, relativeTime, { force: true });
+      }
+      await Promise.all(['left', 'right'].map((side) => inlineVideoForSide(card, side)?.play()));
+    } else if (action === 'pause') {
+      ['left', 'right'].forEach((side) => inlineVideoForSide(card, side)?.pause());
+    }
+  } finally {
+    runtime.guard = false;
+  }
+  return true;
+}
+
+function waitForInlineFrame(video, timeout = 250) {
+  if (!video || typeof video.requestVideoFrameCallback !== 'function') return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const timer = setTimeout(finish, timeout);
+    video.requestVideoFrameCallback(() => {
+      clearTimeout(timer);
+      finish();
+    });
+  });
+}
+
+async function stepInlineVideo(card, side, direction) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const video = inlineVideoForSide(card, side);
+  if (!block || !video || !window.pitchingApp?.sync?.planFrameStep) return;
+  const plan = await window.pitchingApp.sync.planFrameStep({
+    timing: playerTimingForAsset(mediaAssetFor(playerAssetIdFor(block, side)), video.duration),
+    duration: Number.isFinite(video.duration) ? video.duration : undefined,
+    currentTime: Number(video.currentTime) || 0,
+    direction,
+    capability: { supportsFrameStep: typeof video.seekToNextFrame === 'function' },
+  });
+  const targetTime = plan.targetTime;
+  if (plan.exact && direction > 0 && typeof video.seekToNextFrame === 'function') {
+    video.seekToNextFrame();
+  } else {
+    video.currentTime = targetTime;
+  }
+  await waitForInlineFrame(video);
+  const binding = inlineBindingForBlock(block);
+  const precisionLabel = plan.fallback ? '時間同步 fallback' : '精確影格';
+  setInlineVideoStatus(
+    card.querySelector(`[data-inline-side="${side}"]`),
+    `${direction > 0 ? '下一幀' : '上一幀'}：${precisionLabel}`,
+    plan.fallback ? 'fallback' : 'loaded',
+  );
+  if (binding.enabled) queueInlineBindingSync(card, block, binding.masterSide, { force: true });
+}
+
+function bindInlineVideoRuntime(card, block, side, video) {
+  if (!video || video.dataset.inlineRuntimeBound === 'true') return;
+  video.dataset.inlineRuntimeBound = 'true';
+  video.addEventListener('timeupdate', () => {
+    updateInlineVideoTime(video.closest('[data-inline-side]'));
+    const current = blockForEditorCard(card).block;
+    const binding = inlineBindingForBlock(current);
+    const runtime = inlineRuntimeForCard(card);
+    if (current && binding.enabled && !runtime.guard && side === binding.masterSide) {
+      queueInlineBindingSync(card, current, side);
+    }
+  });
+  video.addEventListener('seeked', () => {
+    const current = blockForEditorCard(card).block;
+    const binding = inlineBindingForBlock(current);
+    const runtime = inlineRuntimeForCard(card);
+    if (current && binding.enabled && !runtime.guard) {
+      queueInlineBindingSync(card, current, binding.masterSide, { force: true });
+    }
+  });
+  video.addEventListener('play', () => {
+    const current = blockForEditorCard(card).block;
+    const runtime = inlineRuntimeForCard(card);
+    if (current && !runtime.guard) void propagateInlinePlayback(card, 'play', side);
+  });
+  video.addEventListener('pause', () => {
+    const current = blockForEditorCard(card).block;
+    const runtime = inlineRuntimeForCard(card);
+    if (current && !runtime.guard) void propagateInlinePlayback(card, 'pause', side);
+  });
+  video.addEventListener('ratechange', () => {
+    const current = blockForEditorCard(card).block;
+    const binding = inlineBindingForBlock(current);
+    const runtime = inlineRuntimeForCard(card);
+    if (!current || !binding.enabled || runtime.guard || side !== binding.masterSide) return;
+    persistInlineBinding(current, { playbackRate: video.playbackRate });
+    ['left', 'right'].forEach((item) => applyInlineSideSettings(card, current, item));
+    scheduleSave();
+  });
+  video.addEventListener('ended', () => {
+    const current = blockForEditorCard(card).block;
+    const binding = inlineBindingForBlock(current);
+    if (current && binding.enabled && side === binding.masterSide) {
+      setInlineBindingStatus(card, '持續綁定已到達控制側結束位置。', 'loaded');
+    }
+  });
+}
+
+async function captureInlineAnchor(card, side) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const video = inlineVideoForSide(card, side);
+  const assetId = playerAssetIdFor(block, side);
+  if (!block || block.type !== 'comparisonVideo' || !video || !assetId || !Number.isFinite(video.currentTime)) return;
+  if (!window.pitchingApp?.sync?.captureAnchor) return;
+  try {
+    const anchor = await window.pitchingApp.sync.captureAnchor({
+      comparisonBlockId: block.id,
+      side,
+      mediaAssetId: assetId,
+      observedTime: video.currentTime,
+      timingSnapshot: playerTimingForAsset(mediaAssetFor(assetId), video.duration),
+      capability: { supportsFrameStep: typeof video.seekToNextFrame === 'function' },
+      capturedAt: new Date().toISOString(),
+    });
+    persistInlineBinding(block, { anchors: { [side]: anchor } });
+    patchInlineVideoCard(card, block);
+    scheduleSave();
+    setInlineVideoStatus(
+      card.querySelector(`[data-inline-side="${side}"]`),
+      `${side === 'left' ? '左側' : '右側'}同步錨點已保存（${displayPrecision(anchor.precision)}）。`,
+      'loaded',
+    );
+    const binding = inlineBindingForBlock(block);
+    if (binding.enabled) queueInlineBindingSync(card, block, binding.masterSide, { force: true });
+  } catch {
+    setInlineVideoStatus(card.querySelector(`[data-inline-side="${side}"]`), '同步錨點無法保存，請確認媒體位置有效。', 'error');
+  }
+}
+
 async function loadInlineVideoSide(card, block, side, generation) {
   const sideElement = card.querySelector(`[data-inline-side="${side}"]`);
   const video = sideElement?.querySelector('[data-inline-video]');
   if (!sideElement || !video || generation !== state.inlineGeneration) return;
+  bindInlineVideoRuntime(card, block, side, video);
   const assetId = playerAssetIdFor(block, side);
   const asset = mediaAssetFor(assetId);
   if (!assetId || !asset) {
@@ -771,8 +1249,8 @@ async function loadInlineVideoSide(card, block, side, generation) {
     video.onloadedmetadata = () => {
       setInlineVideoStatus(sideElement, '準備就緒；已載入實際媒體來源。', 'loaded');
       updateInlineVideoTime(sideElement);
+      applyInlineSideSettings(card, block, side);
     };
-    video.ontimeupdate = () => updateInlineVideoTime(sideElement);
     video.onerror = () => setInlineVideoStatus(sideElement, '此執行環境無法播放媒體。', 'error');
     video.src = safeInlineMediaSourceUrl(source);
     video.playbackRate = Number(playerSideConfig(block, side).playback?.rate) || 1;
@@ -800,30 +1278,52 @@ async function playInlineCard(card) {
     card.querySelectorAll('[data-inline-side]').forEach((side) => setInlineVideoStatus(side, '載入可播放來源後才能播放。', 'pending'));
     return;
   }
+  const entry = blockForEditorCard(card);
+  const binding = inlineBindingForBlock(entry.block);
   try {
+    const runtime = inlineRuntimeForCard(card);
+    if (entry.block?.type === 'comparisonVideo' && binding.enabled) {
+      const masterVideo = inlineVideoForSide(card, binding.masterSide);
+      const relativeTime = inlineRelativeTimeForSide(entry.block, binding.masterSide, masterVideo);
+      if (relativeTime !== null) await applyInlineBindingAtRelativeTime(card, entry.block, relativeTime, { force: true });
+      runtime.guard = true;
+      await Promise.all(['left', 'right'].map((side) => inlineVideoForSide(card, side)?.play()));
+      runtime.guard = false;
+      return;
+    }
     await Promise.all(ready.map((video) => video.play()));
   } catch {
+    inlineRuntimeForCard(card).guard = false;
     card.querySelectorAll('[data-inline-side]').forEach((side) => setInlineVideoStatus(side, '播放遭阻擋或無法使用。', 'error'));
   }
 }
 
 async function alignInlineComparison(card) {
   const entry = blockForEditorCard(card);
+  const binding = inlineBindingForBlock(entry.block);
   const leftElement = card.querySelector('[data-inline-side="left"]');
   const rightElement = card.querySelector('[data-inline-side="right"]');
   const leftVideo = leftElement?.querySelector('[data-inline-video]');
   const rightVideo = rightElement?.querySelector('[data-inline-video]');
   const left = playerSideConfig(entry.block, 'left');
   const right = playerSideConfig(entry.block, 'right');
+  if (entry.block && binding.enabled) {
+    const masterVideo = inlineVideoForSide(card, binding.masterSide);
+    const relativeTime = inlineRelativeTimeForSide(entry.block, binding.masterSide, masterVideo);
+    if (relativeTime !== null) {
+      await applyInlineBindingAtRelativeTime(card, entry.block, relativeTime, { force: true });
+    }
+    return;
+  }
   if (!entry.block || !leftVideo || !rightVideo || !leftVideo.src || !rightVideo.src || !left.anchor || !right.anchor) {
     setInlineVideoStatus(leftElement, '兩個來源都必須載入媒體，並分別設定錨點。', 'pending');
     return;
   }
   try {
     const alignment = await window.pitchingApp.sync.alignComparisonAtRelativeTime({
-      left: { anchor: left.anchor, duration: leftVideo.duration, timing: playerTimingForAsset(mediaAssetFor(playerAssetIdFor(entry.block, 'left')), leftVideo.duration), capability: { supportsFrameStep: typeof leftVideo.seekToNextFrame === 'function' } },
-      right: { anchor: right.anchor, duration: rightVideo.duration, timing: playerTimingForAsset(mediaAssetFor(playerAssetIdFor(entry.block, 'right')), rightVideo.duration), capability: { supportsFrameStep: typeof rightVideo.seekToNextFrame === 'function' } },
-    }, 0);
+      left: inlineBindingSource(entry.block, 'left', leftVideo),
+      right: inlineBindingSource(entry.block, 'right', rightVideo),
+    }, 0, { mode: binding.mode });
     leftVideo.currentTime = alignment.sides.left.playbackTime;
     rightVideo.currentTime = alignment.sides.right.playbackTime;
     setInlineVideoStatus(leftElement, `已對齊至 0 秒（${displayPrecision(alignment.precision)}）。`, 'loaded');
@@ -839,12 +1339,19 @@ function handleInlineVideoEvent(event) {
   if (!card) return false;
   const sideElement = target.closest('[data-inline-side]');
   const video = sideElement?.querySelector('[data-inline-video]');
+  const actionElement = target.closest('[data-inline-action]');
+  const action = actionElement?.dataset.inlineAction;
+  const actionSide = actionElement?.dataset.inlineAnchorSide || sideElement?.dataset.inlineSide;
   if (target.matches('[data-inline-seek]') && video) {
     video.currentTime = Number(target.value) || 0;
     updateInlineVideoTime(sideElement);
+    const entry = blockForEditorCard(card);
+    if (entry.block && inlineBindingForBlock(entry.block).enabled) {
+      const binding = inlineBindingForBlock(entry.block);
+      queueInlineBindingSync(card, entry.block, binding.masterSide, { force: true });
+    }
     return true;
   }
-  const action = target.closest('[data-inline-action]')?.dataset.inlineAction;
   if (!action) return false;
   if (action === 'open') {
     const details = card.querySelector('details');
@@ -853,30 +1360,68 @@ function handleInlineVideoEvent(event) {
   } else if (action === 'play-all') {
     void playInlineCard(card);
   } else if (action === 'pause-all') {
-    card.querySelectorAll('[data-inline-video]').forEach((item) => item.pause());
+    const entry = blockForEditorCard(card);
+    if (entry.block && inlineBindingForBlock(entry.block).enabled) {
+      void propagateInlinePlayback(card, 'pause', inlineBindingForBlock(entry.block).masterSide);
+    } else {
+      card.querySelectorAll('[data-inline-video]').forEach((item) => item.pause());
+    }
   } else if (action === 'play' && video) {
-    void video.play().catch(() => setInlineVideoStatus(sideElement, '播放遭阻擋或無法使用。', 'error'));
+    const entry = blockForEditorCard(card);
+    if (entry.block && inlineBindingForBlock(entry.block).enabled) {
+      void playInlineCard(card);
+    } else {
+      void video.play().catch(() => setInlineVideoStatus(sideElement, '播放遭阻擋或無法使用。', 'error'));
+    }
   } else if (action === 'pause' && video) {
-    video.pause();
+    const entry = blockForEditorCard(card);
+    if (entry.block && inlineBindingForBlock(entry.block).enabled) {
+      void propagateInlinePlayback(card, 'pause', actionSide || inlineBindingForBlock(entry.block).masterSide);
+    } else {
+      video.pause();
+    }
   } else if (action === 'fullscreen' && video && typeof video.requestFullscreen === 'function') {
     void video.requestFullscreen().catch(() => {});
   } else if (action === 'align-zero') {
     void alignInlineComparison(card);
+  } else if (action === 'capture-anchor' && actionSide) {
+    void captureInlineAnchor(card, actionSide);
+  } else if ((action === 'step-prev' || action === 'step-next') && actionSide) {
+    void stepInlineVideo(card, actionSide, action === 'step-next' ? 1 : -1);
   }
   return true;
+}
+
+function handleInlineVideoKeydown(event) {
+  if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+  const video = event.target.closest?.('[data-inline-video]');
+  if (!video) return;
+  const sideElement = video.closest('[data-inline-side]');
+  const card = video.closest('[data-inline-video-block]');
+  const side = sideElement?.dataset.inlineSide;
+  if (!card || !side) return;
+  event.preventDefault();
+  void stepInlineVideo(card, side, event.key === 'ArrowRight' ? 1 : -1);
 }
 
 function patchInlineVideoCard(card, block) {
   if (!card || !block || !card.matches('[data-inline-video-block]')) return;
   const comparison = block.type === 'comparisonVideo';
   const layout = block.layout === 'stacked' ? '堆疊' : '並排';
-  const syncMode = block.sync?.mode === 'frame' ? '明確影格模式' : '共用經過時間同步';
+  const syncMode = inlineBindingSummary(block);
   const title = card.querySelector('.inline-video-title strong');
   const summary = card.querySelector('.inline-video-title span');
   const grid = card.querySelector('.inline-video-grid');
   if (title) title.textContent = block.label || (comparison ? '影片比較' : '影片區塊');
   if (summary) summary.textContent = comparison ? `${syncMode} · ${layout}` : '單一來源 · 專案內媒體';
   if (grid) grid.dataset.layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
+  const bindingStatus = card.querySelector('[data-inline-binding-status]');
+  if (bindingStatus) bindingStatus.textContent = inlineBindingSummary(block);
+  for (const side of ['left', 'right']) {
+    const anchorInput = card.querySelector(`[data-inline-anchor-value="${side}"]`);
+    const anchorTime = inlineBindingForBlock(block).anchors[side]?.observedTime;
+    if (anchorInput) anchorInput.value = anchorTime === undefined ? '' : String(anchorTime);
+  }
 }
 
 function renderBlockEditor(section, block, index) {
@@ -1016,6 +1561,7 @@ function setEditorPath(target, pathValue, value) {
 }
 
 function editorControlValue(target) {
+  if (target.type === 'checkbox') return target.checked;
   if (target.type === 'number') return target.value === '' ? null : Number(target.value);
   return target.value;
 }
@@ -1030,8 +1576,13 @@ function convertVideoBlockMode(block, mode) {
   if (mode === 'comparison' && block.type !== 'comparisonVideo') {
     const singleAsset = referenceId(block.mediaAssetId);
     block.type = 'comparisonVideo';
+    block.sync = {
+      ...(block.sync || {}),
+      mode: block.sync?.mode === 'frame' ? 'frame' : 'time',
+    };
     block.left = { mediaAssetId: singleAsset, label: block.label || '左側影片', segment: block.segment, playback: block.playback, anchor: block.anchor };
     block.right = { mediaAssetId: null, label: '右側影片', segment: { in: 0, out: null }, playback: { rate: 1 }, anchor: null };
+    persistInlineBinding(block, inlineBindingForBlock(block));
     return;
   }
   if (mode === 'single' && block.type !== 'singleVideo') {
@@ -1043,6 +1594,39 @@ function convertVideoBlockMode(block, mode) {
     delete block.left;
     delete block.right;
   }
+}
+
+function inlineSideFromPath(pathValue) {
+  if (pathValue.startsWith('left.')) return 'left';
+  if (pathValue.startsWith('right.')) return 'right';
+  return null;
+}
+
+function refreshInlineBindingAfterEditorChange(card, block, pathValue) {
+  if (block.type !== 'comparisonVideo') return;
+  const bindingPatch = {};
+  if (pathValue === 'sync.mode') bindingPatch.mode = block.sync?.mode === 'frame' ? 'frame' : 'time';
+  if (pathValue === 'sync.binding.enabled') bindingPatch.enabled = block.sync?.binding?.enabled === true;
+  if (pathValue === 'sync.binding.masterSide') bindingPatch.masterSide = block.sync?.binding?.masterSide;
+  if (pathValue === 'sync.binding.playbackRate') bindingPatch.playbackRate = block.sync?.binding?.playbackRate;
+  const side = inlineSideFromPath(pathValue);
+  if (side) {
+    bindingPatch.sides = { [side]: inlineBindingForBlock(block).sides[side] };
+    if (pathValue.endsWith('playback.rate')) {
+      const sideRate = Number(playerSideConfig(block, side).playback?.rate);
+      if (Number.isFinite(sideRate) && sideRate > 0) bindingPatch.playbackRate = sideRate;
+    }
+  }
+  const binding = Object.keys(bindingPatch).length > 0
+    ? persistInlineBinding(block, bindingPatch)
+    : inlineBindingForBlock(block);
+  if (side) applyInlineSideSettings(card, block, side);
+  if (binding.enabled && block.type === 'comparisonVideo') {
+    applyInlineSideSettings(card, block, 'left');
+    applyInlineSideSettings(card, block, 'right');
+    queueInlineBindingSync(card, block, binding.masterSide, { force: true });
+  }
+  patchInlineVideoCard(card, block);
 }
 
 function handleBlockEditorEvent(event) {
@@ -1080,7 +1664,7 @@ function handleBlockEditorEvent(event) {
   if (target.matches('[data-block-path]')) {
     if (!['input', 'change'].includes(event.type)) return;
     setEditorPath(block, target.dataset.blockPath, editorControlValue(target));
-    patchInlineVideoCard(card, block);
+    refreshInlineBindingAfterEditorChange(card, block, target.dataset.blockPath);
     if (event.type === 'change' && target.dataset.blockPath.endsWith('mediaAssetId')) {
       hydrateInlineVideoCards();
     }
@@ -1408,6 +1992,7 @@ elements.addEditorComparisonVideo?.addEventListener('click', () => addComparison
 elements.blockCanvas?.addEventListener('input', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('change', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('click', handleBlockEditorEvent);
+elements.blockCanvas?.addEventListener('keydown', handleInlineVideoKeydown);
 elements.blockCanvas?.addEventListener('focusout', () => {
   setTimeout(flushQueuedBlockCanvasRender, 0);
 });

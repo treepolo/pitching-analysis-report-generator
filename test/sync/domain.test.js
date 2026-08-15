@@ -18,6 +18,7 @@ const {
   createLoop,
   createPlaybackRelationship,
   createPlayerBlock,
+  createSyncBinding,
   createSyncAnchor,
   mapAnchorToRelativeTime,
   mapComparisonSyncState,
@@ -27,6 +28,7 @@ const {
   seekPlayerToRelativeTime,
   setPlaybackRelationship,
   setPlayerLoop,
+  setSyncBinding,
   setSyncStartAnchor,
   timeToFrame,
   validateLoopRange,
@@ -361,6 +363,145 @@ test('start anchors and playback relationship update independently per compariso
   assert.equal(changedAnchor.playback.relativeTime, initial.playback.relativeTime);
   assert.equal(initial.startAnchors.left.observedTime, 1);
   assert.equal(initial.playback.relativeTime, 0);
+});
+
+test('continuous binding persists control side, anchors, segment offsets and playback independently', () => {
+  const leftAnchor = anchor({
+    comparisonBlockId: 'comparison-binding',
+    observedTime: 1,
+  });
+  const rightAnchor = anchor({
+    comparisonBlockId: 'comparison-binding',
+    side: 'right',
+    mediaAssetId: 'asset-right',
+    observedTime: 2,
+  });
+  const state = createComparisonSyncState({
+    comparisonBlockId: 'comparison-binding',
+    binding: {
+      enabled: true,
+      masterSide: 'right',
+      mode: SYNC_MODE.TIME,
+      fallbackPrecision: PRECISION.TIME_BASED,
+      anchors: { left: leftAnchor, right: rightAnchor },
+      sides: {
+        left: { segment: { in: 0.5, out: 2.5 }, offsetSeconds: 0.1 },
+        right: { segment: { in: 1, out: 3 }, offsetSeconds: -0.2 },
+      },
+    },
+    playback: { relativeTime: 0.25, playbackRate: 1.5, status: PLAYER_STATUS.PLAYING },
+  });
+
+  assert.equal(state.binding.enabled, true);
+  assert.equal(state.binding.masterSide, 'right');
+  assert.equal(state.binding.mode, SYNC_MODE.TIME);
+  assert.equal(state.binding.anchors.left.observedTime, 1);
+  assert.equal(state.binding.sides.left.offsetSeconds, 0.1);
+  assert.deepEqual(state.binding.sides.right.segment, { in: 1, out: 3 });
+  assert.equal(state.playback.clockSide, 'right');
+
+  const canonicalState = createComparisonSyncState({
+    comparisonBlockId: 'comparison-binding-canonical',
+    binding: {
+      enabled: true,
+      mode: SYNC_MODE.TIME,
+      anchors: {
+        left: anchor({ comparisonBlockId: 'comparison-binding-canonical' }),
+        right: anchor({
+          comparisonBlockId: 'comparison-binding-canonical',
+          side: 'right',
+          mediaAssetId: 'asset-right',
+        }),
+      },
+      offsets: { left: 0.15, right: -0.25 },
+    },
+  });
+  assert.equal(canonicalState.binding.sides.left.offsetSeconds, 0.15);
+  assert.equal(canonicalState.binding.sides.right.offsetSeconds, -0.25);
+
+  const mapped = mapComparisonSyncState(state, {
+    left: { timing: cfr(30, 90, 3), duration: 3 },
+    right: { timing: cfr(60, 180, 3), duration: 3 },
+  });
+  assert.equal(mapped.sides.left.targetTime, 1.35);
+  assert.equal(mapped.sides.right.targetTime, 2.05);
+  assert.equal(mapped.binding.fallbackPrecision, PRECISION.TIME_BASED);
+
+  const changed = setPlaybackRelationship(state, {
+    relativeTime: 1,
+    status: PLAYER_STATUS.PAUSED,
+  });
+  assert.equal(changed.playback.relativeTime, 1);
+  assert.equal(changed.playback.status, PLAYER_STATUS.PAUSED);
+  assert.equal(changed.binding.enabled, true);
+  assert.equal(changed.binding.masterSide, 'right');
+  assert.equal(changed.binding.anchors.left.observedTime, 1);
+  assert.equal(state.playback.relativeTime, 0.25);
+});
+
+test('frame binding records honest time fallback precision when either side lacks exact capability', () => {
+  const frameState = createComparisonSyncState({
+    comparisonBlockId: 'comparison-binding-fallback',
+    binding: {
+      enabled: true,
+      mode: SYNC_MODE.FRAME,
+      anchors: {
+        left: anchor({
+          comparisonBlockId: 'comparison-binding-fallback',
+          precision: PRECISION.TIME_BASED,
+          observedFrameIndex: null,
+        }),
+        right: anchor({
+          comparisonBlockId: 'comparison-binding-fallback',
+          side: 'right',
+          mediaAssetId: 'asset-right',
+          precision: PRECISION.TIME_BASED,
+          observedFrameIndex: null,
+        }),
+      },
+    },
+    playback: { relativeTime: 0.5, status: PLAYER_STATUS.PLAYING },
+  });
+  const mapped = mapComparisonSyncState(frameState, {
+    left: { timing: cfr(30, 90, 3), duration: 3, capability: false },
+    right: { timing: cfr(60, 180, 3), duration: 3, capability: true },
+  });
+  assert.equal(mapped.requestedMode, SYNC_MODE.FRAME);
+  assert.equal(mapped.effectiveMode, SYNC_MODE.TIME);
+  assert.equal(mapped.fallback, true);
+  assert.equal(mapped.fallbackPrecision, PRECISION.TIME_BASED);
+  assert.equal(mapped.binding.fallbackPrecision, PRECISION.TIME_BASED);
+  assert.equal(mapped.sides.left.frameIndex, null);
+  assert.equal(mapped.sides.right.frameIndex, null);
+});
+
+test('binding updates keep anchors and side settings block-local', () => {
+  const state = createComparisonSyncState({
+    comparisonBlockId: 'comparison-binding-isolated',
+    startAnchors: {
+      left: anchor({ comparisonBlockId: 'comparison-binding-isolated' }),
+      right: anchor({
+        comparisonBlockId: 'comparison-binding-isolated',
+        side: 'right',
+        mediaAssetId: 'asset-right',
+      }),
+    },
+  });
+  const updated = setSyncBinding(state, {
+    enabled: true,
+    masterSide: 'left',
+    sides: { right: { offsetSeconds: 0.35, segment: { in: 0.2, out: 1.8 } } },
+  });
+  assert.equal(updated.binding.enabled, true);
+  assert.equal(updated.binding.sides.right.offsetSeconds, 0.35);
+  assert.deepEqual(updated.binding.sides.left, { segment: { in: 0, out: null }, offsetSeconds: 0 });
+  assert.equal(updated.startAnchors.left.comparisonBlockId, 'comparison-binding-isolated');
+  assert.equal(state.binding.enabled, false);
+  assert.equal(state.binding.sides.right.offsetSeconds, 0);
+  assert.throws(
+    () => createSyncBinding({ masterSide: 'center' }),
+    /masterSide must be left or right/,
+  );
 });
 
 test('time-mode playback advances one shared elapsed-time playhead at the relationship rate', () => {
