@@ -1,6 +1,13 @@
 # Current Project State
 
-## Current Wave 17B provenance integration (2026-08-15)
+## Current Wave 18A provenance integration (2026-08-15)
+
+- Current implementation tip is `42d2a8a2f427eba02db9cb34cd518cb69d1d558e` on `worker/desktop-vertical-slice`; the clean export collision fix contains only `src/export/exporter.js` and `test/export/app-bridge.test.js`. Local and origin HEAD match before this docs-only checkpoint.
+- Repeated folder, ZIP, and complete-package exports now choose deterministic collision-safe names (`name-2`, then `name-3`, and so on) without overwriting prior folders or ZIP files. Existing output remains preserved and temporary staging is cleaned.
+- Worker-reported export gate is 41 tests total, 40 pass, and 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. This is domain/regression evidence; no requirement is `VERIFIED`.
+- Exported `file://`, native picker, real media/player/sync drift, responsive human evidence, and AT-A through AT-G remain incomplete. Product acceptance remains conditional fail/in progress.
+
+## Historical Wave 17B provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `24d3fa53479220a3471a832c6cb364db8574caaa` on `worker/desktop-vertical-slice`; the clean renderer/player commit contains only `src/renderer.js` and `test/renderer-player.test.js`. This docs-only checkpoint does not modify that source/test.
 - Worker-reported bounded real-MP4 Electron smoke covered single/comparison file-source loading, metadata, play/pause/seek, unsupported frame-step fallback, time/frame alignment fallback, anchors, drift-seek policy, loop/reverse domain probing, and safe file-source URL hydration through the media bridge.

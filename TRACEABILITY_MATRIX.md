@@ -1,6 +1,13 @@
 # Traceability Matrix
 
-## Current Wave 17B provenance integration (2026-08-15)
+## Current Wave 18A provenance integration (2026-08-15)
+
+- Current implementation tip is `42d2a8a2f427eba02db9cb34cd518cb69d1d558e` on `worker/desktop-vertical-slice`; scope is limited to exporter collision resolution and `test/export/app-bridge.test.js`, with no Playback source collision.
+- Repeated folder/ZIP exports select deterministic `name-2`, `name-3`, ... targets, preserve existing outputs, and retain safe staging cleanup; no existing folder or ZIP is overwritten.
+- Evidence provenance is worker-reported 41 total / 40 pass / 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. Requirement rows remain conservative and none are `VERIFIED`.
+- Remaining gaps are exported browser `file://`, native picker, real media/player/sync drift, responsive human acceptance, and AT-A through AT-G.
+
+## Historical Wave 17B provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `24d3fa53479220a3471a832c6cb364db8574caaa` on `worker/desktop-vertical-slice`; scope is limited to `src/renderer.js` and `test/renderer-player.test.js`, with no uncommitted collision.
 - Bounded real-MP4 Electron smoke evidence covers single/comparison file-source load, metadata, play/pause/seek, unsupported frame-step fallback, time/frame alignment fallback, anchors, drift-seek policy, loop/reverse domain probes, and safe local source URL hydration. Test/fixture cleanup was exercised within the bounded run.

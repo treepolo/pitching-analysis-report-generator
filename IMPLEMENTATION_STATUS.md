@@ -1,6 +1,13 @@
 # Implementation Status
 
-## Current Wave 17B provenance integration (2026-08-15)
+## Current Wave 18A provenance integration (2026-08-15)
+
+- Current implementation tip is `42d2a8a2f427eba02db9cb34cd518cb69d1d558e` on `worker/desktop-vertical-slice`; it contains only the exporter collision-resolution implementation and app-bridge regression coverage. This is a docs-only reconciliation.
+- Repeated folder/ZIP/`both` exports resolve deterministic `-2`, `-3`, ... names when the base target exists, preserving earlier outputs and avoiding overwrite while retaining output-root containment and staging cleanup.
+- Worker-reported export regression evidence is 41 total / 40 pass / 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. The skip is unavailable evidence, not browser verification; no requirement may be marked `VERIFIED`.
+- Real exported `file://`, native picker, real media/player/sync drift, responsive human acceptance, and AT-A through AT-G remain pending or unavailable.
+
+## Historical Wave 17B provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `24d3fa53479220a3471a832c6cb364db8574caaa` on `worker/desktop-vertical-slice`; it contains only the renderer/player source and focused test update. This is a docs-only reconciliation.
 - Bounded real-MP4 Electron evidence covers single/comparison source load, metadata, play/pause/seek, unsupported frame-step fallback, time/frame alignment fallback, anchors, drift seek policy, loop/reverse probes, and safe `file:` source hydration through the existing bridge.
