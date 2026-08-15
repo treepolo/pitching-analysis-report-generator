@@ -122,6 +122,53 @@ test('exports a self-contained folder and deterministic ZIP seam without leaking
   assert.deepEqual(zipEntries.get('videos/pitch-clip.mp4'), sourceVideoBefore);
 });
 
+test('exports a video-only document with empty report and section labels', async () => {
+  const sourceVideo = path.join(testRoot, 'video-only-source.mp4');
+  await fs.writeFile(sourceVideo, 'video-only-fixture', 'utf8');
+  const sourceBefore = await fs.readFile(sourceVideo);
+  const outputRoot = path.join(testRoot, 'video-only-output');
+
+  const result = await exportReport({
+    projectRoot: testRoot,
+    outputDirectory: outputRoot,
+    reportName: '',
+    outputKind: 'both',
+    reportDocument: {
+      schemaVersion: 1,
+      title: '',
+      sections: [{
+        title: '',
+        blocks: [{ type: 'singleVideo', mediaAssetId: 'video-only', label: '' }],
+      }],
+    },
+    assets: [
+      {
+        id: 'video-only',
+        kind: 'video',
+        sourceReference: { relativePath: path.relative(testRoot, sourceVideo).split(path.sep).join('/') },
+        displayName: 'video-only.mp4',
+      },
+      {
+        id: 'unused-library-video',
+        kind: 'video',
+        sourceReference: { relativePath: 'https://example.test/unused.mp4' },
+        displayName: 'unused.mp4',
+      },
+    ],
+  });
+
+  assert.equal(result.validation.valid, true);
+  assert.equal(result.validation.assetCount, 1);
+  assert.equal(result.zip.parity.valid, true);
+  const reportHtml = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
+  assert.match(reportHtml, /<video[^>]+src="videos\/video-only\.mp4"/u);
+  assert.doesNotMatch(reportHtml, /No content/u);
+  const zipEntries = readZipEntries(await fs.readFile(result.zipPath));
+  assert.equal(zipEntries.has('videos/video-only.mp4'), true);
+  assert.equal(zipEntries.has('videos/unused.mp4'), false);
+  assert.deepEqual(await fs.readFile(sourceVideo), sourceBefore);
+});
+
 test('does not create a final folder when a referenced asset is missing', async () => {
   const outputRoot = path.join(testRoot, 'missing-output');
   await assert.rejects(

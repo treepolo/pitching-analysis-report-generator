@@ -10,6 +10,7 @@ const {
   assertSafeOutputRoot,
   validatePickedExportDirectory,
 } = require('../../src/export/app-bridge');
+const { exportReport } = require('../../src/export/exporter');
 
 let testRoot;
 
@@ -36,6 +37,42 @@ function request(outputKind = 'folder') {
     outputKind,
   };
 }
+
+test('runs a video-only empty-label report through the export bridge', async () => {
+  const sourceVideo = path.join(testRoot, 'bridge-video-only.mp4');
+  await fs.writeFile(sourceVideo, 'bridge-video-only-fixture', 'utf8');
+  const outputDirectory = path.join(testRoot, 'bridge-video-only-output');
+  const controller = new ExportJobController({ exporter: exportReport });
+  const started = await controller.start({
+    projectId: 'project-1',
+    projectRoot: testRoot,
+    reportDocument: {
+      schemaVersion: 1,
+      title: '',
+      sections: [{
+        title: '',
+        blocks: [{ type: 'singleVideo', mediaAssetId: 'bridge-video', label: '' }],
+      }],
+    },
+    assets: [{
+      id: 'bridge-video',
+      kind: 'video',
+      sourceReference: { relativePath: path.relative(testRoot, sourceVideo).split(path.sep).join('/') },
+      displayName: 'bridge-video-only.mp4',
+    }],
+    outputDirectory,
+    reportName: '',
+    outputKind: 'both',
+  });
+  const completed = await controller.wait(started.jobId);
+
+  assert.equal(completed.status, 'completed');
+  assert.equal(completed.result.validation.valid, true);
+  assert.equal(completed.result.validation.assetCount, 1);
+  assert.equal(completed.result.zip.parity.valid, true);
+  assert.equal(await fs.stat(path.join(completed.result.folderPath, 'report.html')).then((stats) => stats.isFile()), true);
+  assert.equal(await fs.stat(completed.result.zipPath).then((stats) => stats.isFile()), true);
+});
 
 test('validates export output roots lexically and through realpath ancestors', async () => {
   const nested = path.join(testRoot, 'nested', 'output');
