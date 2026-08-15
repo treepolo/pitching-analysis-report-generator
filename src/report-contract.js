@@ -108,6 +108,51 @@
     return Object.keys(sync).length > 0 ? sync : undefined;
   }
 
+  function cloneBindingAnchor(value) {
+    if (value === null) return null;
+    return cloneAnchor(value);
+  }
+
+  function cloneBindingConfig(value) {
+    if (!isRecord(value)) return undefined;
+    const binding = {};
+    copyBoolean(value, binding, 'enabled');
+    if (value.masterSide === 'left' || value.masterSide === 'right' || value.masterSide === 'shared') {
+      binding.masterSide = value.masterSide;
+    }
+    if (value.mode === 'time' || value.mode === 'frame') binding.mode = value.mode;
+
+    if (isRecord(value.anchors)) {
+      const anchors = {};
+      if (Object.prototype.hasOwnProperty.call(value.anchors, 'left')) {
+        const left = cloneBindingAnchor(value.anchors.left);
+        if (left !== undefined) anchors.left = left;
+      }
+      if (Object.prototype.hasOwnProperty.call(value.anchors, 'right')) {
+        const right = cloneBindingAnchor(value.anchors.right);
+        if (right !== undefined) anchors.right = right;
+      }
+      if (Object.keys(anchors).length > 0) binding.anchors = anchors;
+    }
+
+    if (isRecord(value.offsets)) {
+      const offsets = {};
+      copyFiniteNumber(value.offsets, offsets, 'left');
+      copyFiniteNumber(value.offsets, offsets, 'right');
+      if (Object.keys(offsets).length > 0) binding.offsets = offsets;
+    }
+    if (['unknown', 'time', 'frame', 'estimated', 'exact'].includes(value.fallbackPrecision)) {
+      binding.fallbackPrecision = value.fallbackPrecision;
+    }
+    if (value.segmentRelation === 'independent' || value.segmentRelation === 'shared') {
+      binding.segmentRelation = value.segmentRelation;
+    }
+    if (value.loopRelation === 'independent' || value.loopRelation === 'shared') {
+      binding.loopRelation = value.loopRelation;
+    }
+    return Object.keys(binding).length > 0 ? binding : undefined;
+  }
+
   function clonePlaybackConfig(value) {
     if (!isRecord(value)) return undefined;
     const playback = {};
@@ -220,6 +265,8 @@
       copyString(block, output, 'layout');
       const sync = cloneSyncConfig(block.sync);
       if (sync) output.sync = sync;
+      const binding = cloneBindingConfig(block.binding);
+      if (binding) output.binding = binding;
       copyStringArray(block, output, 'labels');
     }
 

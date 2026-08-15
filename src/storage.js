@@ -29,6 +29,10 @@ const SUPPORTED_BLOCK_TYPES = new Set([
   'singleVideo',
   'comparisonVideo',
 ]);
+const BINDING_MASTER_SIDES = new Set(['left', 'right', 'shared']);
+const BINDING_MODES = new Set(['time', 'frame']);
+const BINDING_PRECISIONS = new Set(['unknown', 'time', 'frame', 'estimated', 'exact']);
+const BINDING_RELATIONS = new Set(['independent', 'shared']);
 const PROJECT_FIELDS = new Set([
   'schemaVersion',
   'id',
@@ -185,6 +189,108 @@ function normalizeVideoSide(value, fieldName) {
   return side;
 }
 
+function normalizeBindingAnchor(value, fieldName) {
+  if (value === null || value === undefined) return null;
+  const anchor = normalizeAnchor(value, fieldName);
+  const normalized = {};
+  for (const key of ['observedTime', 'frameIndex', 'precision', 'capturedAt']) {
+    if (anchor[key] !== undefined) normalized[key] = anchor[key];
+  }
+  if (isPlainRecord(anchor.timingMetadata)) {
+    const timingMetadata = {};
+    if (typeof anchor.timingMetadata.fps === 'number' && Number.isFinite(anchor.timingMetadata.fps)) {
+      timingMetadata.fps = anchor.timingMetadata.fps;
+    }
+    if (typeof anchor.timingMetadata.duration === 'number' && Number.isFinite(anchor.timingMetadata.duration)) {
+      timingMetadata.duration = anchor.timingMetadata.duration;
+    }
+    if (typeof anchor.timingMetadata.isVfr === 'boolean') timingMetadata.isVfr = anchor.timingMetadata.isVfr;
+    if (typeof anchor.timingMetadata.normalizationState === 'string') {
+      timingMetadata.normalizationState = anchor.timingMetadata.normalizationState;
+    }
+    if (Object.keys(timingMetadata).length > 0) normalized.timingMetadata = timingMetadata;
+  }
+  return normalized;
+}
+
+function normalizeBindingOffset(value, fieldName) {
+  if (value === undefined || value === null) return 0;
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${fieldName} is invalid`);
+  return value;
+}
+
+function normalizeBindingEnum(value, allowed, fallback) {
+  return allowed.has(value) ? value : fallback;
+}
+
+function normalizeVideoBinding(value, block, fieldName) {
+  if (value !== undefined && !isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
+  const binding = isPlainRecord(value) ? value : {};
+  const legacySync = isPlainRecord(block.sync) ? block.sync : {};
+  const hasLegacySync = isPlainRecord(block.sync);
+  const explicitBinding = value !== undefined;
+  const masterSide = normalizeBindingEnum(
+    binding.masterSide ?? legacySync.masterSide,
+    BINDING_MASTER_SIDES,
+    'left',
+  );
+  const mode = normalizeBindingEnum(binding.mode ?? legacySync.mode, BINDING_MODES, 'time');
+  const bindingAnchors = isPlainRecord(binding.anchors) ? binding.anchors : {};
+  const legacyLeft = isPlainRecord(block.left) ? block.left : {};
+  const legacyRight = isPlainRecord(block.right) ? block.right : {};
+  let leftAnchor = normalizeBindingAnchor(
+    bindingAnchors.left ?? legacyLeft.anchor,
+    `${fieldName}.anchors.left`,
+  );
+  let rightAnchor = normalizeBindingAnchor(
+    bindingAnchors.right ?? legacyRight.anchor,
+    `${fieldName}.anchors.right`,
+  );
+  const legacyStartAnchor = normalizeBindingAnchor(legacySync.startAnchor, `${fieldName}.legacyStartAnchor`);
+  if (legacyStartAnchor && (masterSide === 'right' ? rightAnchor === null : leftAnchor === null)) {
+    if (masterSide === 'right') rightAnchor = legacyStartAnchor;
+    else leftAnchor = legacyStartAnchor;
+  }
+
+  const bindingOffsets = isPlainRecord(binding.offsets) ? binding.offsets : {};
+  const legacyOffsets = isPlainRecord(legacySync.offsets) ? legacySync.offsets : {};
+  const leftOffset = normalizeBindingOffset(
+    bindingOffsets.left ?? legacyOffsets.left ?? legacyLeft.offset,
+    `${fieldName}.offsets.left`,
+  );
+  const rightOffset = normalizeBindingOffset(
+    bindingOffsets.right ?? legacyOffsets.right ?? legacyRight.offset,
+    `${fieldName}.offsets.right`,
+  );
+  const inferredPrecision = [leftAnchor, rightAnchor]
+    .map((anchor) => anchor && anchor.precision)
+    .find((precision) => BINDING_PRECISIONS.has(precision));
+  const fallbackPrecision = normalizeBindingEnum(
+    binding.fallbackPrecision ?? legacySync.fallbackPrecision ?? inferredPrecision,
+    BINDING_PRECISIONS,
+    'unknown',
+  );
+
+  return {
+    enabled: typeof binding.enabled === 'boolean' ? binding.enabled : (explicitBinding || hasLegacySync),
+    masterSide,
+    mode,
+    anchors: { left: leftAnchor, right: rightAnchor },
+    offsets: { left: leftOffset, right: rightOffset },
+    fallbackPrecision,
+    segmentRelation: normalizeBindingEnum(
+      binding.segmentRelation ?? legacySync.segmentRelation,
+      BINDING_RELATIONS,
+      'independent',
+    ),
+    loopRelation: normalizeBindingEnum(
+      binding.loopRelation ?? legacySync.loopRelation,
+      BINDING_RELATIONS,
+      'independent',
+    ),
+  };
+}
+
 function normalizeVideoBlock(block) {
   const normalized = { ...cloneJson(block) };
   if (normalized.label !== undefined) normalized.label = safeOptionalText(normalized.label, 'Video block label', 160);
@@ -212,6 +318,7 @@ function normalizeVideoBlock(block) {
     const right = normalizeVideoSide(normalized.right, 'Video block right');
     if (left !== undefined) normalized.left = left;
     if (right !== undefined) normalized.right = right;
+    normalized.binding = normalizeVideoBinding(normalized.binding, normalized, 'Video block binding');
   }
   return normalized;
 }

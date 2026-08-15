@@ -118,6 +118,20 @@ test('preserves block-local video settings in the shared report contract', () =>
         type: 'comparisonVideo',
         layout: 'side-by-side',
         sync: { mode: 'time', startAnchor: { observedTime: 0.75 } },
+        binding: {
+          enabled: true,
+          masterSide: 'right',
+          mode: 'time',
+          anchors: {
+            left: { observedTime: 1.1, frameIndex: 33, precision: 'time', editorOnly: 'drop' },
+            right: { observedTime: 1.4, frameIndex: 42, precision: 'frame', temporaryPath: 'drop.tmp' },
+          },
+          offsets: { left: -0.1, right: 0.2, internalState: 'drop' },
+          fallbackPrecision: 'estimated',
+          segmentRelation: 'independent',
+          loopRelation: 'shared',
+          editorState: { dirty: true },
+        },
         left: {
           mediaAssetId: 'asset-front',
           segment: { in: 0, out: 3 },
@@ -147,6 +161,19 @@ test('preserves block-local video settings in the shared report contract', () =>
     type: 'comparisonVideo',
     layout: 'side-by-side',
     sync: { mode: 'time', startAnchor: { observedTime: 0.75 } },
+    binding: {
+      enabled: true,
+      masterSide: 'right',
+      mode: 'time',
+      anchors: {
+        left: { observedTime: 1.1, frameIndex: 33, precision: 'time' },
+        right: { observedTime: 1.4, frameIndex: 42, precision: 'frame' },
+      },
+      offsets: { left: -0.1, right: 0.2 },
+      fallbackPrecision: 'estimated',
+      segmentRelation: 'independent',
+      loopRelation: 'shared',
+    },
     left: {
       mediaAssetId: 'asset-front',
       segment: { in: 0, out: 3 },

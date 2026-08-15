@@ -135,6 +135,19 @@ test('persists block-local video editor configuration across reopen', async () =
     layout: 'side-by-side',
     playback: { rate: 1 },
     sync: { mode: 'time', startAnchor: { observedTime: 0.75 } },
+    binding: {
+      enabled: true,
+      masterSide: 'right',
+      mode: 'frame',
+      anchors: {
+        left: { observedTime: 1.1, frameIndex: 33, precision: 'frame' },
+        right: { observedTime: 1.4, frameIndex: 42, precision: 'frame' },
+      },
+      offsets: { left: -0.1, right: 0.2 },
+      fallbackPrecision: 'frame',
+      segmentRelation: 'shared',
+      loopRelation: 'independent',
+    },
     left: {
       mediaAssetId: 'asset-front',
       label: 'Front',
@@ -157,6 +170,48 @@ test('persists block-local video editor configuration across reopen', async () =
   assert.equal(reopened.sections[0].blocks.at(-2).sync.mode, 'frame');
   assert.equal(reopened.sections[0].blocks.at(-1).left.segment.out, 3);
   assert.equal(reopened.sections[0].blocks.at(-1).right.anchor.observedTime, 1.4);
+  assert.deepEqual(reopened.sections[0].blocks.at(-1).binding, {
+    enabled: true,
+    masterSide: 'right',
+    mode: 'frame',
+    anchors: {
+      left: { observedTime: 1.1, frameIndex: 33, precision: 'frame' },
+      right: { observedTime: 1.4, frameIndex: 42, precision: 'frame' },
+    },
+    offsets: { left: -0.1, right: 0.2 },
+    fallbackPrecision: 'frame',
+    segmentRelation: 'shared',
+    loopRelation: 'independent',
+  });
+});
+
+test('migrates legacy comparison sync and side anchors into deterministic binding defaults', async () => {
+  const created = await store.createProject('Legacy binding migration');
+  const snapshot = await store.openProject(created.id);
+  snapshot.sections[0].blocks.push({
+    id: 'legacy-comparison',
+    type: 'comparisonVideo',
+    sync: { mode: 'frame', startAnchor: { observedTime: 0.5, frameIndex: 15 } },
+    left: { anchor: { observedTime: 1.1, frameIndex: 33 } },
+    right: { anchor: { observedTime: 1.4, frameIndex: 42 } },
+  });
+
+  const saved = await store.saveProject(snapshot);
+  assert.deepEqual(saved.sections[0].blocks.at(-1).binding, {
+    enabled: true,
+    masterSide: 'left',
+    mode: 'frame',
+    anchors: {
+      left: { observedTime: 1.1, frameIndex: 33 },
+      right: { observedTime: 1.4, frameIndex: 42 },
+    },
+    offsets: { left: 0, right: 0 },
+    fallbackPrecision: 'unknown',
+    segmentRelation: 'independent',
+    loopRelation: 'independent',
+  });
+  const reopened = await store.openProject(created.id);
+  assert.deepEqual(reopened.sections[0].blocks.at(-1).binding, saved.sections[0].blocks.at(-1).binding);
 });
 
 test('previews strict UTF-8 txt/md imports and persists imported content across reopen', async () => {
