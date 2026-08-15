@@ -95,6 +95,43 @@ const DISPLAY_STATUS_LABELS = Object.freeze({
   error: '錯誤',
 });
 
+const DISPLAY_ERROR_CODE_MAP = Object.freeze({
+  EXPORT_VALIDATION_FAILED: Object.freeze({
+    code: 'EXPORT_VALIDATION_FAILED',
+    reason: '匯出資料驗證失敗，請檢查輸出資料夾與報告引用的媒體。',
+  }),
+  EXPORT_FAILED: Object.freeze({
+    code: 'EXPORT_FAILED',
+    reason: '匯出工作失敗，請檢查輸出資料夾、來源檔案與權限。',
+  }),
+  EXPORT_CANCELLED: Object.freeze({
+    code: 'EXPORT_CANCELLED',
+    reason: '匯出已取消。',
+  }),
+  EXPORT_PICKER_UNAVAILABLE: Object.freeze({
+    code: 'EXPORT_PICKER_UNAVAILABLE',
+    reason: '目前無法使用資料夾選擇器，已改用專案預設位置。',
+  }),
+  EXPORT_PICKER_INVALID_RESULT: Object.freeze({
+    code: 'EXPORT_PICKER_INVALID_RESULT',
+    reason: '資料夾選擇器回傳無效結果，已改用專案預設位置。',
+  }),
+  EXPORT_PICKER_FAILED: Object.freeze({
+    code: 'EXPORT_PICKER_FAILED',
+    reason: '資料夾選擇橋接失敗，已改用專案預設位置。',
+  }),
+  EXPORT_START_FAILED: Object.freeze({
+    code: 'EXPORT_START_FAILED',
+    reason: '匯出工作無法啟動，請檢查輸出資料夾、來源檔案與權限。',
+  }),
+  IPC_FAILED: Object.freeze({
+    code: 'IPC_FAILED',
+    reason: '畫面與桌面橋接通訊失敗，請重試。',
+  }),
+});
+
+const SAFE_ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_-]{1,48}$/u;
+
 function displayStatus(value) {
   if (value === null || value === undefined || value === '') return '未知';
   const normalized = String(value).toLowerCase();
@@ -128,10 +165,30 @@ function displayBlockType(value) {
   return labels[value] || '未知區塊';
 }
 
-function displayErrorMessage(error) {
-  const message = typeof error === 'string' ? error : error?.message;
-  if (!message) return '未知錯誤';
-  return /[A-Za-z]{2,}/u.test(message) ? '操作失敗，請稍後再試。' : String(message);
+function errorCodeText(error) {
+  const candidates = [
+    error?.code,
+    error?.error?.code,
+    error?.details?.code,
+    error?.cause?.code,
+  ];
+  return candidates.find((value) => typeof value === 'string' && value.trim() !== '')?.trim().toUpperCase() || '';
+}
+
+function displayErrorMessage(error, fallbackCode = 'APP_ERROR') {
+  const explicitCode = errorCodeText(error);
+  const descriptor = DISPLAY_ERROR_CODE_MAP[explicitCode];
+  if (descriptor) return `${descriptor.reason}（錯誤碼：${descriptor.code}）`;
+  const safeCode = SAFE_ERROR_CODE_PATTERN.test(fallbackCode) ? fallbackCode : 'APP_ERROR';
+  return `發生未分類錯誤，請重試。（錯誤碼：${safeCode}）`;
+}
+
+function serializeRendererError(error, fallbackCode) {
+  const explicitCode = errorCodeText(error);
+  const descriptor = DISPLAY_ERROR_CODE_MAP[explicitCode];
+  if (descriptor) return { code: descriptor.code, message: descriptor.reason };
+  const safeCode = SAFE_ERROR_CODE_PATTERN.test(fallbackCode) ? fallbackCode : 'APP_ERROR';
+  return { code: safeCode, message: '發生未分類錯誤，請重試。' };
 }
 
 function activeSection() {
@@ -353,7 +410,7 @@ async function chooseExportDirectory() {
   if (!state.activeProject || ['running', 'cancelling'].includes(state.export.status)) return;
   const picker = exportDirectoryPicker();
   if (!picker) {
-    state.export.directoryNotice = '無法使用資料夾選擇器；改用專案預設位置。';
+    state.export.directoryNotice = displayErrorMessage({ code: 'EXPORT_PICKER_UNAVAILABLE' });
     renderExportControls();
     return;
   }
@@ -362,13 +419,13 @@ async function chooseExportDirectory() {
     if (picked.canceled) {
       state.export.directoryNotice = '已取消資料夾選擇；尚未開始匯出。';
     } else if (!picked.directory) {
-      state.export.directoryNotice = '資料夾選擇器沒有回傳可用資料夾；改用專案預設位置。';
+      state.export.directoryNotice = displayErrorMessage({ code: 'EXPORT_PICKER_INVALID_RESULT' });
     } else {
       state.export.outputDirectory = picked.directory;
       state.export.directoryNotice = `已選資料夾：${displaySafeDirectoryLabel(picked.directory)}`;
     }
-  } catch {
-    state.export.directoryNotice = '資料夾選擇失敗；改用專案預設位置。';
+  } catch (error) {
+    state.export.directoryNotice = displayErrorMessage(error, 'EXPORT_PICKER_FAILED');
   }
   renderExportControls();
 }
@@ -433,11 +490,11 @@ function renderExportControls() {
     if (elements.exportStatus) elements.exportStatus.textContent = exportResultLabel(snapshot);
   } else if (exportState.status === 'failed') {
     if (elements.exportStatus) {
-      elements.exportStatus.textContent = `匯出失敗：${displayErrorMessage(snapshot?.error?.message)}`;
+      elements.exportStatus.textContent = `匯出失敗：${displayErrorMessage(snapshot?.error, 'EXPORT_FAILED')}`;
     }
   } else if (exportState.status === 'cancelled') {
     if (elements.exportStatus) {
-      elements.exportStatus.textContent = `匯出已取消：${displayErrorMessage(snapshot?.error?.message || '尚未建立輸出')}`;
+      elements.exportStatus.textContent = `匯出已取消：${displayErrorMessage(snapshot?.error || { code: 'EXPORT_CANCELLED' })}`;
     }
   } else {
     if (elements.exportStatus) {
@@ -492,7 +549,7 @@ async function startReportExport() {
     await monitorExportJob(started.jobId);
   } catch (error) {
     state.export.jobId = null;
-    setExportSnapshot({ status: 'failed', error: { message: displayErrorMessage(error) } });
+    setExportSnapshot({ status: 'failed', error: serializeRendererError(error, 'EXPORT_START_FAILED') });
   }
 }
 
