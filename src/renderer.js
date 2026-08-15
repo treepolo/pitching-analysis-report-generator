@@ -726,6 +726,23 @@ function updateInlineVideoTime(sideElement) {
   time.textContent = `${(Number(video.currentTime) || 0).toFixed(2)}s${duration > 0 ? ` / ${duration.toFixed(2)}s` : ''}`;
 }
 
+function safeInlineMediaSourceUrl(source) {
+  const sourceUrl = source && typeof source === 'object' ? source.sourceUrl : null;
+  if (typeof sourceUrl !== 'string' || sourceUrl.trim() === '') {
+    throw new Error('Media source bridge returned no source URL');
+  }
+  let parsed;
+  try {
+    parsed = new URL(sourceUrl);
+  } catch {
+    throw new Error('Media source bridge returned an invalid source URL');
+  }
+  if (parsed.protocol !== 'file:') {
+    throw new Error('Media source bridge returned a non-local source URL');
+  }
+  return parsed.href;
+}
+
 async function loadInlineVideoSide(card, block, side, generation) {
   const sideElement = card.querySelector(`[data-inline-side="${side}"]`);
   const video = sideElement?.querySelector('[data-inline-video]');
@@ -745,17 +762,20 @@ async function loadInlineVideoSide(card, block, side, generation) {
     return;
   }
   setInlineVideoStatus(sideElement, '正在載入專案內媒體…', 'pending');
+  video.dataset.mediaAssetId = assetId;
+  video.removeAttribute('src');
+  video.load();
   try {
     const source = await window.pitchingApp.resolveMediaSource(state.activeProject.id, assetId);
     if (generation !== state.inlineGeneration || !card.isConnected) return;
-    video.src = source.sourceUrl;
-    video.playbackRate = Number(playerSideConfig(block, side).playback?.rate) || 1;
     video.onloadedmetadata = () => {
       setInlineVideoStatus(sideElement, '準備就緒；已載入實際媒體來源。', 'loaded');
       updateInlineVideoTime(sideElement);
     };
     video.ontimeupdate = () => updateInlineVideoTime(sideElement);
     video.onerror = () => setInlineVideoStatus(sideElement, '此執行環境無法播放媒體。', 'error');
+    video.src = safeInlineMediaSourceUrl(source);
+    video.playbackRate = Number(playerSideConfig(block, side).playback?.rate) || 1;
     video.load();
   } catch {
     setInlineVideoStatus(sideElement, '無法安全解析媒體來源。', 'error');

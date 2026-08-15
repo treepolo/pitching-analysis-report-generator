@@ -85,6 +85,10 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /state\.export\.outputDirectory \|\| defaultExportDirectory\(\)/u);
   assert.match(renderer, /data-inline-video-block/u);
   assert.match(renderer, /elements\.blockCanvas\?\.addEventListener\('click'/u);
+  assert.match(renderer, /function safeInlineMediaSourceUrl\(source\)/u);
+  assert.match(renderer, /parsed\.protocol !== 'file:'/u);
+  assert.match(renderer, /video\.dataset\.mediaAssetId = assetId/u);
+  assert.match(renderer, /video\.removeAttribute\('src'\)/u);
   assert.match(renderer, /無法使用畫面層橋接/u);
   assert.match(renderer, /elements\.appError\) return/u);
   assert.doesNotMatch(renderer, /elements\.(mediaLibrary|playerPanel|preview|sectionList)\s*=|document\.querySelector\('#(?:media-library|player-panel|preview|section-list)'\)/u);
@@ -94,5 +98,6 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
 test('renderer source never constructs a media URL from a filesystem path', () => {
   assert.doesNotMatch(renderer, /path\.(join|resolve|normalize)\(/u);
   assert.doesNotMatch(renderer, /file:\/\//u);
-  assert.match(renderer, /video\.src = source\.sourceUrl/u);
+  assert.match(renderer, /video\.src = safeInlineMediaSourceUrl\(source\)/u);
+  assert.doesNotMatch(renderer, /video\.src = source\.sourceUrl/u);
 });
