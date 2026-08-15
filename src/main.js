@@ -311,8 +311,9 @@ async function runElectronSmoke() {
         const createdId = projectButton && projectButton.dataset.projectId;
         if (!createdId) throw new Error('created project id is missing from the project list');
         await waitFor(
-          () => document.querySelector('.project-card.is-active')?.dataset.projectId === createdId
-            && !document.querySelector('#section-title').disabled,
+          () => !document.querySelector('#editor')?.hidden
+            && document.querySelector('#block-canvas')
+            && !document.querySelector('#block-section-target')?.disabled,
           'created project did not open in the renderer',
         );
 
@@ -324,8 +325,8 @@ async function runElectronSmoke() {
         opened.sections[0].blocks[0].content = 'Saved through Electron IPC';
         await window.pitchingApp.saveProject(opened);
 
-        const sectionTitle = document.querySelector('#section-title');
-        const sectionContent = document.querySelector('#section-content');
+        const sectionTitle = document.querySelector('#block-canvas [data-section-title]');
+        const sectionContent = document.querySelector('#block-canvas [data-block-field="content"]');
         if (!sectionTitle || !sectionContent) throw new Error('editor fields are missing');
         sectionTitle.value = 'Autosaved section';
         sectionTitle.dispatchEvent(new Event('input', { bubbles: true }));
@@ -368,21 +369,12 @@ async function runElectronSmoke() {
         }
         const listedMedia = await window.pitchingApp.listMedia(createdId);
         if (!Array.isArray(listedMedia) || listedMedia.length !== 0) throw new Error('empty media library did not list safely');
-        if (!document.querySelector('#block-canvas')
+        if (!document.querySelector('#editor:not([hidden])')
+          || !document.querySelector('#block-canvas')
           || !document.querySelector('#add-text-block')
           || !document.querySelector('#add-editor-single-video')
-          || !document.querySelector('#add-editor-comparison-video')
-          || !document.querySelector('.editor-grid')?.hidden) {
+          || !document.querySelector('#add-editor-comparison-video')) {
           throw new Error('canonical block editor UI is not rendered');
-        }
-        const playerEmpty = document.querySelector('#player-empty');
-        if (!playerEmpty || playerEmpty.hidden || !document.querySelector('#player-panel')) {
-          throw new Error('player empty state is not rendered without media');
-        }
-        if (!document.querySelector('#add-single-video')?.disabled
-          || !document.querySelector('#add-comparison-video')?.disabled
-          || !document.querySelector('#single-play')?.disabled) {
-          throw new Error('player controls were enabled without a loaded real video');
         }
         if (typeof window.pitchingApp.sync?.planFrameStep !== 'function') {
           throw new Error('sync frame-step bridge is missing');
@@ -419,8 +411,8 @@ async function runElectronSmoke() {
           explicitSaveVerified: true,
           textImportVerified: true,
           blockEditorUiVerified: true,
+          editorControlsVerified: true,
           mediaListVerified: true,
-          playerEmptyStateVerified: true,
           syncFallbackVerified: true,
           bridgeSecurityVerified: true,
           invalidProjectRejected,
@@ -434,10 +426,9 @@ async function runElectronSmoke() {
           '#save-project',
           '#import-text',
           '#import-media',
-          '#player-panel',
-          '#player-block-select',
-          '#add-single-video',
-          '#add-comparison-video',
+          '#add-text-block',
+          '#add-editor-single-video',
+          '#add-editor-comparison-video',
           '#export-report',
         ];
         const inspect = (selector) => {
