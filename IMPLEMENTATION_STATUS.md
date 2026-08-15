@@ -1,11 +1,11 @@
 # Implementation Status
 
-## Current Wave 11A/B/C Integrator gate (2026-08-15)
+## Current Wave 12A/B/C Integrator gate (2026-08-15)
 
-- Actual product tip is `27038b9f48dcd449aa1b3aaaf9525b8a49e224c5` on `worker/desktop-vertical-slice`; Wave 11A `d6b6c55ed5895a75e6b34b6bcbde367772179b3e` fixes autosave redraw focus loss, and Wave 11B `27038b9f48dcd449aa1b3aaaf9525b8a49e224c5` adds video-only export regression coverage without an exporter source bypass.
-- Wave 11A focused tests pass for no-DOM-rebuild autosave, focus/caret preservation, and text/video setting persistence. Wave 11B focused tests pass for empty-label video-only folder/ZIP export, report HTML, referenced-only traversal, unused asset exclusion, and original preservation.
-- Fresh evidence: `npm test` 118 total / 117 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` skip; 36 JavaScript syntax checks; package/lock consistency; `git diff --check`; and tracked artifact/private scan. The Electron skip is unavailable evidence, not a pass.
-- Product acceptance remains conditional fail/in progress. Real ffprobe/FFmpeg execution, real media/player/sync/drift, exported folder/ZIP `file://`, responsive human evidence, and AT-A through AT-G remain incomplete or unavailable. No requirement may be marked `VERIFIED`.
+- Actual product tip is `f4a59fc302a05a7f156a3fafea40e2ed802407e9` on `worker/desktop-vertical-slice`; it contains Wave 12A UI commit `f4dc599a18847d961f33d36f6da3e1da5926c200` and the export request regression guard.
+- Wave 12A handoff reports 12/12 focused tests and 120 pass plus one Electron `file://` skip. Wave 12B focused export evidence is 19/19: text-only, video-only, and mixed renderer-shaped requests complete folder+ZIP jobs with referenced-only assets and original preservation. This is domain/bridge evidence, not UI runtime verification.
+- Static evidence: 36 `node --check` files, package/lock consistency, `git diff --check`, tracked artifact/private scan, and credential-pattern scan pass. Existing Electron smoke failed before UI/export evidence with `render-process-gone` `launch-failed` exitCode 49 and `ERR_FAILED (-2)` loading `file://`.
+- Product acceptance remains conditional fail/in progress. Real export UI/file:// runtime, real ffprobe/FFmpeg, real player/sync/drift, responsive human evidence, and AT-A through AT-G remain incomplete or unavailable. No requirement may be marked `VERIFIED`.
 
 ## Historical Wave 8D Integrator gate (superseded, 2026-08-15)
 

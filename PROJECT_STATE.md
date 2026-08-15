@@ -1,11 +1,11 @@
 # Current Project State
 
-## Current Wave 11A/B/C Integrator gate (2026-08-15)
+## Current Wave 12A/B/C Integrator gate (2026-08-15)
 
-- Actual product tip is `27038b9f48dcd449aa1b3aaaf9525b8a49e224c5` on `worker/desktop-vertical-slice`, integrating Wave 11A `d6b6c55ed5895a75e6b34b6bcbde367772179b3e` autosave/focus preservation and Wave 11B `27038b9f48dcd449aa1b3aaaf9525b8a49e224c5` video-only export regression coverage.
-- Wave 11A focused evidence passes: autosave does not rebuild the active block DOM, redraw preserves focus/selection, and text/video settings persist. Wave 11B focused evidence passes: a video-only document with empty title/section label produces valid folder and ZIP output, referenced-only media, unused-asset exclusion, and original preservation.
-- Fresh regression evidence: `npm test` reports 118 tests, 117 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip; 36 current JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/private scan pass.
-- The Electron `file://` skip, real ffprobe/FFmpeg execution, real video/player/sync/drift runtime, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
+- Actual product tip is `f4a59fc302a05a7f156a3fafea40e2ed802407e9` on `worker/desktop-vertical-slice`, including Wave 12A UI commit `f4dc599a18847d961f33d36f6da3e1da5926c200` and this export regression-test commit.
+- Wave 12A handoff reports the select-interaction redraw fix with 12/12 focused tests and 120 passing tests plus one Electron `file://` skip. Wave 12B export request evidence is 19/19 for renderer-shaped text-only, video-only, and mixed folder+ZIP jobs; no exporter source bypass was needed.
+- Static evidence: 36 current JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, tracked artifact/private scan, and credential-pattern scan pass. A smoke launch failed before UI evidence: `render-process-gone` `launch-failed` exitCode 49 and `ERR_FAILED (-2)` loading the app `file://` page.
+- Real export UI/file:// runtime, real ffprobe/FFmpeg execution, real video/player/sync/drift runtime, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
 
 ## Historical Wave 8D Integrator gate (superseded, 2026-08-15)
 

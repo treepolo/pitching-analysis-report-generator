@@ -1,10 +1,10 @@
 # Traceability Matrix
 
-## Current Wave 11A/B/C Integrator gate (2026-08-15)
+## Current Wave 12A/B/C Integrator gate (2026-08-15)
 
-- Product tip is `27038b9f48dcd449aa1b3aaaf9525b8a49e224c5` on `worker/desktop-vertical-slice`; integrated Wave 11A `d6b6c55ed5895a75e6b34b6bcbde367772179b3e` autosave/focus fix and Wave 11B `27038b9f48dcd449aa1b3aaaf9525b8a49e224c5` video-only export regression guard.
-- Wave 11A focused evidence covers no DOM rebuild during autosave, focus/caret preservation, and text/video setting persistence. Wave 11B covers empty-title/empty-section video-only folder and ZIP output, referenced-only assets, unused-library exclusion, and original preservation.
-- Gate evidence: 118 npm tests / 117 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` skip; 36 JavaScript syntax checks; package/lock, diff-check, and tracked artifact/private scan pass. The Electron skip remains unavailable evidence, not a pass.
+- Product tip is `f4a59fc302a05a7f156a3fafea40e2ed802407e9` on `worker/desktop-vertical-slice`; integrated Wave 12A UI commit `f4dc599a18847d961f33d36f6da3e1da5926c200` and Wave 12B renderer-shaped export request regression coverage.
+- Wave 12A handoff reports 12/12 focused tests and 120 pass plus one Electron `file://` skip. Wave 12B evidence is 19/19 for text-only, video-only, and mixed folder+ZIP jobs, including referenced-only traversal and original preservation.
+- Static gate evidence: 36 JavaScript syntax checks; package/lock, diff-check, tracked artifact/private, and credential-pattern scans pass. Electron smoke failed before UI evidence with render-process launch failure exitCode 49 / `ERR_FAILED (-2)`; this is unavailable evidence, not a pass.
 - Real media/player/sync/drift runtime, exported browser `file://`, responsive human acceptance, and AT-A through AT-G remain unresolved. Requirement rows remain conservative and none are `VERIFIED`.
 
 ## Historical Wave 8D Integrator gate (superseded, 2026-08-15)
