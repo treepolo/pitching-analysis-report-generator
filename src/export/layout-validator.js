@@ -248,12 +248,17 @@ async function validateExportLayout(outputDirectory, {
   const htmlFile = await resolveHtmlFile(outputRoot, htmlFileName);
   const indexPath = htmlFile.path;
   await assertFile(indexPath, `Export ${htmlFile.relativePath}`, outputRoot);
-  await assertDirectory(path.join(outputRoot, 'videos'), 'Export videos directory', outputRoot);
-  await assertDirectory(path.join(outputRoot, 'images'), 'Export images directory', outputRoot);
 
   const renderedHtml = html === undefined ? await fs.readFile(indexPath, 'utf8') : html;
   const references = validateRelativeAssetPaths(renderedHtml);
   const manifest = normalizeAssetManifest(assetManifest);
+  const manifestRoots = new Set(manifest.map((asset) => asset.relativePath.split('/')[0]));
+  if (manifestRoots.has('videos')) {
+    await assertDirectory(path.join(outputRoot, 'videos'), 'Export videos directory', outputRoot);
+  }
+  if (manifestRoots.has('images')) {
+    await assertDirectory(path.join(outputRoot, 'images'), 'Export images directory', outputRoot);
+  }
   const byPath = new Map(manifest.map((asset) => [asset.relativePath, asset]));
   const referencedPaths = new Set();
 

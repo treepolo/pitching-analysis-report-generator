@@ -62,6 +62,41 @@ function mediaSignature(runtimeResult) {
   }));
 }
 
+test('accepts text-only folder and ZIP extraction without empty media directories', async () => {
+  const outputRoot = path.join(testRoot, 'text-only-output');
+  const result = await exportReport({
+    projectRoot: testRoot,
+    outputDirectory: outputRoot,
+    reportName: 'Text Only Runtime',
+    createZip: true,
+    reportDocument: {
+      schemaVersion: 1,
+      title: 'Text Only Runtime',
+      sections: [{
+        title: 'Summary',
+        blocks: [{ type: 'rich-text', content: 'Synthetic text-only report' }],
+      }],
+    },
+    assets: [],
+  });
+
+  assert.equal(result.validation.valid, true);
+  assert.equal(result.manifest.assets.length, 0);
+  assert.equal(result.zip.parity.valid, true);
+
+  const extractedPath = path.join(testRoot, 'text-only-extracted');
+  await extractZipArchive(result.zipPath, extractedPath);
+  const extractedLayout = await validateExportLayout(extractedPath, {
+    assetManifest: result.manifest.assets,
+    verifyManifest: true,
+  });
+  assert.equal(extractedLayout.valid, true);
+  assert.equal(extractedLayout.manifestValidation.valid, true);
+  assert.equal(await fs.stat(path.join(extractedPath, 'report.html')).then((stats) => stats.isFile()), true);
+  assert.equal(await fs.stat(path.join(extractedPath, 'videos')).catch(() => null), null);
+  assert.equal(await fs.stat(path.join(extractedPath, 'images')).catch(() => null), null);
+});
+
 async function assertRuntimeResult(t, result) {
   if (result.status === 'unavailable') {
     t.skip(`Electron file:// runtime unavailable: ${result.reason}`);

@@ -53,6 +53,19 @@ test('validates index, required asset directories, relative references, and file
   assert.equal(result.fileUrlValidation.networkIsolation.valid, true);
 });
 
+test('still requires a media directory when the manifest references an asset', async () => {
+  const root = path.join(testRoot, 'missing-media-directory');
+  await fs.mkdir(root, { recursive: true });
+  await fs.writeFile(path.join(root, 'report.html'), '<video src="videos/pitch.mp4"></video>', 'utf8');
+
+  await assert.rejects(
+    validateExportLayout(root, {
+      assetManifest: [{ id: 'pitch', kind: 'video', relativePath: 'videos/pitch.mp4' }],
+    }),
+    /Export videos directory is missing/u,
+  );
+});
+
 test('blocks an unmanifested or external asset reference', async () => {
   const root = await createLayout('invalid-reference', '<img src="images/not-in-manifest.png">');
   await fs.writeFile(path.join(root, 'images', 'not-in-manifest.png'), 'frame');
