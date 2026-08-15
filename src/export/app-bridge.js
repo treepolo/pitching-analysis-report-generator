@@ -30,6 +30,22 @@ async function realpathNearestExisting(targetPath) {
   }
 }
 
+async function assertNoSymbolicLinkAncestors(targetPath, description) {
+  let currentPath = path.resolve(targetPath);
+  while (true) {
+    const entry = await fs.lstat(currentPath).catch((error) => {
+      if (error.code === 'ENOENT') return null;
+      throw new ExportValidationError(`${description} cannot be inspected: ${currentPath}`, { cause: error });
+    });
+    if (entry?.isSymbolicLink()) {
+      throw new ExportValidationError(`${description} contains a symbolic link: ${currentPath}`);
+    }
+    const parentPath = path.dirname(currentPath);
+    if (parentPath === currentPath) return;
+    currentPath = parentPath;
+  }
+}
+
 async function assertSafeOutputRoot(projectRoot, outputDirectory) {
   if (typeof projectRoot !== 'string' || projectRoot.trim() === '') {
     throw new ExportValidationError('Export projectRoot is required');
@@ -43,24 +59,24 @@ async function assertSafeOutputRoot(projectRoot, outputDirectory) {
 
   const lexicalProjectRoot = path.resolve(projectRoot);
   const lexicalOutputRoot = path.resolve(outputDirectory);
-  if (!isPathInsideOrEqual(lexicalProjectRoot, lexicalOutputRoot)) {
-    throw new ExportValidationError('Export outputDirectory resolves outside the project root');
-  }
 
-  let realProjectRoot;
   try {
-    realProjectRoot = await fs.realpath(lexicalProjectRoot);
+    await fs.realpath(lexicalProjectRoot);
   } catch (error) {
     throw new ExportValidationError('Export projectRoot is unavailable', { cause: error });
   }
+  await assertNoSymbolicLinkAncestors(lexicalOutputRoot, 'Export outputDirectory');
   let realOutputAncestor;
   try {
     realOutputAncestor = await realpathNearestExisting(lexicalOutputRoot);
   } catch (error) {
     throw new ExportValidationError('Export outputDirectory cannot be resolved safely', { cause: error });
   }
-  if (!isPathInsideOrEqual(realProjectRoot, realOutputAncestor)) {
-    throw new ExportValidationError('Export outputDirectory resolves outside the project root');
+  const ancestorStats = await fs.stat(realOutputAncestor).catch((error) => {
+    throw new ExportValidationError('Export outputDirectory cannot be inspected safely', { cause: error });
+  });
+  if (!ancestorStats.isDirectory()) {
+    throw new ExportValidationError('Export outputDirectory parent must be a directory');
   }
   return lexicalOutputRoot;
 }

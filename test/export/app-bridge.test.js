@@ -150,13 +150,15 @@ test('exports renderer-shaped text-only, video-only, and mixed snapshots through
   }
 });
 
-test('validates export output roots lexically and through realpath ancestors', async () => {
+test('validates export output roots and permits safe external destinations', async () => {
   const nested = path.join(testRoot, 'nested', 'output');
   assert.equal(await assertSafeOutputRoot(testRoot, nested), path.resolve(nested));
-  await assert.rejects(
-    assertSafeOutputRoot(testRoot, path.join(testRoot, '..', 'outside')),
-    /outside the project root/iu,
-  );
+  const external = await fs.mkdtemp(path.join(require('node:os').tmpdir(), 'pitch-report-external-root-'));
+  try {
+    assert.equal(await assertSafeOutputRoot(testRoot, external), path.resolve(external));
+  } finally {
+    await fs.rm(external, { recursive: true, force: true });
+  }
   await assert.rejects(
     assertSafeOutputRoot(testRoot, 'relative-output'),
     /absolute safe path/iu,
@@ -165,25 +167,57 @@ test('validates export output roots lexically and through realpath ancestors', a
 
 test('validates native picker results as existing directories inside the project root', async () => {
   const selected = path.join(testRoot, 'selected-output');
+  const external = await fs.mkdtemp(path.join(require('node:os').tmpdir(), 'pitch-report-external-output-'));
   await fs.mkdir(selected, { recursive: true });
-  assert.equal(await validatePickedExportDirectory(testRoot, selected), path.resolve(selected));
-  assert.equal(await validatePickedExportDirectory(testRoot, null), null);
-  assert.equal(await validatePickedExportDirectory(testRoot, undefined), null);
+  try {
+    assert.equal(await validatePickedExportDirectory(testRoot, selected), path.resolve(selected));
+    assert.equal(await validatePickedExportDirectory(testRoot, external), path.resolve(external));
+    assert.equal(await validatePickedExportDirectory(testRoot, null), null);
+    assert.equal(await validatePickedExportDirectory(testRoot, undefined), null);
 
-  await assert.rejects(
-    validatePickedExportDirectory(testRoot, path.join(testRoot, '..', 'outside')),
-    /outside the project root/iu,
-  );
-  const filePath = path.join(testRoot, 'not-a-directory');
-  await fs.writeFile(filePath, 'fixture');
-  await assert.rejects(
-    validatePickedExportDirectory(testRoot, filePath),
-    /must be a directory/iu,
-  );
-  await assert.rejects(
-    validatePickedExportDirectory(testRoot, path.join(testRoot, 'missing-output')),
-    /unavailable/iu,
-  );
+    const filePath = path.join(testRoot, 'not-a-directory');
+    await fs.writeFile(filePath, 'fixture');
+    await assert.rejects(
+      validatePickedExportDirectory(testRoot, filePath),
+      /must be a directory/iu,
+    );
+    await assert.rejects(
+      validatePickedExportDirectory(testRoot, path.join(testRoot, 'missing-output')),
+      /unavailable/iu,
+    );
+  } finally {
+    await fs.rm(external, { recursive: true, force: true });
+  }
+});
+
+test('exports a pure text report to default-style folder and ZIP destinations', async () => {
+  const reportDocument = {
+    schemaVersion: 1,
+    title: '純文字報告',
+    sections: [{ title: '', blocks: [{ type: 'rich-text', content: '純文字內容' }] }],
+  };
+  for (const outputKind of ['folder', 'zip']) {
+    const controller = new ExportJobController({ exporter: exportReport });
+    const started = await controller.start({
+      projectId: 'project-1',
+      projectRoot: testRoot,
+      reportDocument,
+      assets: [],
+      outputDirectory: path.join(testRoot, `default-output-${outputKind}`),
+      reportName: reportDocument.title,
+      outputKind,
+    });
+    const completed = await controller.wait(started.jobId);
+    assert.equal(completed.status, 'completed', `${outputKind} text export failed`);
+    assert.equal(completed.result.validation.valid, true);
+    assert.equal(completed.result.validation.assetCount, 0);
+    if (outputKind === 'folder') {
+      assert.equal(completed.result.zipPath, null);
+      assert.equal(await fs.stat(path.join(completed.result.folderPath, 'report.html')).then((stats) => stats.isFile()), true);
+    } else {
+      assert.equal(await fs.stat(completed.result.zipPath).then((stats) => stats.isFile()), true);
+    }
+  }
 });
 
 test('exposes running, failure, retry, and completion states with a stable job id contract', async () => {

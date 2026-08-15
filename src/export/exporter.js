@@ -68,6 +68,22 @@ async function realpathNearestExisting(targetPath) {
   }
 }
 
+async function assertNoSymbolicLinkAncestors(targetPath, description) {
+  let currentPath = path.resolve(targetPath);
+  while (true) {
+    const entry = await fs.lstat(currentPath).catch((error) => {
+      if (error.code === 'ENOENT') return null;
+      throw new ExportValidationError(`${description} cannot be inspected: ${currentPath}`, { cause: error });
+    });
+    if (entry?.isSymbolicLink()) {
+      throw new ExportValidationError(`${description} contains a symbolic link: ${currentPath}`);
+    }
+    const parentPath = path.dirname(currentPath);
+    if (parentPath === currentPath) return;
+    currentPath = parentPath;
+  }
+}
+
 async function assertContainedPath({ lexicalRoot, realRoot, targetPath, description, allowEqual = true }) {
   const resolvedTarget = path.resolve(targetPath);
   if ((!allowEqual && resolvedTarget === path.resolve(lexicalRoot))
@@ -354,12 +370,19 @@ async function exportReport({
   const safeReportDocument = toReportDocument(reportDocument);
   const referencedAssetIds = new Set(collectReferencedVideoAssetIds(safeReportDocument));
   const outputRoot = path.resolve(outputDirectory);
-  await assertContainedPath({
-    lexicalRoot: projectRootLexical,
-    realRoot: projectRootReal,
-    targetPath: outputRoot,
-    description: 'Export outputDirectory',
+  if (typeof outputDirectory !== 'string' || outputDirectory.trim() === '' || !path.isAbsolute(outputDirectory)) {
+    throw new ExportValidationError('Export outputDirectory must be an absolute safe path');
+  }
+  await assertNoSymbolicLinkAncestors(outputRoot, 'Export outputDirectory');
+  const outputAncestor = await realpathNearestExisting(outputRoot).catch((error) => {
+    throw new ExportValidationError('Export outputDirectory cannot be resolved safely', { cause: error });
   });
+  const outputAncestorStats = await fs.stat(outputAncestor).catch((error) => {
+    throw new ExportValidationError('Export outputDirectory cannot be inspected safely', { cause: error });
+  });
+  if (!outputAncestorStats.isDirectory()) {
+    throw new ExportValidationError('Export outputDirectory parent must be a directory');
+  }
   const safeName = safeReportName(reportName ?? safeReportDocument.title);
   const folderPath = path.join(outputRoot, safeName);
   const shouldCreateZip = createZip === true || outputKind === 'zip' || outputKind === 'both';
@@ -375,9 +398,6 @@ async function exportReport({
 
   await fs.mkdir(outputRoot, { recursive: true });
   const realOutputRoot = await fs.realpath(outputRoot);
-  if (!isPathInsideOrEqual(projectRootReal, realOutputRoot)) {
-    throw new ExportValidationError('Export outputDirectory resolves outside the project root');
-  }
   if (shouldCreateZip) {
     await assertContainedPath({
       lexicalRoot: outputRoot,
