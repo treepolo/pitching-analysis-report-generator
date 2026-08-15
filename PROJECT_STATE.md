@@ -1,5 +1,12 @@
 # Current Project State
 
+## Current Wave 13C Integrator gate (2026-08-15)
+
+- Current implementation tip is `c3d136b3cf148a82924d2a6942e9de53f2731a27` on `worker/desktop-vertical-slice`; it is the formal same-content follow-up to `811ac54` for renderer export/picker diagnostics. The preceding export fix is `722f094`, and the worktree is clean before this docs-only checkpoint.
+- `722f094` only changes output-destination policy: an absolute, existing-or-creatable directory outside the project root is allowed when its existing ancestors are directories with no symbolic links. Project-local media/source containment, ZIP target containment, realpath checks, referenced-only traversal, and original preservation remain enforced. `c3d136b` only adds user-visible allowlisted error codes/reasons and focused renderer assertions; no export/domain source was changed by that commit.
+- Fresh safe scoped evidence: renderer/export/style tests pass `44/44`; `node --check` passes for 37 current JavaScript files; package/lock metadata, `git diff --check`, tracked artifact scan, and credential-pattern scan pass. Electron runtime was not started in this gate; the known exported-folder/ZIP `file://` check remains unavailable/skip evidence, not a pass.
+- Three local MP4 files under ignored `projects/` data remain outside Git and were not staged. Real export UI/file:// runtime, real ffprobe/FFmpeg execution, real video/player/sync/drift runtime, native picker/human interaction, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
+
 ## Current Wave 12A/B/C Integrator gate (2026-08-15)
 
 - Actual product tip is `f4a59fc302a05a7f156a3fafea40e2ed802407e9` on `worker/desktop-vertical-slice`, including Wave 12A UI commit `f4dc599a18847d961f33d36f6da3e1da5926c200` and this export regression-test commit.

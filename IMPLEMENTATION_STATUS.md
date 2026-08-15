@@ -1,5 +1,13 @@
 # Implementation Status
 
+## Current Wave 13C Integrator gate (2026-08-15)
+
+- Current implementation tip is `c3d136b3cf148a82924d2a6942e9de53f2731a27` on `worker/desktop-vertical-slice`; `c3d136b` is the formal same-content follow-up to `811ac54`, with `722f094` as the preceding safe external-output fix. This section is reconciled by a docs-only checkpoint; the worktree was clean before documentation edits.
+- Export policy now permits a user-selected absolute output directory outside the project root only when its existing ancestors are directories without symbolic links. Source media remains project-root-contained through lexical/realpath checks; ZIP targets remain inside the selected output root; referenced-only assets and untouched originals are preserved.
+- Renderer export/picker failures now use allowlisted codes and Traditional Chinese reasons, including `EXPORT_VALIDATION_FAILED`, `EXPORT_PICKER_FAILED`, and `EXPORT_START_FAILED`, instead of hiding all failures behind a generic message. This is renderer consumer evidence, not runtime verification.
+- Fresh scoped gate: 44/44 renderer, style, and export tests pass; 37 JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, tracked artifact scan, and credential-pattern scan pass. Electron was intentionally not launched; the existing exported `file://` runtime remains unavailable/skip evidence, not a pass.
+- Product acceptance remains conditional fail/in progress. Real MP4/FFmpeg, real player/sync/drift, native picker interaction, export folder/ZIP `file://`, responsive human evidence, and AT-A through AT-G remain pending. No requirement may be marked `VERIFIED`.
+
 ## Current Wave 12A/B/C Integrator gate (2026-08-15)
 
 - Actual product tip is `f4a59fc302a05a7f156a3fafea40e2ed802407e9` on `worker/desktop-vertical-slice`; it contains Wave 12A UI commit `f4dc599a18847d961f33d36f6da3e1da5926c200` and the export request regression guard.

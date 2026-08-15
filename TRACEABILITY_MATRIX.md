@@ -1,5 +1,12 @@
 # Traceability Matrix
 
+## Current Wave 13C Integrator gate (2026-08-15)
+
+- Current implementation tip is `c3d136b3cf148a82924d2a6942e9de53f2731a27` on `worker/desktop-vertical-slice`; it is the formal same-content follow-up to `811ac54`, with `722f094` providing safe external output-directory handling. The worktree was clean before this docs-only reconciliation.
+- Export destination evidence: absolute external output directories are accepted only with existing-directory and no-symlink-ancestor checks. Project-local source/media containment, ZIP target containment, referenced-video-only traversal, and originals preservation remain unchanged. Renderer evidence: allowlisted export/picker error codes and localized reasons are displayed without exposing arbitrary error text.
+- Fresh safe scoped evidence is 44/44 tests passing across renderer/export/style coverage and 37/37 JavaScript syntax checks, plus package/lock, diff-check, tracked artifact, and credential scans. Electron was not started; the exported folder/ZIP browser `file://` check remains an explicit unavailable/skip gate rather than pass evidence.
+- Requirement rows remain conservative and none are `VERIFIED`. Unresolved evidence includes real video/FFmpeg/player/sync/drift, native picker/human interaction, exported browser `file://`, responsive human acceptance, and AT-A through AT-G.
+
 ## Current Wave 12A/B/C Integrator gate (2026-08-15)
 
 - Product tip is `f4a59fc302a05a7f156a3fafea40e2ed802407e9` on `worker/desktop-vertical-slice`; integrated Wave 12A UI commit `f4dc599a18847d961f33d36f6da3e1da5926c200` and Wave 12B renderer-shaped export request regression coverage.
