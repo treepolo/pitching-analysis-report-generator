@@ -1,6 +1,13 @@
 # Current Project State
 
-## Current Wave 16G provenance integration (2026-08-15)
+## Current Wave 17A provenance integration (2026-08-15)
+
+- Current implementation tip is `5883ac74c545868c6836121013589e06c04b11d6` on `worker/desktop-vertical-slice`; the export layout fix is limited to `src/export/layout-validator.js`, `test/export/layout-validator.test.js`, and `test/export/runtime-smoke.test.js`. The worktree is clean before this docs-only checkpoint.
+- Text-only ZIP layout validation now permits folders without empty `videos/` or `images/` directories while still requiring a referenced media root. The runtime regression covers text-only folder output and ZIP extraction; referenced-only media validation remains enforced.
+- Worker-reported regression evidence is 40 tests total, 39 pass, and 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. The ignored `.tmp/wave17-real` harness remains untouched and no private/generated artifact is tracked.
+- Exported `file://` runtime remains unavailable, and native picker, real player/sync drift, real media acceptance, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
+
+## Historical Wave 16G provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `5f708ff002157385666254031b5e5d8e1c2f310a` on `worker/desktop-vertical-slice`, with `e6a436b`, `df2d429`, and `f9f355b` in its ancestry; local and origin HEAD match before this docs-only checkpoint.
 - Real Electron smoke exited 0 after the harness was aligned with the canonical block editor; the earlier legacy-selector false failure was corrected. Smoke evidence reports project open, autosave, explicit save, text import, canonical editor, media list, sync fallback, IPC security, invalid-project handling, responsive desktop/narrow controls, close flush/reopen, and payload-schema preservation as true.

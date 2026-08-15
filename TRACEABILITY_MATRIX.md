@@ -1,6 +1,13 @@
 # Traceability Matrix
 
-## Current Wave 16G provenance integration (2026-08-15)
+## Current Wave 17A provenance integration (2026-08-15)
+
+- Current implementation tip is `5883ac74c545868c6836121013589e06c04b11d6` on `worker/desktop-vertical-slice`; it is the export layout validator correction with focused layout/runtime-smoke coverage, and no Playback source collision is present.
+- Text-only ZIP/folder output no longer requires empty media directories; a referenced `videos/` or `images/` root is still required and validated. This preserves referenced-only export semantics.
+- Evidence provenance is worker-reported 40 total / 39 pass / 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. The ignored `.tmp/wave17-real` harness is preserved outside Git; no requirement row is `VERIFIED`.
+- Remaining gaps are exported browser `file://`, native picker, real media/player/sync drift, responsive human acceptance, and AT-A through AT-G.
+
+## Historical Wave 16G provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `5f708ff002157385666254031b5e5d8e1c2f310a` on `worker/desktop-vertical-slice`, with `e6a436b`, `df2d429`, and `f9f355b` included; local/origin HEAD matched before this docs-only update.
 - Electron smoke evidence is a real exit 0 after correcting stale legacy selectors. The smoke reported true for project open, autosave/explicit save, text import, canonical editor, media list, sync fallback, IPC security, invalid project, responsive desktop+narrow controls, close flush/reopen, and payload schema preservation.

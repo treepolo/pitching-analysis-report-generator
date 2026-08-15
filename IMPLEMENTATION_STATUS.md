@@ -1,6 +1,13 @@
 # Implementation Status
 
-## Current Wave 16G provenance integration (2026-08-15)
+## Current Wave 17A provenance integration (2026-08-15)
+
+- Current implementation tip is `5883ac74c545868c6836121013589e06c04b11d6` on `worker/desktop-vertical-slice`; it contains only the text-only ZIP layout validator fix and focused export runtime/layout tests. This is a docs-only reconciliation; source and tests are unchanged here.
+- The validator now requires `videos/` or `images/` only when the export manifest references that root, fixing valid text-only folder/ZIP validation while retaining missing referenced-media directory failure behavior.
+- Worker-reported full gate is 40 tests / 39 pass / 1 explicit Electron exported folder/ZIP `file://` unavailable skip. This is regression evidence, not browser runtime verification; the ignored `.tmp/wave17-real` harness was not modified.
+- Exported `file://`, native picker, real media/player/sync drift, responsive human acceptance, and AT-A through AT-G remain pending or unavailable. No requirement may be marked `VERIFIED`.
+
+## Historical Wave 16G provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `5f708ff002157385666254031b5e5d8e1c2f310a` on `worker/desktop-vertical-slice`; it includes the `e6a436b` provenance checkpoint, `df2d429` media cancellation cleanup, and `f9f355b` sync contract coverage. This is a docs-only reconciliation; source and tests are unchanged here.
 - Actual Electron smoke returned exit 0 after stale legacy selectors in the harness were aligned with the block-editor DOM. Reported true gates include project-open, autosave, explicit save, text import, canonical editor, media list, sync fallback, IPC security, invalid project, responsive desktop/narrow, close flush/reopen, and payload schema.
