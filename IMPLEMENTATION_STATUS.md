@@ -1,6 +1,13 @@
 # Implementation Status
 
-## Current Wave 17A provenance integration (2026-08-15)
+## Current Wave 17B provenance integration (2026-08-15)
+
+- Current implementation tip is `24d3fa53479220a3471a832c6cb364db8574caaa` on `worker/desktop-vertical-slice`; it contains only the renderer/player source and focused test update. This is a docs-only reconciliation.
+- Bounded real-MP4 Electron evidence covers single/comparison source load, metadata, play/pause/seek, unsupported frame-step fallback, time/frame alignment fallback, anchors, drift seek policy, loop/reverse probes, and safe `file:` source hydration through the existing bridge.
+- The worker reports test/fixture cleanup evidence for the bounded run. Cleanup is not a global process-liveness guarantee; any process outside the bounded harness remains a limitation. Synthetic/VFR behavior and exported folder/ZIP `file://` are not promoted by this evidence.
+- Real player/sync drift, native picker, exported browser `file://`, responsive human acceptance, and AT-A through AT-G remain pending. No requirement may be marked `VERIFIED`.
+
+## Historical Wave 17A provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `5883ac74c545868c6836121013589e06c04b11d6` on `worker/desktop-vertical-slice`; it contains only the text-only ZIP layout validator fix and focused export runtime/layout tests. This is a docs-only reconciliation; source and tests are unchanged here.
 - The validator now requires `videos/` or `images/` only when the export manifest references that root, fixing valid text-only folder/ZIP validation while retaining missing referenced-media directory failure behavior.

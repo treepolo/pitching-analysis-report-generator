@@ -1,6 +1,13 @@
 # Traceability Matrix
 
-## Current Wave 17A provenance integration (2026-08-15)
+## Current Wave 17B provenance integration (2026-08-15)
+
+- Current implementation tip is `24d3fa53479220a3471a832c6cb364db8574caaa` on `worker/desktop-vertical-slice`; scope is limited to `src/renderer.js` and `test/renderer-player.test.js`, with no uncommitted collision.
+- Bounded real-MP4 Electron smoke evidence covers single/comparison file-source load, metadata, play/pause/seek, unsupported frame-step fallback, time/frame alignment fallback, anchors, drift-seek policy, loop/reverse domain probes, and safe local source URL hydration. Test/fixture cleanup was exercised within the bounded run.
+- Cleanup evidence has a process-liveness limitation outside the bounded harness; synthetic/VFR probes and exported folder/ZIP `file://` runtime remain separate unavailable or incomplete gates. Requirement rows remain conservative and none are `VERIFIED`.
+- Remaining gaps are real player/sync drift acceptance, native picker, exported browser `file://`, responsive human evidence, and AT-A through AT-G.
+
+## Historical Wave 17A provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `5883ac74c545868c6836121013589e06c04b11d6` on `worker/desktop-vertical-slice`; it is the export layout validator correction with focused layout/runtime-smoke coverage, and no Playback source collision is present.
 - Text-only ZIP/folder output no longer requires empty media directories; a referenced `videos/` or `images/` root is still required and validated. This preserves referenced-only export semantics.

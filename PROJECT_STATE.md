@@ -1,6 +1,13 @@
 # Current Project State
 
-## Current Wave 17A provenance integration (2026-08-15)
+## Current Wave 17B provenance integration (2026-08-15)
+
+- Current implementation tip is `24d3fa53479220a3471a832c6cb364db8574caaa` on `worker/desktop-vertical-slice`; the clean renderer/player commit contains only `src/renderer.js` and `test/renderer-player.test.js`. This docs-only checkpoint does not modify that source/test.
+- Worker-reported bounded real-MP4 Electron smoke covered single/comparison file-source loading, metadata, play/pause/seek, unsupported frame-step fallback, time/frame alignment fallback, anchors, drift-seek policy, loop/reverse domain probing, and safe file-source URL hydration through the media bridge.
+- Test and cleanup evidence is bounded to that smoke/fixture run. Process cleanup was exercised but does not prove that every Electron/fixture process is absent outside the bounded run; synthetic/VFR probes and exported folder/ZIP `file://` runtime remain separate evidence gaps.
+- Real media smoke is not full product acceptance: real player/sync drift, native picker, exported `file://`, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
+
+## Historical Wave 17A provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `5883ac74c545868c6836121013589e06c04b11d6` on `worker/desktop-vertical-slice`; the export layout fix is limited to `src/export/layout-validator.js`, `test/export/layout-validator.test.js`, and `test/export/runtime-smoke.test.js`. The worktree is clean before this docs-only checkpoint.
 - Text-only ZIP layout validation now permits folders without empty `videos/` or `images/` directories while still requiring a referenced media root. The runtime regression covers text-only folder output and ZIP extraction; referenced-only media validation remains enforced.
