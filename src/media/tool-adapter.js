@@ -278,6 +278,7 @@ function createLocalMediaToolRunner(input = {}) {
     return new Promise((resolve, reject) => {
       let child;
       let settled = false;
+      let pendingError = null;
       let stdout = '';
       let stderr = '';
 
@@ -296,6 +297,18 @@ function createLocalMediaToolRunner(input = {}) {
         cleanup();
         reject(error);
       };
+      const terminate = (error) => {
+        pendingError = error;
+        if (!child || typeof child.kill !== 'function') {
+          settleReject(error);
+          return;
+        }
+        try {
+          child.kill();
+        } catch {
+          settleReject(error);
+        }
+      };
       const append = (field, value) => {
         const text = Buffer.isBuffer(value) || value instanceof Uint8Array
           ? Buffer.from(value).toString('utf8')
@@ -304,8 +317,7 @@ function createLocalMediaToolRunner(input = {}) {
         if (Buffer.byteLength(next, 'utf8') > maxOutputBytes) {
           const error = new Error('Media tool output exceeded the configured limit');
           error.code = 'OUTPUT_LIMIT_EXCEEDED';
-          if (child && typeof child.kill === 'function') child.kill();
-          settleReject(error);
+          terminate(error);
           return;
         }
         if (field === 'stdout') stdout = next;
@@ -314,22 +326,20 @@ function createLocalMediaToolRunner(input = {}) {
           try {
             onOutput({ stream: field, text });
           } catch (error) {
-            if (child && typeof child.kill === 'function') child.kill();
             const callbackError = new MediaToolAdapterError(
               'Media tool output callback failed',
               'OUTPUT_CALLBACK_FAILED',
             );
             callbackError.cause = error;
-            settleReject(callbackError);
+            terminate(callbackError);
           }
         }
       };
       const onAbort = () => {
-        if (child && typeof child.kill === 'function') child.kill();
         const error = new Error('Media tool execution was cancelled');
         error.name = 'AbortError';
         error.code = 'ABORT_ERR';
-        settleReject(error);
+        terminate(error);
       };
 
       if (signal?.aborted) {
@@ -355,8 +365,14 @@ function createLocalMediaToolRunner(input = {}) {
       }
       child.stdout?.on('data', (value) => append('stdout', value));
       child.stderr?.on('data', (value) => append('stderr', value));
-      child.once('error', settleReject);
+      child.once('error', (error) => {
+        if (pendingError === null) settleReject(error);
+      });
       child.once('close', (code, signalName) => {
+        if (pendingError !== null) {
+          settleReject(pendingError);
+          return;
+        }
         settleResolve({
           exitCode: Number.isInteger(code) ? code : -1,
           stdout,
@@ -364,6 +380,7 @@ function createLocalMediaToolRunner(input = {}) {
         });
       });
       if (signal) signal.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) onAbort();
     });
   };
 }

@@ -102,6 +102,31 @@ test('local adapter reports an unavailable executable without pretending probe s
   assert.equal(inspected.inspectionStatus, INSPECTION_STATUS.METADATA_PENDING);
 });
 
+test('local runner waits for a cancelled child to close before releasing its output file', async () => {
+  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'media-cancel-cleanup-'));
+  const outputPath = path.join(fixtureRoot, 'partial-normalized.mp4');
+  const controller = new AbortController();
+  try {
+    const running = createLocalMediaToolRunner()({
+      command: process.execPath,
+      args: [
+        '-e',
+        "const fs=require('node:fs'); fs.writeFileSync(process.argv[1], 'partial-output'); process.stdout.write('ready'); setTimeout(() => {}, 2000)",
+        outputPath,
+      ],
+      signal: controller.signal,
+      onOutput: ({ stream, text }) => {
+        if (stream === 'stdout' && text.includes('ready')) controller.abort();
+      },
+    });
+    await assert.rejects(running, (error) => error?.code === 'ABORT_ERR');
+    await fs.rm(outputPath, { force: true });
+    assert.equal(await fs.stat(outputPath).catch(() => null), null);
+  } finally {
+    await fs.rm(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
 test('local normalization orchestration keeps missing real tools recoverable', async () => {
   const projectRoot = path.resolve('local-normalization-boundary-project');
   const result = await runNormalizationJobWithLocalTools({
