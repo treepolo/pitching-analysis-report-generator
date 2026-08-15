@@ -74,6 +74,82 @@ test('runs a video-only empty-label report through the export bridge', async () 
   assert.equal(await fs.stat(completed.result.zipPath).then((stats) => stats.isFile()), true);
 });
 
+test('exports renderer-shaped text-only, video-only, and mixed snapshots through jobs', async () => {
+  const sourceVideo = path.join(testRoot, 'bridge-shape-video.mp4');
+  await fs.writeFile(sourceVideo, 'bridge-shape-video-fixture', 'utf8');
+  const relativeVideo = path.relative(testRoot, sourceVideo).split(path.sep).join('/');
+  const videoAsset = {
+    id: 'bridge-shape-video',
+    kind: 'video',
+    sourceReference: { relativePath: relativeVideo },
+    displayName: 'bridge-shape-video.mp4',
+  };
+  const cases = [
+    {
+      name: 'text-only',
+      document: {
+        schemaVersion: 1,
+        title: '純文字報告',
+        sections: [{ title: '', blocks: [{ type: 'rich-text', content: '純文字內容' }] }],
+      },
+      assets: [],
+    },
+    {
+      name: 'video-only',
+      document: {
+        schemaVersion: 1,
+        title: '',
+        sections: [{ title: '', blocks: [{ type: 'singleVideo', mediaAssetId: videoAsset.id, label: '' }] }],
+      },
+      assets: [videoAsset],
+    },
+    {
+      name: 'mixed',
+      document: {
+        schemaVersion: 1,
+        title: '混合報告',
+        sections: [{
+          title: '',
+          blocks: [
+            { type: 'rich-text', content: '影片前說明' },
+            { type: 'singleVideo', mediaAssetId: videoAsset.id, label: '實測影片' },
+          ],
+        }],
+      },
+      assets: [videoAsset, {
+        id: 'bridge-shape-unused',
+        kind: 'video',
+        sourceReference: { relativePath: 'https://example.test/not-copied.mp4' },
+        displayName: 'not-copied.mp4',
+      }],
+    },
+  ];
+
+  for (const entry of cases) {
+    const controller = new ExportJobController({ exporter: exportReport });
+    const rendererRequest = {
+      projectId: 'project-1',
+      outputDirectory: path.join(testRoot, `bridge-shape-${entry.name}`),
+      reportName: entry.document.title,
+      outputKind: 'both',
+    };
+    const started = await controller.start({
+      projectRoot: testRoot,
+      ...rendererRequest,
+      // Main adds these persisted snapshot fields after preload allowlisting.
+      reportDocument: entry.document,
+      assets: entry.assets,
+    });
+    const completed = await controller.wait(started.jobId);
+    assert.equal(completed.status, 'completed', `${entry.name} export failed`);
+    assert.equal(completed.result.validation.valid, true, `${entry.name} folder invalid`);
+    assert.equal(completed.result.zip.parity.valid, true, `${entry.name} ZIP invalid`);
+    assert.equal(await fs.stat(path.join(completed.result.folderPath, 'report.html')).then((stats) => stats.isFile()), true);
+    assert.equal(await fs.stat(completed.result.zipPath).then((stats) => stats.isFile()), true);
+    assert.equal(completed.result.manifest.assets.length, entry.name === 'text-only' ? 0 : 1);
+  }
+});
+
 test('validates export output roots lexically and through realpath ancestors', async () => {
   const nested = path.join(testRoot, 'nested', 'output');
   assert.equal(await assertSafeOutputRoot(testRoot, nested), path.resolve(nested));
