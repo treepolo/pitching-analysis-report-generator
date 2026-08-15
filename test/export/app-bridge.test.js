@@ -220,6 +220,121 @@ test('exports a pure text report to default-style folder and ZIP destinations', 
   }
 });
 
+test('exports ZIP after folder without overwriting the folder and preserves ZIP-to-folder policy', async () => {
+  const sourceVideo = path.join(testRoot, 'sequence-video.mp4');
+  await fs.writeFile(sourceVideo, 'sequence-video-fixture', 'utf8');
+  const cases = [
+    {
+      name: 'text-only',
+      reportName: 'Sequence text',
+      reportDocument: {
+        schemaVersion: 1,
+        title: 'Sequence text',
+        sections: [{ blocks: [{ type: 'rich-text', content: 'sequence text' }] }],
+      },
+      assets: [],
+    },
+    {
+      name: 'mixed',
+      reportName: 'Sequence mixed',
+      reportDocument: {
+        schemaVersion: 1,
+        title: 'Sequence mixed',
+        sections: [{ blocks: [
+          { type: 'rich-text', content: 'sequence mixed' },
+          { type: 'singleVideo', mediaAssetId: 'sequence-video' },
+        ] }],
+      },
+      assets: [{
+        id: 'sequence-video',
+        kind: 'video',
+        sourceReference: { relativePath: path.relative(testRoot, sourceVideo).split(path.sep).join('/') },
+        displayName: 'sequence-video.mp4',
+      }],
+    },
+  ];
+
+  for (const entry of cases) {
+    const outputDirectory = path.join(testRoot, `sequence-${entry.name}`);
+    const folderController = new ExportJobController({ exporter: exportReport });
+    const folderStarted = await folderController.start({
+      projectId: 'project-1',
+      projectRoot: testRoot,
+      reportDocument: entry.reportDocument,
+      assets: entry.assets,
+      outputDirectory,
+      reportName: entry.reportName,
+      outputKind: 'folder',
+    });
+    const folderCompleted = await folderController.wait(folderStarted.jobId);
+    assert.equal(folderCompleted.status, 'completed', `${entry.name} folder export failed`);
+    const folderPath = folderCompleted.result.folderPath;
+    const reportBeforeZip = await fs.readFile(path.join(folderPath, 'report.html'));
+
+    const zipController = new ExportJobController({ exporter: exportReport });
+    const zipStarted = await zipController.start({
+      projectId: 'project-1',
+      projectRoot: testRoot,
+      reportDocument: entry.reportDocument,
+      assets: entry.assets,
+      outputDirectory,
+      reportName: entry.reportName,
+      outputKind: 'zip',
+    });
+    const zipCompleted = await zipController.wait(zipStarted.jobId);
+    assert.equal(zipCompleted.status, 'completed', `${entry.name} ZIP-after-folder export failed`);
+    assert.equal(zipCompleted.result.folderPath, null);
+    assert.equal(await fs.stat(zipCompleted.result.zipPath).then((stats) => stats.isFile()), true);
+    assert.deepEqual(await fs.readFile(path.join(folderPath, 'report.html')), reportBeforeZip);
+    const outputEntries = await fs.readdir(outputDirectory);
+    assert.deepEqual(outputEntries.filter((name) => name.startsWith('.report-export-')), []);
+  }
+
+  const zipFirstDirectory = path.join(testRoot, 'sequence-zip-first');
+  const zipFirstController = new ExportJobController({ exporter: exportReport });
+  const zipFirstStarted = await zipFirstController.start({
+    projectId: 'project-1',
+    projectRoot: testRoot,
+    reportDocument: cases[0].reportDocument,
+    assets: cases[0].assets,
+    outputDirectory: zipFirstDirectory,
+    reportName: cases[0].reportName,
+    outputKind: 'zip',
+  });
+  const zipFirstCompleted = await zipFirstController.wait(zipFirstStarted.jobId);
+  assert.equal(zipFirstCompleted.status, 'completed');
+
+  const folderAfterZipController = new ExportJobController({ exporter: exportReport });
+  const folderAfterZipStarted = await folderAfterZipController.start({
+    projectId: 'project-1',
+    projectRoot: testRoot,
+    reportDocument: cases[0].reportDocument,
+    assets: cases[0].assets,
+    outputDirectory: zipFirstDirectory,
+    reportName: cases[0].reportName,
+    outputKind: 'folder',
+  });
+  const folderAfterZipCompleted = await folderAfterZipController.wait(folderAfterZipStarted.jobId);
+  assert.equal(folderAfterZipCompleted.status, 'completed');
+  assert.equal(await fs.stat(zipFirstCompleted.result.zipPath).then((stats) => stats.isFile()), true);
+  assert.equal(await fs.stat(folderAfterZipCompleted.result.folderPath).then((stats) => stats.isDirectory()), true);
+
+  const duplicateZipController = new ExportJobController({ exporter: exportReport });
+  const duplicateZipStarted = await duplicateZipController.start({
+    projectId: 'project-1',
+    projectRoot: testRoot,
+    reportDocument: cases[0].reportDocument,
+    assets: cases[0].assets,
+    outputDirectory: zipFirstDirectory,
+    reportName: cases[0].reportName,
+    outputKind: 'zip',
+  });
+  const duplicateZipCompleted = await duplicateZipController.wait(duplicateZipStarted.jobId);
+  assert.equal(duplicateZipCompleted.status, 'failed');
+  assert.equal(duplicateZipCompleted.error.code, 'EXPORT_VALIDATION_FAILED');
+  assert.match(duplicateZipCompleted.error.message, /ZIP target already exists/iu);
+});
+
 test('exposes running, failure, retry, and completion states with a stable job id contract', async () => {
   let attempts = 0;
   const calls = [];

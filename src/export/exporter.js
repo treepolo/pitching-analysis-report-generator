@@ -384,6 +384,7 @@ async function exportReport({
     throw new ExportValidationError('Export outputDirectory parent must be a directory');
   }
   const safeName = safeReportName(reportName ?? safeReportDocument.title);
+  const shouldKeepFolder = outputKind !== 'zip';
   const folderPath = path.join(outputRoot, safeName);
   const shouldCreateZip = createZip === true || outputKind === 'zip' || outputKind === 'both';
   const resolvedZipPath = path.resolve(zipPath || path.join(outputRoot, `${safeName}_offline.zip`));
@@ -391,7 +392,9 @@ async function exportReport({
     throw new ExportValidationError('Export targets must stay inside outputDirectory');
   }
   if (resolvedZipPath === outputRoot) throw new ExportValidationError('ZIP target must be a file path');
-  if (await pathExists(folderPath)) throw new ExportValidationError(`Export folder already exists: ${folderPath}`);
+  if (shouldKeepFolder && await pathExists(folderPath)) {
+    throw new ExportValidationError(`Export folder already exists: ${folderPath}`);
+  }
   if (shouldCreateZip && await pathExists(resolvedZipPath)) {
     throw new ExportValidationError(`ZIP target already exists: ${resolvedZipPath}`);
   }
@@ -410,6 +413,7 @@ async function exportReport({
   const temporaryRoot = await fs.mkdtemp(path.join(outputRoot, '.report-export-'));
   const stagingPath = path.join(temporaryRoot, safeName);
   const reportFileName = 'report.html';
+  const outputFolderPath = shouldKeepFolder ? folderPath : stagingPath;
   let moved = false;
   let zipCreatedPath = null;
   try {
@@ -440,11 +444,13 @@ async function exportReport({
     });
     await writeJson(path.join(stagingPath, 'export-manifest.json'), manifest);
 
-    await fs.rename(stagingPath, folderPath);
-    moved = true;
-    await fs.rm(temporaryRoot, { recursive: true, force: true });
+    if (shouldKeepFolder) {
+      await fs.rename(stagingPath, folderPath);
+      moved = true;
+      await fs.rm(temporaryRoot, { recursive: true, force: true });
+    }
 
-    const validation = await validateExportLayout(folderPath, {
+    const validation = await validateExportLayout(outputFolderPath, {
       assetManifest: stagedManifest,
       html,
       requireAllManifestAssetsUsed: false,
@@ -456,18 +462,19 @@ async function exportReport({
       assetCount: validation.assetCount,
       referencedAssetCount: validation.referencedAssetCount,
     };
-    await writeJson(path.join(folderPath, 'export-manifest.json'), manifest);
+    await writeJson(path.join(outputFolderPath, 'export-manifest.json'), manifest);
 
     let zip = null;
     if (shouldCreateZip) {
       throwIfAborted(signal);
       zipCreatedPath = resolvedZipPath;
-      zip = await createZipArchive(folderPath, resolvedZipPath);
-      zip.parity = await validateZipParity(folderPath, resolvedZipPath);
+      zip = await createZipArchive(outputFolderPath, resolvedZipPath);
+      zip.parity = await validateZipParity(outputFolderPath, resolvedZipPath);
     }
     throwIfAborted(signal);
+    if (!shouldKeepFolder) await fs.rm(temporaryRoot, { recursive: true, force: true });
     return {
-      folderPath,
+      folderPath: shouldKeepFolder ? folderPath : null,
       zipPath: zip ? zip.zipPath : null,
       safeName,
       reportDocumentSha256: manifest.report.documentSha256,
