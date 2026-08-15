@@ -1,9 +1,10 @@
 # Implementation Status
 
-## Current Wave 10A/B/C Integrator gate (2026-08-15)
+## Current Wave 11A/B/C Integrator gate (2026-08-15)
 
-- Actual product tip is `a0fcdb400aa24f36cf430fb23b4e07ef6df370c3` on `worker/desktop-vertical-slice`; Wave 10A UI localization/static gate is PASS for Traditional Chinese user-facing text/accessibility labels with no general English leakage, as reported by the QA gate.
-- Fresh evidence: `npm test` 113 total / 112 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` skip; 35 JavaScript syntax checks; package/lock consistency; `git diff --check`; and tracked artifact/private scan. The Electron skip and worker-reported runtime evidence are not independent product verification.
+- Actual product tip is `27038b9f48dcd449aa1b3aaaf9525b8a49e224c5` on `worker/desktop-vertical-slice`; Wave 11A `d6b6c55ed5895a75e6b34b6bcbde367772179b3e` fixes autosave redraw focus loss, and Wave 11B `27038b9f48dcd449aa1b3aaaf9525b8a49e224c5` adds video-only export regression coverage without an exporter source bypass.
+- Wave 11A focused tests pass for no-DOM-rebuild autosave, focus/caret preservation, and text/video setting persistence. Wave 11B focused tests pass for empty-label video-only folder/ZIP export, report HTML, referenced-only traversal, unused asset exclusion, and original preservation.
+- Fresh evidence: `npm test` 118 total / 117 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` skip; 36 JavaScript syntax checks; package/lock consistency; `git diff --check`; and tracked artifact/private scan. The Electron skip is unavailable evidence, not a pass.
 - Product acceptance remains conditional fail/in progress. Real ffprobe/FFmpeg execution, real media/player/sync/drift, exported folder/ZIP `file://`, responsive human evidence, and AT-A through AT-G remain incomplete or unavailable. No requirement may be marked `VERIFIED`.
 
 ## Historical Wave 8D Integrator gate (superseded, 2026-08-15)

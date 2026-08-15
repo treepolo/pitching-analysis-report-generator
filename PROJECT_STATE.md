@@ -1,10 +1,11 @@
 # Current Project State
 
-## Current Wave 10A/B/C Integrator gate (2026-08-15)
+## Current Wave 11A/B/C Integrator gate (2026-08-15)
 
-- Actual product tip is `a0fcdb400aa24f36cf430fb23b4e07ef6df370c3` on `worker/desktop-vertical-slice`, integrating the Wave 10A UI localization/static gate PASS on top of the Wave 9A/B/C checkpoint. Traditional Chinese user-facing text and accessibility labels passed the static gate; no general English leakage was found by that gate.
-- Fresh regression evidence: `npm test` reports 113 tests, 112 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip; 35 current JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/private scan pass.
-- The Electron `file://` skip, worker-reported runtime evidence, real ffprobe/FFmpeg execution, real video/player/sync/drift runtime, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
+- Actual product tip is `27038b9f48dcd449aa1b3aaaf9525b8a49e224c5` on `worker/desktop-vertical-slice`, integrating Wave 11A `d6b6c55ed5895a75e6b34b6bcbde367772179b3e` autosave/focus preservation and Wave 11B `27038b9f48dcd449aa1b3aaaf9525b8a49e224c5` video-only export regression coverage.
+- Wave 11A focused evidence passes: autosave does not rebuild the active block DOM, redraw preserves focus/selection, and text/video settings persist. Wave 11B focused evidence passes: a video-only document with empty title/section label produces valid folder and ZIP output, referenced-only media, unused-asset exclusion, and original preservation.
+- Fresh regression evidence: `npm test` reports 118 tests, 117 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip; 36 current JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/private scan pass.
+- The Electron `file://` skip, real ffprobe/FFmpeg execution, real video/player/sync/drift runtime, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
 
 ## Historical Wave 8D Integrator gate (superseded, 2026-08-15)
 
