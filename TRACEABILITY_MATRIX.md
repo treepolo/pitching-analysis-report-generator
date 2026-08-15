@@ -1,6 +1,13 @@
 # Traceability Matrix
 
-## Current Wave 16E provenance integration (2026-08-15)
+## Current Wave 16G provenance integration (2026-08-15)
+
+- Current implementation tip is `5f708ff002157385666254031b5e5d8e1c2f310a` on `worker/desktop-vertical-slice`, with `e6a436b`, `df2d429`, and `f9f355b` included; local/origin HEAD matched before this docs-only update.
+- Electron smoke evidence is a real exit 0 after correcting stale legacy selectors. The smoke reported true for project open, autosave/explicit save, text import, canonical editor, media list, sync fallback, IPC security, invalid project, responsive desktop+narrow controls, close flush/reopen, and payload schema preservation.
+- Regression provenance is worker-reported 128 npm pass plus 1 explicit exported folder/ZIP `file://` unavailable skip. The legacy-selector failure is treated as a harness false failure correction, not as product acceptance of real media or browser export runtime.
+- Requirement rows remain conservative and none are `VERIFIED`. Exported `file://`, native picker, real media/player/sync drift, responsive human acceptance, and AT-A through AT-G remain unresolved.
+
+## Historical Wave 16E provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `df2d429e3910e6950cf00022ec6b8213e7dab03f` on `worker/desktop-vertical-slice`, with `f9f355b` sync contract tests and `df2d429` media cancellation cleanup; local/origin HEAD matched before this docs-only update.
 - Wave 16A media evidence records local `ffmpeg`/`ffprobe` version `9.0.1`, ignored MP4 fixture normalization, 46 progress events, original preservation, and cancellation cleanup. The media worker's process-close fix is covered by 34/34 scoped media tests; fixtures/evidence are non-tracked.

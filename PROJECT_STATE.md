@@ -1,6 +1,13 @@
 # Current Project State
 
-## Current Wave 16E provenance integration (2026-08-15)
+## Current Wave 16G provenance integration (2026-08-15)
+
+- Current implementation tip is `5f708ff002157385666254031b5e5d8e1c2f310a` on `worker/desktop-vertical-slice`, with `e6a436b`, `df2d429`, and `f9f355b` in its ancestry; local and origin HEAD match before this docs-only checkpoint.
+- Real Electron smoke exited 0 after the harness was aligned with the canonical block editor; the earlier legacy-selector false failure was corrected. Smoke evidence reports project open, autosave, explicit save, text import, canonical editor, media list, sync fallback, IPC security, invalid-project handling, responsive desktop/narrow controls, close flush/reopen, and payload-schema preservation as true.
+- Worker-reported full regression is 128 npm tests passing with one explicit exported-folder/ZIP `file://` unavailable skip. This records smoke/regression evidence only; the exported `file://` skip is not a pass and native picker interaction was not established.
+- Real local media/player/sync drift acceptance, native picker/human interaction, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
+
+## Historical Wave 16E provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `df2d429e3910e6950cf00022ec6b8213e7dab03f` on `worker/desktop-vertical-slice`, with `f9f355b` sync contract coverage and `df2d429` media cancellation cleanup in its ancestry; local and origin HEAD match before this docs-only checkpoint.
 - Wave 16A worker evidence records local `ffmpeg`/`ffprobe` `9.0.1` processing of ignored project-local MP4 fixtures, normalization with 46 progress events, original preservation, and cancellation cleanup. The media cancellation implementation waits for child-process close before rejecting, avoiding Windows cleanup races; the fixture media and evidence remain outside Git.
