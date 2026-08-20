@@ -33,7 +33,10 @@ if not exist "node_modules\electron\package.json" goto install_incomplete
 
 :start_app
 set "PITCHING_DISABLE_GPU=0"
-set "PITCHING_USER_DATA=%PROJECT_ROOT%\.runtime\electron-user-data"
+rem Keep the command-line path ASCII-only. Electron resolves this relative to
+rem the project directory after pushd; passing the Chinese absolute path
+rem through cmd/npm can create mojibake folders beside the project.
+set "PITCHING_USER_DATA=.runtime\electron-user-data"
 echo [INFO] Starting Pitching Report Generator...
 rem This desktop environment cannot launch Electron's renderer sandbox (exitCode 49).
 rem Keep the renderer's context isolation/preload boundary; disable only Chromium's
