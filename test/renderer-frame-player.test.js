@@ -81,3 +81,10 @@ test('missing bridge and cache failures remain explicit player states', () => {
   assert.match(renderer, /影格快取錯誤/u);
   assert.match(renderer, /影格快取尚未完成/u);
 });
+
+test('comparison playback requires both sides ready and all frames rendered', () => {
+  assert.match(renderer, /function framePlayerReady\(block, runtime\)/u);
+  assert.match(renderer, /framePlayerSides\(block\)\.every\(\(side\)/u);
+  assert.match(renderer, /results\.every\(Boolean\)/u);
+  assert.match(renderer, /比較播放器需要左右兩側都成功載入影格/u);
+});

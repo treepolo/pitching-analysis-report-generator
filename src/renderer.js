@@ -669,7 +669,10 @@ function exportResultLabel(snapshot) {
   const result = snapshot?.result;
   if (!result) return '';
   const output = result.zipPath || result.folderPath;
-  return output ? `輸出就緒：${output}` : '匯出完成，但沒有輸出路徑。';
+  const warnings = Array.isArray(result.warnings) && result.warnings.length > 0
+    ? `；警告：${result.warnings.join('；')}`
+    : '';
+  return output ? `輸出就緒：${output}${warnings}` : `匯出完成，但沒有輸出路徑${warnings}。`;
 }
 
 function renderExportControls() {
@@ -1040,9 +1043,17 @@ function framePlayerPrimarySide(block, runtime) {
   return runtime.caches.left ? 'left' : runtime.caches.right ? 'right' : configured;
 }
 
+function framePlayerReady(block, runtime) {
+  return framePlayerSides(block).every((side) => {
+    const cache = runtime.caches[side];
+    return cache && Number.isInteger(cache.frameCount) && cache.frameCount > 0;
+  });
+}
+
 function framePlayerFrameCount(block, runtime) {
   const primary = framePlayerPrimarySide(block, runtime);
   const primaryCount = runtime.caches[primary]?.frameCount || 0;
+  if (!framePlayerReady(block, runtime)) return 0;
   if (primaryCount > 0) return primaryCount;
   return framePlayerSides(block).reduce((highest, side) => Math.max(highest, runtime.caches[side]?.frameCount || 0), 0);
 }
@@ -1146,10 +1157,16 @@ async function renderFramePlayerIndex(card, frameIndex) {
     }
   }));
   if (requestSerial !== runtime.requestSerial) return;
-  if (results.some(Boolean)) {
+  if (results.every(Boolean)) {
     setFramePlayerStatus(card, `已顯示第 ${runtime.currentFrameIndex + 1} 幀。`, 'loaded');
   } else {
-    setFramePlayerStatus(card, '影格無法顯示，請重試影格快取。', 'error');
+    setFramePlayerStatus(
+      card,
+      entry.block?.type === 'comparisonVideo'
+        ? '比較播放器需要左右兩側都成功載入影格，請檢查另一側快取。'
+        : '影格無法顯示，請重試影格快取。',
+      'error',
+    );
   }
 }
 
@@ -1233,8 +1250,15 @@ async function prepareFramePlayerCard(card, block, generation) {
   }
   await Promise.all(framePlayerSides(block).map((side) => prepareFramePlayerSide(card, block, side, generation, adapter, runtime)));
   if (generation !== state.inlineGeneration || !card.isConnected) return;
-  if (framePlayerFrameCount(block, runtime) <= 0) {
-    setFramePlayerStatus(card, '影格快取尚未完成，請稍後重試。', 'pending');
+  if (!framePlayerReady(block, runtime)) {
+    const comparison = block?.type === 'comparisonVideo';
+    setFramePlayerStatus(
+      card,
+      comparison
+        ? '比較播放器需要左右兩側影格快取都就緒，尚未能播放。'
+        : '影格快取尚未完成，請稍後重試。',
+      comparison ? 'error' : 'pending',
+    );
     updateFramePlayerControls(card);
     return;
   }

@@ -9,6 +9,7 @@ if (process.env.PITCHING_DISABLE_GPU === '1') {
 
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 const { pathToFileURL } = require('node:url');
 const {
   createProjectStore,
@@ -20,6 +21,7 @@ const {
   ExportJobController,
   validatePickedExportDirectory,
 } = require('./export/app-bridge');
+const { collectReferencedVideoAssetIds } = require('./export/asset-paths');
 const {
   FRAME_CACHE_BRIDGE_METHODS,
   FRAME_CACHE_CONTRACT_VERSION,
@@ -232,6 +234,33 @@ async function resolveFrameCacheAsset(request) {
   };
 }
 
+async function readExportFrameCaches(project) {
+  const assetIds = collectReferencedVideoAssetIds(project);
+  return Promise.all(assetIds.map(async (assetId) => {
+    const request = {
+      schemaVersion: FRAME_CACHE_CONTRACT_VERSION,
+      operation: FRAME_CACHE_BRIDGE_METHODS.READ,
+      requestId: `export-${randomUUID()}`,
+      projectId: project.id,
+      assetId,
+    };
+    try {
+      const resolved = await resolveFrameCacheAsset(request);
+      const response = normalizeFrameCacheResponse(await readFrameCache({
+        ...request,
+        sourceReference: resolved.sourceReference,
+        projectRoot: PROJECT_ROOT,
+      }));
+      return { assetId, response };
+    } catch (error) {
+      return {
+        assetId,
+        response: frameCacheFailure(request, frameCacheStatusForError(error), error),
+      };
+    }
+  }));
+}
+
 async function invokeFrameCacheOperation(event, payload, operation, operationFn) {
   const senderWindow = assertTrustedSender(event);
   const request = normalizeFrameCacheBridgeRequest(payload, operation);
@@ -367,8 +396,14 @@ async function invokeFrameCacheSource(event, payload) {
 
   const projectRoot = path.resolve(projectStore.root);
   const cacheRoot = resolveProjectRelativePath(projectRoot, response.cache.rootRelativePath);
+  const frameDirectory = resolveProjectRelativePath(projectRoot, response.cache.frameDirectoryRelativePath);
   const framePath = resolveProjectRelativePath(projectRoot, frame.relativePath);
-  if (!isPathInside(projectRoot, cacheRoot) || !isPathInside(cacheRoot, framePath)) {
+  if (!isPathInside(projectRoot, cacheRoot)
+    || !isPathInside(projectRoot, frameDirectory)
+    || !isPathInside(cacheRoot, frameDirectory)
+    || frameDirectory === cacheRoot
+    || !isPathInside(frameDirectory, framePath)
+    || framePath === frameDirectory) {
     throw new Error('影格來源不在專案快取範圍內。');
   }
   await assertNoFrameCacheSymlinkAncestors(projectRoot, framePath);
@@ -502,11 +537,13 @@ function registerIpc() {
     assertTrustedSender(event);
     const projectId = payload?.projectId;
     const project = await projectStore.readProject(projectId);
+    const frameCaches = await readExportFrameCaches(project);
     return exportJobs.start({
       projectId: project.id,
       projectRoot: PROJECT_ROOT,
       reportDocument: project,
       assets: project.media,
+      frameCaches,
       outputDirectory: payload?.outputDirectory,
       reportName: payload?.reportName ?? project.reportTitle ?? project.displayName,
       outputKind: payload?.outputKind,
