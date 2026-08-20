@@ -126,6 +126,12 @@ test('native scrubbing coalesces stale targets and keyboard steps use the native
   const controls = functionSlice(renderer, 'function toggleFramePlayer(', 'function handleFramePlayerEvent(');
   assert.match(controls, /adapter\?\.pause|adapter\?\.play/u);
   assert.match(controls, /nativePlayerEnded/u);
+  assert.match(controls, /currentFrameIndex >= session\.frameCount - 1/u);
+  assert.match(controls, /requestNativeScrub\(card, 0\)/u);
+  const nativeClock = functionSlice(renderer, 'function scheduleNativePlayerUiTick(', 'async function closeNativePlayerSession(');
+  assert.match(nativeClock, /nativePlaybackRate/u);
+  assert.match(nativeClock, /nextFrameIndex >= runtime\.nativeSession\.frameCount - 1/u);
+  assert.match(nativeClock, /await adapter\.pause\(\{ sessionId \}\)/u);
   const events = functionSlice(renderer, 'function handleFramePlayerEvent(', 'function handleFramePlayerKeydown(');
   assert.match(events, /event\.type !== 'pointermove'/u);
   assert.match(events, /requestNativeScrub\(card, Number\(target\.value\)\)/u);

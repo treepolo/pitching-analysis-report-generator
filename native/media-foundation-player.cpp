@@ -417,7 +417,11 @@ class MediaFoundationPlayer final {
     const int scaledY = static_cast<int>(y * devicePixelRatio);
     const int scaledWidth = std::max(1, static_cast<int>(width * devicePixelRatio));
     const int scaledHeight = std::max(1, static_cast<int>(height * devicePixelRatio));
-    if (!MoveWindow(renderWindow_, scaledX, scaledY, scaledWidth, scaledHeight, TRUE)) {
+    // Moving the child with repaint=TRUE erases the EVR backing surface on
+    // every page scroll. Keep the last presented sample in place while the
+    // native child is moved; SetVideoPosition updates the presenter geometry
+    // without asking EVR to repaint an unavailable sample.
+    if (!MoveWindow(renderWindow_, scaledX, scaledY, scaledWidth, scaledHeight, FALSE)) {
       const HRESULT error = HRESULT_FROM_WIN32(GetLastError());
       Emit("bounds-applied", requestId, error);
       return error;
@@ -429,9 +433,6 @@ class MediaFoundationPlayer final {
       Emit("bounds-applied", requestId, positionResult);
       return positionResult;
     }
-    // Repaint after every resize/scroll so the EVR presenter does not leave
-    // the old Chromium child-window backing store in the native surface.
-    displayControl_->RepaintVideo();
     Emit("bounds-applied", requestId, S_OK,
          "\"x\":" + std::to_string(scaledX) + ",\"y\":" + std::to_string(scaledY)
          + ",\"width\":" + std::to_string(scaledWidth)

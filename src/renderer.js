@@ -1068,6 +1068,7 @@ function framePlayerRuntimeForCard(card) {
       nativeBoundsLoop: null,
       nativeLifecycle: 'idle',
       nativePlaybackTimer: null,
+      nativePlaybackRate: 1,
     };
     state.framePlayerByCard.set(card, runtime);
   }
@@ -1252,6 +1253,7 @@ function handleNativePlayerBridgeEvent(event) {
       runtime.playing = false;
       if (runtime.nativePlaybackTimer) clearTimeout(runtime.nativePlaybackTimer);
       runtime.nativePlaybackTimer = null;
+      runtime.nativePlaybackRate = 1;
       runtime.nativeLifecycle = 'ended';
       runtime.currentFrameIndex = runtime.nativeSession.frameCount - 1;
       setFramePlayerStatus(card, '已到達最後一幀。', 'loaded');
@@ -1280,15 +1282,40 @@ function scheduleNativePlayerUiTick(card) {
   const runtime = framePlayerRuntimeForCard(card);
   if (!runtime.native || !runtime.nativeSession || !runtime.playing) return;
   if (runtime.nativePlaybackTimer) clearTimeout(runtime.nativePlaybackTimer);
-  const frameDuration = 1000 / Math.max(1, runtime.nativeSession.fps || 30);
+  const frameDuration = 1000 / (
+    Math.max(1, runtime.nativeSession.fps || 30)
+    * Math.max(0.05, Number(runtime.nativePlaybackRate) || 1)
+  );
   runtime.nativePlaybackTimer = setTimeout(() => {
     runtime.nativePlaybackTimer = null;
     if (!runtime.playing || !runtime.nativeSession || !card.isConnected) return;
-    runtime.currentFrameIndex = Math.min(
+    const nextFrameIndex = Math.min(
       runtime.nativeSession.frameCount - 1,
       runtime.currentFrameIndex + 1,
     );
+    runtime.currentFrameIndex = nextFrameIndex;
     updateFramePlayerControls(card);
+    if (nextFrameIndex >= runtime.nativeSession.frameCount - 1) {
+      // The native session can deliver its end event a little after the UI
+      // clock reaches the last indexed frame. Pause at this boundary so the
+      // surface cannot continue/restart while the timeline remains clamped
+      // to the final frame.
+      runtime.playing = false;
+      runtime.nativePlaybackRate = 1;
+      runtime.nativeLifecycle = 'ended';
+      setFramePlayerStatus(card, '已到達最後一幀。', 'loaded');
+      const sessionId = runtime.nativeSession.sessionId;
+      const adapter = nativePlayerAdapter();
+      if (adapter?.pause) {
+        const pause = enqueueNativeOperation(runtime, async () => {
+          if (runtime.nativeSession?.sessionId !== sessionId) return;
+          await adapter.pause({ sessionId });
+        });
+        void pause.catch(() => {});
+      }
+      updateFramePlayerControls(card);
+      return;
+    }
     scheduleNativePlayerUiTick(card);
   }, Math.max(8, Math.round(frameDuration)));
 }
@@ -1306,6 +1333,7 @@ async function closeNativePlayerSession(runtime, adapter) {
   // replacement session is opened; it will finish without touching it.
   runtime.nativeScrubLoop = null;
   runtime.nativeBoundsLoop = null;
+  runtime.nativePlaybackRate = 1;
   try {
     await adapter.close({ sessionId: session.sessionId });
   } catch {
@@ -1377,6 +1405,7 @@ function commitNativePlayerFrame(card, runtime, frameIndex, response, statusMess
   updateFramePlayerControls(card);
   if (nativePlayerEnded(response)) {
     runtime.playing = false;
+    runtime.nativePlaybackRate = 1;
     runtime.nativeLifecycle = 'ended';
     setFramePlayerStatus(card, '已到達最後一幀。', 'loaded');
     updateFramePlayerControls(card);
@@ -1524,6 +1553,7 @@ async function prepareNativeFramePlayerCard(card, block, generation, runtime) {
   runtime.nativeScrubTarget = null;
   runtime.nativeScrubLoop = null;
   runtime.nativeBoundsLoop = null;
+  runtime.nativePlaybackRate = 1;
   runtime.nativeScrubSerial += 1;
   await closeNativePlayerSession(runtime, adapter);
   const placeholder = card.querySelector('[data-inline-side="single"] [data-frame-placeholder]');
@@ -1855,6 +1885,18 @@ function toggleFramePlayer(card) {
     const configuredRate = Number(playerSideConfig(entry.block, 'single').playback?.rate);
     const desiredPlaying = !runtime.playing;
     const session = runtime.nativeSession;
+    const playbackRate = Number.isFinite(configuredRate) && configuredRate > 0 ? configuredRate : 1;
+    if (desiredPlaying && runtime.currentFrameIndex >= session.frameCount - 1) {
+      // A completed session starts from its current end position when Start
+      // receives VT_EMPTY. Reset the native surface and the timeline together
+      // before allowing a replay, otherwise the video restarts at frame 0
+      // while the UI remains clamped at the last frame.
+      runtime.currentFrameIndex = 0;
+      session.currentFrameIndex = 0;
+      updateFramePlayerControls(card);
+      void requestNativeScrub(card, 0);
+    }
+    runtime.nativePlaybackRate = desiredPlaying ? playbackRate : 1;
     runtime.playing = desiredPlaying;
     runtime.nativeLifecycle = desiredPlaying ? 'playing' : 'paused';
     updateFramePlayerControls(card);
@@ -1872,7 +1914,7 @@ function toggleFramePlayer(card) {
       const response = await method({
         sessionId,
         ...(desiredPlaying
-          ? { rate: Number.isFinite(configuredRate) && configuredRate > 0 ? configuredRate : 1 }
+          ? { rate: playbackRate }
           : {}),
       });
       if (runtime.nativeSession?.sessionId !== sessionId || !card.isConnected) return;
@@ -1887,6 +1929,7 @@ function toggleFramePlayer(card) {
         setFramePlayerStatus(card, response?.message || '原生播放器播放失敗。', 'error');
       } else if (nativePlayerEnded(response)) {
         runtime.playing = false;
+        runtime.nativePlaybackRate = 1;
         runtime.nativeLifecycle = 'ended';
         setFramePlayerStatus(card, '已到達最後一幀。', 'loaded');
       } else {
@@ -1900,6 +1943,7 @@ function toggleFramePlayer(card) {
       if (runtime.nativeSession?.sessionId !== sessionId || !card.isConnected
         || runtime.playing !== desiredPlaying) return;
       runtime.playing = false;
+      runtime.nativePlaybackRate = 1;
       if (runtime.nativePlaybackTimer) clearTimeout(runtime.nativePlaybackTimer);
       runtime.nativePlaybackTimer = null;
       runtime.nativeLifecycle = 'error';

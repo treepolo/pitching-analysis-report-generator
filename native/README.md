@@ -17,6 +17,9 @@ The helper uses the following native operations:
 - Playback: a play request first waits for the session's asynchronous
   `MESessionPaused` boundary, then changes from rate zero to the requested
   positive rate and completes only on the corresponding `MESessionStarted`.
+- Surface bounds: scrolling moves the EVR child without forcing a repaint;
+  this preserves the last presented sample instead of flashing the surface
+  background while the native window follows the editor viewport.
 - Frame-step capability: EVR `IVideoFrameStep::CanStep`, `Step(1, ...)`, and
   `CancelStep()` are wired for native capability detection. The editor's
   exact previous/next operation currently uses the Media Session scrub path in
