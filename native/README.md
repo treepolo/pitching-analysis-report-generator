@@ -11,8 +11,12 @@ The helper uses the following native operations:
 - Scrub: `IMFRateControl::SetRate(FALSE, 0.0f)` followed by
   `IMFMediaSession::Start` with a 100 ns position. A scrub is complete only
   after `MESessionScrubSampleComplete`; `scrub-submitted` is not completion.
-  Media Session seeks are FIFO, so a newer scrub stops the current one and
-  coalesces queued pointer positions to the latest request before starting it.
+  Media Session seeks are FIFO, so a newer scrub coalesces queued pointer
+  positions to the latest request before starting it. The helper never calls
+  `Stop()` to supersede a scrub because stopping clears the EVR image.
+- Playback: a play request first waits for the session's asynchronous
+  `MESessionPaused` boundary, then changes from rate zero to the requested
+  positive rate and completes only on the corresponding `MESessionStarted`.
 - Frame-step capability: EVR `IVideoFrameStep::CanStep`, `Step(1, ...)`, and
   `CancelStep()` are wired for native capability detection. The editor's
   exact previous/next operation currently uses the Media Session scrub path in

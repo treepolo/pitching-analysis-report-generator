@@ -351,28 +351,56 @@ class MediaFoundationPlayer final {
     return result;
   }
 
-  HRESULT Scrub(LONGLONG position, const std::string& requestId) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (!session_ || !rateControl_) return MF_E_NOT_INITIALIZED;
-    if (position < 0) return E_INVALIDARG;
-    // Media Session seek requests are FIFO. Stop the current scrub before
-    // starting a newer pointer position, and keep only that newest request;
-    // otherwise a fast drag would decode every stale position in sequence.
-    if (!pendingScrubRequest_.empty()) {
-      queuedScrubRequest_ = requestId;
-      queuedScrubPosition_ = position;
-      HRESULT result = S_OK;
-      if (!stopForScrub_) {
-        stopForScrub_ = true;
-        result = session_->Stop();
+  HRESULT PauseAndWait() {
+    HRESULT result = S_OK;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (!session_) return MF_E_NOT_INITIALIZED;
+      bool alreadyPaused = false;
+      {
+        std::lock_guard<std::mutex> readyLock(readyMutex_);
+        alreadyPaused = paused_;
+        if (!alreadyPaused) paused_ = false;
       }
-      if (SUCCEEDED(result)) {
+      if (alreadyPaused) return S_OK;
+      result = session_->Pause();
+    }
+    if (FAILED(result)) return result;
+
+    std::unique_lock<std::mutex> readyLock(readyMutex_);
+    const bool completed = readyCondition_.wait_for(
+        readyLock, std::chrono::milliseconds(kOpenTimeoutMs),
+        [this] { return paused_ || terminalError_ != S_OK; });
+    if (!completed) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+    return terminalError_ == S_OK ? S_OK : terminalError_;
+  }
+
+  HRESULT Scrub(LONGLONG position, const std::string& requestId) {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (!session_ || !rateControl_) return MF_E_NOT_INITIALIZED;
+      if (position < 0) return E_INVALIDARG;
+      // Media Session seek requests are FIFO. Keep only the newest pointer
+      // position while one sample is being decoded. Never call Stop here:
+      // Stop clears the EVR image and is the source of the grey/black flash.
+      if (!pendingScrubRequest_.empty()) {
+        queuedScrubRequest_ = requestId;
+        queuedScrubPosition_ = position;
         Emit("scrub-submitted", requestId, S_OK,
              "\"rate\":0,\"position100ns\":" + std::to_string(position)
              + ",\"queued\":true");
+        return S_OK;
       }
-      return result;
     }
+
+    // A running session cannot transition directly from a positive rate to
+    // rate zero. Pause it first, and wait for MESessionPaused before issuing
+    // the scrub Start request.
+    const HRESULT pauseResult = PauseAndWait();
+    if (FAILED(pauseResult)) return pauseResult;
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!session_ || !rateControl_) return MF_E_NOT_INITIALIZED;
     const HRESULT result = BeginScrubLocked(position, requestId);
     if (SUCCEEDED(result)) {
       Emit("scrub-submitted", requestId, result,
@@ -437,24 +465,45 @@ class MediaFoundationPlayer final {
   }
 
   HRESULT Play(float rate, const std::string& requestId) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (!session_ || !rateControl_ || rate <= 0.0f || rate > 16.0f) return E_INVALIDARG;
-    HRESULT result = rateControl_->SetRate(FALSE, rate);
-    if (SUCCEEDED(result)) {
-      PROPVARIANT startPosition;
-      PropVariantInit(&startPosition);
-      startPosition.vt = VT_EMPTY;
-      result = session_->Start(&GUID_NULL, &startPosition);
-      PropVariantClear(&startPosition);
+    if (rate <= 0.0f || rate > 16.0f) {
+      Emit("play", requestId, E_INVALIDARG);
+      return E_INVALIDARG;
     }
-    Emit("play", requestId, result, "\"rate\":" + std::to_string(rate));
+
+    // Media Foundation requires a paused/stopped session before changing
+    // from the scrub rate (0) to a positive playback rate. This also handles
+    // a play request that arrives while a previous command left the session
+    // running at rate zero.
+    HRESULT result = PauseAndWait();
+    if (SUCCEEDED(result)) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (!session_ || !rateControl_) {
+        result = MF_E_NOT_INITIALIZED;
+      } else {
+        result = rateControl_->SetRate(FALSE, rate);
+        if (SUCCEEDED(result)) {
+          {
+            std::lock_guard<std::mutex> requestLock(playRequestMutex_);
+            pendingPlayRequest_ = requestId;
+          }
+          PROPVARIANT startPosition;
+          PropVariantInit(&startPosition);
+          startPosition.vt = VT_EMPTY;
+          result = session_->Start(&GUID_NULL, &startPosition);
+          PropVariantClear(&startPosition);
+          if (FAILED(result)) {
+            std::lock_guard<std::mutex> requestLock(playRequestMutex_);
+            pendingPlayRequest_.clear();
+          }
+        }
+      }
+    }
+    if (FAILED(result)) Emit("play", requestId, result);
     return result;
   }
 
   HRESULT Pause(const std::string& requestId) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (!session_) return MF_E_NOT_INITIALIZED;
-    const HRESULT result = session_->Pause();
+    const HRESULT result = PauseAndWait();
     Emit("pause", requestId, result);
     return result;
   }
@@ -489,7 +538,10 @@ class MediaFoundationPlayer final {
     pendingScrubRequest_.clear();
     queuedScrubRequest_.clear();
     queuedScrubPosition_ = 0;
-    stopForScrub_ = false;
+    {
+      std::lock_guard<std::mutex> requestLock(playRequestMutex_);
+      pendingPlayRequest_.clear();
+    }
     terminalError_ = S_OK;
     if (renderWindow_) {
       DestroyWindow(renderWindow_);
@@ -521,14 +573,33 @@ class MediaFoundationPlayer final {
       }
     } else if (type == MESessionScrubSampleComplete) {
       std::string requestId;
+      std::string queuedRequest;
+      LONGLONG queuedPosition = 0;
+      HRESULT queuedResult = S_OK;
       {
         std::lock_guard<std::mutex> lock(mutex_);
         requestId = pendingScrubRequest_;
         pendingScrubRequest_.clear();
+        if (!queuedScrubRequest_.empty()) {
+          queuedRequest = queuedScrubRequest_;
+          queuedPosition = queuedScrubPosition_;
+          queuedScrubRequest_.clear();
+          queuedScrubPosition_ = 0;
+          queuedResult = BeginScrubLocked(queuedPosition, queuedRequest);
+        }
       }
       if (!requestId.empty()) {
         Emit("scrub-complete", requestId, S_OK,
              "\"rate\":0,\"completion\":\"MESessionScrubSampleComplete\"");
+      }
+      if (!queuedRequest.empty()) {
+        if (SUCCEEDED(queuedResult)) {
+          Emit("scrub-submitted", queuedRequest, S_OK,
+               "\"rate\":0,\"position100ns\":"
+               + std::to_string(queuedPosition) + ",\"queued\":true");
+        } else {
+          Emit("command-failed", queuedRequest, queuedResult);
+        }
       }
     } else if (type == MESessionEnded) {
       Emit("ended");
@@ -542,10 +613,18 @@ class MediaFoundationPlayer final {
       {
         std::lock_guard<std::mutex> lock(readyMutex_);
         topologyReady_ = true;
+        paused_ = false;
       }
       readyCondition_.notify_all();
       Emit("ready");
       Emit("started");
+      std::string playRequest;
+      {
+        std::lock_guard<std::mutex> requestLock(playRequestMutex_);
+        playRequest = pendingPlayRequest_;
+        pendingPlayRequest_.clear();
+      }
+      if (!playRequest.empty()) Emit("play", playRequest, S_OK);
     } else if (type == MESessionPaused) {
       {
         std::lock_guard<std::mutex> lock(readyMutex_);
@@ -554,27 +633,9 @@ class MediaFoundationPlayer final {
       readyCondition_.notify_all();
       Emit("paused");
     } else if (type == MESessionStopped) {
-      std::string queuedRequest;
-      LONGLONG queuedPosition = 0;
-      HRESULT queuedResult = S_OK;
       {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (stopForScrub_ && !queuedScrubRequest_.empty()) {
-          queuedRequest = queuedScrubRequest_;
-          queuedPosition = queuedScrubPosition_;
-          queuedScrubRequest_.clear();
-          stopForScrub_ = false;
-          queuedResult = BeginScrubLocked(queuedPosition, queuedRequest);
-        }
-      }
-      if (!queuedRequest.empty()) {
-        if (SUCCEEDED(queuedResult)) {
-          Emit("scrub-submitted", queuedRequest, S_OK,
-               "\"rate\":0,\"position100ns\":"
-               + std::to_string(queuedPosition) + ",\"queued\":true");
-        } else {
-          Emit("command-failed", queuedRequest, queuedResult);
-        }
+        std::lock_guard<std::mutex> readyLock(readyMutex_);
+        paused_ = false;
       }
       Emit("stopped");
     } else if (type == MEError) {
@@ -659,6 +720,7 @@ class MediaFoundationPlayer final {
   std::mutex mutex_;
   std::mutex readyMutex_;
   std::condition_variable readyCondition_;
+  std::mutex playRequestMutex_;
   bool mfStarted_ = false;
   bool topologyReady_ = false;
   bool paused_ = false;
@@ -667,7 +729,7 @@ class MediaFoundationPlayer final {
   std::string pendingScrubRequest_;
   std::string queuedScrubRequest_;
   LONGLONG queuedScrubPosition_ = 0;
-  bool stopForScrub_ = false;
+  std::string pendingPlayRequest_;
   ComPtr<SessionCallback> callback_;
   ComPtr<IMFMediaSession> session_;
   ComPtr<IMFMediaSource> source_;

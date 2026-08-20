@@ -40,7 +40,14 @@ test('native helper uses Media Foundation completion rather than image/cache tra
   assert.match(native, /SetRate\(FALSE, 0\.0f\)/u);
   assert.match(native, /MESessionScrubSampleComplete/u);
   assert.match(native, /queuedScrubRequest_/u);
-  assert.match(native, /stopForScrub_/u);
+  assert.match(native, /PauseAndWait\(\)/u);
+  assert.match(native, /pendingPlayRequest_/u);
+  assert.match(native, /playRequestMutex_/u);
+  const scrub = native.slice(native.indexOf('HRESULT Scrub('), native.indexOf('HRESULT SetBounds('));
+  assert.doesNotMatch(scrub, /session_->Stop\(\)/u);
+  const play = native.slice(native.indexOf('HRESULT Play('), native.indexOf('HRESULT Pause('));
+  assert.match(play, /PauseAndWait\(\)/u);
+  assert.match(play, /session_->Start\(&GUID_NULL/u);
   assert.match(native, /MFVP_MESSAGE_STEP|IVideoFrameStep/u);
   assert.match(native, /IMFVideoDisplayControl/u);
   assert.match(native, /SetVideoPosition/u);
