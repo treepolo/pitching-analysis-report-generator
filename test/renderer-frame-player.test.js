@@ -88,3 +88,36 @@ test('comparison playback requires both sides ready and all frames rendered', ()
   assert.match(renderer, /results\.every\(Boolean\)/u);
   assert.match(renderer, /比較播放器需要左右兩側都成功載入影格/u);
 });
+
+test('single-player editor uses the native surface contract and does not open frame-cache PNGs', () => {
+  const adapter = functionSlice(renderer, 'function nativePlayerAdapter(', 'function normalizeFrameIndexResult(');
+  for (const method of ['open', 'setBounds', 'scrub', 'step', 'play', 'pause', 'close']) {
+    assert.match(adapter, new RegExp(`method\\('${method}'\\)`, 'u'));
+  }
+  const side = functionSlice(renderer, 'function renderInlineVideoSide(', 'function renderInlineVideoBlock(');
+  assert.match(side, /native-player-surface/u);
+  assert.match(side, /nativeSingle/u);
+  const nativePrepare = functionSlice(renderer, 'async function prepareNativeFramePlayerCard(', 'function closeNativeFramePlayers(');
+  assert.match(nativePrepare, /adapter\.open\(request\)/u);
+  assert.match(nativePrepare, /setNativePlayerBounds/u);
+  assert.match(nativePrepare, /requestNativeScrub/u);
+  assert.doesNotMatch(nativePrepare, /frameCacheAdapter|prepareFrameCache|getFrameSource|dataUrl|base64|currentTime/u);
+});
+
+test('native scrubbing supersedes stale completions and keyboard steps use the native bridge', () => {
+  const scrub = functionSlice(renderer, 'async function requestNativeScrub(', 'async function requestNativeStep(');
+  assert.match(scrub, /nativeScrubSerial/u);
+  assert.match(scrub, /nativePendingScrub/u);
+  assert.match(scrub, /previous\.cancelled = true/u);
+  assert.match(scrub, /requestId/u);
+  assert.match(renderer, /function nativePlayerOperationCompleted\(response\)/u);
+  const step = functionSlice(renderer, 'async function requestNativeStep(', 'async function prepareNativeFramePlayerCard(');
+  assert.match(step, /adapter\.step\(/u);
+  assert.match(step, /direction/u);
+  const controls = functionSlice(renderer, 'function toggleFramePlayer(', 'function handleFramePlayerEvent(');
+  assert.match(controls, /adapter\?\.pause|adapter\?\.play/u);
+  assert.match(controls, /nativePlayerEnded/u);
+  const events = functionSlice(renderer, 'function handleFramePlayerEvent(', 'function handleFramePlayerKeydown(');
+  assert.match(events, /event\.type !== 'pointermove'/u);
+  assert.match(events, /requestNativeScrub\(card, Number\(target\.value\)\)/u);
+});

@@ -285,6 +285,32 @@ function frameCacheAdapter() {
   };
 }
 
+/**
+ * The editor single-player surface is owned by the native playback bridge.
+ * The renderer only sends player identity, surface bounds, and control
+ * requests; decoded pixels never cross this bridge.
+ */
+function nativePlayerAdapter() {
+  const bridge = window.pitchingApp?.nativePlayer;
+  if (!bridge || typeof bridge !== 'object') return null;
+  const method = (name) => typeof bridge[name] === 'function' ? bridge[name].bind(bridge) : null;
+  return {
+    open: method('open'),
+    setBounds: method('setBounds'),
+    scrub: method('scrub'),
+    step: method('step'),
+    play: method('play'),
+    pause: method('pause'),
+    close: method('close'),
+    onEvent: method('onEvent'),
+  };
+}
+
+function nativePlayerReady(adapter) {
+  return Boolean(adapter?.open && adapter?.setBounds && adapter?.scrub
+    && adapter?.step && adapter?.play && adapter?.pause && adapter?.close);
+}
+
 function normalizeFrameIndexResult(result) {
   const frames = Array.isArray(result?.frames) ? result.frames : null;
   const metadata = result?.metadata || {};
@@ -928,14 +954,14 @@ function renderVideoBlockEditor(block) {
 function renderInlineVideoSide(block, side) {
   const config = playerSideConfig(block, side);
   const label = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
+  const nativeSingle = block?.type === 'singleVideo';
   return `
     <div class="inline-video-side" data-inline-side="${side}">
       <h3>${label}</h3>
-      <div class="inline-video-frame inline-frame-surface" data-frame-surface tabindex="0" aria-label="${label}影格畫面">
-        <img data-inline-frame alt="${label}目前影格" hidden />
-        <span class="inline-frame-placeholder" data-frame-placeholder>尚未準備影格快取</span>
+      <div class="inline-video-frame inline-frame-surface${nativeSingle ? ' native-player-surface' : ''}" data-frame-surface${nativeSingle ? ' data-native-player-surface' : ''} tabindex="0" aria-label="${label}影格畫面">
+        ${nativeSingle ? '<span class="inline-frame-placeholder" data-frame-placeholder>尚未連線原生播放器</span>' : '<img data-inline-frame alt="' + label + '目前影格" hidden /><span class="inline-frame-placeholder" data-frame-placeholder>尚未準備影格快取</span>'}
       </div>
-      <p class="inline-video-status" data-inline-status role="status">尚未準備；等待影格快取。</p>
+      <p class="inline-video-status" data-inline-status role="status">${nativeSingle ? '尚未準備；等待原生播放器。' : '尚未準備；等待影格快取。'}</p>
     </div>`;
 }
 
@@ -945,7 +971,7 @@ function renderInlineVideoBlock(section, block) {
   const sides = comparison ? `${renderInlineVideoSide(block, 'left')}${renderInlineVideoSide(block, 'right')}` : renderInlineVideoSide(block, 'single');
   const syncMode = inlineBindingSummary(block);
   return `
-    <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block data-frame-player>
+    <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block data-frame-player${block.type === 'singleVideo' ? ' data-native-frame-player' : ''}>
       <header class="inline-video-header">
         <div class="inline-video-title"><strong>${escapeHtml(block.label || (comparison ? '影片比較' : '影片區塊'))}</strong><span>${comparison ? `${escapeHtml(syncMode)} · ${layout === 'stacked' ? '堆疊' : '並排'}` : '單一來源 · 專案內媒體'}</span></div>
         <div class="inline-video-actions">
@@ -960,7 +986,7 @@ function renderInlineVideoBlock(section, block) {
         <button class="button button-quiet" type="button" data-frame-action="next" disabled>下一幀</button>
         <output class="inline-frame-position" data-frame-position>尚未準備</output>
         <button class="button button-secondary" type="button" data-frame-action="toggle" disabled aria-pressed="false">播放</button>
-        <span class="inline-frame-player-status" data-frame-player-status role="status" data-state="pending">正在準備影格快取…</span>
+        <span class="inline-frame-player-status" data-frame-player-status role="status" data-state="pending">${block.type === 'singleVideo' ? '正在連線原生播放器…' : '正在準備影格快取…'}</span>
       </div>
       <details class="inline-video-details"><summary>區塊設定</summary>${renderVideoBlockEditor(block)}</details>
     </article>`;
@@ -1028,6 +1054,12 @@ function framePlayerRuntimeForCard(card) {
       playing: false,
       playbackTimer: null,
       primarySide: 'single',
+      native: false,
+      nativeSession: null,
+      nativeScrubSerial: 0,
+      nativePendingScrub: null,
+      nativeLifecycle: 'idle',
+      nativePlaybackTimer: null,
     };
     state.framePlayerByCard.set(card, runtime);
   }
@@ -1103,6 +1135,309 @@ function framePlayerIndexForSide(block, runtime, side, primaryIndex) {
   const primaryCount = runtime.caches[primary]?.frameCount || cache.frameCount;
   if (side === primary || primaryCount <= 1) return Math.min(primaryIndex, cache.frameCount - 1);
   return Math.min(cache.frameCount - 1, Math.max(0, Math.round((primaryIndex / (primaryCount - 1)) * (cache.frameCount - 1))));
+}
+
+function nativePlayerSurfaceId(card, side = 'single') {
+  const surface = card?.querySelector(`[data-inline-side="${side}"] [data-native-player-surface]`);
+  if (!surface) return null;
+  if (!surface.dataset.nativeSurfaceId) {
+    const projectId = String(state.activeProject?.id || 'project').replace(/[^a-zA-Z0-9_-]/gu, '-');
+    const blockId = String(card.dataset.blockId || 'block').replace(/[^a-zA-Z0-9_-]/gu, '-');
+    surface.dataset.nativeSurfaceId = `native-surface-${projectId}-${blockId}-${side}`;
+  }
+  return surface.dataset.nativeSurfaceId;
+}
+
+function nativePlayerSurfaceBounds(card, side = 'single') {
+  const surface = card?.querySelector(`[data-inline-side="${side}"] [data-native-player-surface]`);
+  if (!surface) return null;
+  const rect = surface.getBoundingClientRect();
+  return {
+    x: Math.round(rect.left),
+    y: Math.round(rect.top),
+    width: Math.max(1, Math.round(rect.width)),
+    height: Math.max(1, Math.round(rect.height)),
+    devicePixelRatio: Number.isFinite(window.devicePixelRatio) ? window.devicePixelRatio : 1,
+  };
+}
+
+function nativePlayerRequestId() {
+  if (typeof window.crypto?.randomUUID === 'function') return window.crypto.randomUUID();
+  return `native-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeNativePlayerSession(result, request) {
+  const sessionId = typeof result?.sessionId === 'string' ? result.sessionId : null;
+  const frameCount = Number(result?.frameCount);
+  const fps = Number(result?.fps);
+  const durationSeconds = Number(result?.durationSeconds);
+  if (!sessionId || !Number.isInteger(frameCount) || frameCount < 1) {
+    throw new Error('原生播放器回傳的 session 或影格數無效。');
+  }
+  return {
+    sessionId,
+    projectId: request.projectId,
+    assetId: request.assetId,
+    surfaceId: request.surfaceId,
+    frameCount,
+    fps: Number.isFinite(fps) && fps > 0 ? fps : 30,
+    durationSeconds: Number.isFinite(durationSeconds) && durationSeconds >= 0 ? durationSeconds : null,
+    currentFrameIndex: Number.isInteger(result?.currentFrameIndex)
+      ? Math.min(frameCount - 1, Math.max(0, result.currentFrameIndex))
+      : 0,
+  };
+}
+
+function nativePlayerOperationCompleted(response) {
+  return response?.status === 'completed'
+    && response?.surfaceUpdated !== false;
+}
+
+function nativePlayerEnded(response) {
+  return response?.ended === true || response?.status === 'ended';
+}
+
+function handleNativePlayerBridgeEvent(event) {
+  if (!event || typeof event !== 'object' || !event.sessionId) return;
+  document.querySelectorAll('[data-native-frame-player]').forEach((card) => {
+    const runtime = framePlayerRuntimeForCard(card);
+    if (runtime.nativeSession?.sessionId !== event.sessionId) return;
+    if (Number.isInteger(event.frameIndex)) {
+      runtime.currentFrameIndex = Math.max(0, Math.min(
+        runtime.nativeSession.frameCount - 1,
+        event.frameIndex,
+      ));
+      updateFramePlayerControls(card);
+    }
+    if (event.type === 'ended') {
+      runtime.playing = false;
+      if (runtime.nativePlaybackTimer) clearTimeout(runtime.nativePlaybackTimer);
+      runtime.nativePlaybackTimer = null;
+      runtime.nativeLifecycle = 'ended';
+      runtime.currentFrameIndex = runtime.nativeSession.frameCount - 1;
+      setFramePlayerStatus(card, '已到達最後一幀。', 'loaded');
+      updateFramePlayerControls(card);
+    } else if (event.type === 'error') {
+      runtime.playing = false;
+      runtime.nativeLifecycle = 'error';
+      setFramePlayerStatus(card, '原生播放器發生錯誤。', 'error');
+      updateFramePlayerControls(card);
+    }
+  });
+}
+
+function scheduleNativePlayerUiTick(card) {
+  const runtime = framePlayerRuntimeForCard(card);
+  if (!runtime.native || !runtime.nativeSession || !runtime.playing) return;
+  if (runtime.nativePlaybackTimer) clearTimeout(runtime.nativePlaybackTimer);
+  const frameDuration = 1000 / Math.max(1, runtime.nativeSession.fps || 30);
+  runtime.nativePlaybackTimer = setTimeout(() => {
+    runtime.nativePlaybackTimer = null;
+    if (!runtime.playing || !runtime.nativeSession || !card.isConnected) return;
+    runtime.currentFrameIndex = Math.min(
+      runtime.nativeSession.frameCount - 1,
+      runtime.currentFrameIndex + 1,
+    );
+    updateFramePlayerControls(card);
+    scheduleNativePlayerUiTick(card);
+  }, Math.max(8, Math.round(frameDuration)));
+}
+
+async function closeNativePlayerSession(runtime, adapter) {
+  const session = runtime?.nativeSession;
+  if (!session || !adapter?.close) return;
+  runtime.nativeSession = null;
+  runtime.nativeLifecycle = 'closing';
+  try {
+    await adapter.close({ sessionId: session.sessionId });
+  } catch {
+    // Cleanup is best effort while the card is being replaced.
+  }
+  runtime.nativeLifecycle = 'closed';
+}
+
+async function setNativePlayerBounds(card, runtime, adapter) {
+  const session = runtime?.nativeSession;
+  if (!session || !adapter?.setBounds) return false;
+  const bounds = nativePlayerSurfaceBounds(card, 'single');
+  if (!bounds) return false;
+  const response = await adapter.setBounds({
+    sessionId: session.sessionId,
+    surfaceId: session.surfaceId,
+    bounds,
+  });
+  if (response?.status === 'error' || response?.ok === false) {
+    throw new Error(response?.message || '原生播放器畫面位置更新失敗。');
+  }
+  return true;
+}
+
+function commitNativePlayerFrame(card, runtime, frameIndex, response, statusMessage = null) {
+  const session = runtime.nativeSession;
+  if (!session) return;
+  const index = Number.isInteger(response?.frameIndex) ? response.frameIndex : frameIndex;
+  runtime.currentFrameIndex = Math.min(session.frameCount - 1, Math.max(0, index));
+  session.currentFrameIndex = runtime.currentFrameIndex;
+  updateFramePlayerControls(card);
+  if (nativePlayerEnded(response)) {
+    runtime.playing = false;
+    runtime.nativeLifecycle = 'ended';
+    setFramePlayerStatus(card, '已到達最後一幀。', 'loaded');
+    updateFramePlayerControls(card);
+    return;
+  }
+  setFramePlayerStatus(card, statusMessage || `已顯示第 ${runtime.currentFrameIndex + 1} 幀。`, 'loaded');
+}
+
+async function requestNativeScrub(card, frameIndex) {
+  const entry = blockForEditorCard(card);
+  const runtime = framePlayerRuntimeForCard(card);
+  const adapter = nativePlayerAdapter();
+  const session = runtime.nativeSession;
+  if (!session || !adapter?.scrub) return;
+  const target = Math.min(session.frameCount - 1, Math.max(0, Math.round(Number(frameIndex) || 0)));
+  const previous = runtime.nativePendingScrub;
+  if (previous) previous.cancelled = true;
+  const serial = ++runtime.nativeScrubSerial;
+  const requestId = nativePlayerRequestId();
+  const pending = { serial, requestId, target, cancelled: false };
+  runtime.nativePendingScrub = pending;
+  const timeline = card.querySelector('[data-frame-timeline]');
+  if (timeline) timeline.value = String(target);
+  setFramePlayerStatus(card, `正在定位第 ${target + 1} 幀…`, 'pending');
+  try {
+    const response = await adapter.scrub({
+      sessionId: session.sessionId,
+      surfaceId: session.surfaceId,
+      requestId,
+      frameIndex: target,
+    });
+    if (pending.cancelled || runtime.nativePendingScrub !== pending
+      || serial !== runtime.nativeScrubSerial || !card.isConnected) return;
+    if (!nativePlayerOperationCompleted(response)) {
+      if (response?.status === 'cancelled') return;
+      throw new Error(response?.message || '原生播放器定位未完成。');
+    }
+    commitNativePlayerFrame(card, runtime, target, response);
+  } catch (error) {
+    if (pending.cancelled || runtime.nativePendingScrub !== pending
+      || serial !== runtime.nativeScrubSerial || !card.isConnected) return;
+    setFramePlayerStatus(card, `原生定位失敗：${error?.message || '請重試。'}`, 'error');
+  } finally {
+    if (runtime.nativePendingScrub === pending) runtime.nativePendingScrub = null;
+  }
+  if (entry.block?.type !== 'singleVideo') updateFramePlayerControls(card);
+}
+
+async function requestNativeStep(card, direction) {
+  const runtime = framePlayerRuntimeForCard(card);
+  const adapter = nativePlayerAdapter();
+  const session = runtime.nativeSession;
+  if (!session || !adapter?.step || ![-1, 1].includes(direction)) return;
+  const requestId = nativePlayerRequestId();
+  const target = Math.min(
+    session.frameCount - 1,
+    Math.max(0, runtime.currentFrameIndex + direction),
+  );
+  setFramePlayerStatus(card, `正在切換第 ${target + 1} 幀…`, 'pending');
+  try {
+    const response = await adapter.step({
+      sessionId: session.sessionId,
+      surfaceId: session.surfaceId,
+      requestId,
+      direction,
+    });
+    if (!card.isConnected || runtime.nativeSession !== session) return;
+    if (!nativePlayerOperationCompleted(response)) {
+      if (response?.status === 'cancelled') return;
+      throw new Error(response?.message || '原生逐幀未完成。');
+    }
+    commitNativePlayerFrame(card, runtime, target, response);
+  } catch (error) {
+    if (!card.isConnected || runtime.nativeSession !== session) return;
+    setFramePlayerStatus(card, `原生逐幀失敗：${error?.message || '請重試。'}`, 'error');
+  }
+}
+
+async function prepareNativeFramePlayerCard(card, block, generation, runtime) {
+  const adapter = nativePlayerAdapter();
+  const assetId = playerAssetIdFor(block, 'single');
+  const surfaceId = nativePlayerSurfaceId(card, 'single');
+  runtime.native = true;
+  runtime.nativeLifecycle = 'opening';
+  runtime.nativePendingScrub = null;
+  runtime.nativeScrubSerial += 1;
+  await closeNativePlayerSession(runtime, adapter);
+  runtime.caches = Object.create(null);
+  runtime.currentFrameIndex = 0;
+  runtime.playing = false;
+  if (runtime.nativePlaybackTimer) clearTimeout(runtime.nativePlaybackTimer);
+  runtime.nativePlaybackTimer = null;
+  updateFramePlayerControls(card);
+  if (!assetId || !mediaAssetFor(assetId)) {
+    setInlineVideoStatus(card.querySelector('[data-inline-side="single"]'), '尚未選擇專案內資產。', 'pending');
+    setFramePlayerStatus(card, '尚未選擇專案內影片。', 'pending');
+    return;
+  }
+  if (!nativePlayerReady(adapter)) {
+    setInlineVideoStatus(card.querySelector('[data-inline-side="single"]'), '原生播放器橋接契約尚未提供。', 'error');
+    setFramePlayerStatus(card, '原生播放器橋接尚未提供。', 'error');
+    runtime.nativeLifecycle = 'error';
+    return;
+  }
+  if (!surfaceId) {
+    setFramePlayerStatus(card, '原生播放器畫面容器不存在。', 'error');
+    runtime.nativeLifecycle = 'error';
+    return;
+  }
+  setInlineVideoStatus(card.querySelector('[data-inline-side="single"]'), '正在開啟原生播放器…', 'pending');
+  setFramePlayerStatus(card, '正在開啟原生播放器…', 'pending');
+  const request = {
+    projectId: state.activeProject.id,
+    assetId,
+    surfaceId,
+  };
+  try {
+    const opened = await adapter.open(request);
+    if (generation !== state.inlineGeneration || !card.isConnected) return;
+    const session = normalizeNativePlayerSession(opened, request);
+    runtime.nativeSession = session;
+    runtime.nativeLifecycle = 'ready';
+    runtime.caches.single = {
+      frameCount: session.frameCount,
+      fps: session.fps,
+      duration: session.durationSeconds,
+      assetId,
+    };
+    await setNativePlayerBounds(card, runtime, adapter);
+    if (generation !== state.inlineGeneration || !card.isConnected) return;
+    setInlineVideoStatus(card.querySelector('[data-inline-side="single"]'), '原生播放器已就緒。', 'loaded');
+    updateFramePlayerControls(card);
+    await requestNativeScrub(card, session.currentFrameIndex);
+  } catch (error) {
+    if (generation !== state.inlineGeneration || !card.isConnected) return;
+    runtime.nativeLifecycle = 'error';
+    runtime.nativeSession = null;
+    setInlineVideoStatus(card.querySelector('[data-inline-side="single"]'), `原生播放器錯誤：${error?.message || '無法開啟影片。'}`, 'error');
+    setFramePlayerStatus(card, '原生播放器無法開啟此影片。', 'error');
+    updateFramePlayerControls(card);
+  }
+}
+
+function closeNativeFramePlayers() {
+  const adapter = nativePlayerAdapter();
+  if (!adapter?.close || !elements.blockCanvas) return;
+  elements.blockCanvas.querySelectorAll('[data-native-frame-player]').forEach((card) => {
+    const runtime = state.framePlayerByCard.get(card);
+    const session = runtime?.nativeSession;
+    if (!session) return;
+    runtime.nativeSession = null;
+    runtime.nativeLifecycle = 'closed';
+    if (runtime.nativePendingScrub) runtime.nativePendingScrub.cancelled = true;
+    runtime.nativePendingScrub = null;
+    const closePromise = adapter.close({ sessionId: session.sessionId });
+    if (closePromise && typeof closePromise.catch === 'function') void closePromise.catch(() => {});
+  });
 }
 
 async function getCachedFrameSource(assetId, frameIndex, cache) {
@@ -1238,6 +1573,11 @@ async function prepareFramePlayerCard(card, block, generation) {
   runtime.currentFrameIndex = 0;
   runtime.requestSerial += 1;
   runtime.caches = Object.create(null);
+  if (block?.type === 'singleVideo') {
+    await prepareNativeFramePlayerCard(card, block, generation, runtime);
+    return;
+  }
+  runtime.native = false;
   const adapter = frameCacheAdapter();
   await cancelPendingFrameCacheRequests(runtime, adapter);
   updateFramePlayerControls(card);
@@ -1271,8 +1611,19 @@ async function prepareFramePlayerCard(card, block, generation) {
 function stopFramePlayer(card) {
   const runtime = framePlayerRuntimeForCard(card);
   runtime.playing = false;
+  if (runtime.nativePlaybackTimer) clearTimeout(runtime.nativePlaybackTimer);
+  runtime.nativePlaybackTimer = null;
   if (runtime.playbackTimer) clearTimeout(runtime.playbackTimer);
   runtime.playbackTimer = null;
+  if (runtime.native && runtime.nativeSession) {
+    runtime.nativeScrubSerial += 1;
+    if (runtime.nativePendingScrub) runtime.nativePendingScrub.cancelled = true;
+    runtime.nativePendingScrub = null;
+    runtime.nativeLifecycle = 'paused';
+    const adapter = nativePlayerAdapter();
+    const pausePromise = adapter?.pause?.({ sessionId: runtime.nativeSession.sessionId });
+    if (pausePromise && typeof pausePromise.catch === 'function') void pausePromise.catch(() => {});
+  }
   updateFramePlayerControls(card);
 }
 
@@ -1280,6 +1631,7 @@ function scheduleFramePlayerTick(card) {
   const entry = blockForEditorCard(card);
   const runtime = framePlayerRuntimeForCard(card);
   if (!runtime.playing) return;
+  if (runtime.native) return;
   const count = framePlayerFrameCount(entry.block, runtime);
   if (runtime.currentFrameIndex >= count - 1) {
     stopFramePlayer(card);
@@ -1298,7 +1650,52 @@ function scheduleFramePlayerTick(card) {
 function toggleFramePlayer(card) {
   const runtime = framePlayerRuntimeForCard(card);
   if (framePlayerFrameCount(blockForEditorCard(card).block, runtime) <= 0) {
-    setFramePlayerStatus(card, '影格快取尚未準備，無法播放。', 'error');
+    setFramePlayerStatus(card, runtime.native ? '原生播放器尚未準備，無法播放。' : '影格快取尚未準備，無法播放。', 'error');
+    return;
+  }
+  if (runtime.native && runtime.nativeSession) {
+    const adapter = nativePlayerAdapter();
+    const method = runtime.playing ? adapter?.pause : adapter?.play;
+    if (!method) {
+      setFramePlayerStatus(card, '原生播放器播放橋接尚未提供。', 'error');
+      return;
+    }
+    const sessionId = runtime.nativeSession.sessionId;
+    const entry = blockForEditorCard(card);
+    const configuredRate = Number(playerSideConfig(entry.block, 'single').playback?.rate);
+    runtime.playing = !runtime.playing;
+    runtime.nativeLifecycle = runtime.playing ? 'playing' : 'paused';
+    updateFramePlayerControls(card);
+    if (runtime.playing) scheduleNativePlayerUiTick(card);
+    else if (runtime.nativePlaybackTimer) {
+      clearTimeout(runtime.nativePlaybackTimer);
+      runtime.nativePlaybackTimer = null;
+    }
+    void method({ sessionId, rate: Number.isFinite(configuredRate) && configuredRate > 0 ? configuredRate : 1 }).then((response) => {
+      if (runtime.nativeSession?.sessionId !== sessionId || !card.isConnected) return;
+      if (response?.status === 'error' || response?.ok === false) {
+        runtime.playing = false;
+        if (runtime.nativePlaybackTimer) clearTimeout(runtime.nativePlaybackTimer);
+        runtime.nativePlaybackTimer = null;
+        runtime.nativeLifecycle = 'error';
+        setFramePlayerStatus(card, response?.message || '原生播放器播放失敗。', 'error');
+      } else if (nativePlayerEnded(response)) {
+        runtime.playing = false;
+        runtime.nativeLifecycle = 'ended';
+        setFramePlayerStatus(card, '已到達最後一幀。', 'loaded');
+      } else {
+        setFramePlayerStatus(card, runtime.playing ? '播放中。' : '已暫停。', 'loaded');
+      }
+      updateFramePlayerControls(card);
+    }).catch((error) => {
+      if (runtime.nativeSession?.sessionId !== sessionId || !card.isConnected) return;
+      runtime.playing = false;
+      if (runtime.nativePlaybackTimer) clearTimeout(runtime.nativePlaybackTimer);
+      runtime.nativePlaybackTimer = null;
+      runtime.nativeLifecycle = 'error';
+      setFramePlayerStatus(card, `原生播放器播放失敗：${error?.message || '請重試。'}`, 'error');
+      updateFramePlayerControls(card);
+    });
     return;
   }
   runtime.playing = !runtime.playing;
@@ -1311,6 +1708,10 @@ function toggleFramePlayer(card) {
 function stepFramePlayer(card, direction) {
   stopFramePlayer(card);
   const runtime = framePlayerRuntimeForCard(card);
+  if (runtime.native && runtime.nativeSession) {
+    void requestNativeStep(card, direction);
+    return;
+  }
   const maxIndex = Math.max(0, framePlayerFrameCount(blockForEditorCard(card).block, runtime) - 1);
   const target = Math.min(maxIndex, Math.max(0, runtime.currentFrameIndex + direction));
   void renderFramePlayerIndex(card, target);
@@ -1321,7 +1722,19 @@ function handleFramePlayerEvent(event) {
   const card = target.closest('[data-frame-player]');
   if (!card) return false;
   if (target.matches('[data-frame-timeline]')) {
-    void renderFramePlayerIndex(card, Number(target.value));
+    const runtime = framePlayerRuntimeForCard(card);
+    if (runtime.native) {
+      if (event.type !== 'pointermove' || event.buttons || event.pointerType === 'touch') {
+        void requestNativeScrub(card, Number(target.value));
+      }
+    } else {
+      void renderFramePlayerIndex(card, Number(target.value));
+    }
+    return true;
+  }
+  const surface = target.closest('[data-frame-surface]');
+  if (surface) {
+    surface.focus({ preventScroll: true });
     return true;
   }
   const action = target.closest('[data-frame-action]')?.dataset.frameAction;
@@ -1926,10 +2339,12 @@ function renderBlockCanvas({ preserveFocus = false, allowFocusedSelect = false }
     .forEach((element) => { element.disabled = !project; });
   if (!elements.blockCanvas) return;
   if (!project) {
+    closeNativeFramePlayers();
     elements.blockCanvas.innerHTML = '<p class="empty-state">開啟專案以編輯區塊。</p>';
     return;
   }
 
+  closeNativeFramePlayers();
   if (!project.sections.some((section) => section.id === state.selectedSectionId)) {
     state.selectedSectionId = project.sections[0]?.id || null;
   }
@@ -2035,7 +2450,9 @@ function refreshInlineBindingAfterEditorChange(card, block, pathValue) {
 function handleBlockEditorEvent(event) {
   const target = event.target;
   if (target.closest('[data-frame-player]')
-    && (target.matches('[data-frame-timeline]') || target.closest('[data-frame-action]'))) {
+    && (target.matches('[data-frame-timeline]')
+      || target.closest('[data-frame-action]')
+      || target.closest('[data-frame-surface]'))) {
     handleFramePlayerEvent(event);
     return;
   }
@@ -2408,6 +2825,7 @@ elements.addEditorComparisonVideo?.addEventListener('click', () => addComparison
 elements.blockCanvas?.addEventListener('input', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('change', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('click', handleBlockEditorEvent);
+elements.blockCanvas?.addEventListener('pointermove', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('keydown', handleInlineVideoKeydown);
 elements.blockCanvas?.addEventListener('keydown', handleFramePlayerKeydown);
 elements.blockCanvas?.addEventListener('focusout', () => {
@@ -2417,6 +2835,19 @@ elements.blockCanvas?.addEventListener('focusout', () => {
 if (typeof window.pitchingApp?.onBeforeClose === 'function') {
   window.pitchingApp.onBeforeClose(() => flushPendingChanges());
 }
+if (typeof window.pitchingApp?.nativePlayer?.onEvent === 'function') {
+  window.pitchingApp.nativePlayer.onEvent(handleNativePlayerBridgeEvent);
+}
+function refreshNativePlayerBounds() {
+  const adapter = nativePlayerAdapter();
+  if (!adapter?.setBounds) return;
+  document.querySelectorAll('[data-native-frame-player]').forEach((card) => {
+    const runtime = framePlayerRuntimeForCard(card);
+    if (runtime.nativeSession) void setNativePlayerBounds(card, runtime, adapter).catch(() => {});
+  });
+}
+window.addEventListener('resize', refreshNativePlayerBounds, { passive: true });
+window.addEventListener('scroll', refreshNativePlayerBounds, { passive: true, capture: true });
 
 (async function bootstrap() {
   try {

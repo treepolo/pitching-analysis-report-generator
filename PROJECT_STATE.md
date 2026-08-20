@@ -1,5 +1,12 @@
 # Current Project State
 
+## Current Wave 20D native single-player implementation (2026-08-20)
+
+- Worktree contains the bounded Wave20D native single-video path: `native/media-foundation-player.cpp`, its build script/README, main/preload native-player IPC, renderer native surface/control lifecycle, and focused contract tests. Existing comparison/export frame-cache paths remain unchanged in this wave.
+- The native path uses Media Foundation Media Session + EVR child surface. Scrub requests set rate 0 and complete only on `MESessionScrubSampleComplete`; stale scrub requests are superseded. The exact previous/next control currently uses this completion-backed native scrub for both directions because EVR `IVideoFrameStep::Step` is asynchronous and has no completion event in this Media Session host; no submission is reported as a displayed frame.
+- JavaScript evidence: `node --check` passes for main/preload/renderer; focused native/renderer tests and full `npm test` pass with 166 total / 165 pass / 1 explicit Electron `file://` unavailable skip. No native helper binary is tracked.
+- Native verification boundary: `native/build-media-foundation-player.ps1` stops explicitly because this environment has no `cl.exe`/MSBuild. The source/bridge checkpoint is preserved, but no real Electron HWND, Media Foundation helper build, or real MP4 scrub/frame/playback evidence is available. No Wave20D requirement is `VERIFIED`; runtime acceptance remains pending the Windows toolchain and smoke steps.
+
 ## Current Wave 20B integrator gate (2026-08-20)
 
 - Current provenance tip is the latest branch HEAD on `worker/desktop-vertical-slice` (the real-smoke evidence checkpoint is `3412ab7`); the product code tip is `7c2c40c`. The successful `git push` updated `origin/worker/desktop-vertical-slice`.

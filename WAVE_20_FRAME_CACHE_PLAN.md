@@ -86,13 +86,13 @@
 - [ ] Electron editor runtime、export folder／ZIP runtime 與真人驗收分層記錄，不誇大 evidence。
 - [ ] Integrator 建立可恢復 Git/GitHub checkpoint，更新 current provenance。
 
-## 當前狀態
+## 當前狀態（Wave 20D supersedes editor playback path）
 
 - UI 方案：已由使用者選定方案 1。
-- 技術方案：FFmpeg 逐幀解碼／索引／快取。
+- 編輯器單片技術方案：Windows Media Foundation Media Session + EVR native surface；FFmpeg 逐幀 cache 僅保留給 comparison/export 與明確離線用途。
 - 平行方案：D，四條 bounded lanes。
-- 實作：Wave 20A Media frame-cache pipeline（`79e196c`）與 Wave 20B Bridge/Editor（`5525b49`）、Portable Export（`342d6e1`）、Integrator hardening（`7c2c40c`）已完成 bounded implementation/contract gate。
-- 驗證：`npm test` 162 total / 161 pass / 1 explicit Electron `file://` unavailable skip；47 JS syntax checks、focused tests、artifact/credential scans pass。這些不是完整 runtime 或真人驗收。
+- 實作：Wave 20A Media frame-cache pipeline（`79e196c`）與 Wave 20B Bridge/Editor（`5525b49`）、Portable Export（`342d6e1`）、Integrator hardening（`7c2c40c`）仍支援比較／匯出；Wave 20D native single-player source、bridge 與 renderer 已整合，並以獨立 Git checkpoint 保存。
+- 驗證：`npm test` 166 total / 165 pass / 1 explicit Electron `file://` unavailable skip；JavaScript syntax checks、focused native/renderer tests、artifact/credential scans pass。這些不是完整 runtime 或真人驗收。
 - 補充的 bounded real local smoke：專案內產生的 MP4 經 FFmpeg／ffprobe 轉成可重用的 ready cache（12 幀、CFR），再輸出 referenced-only folder／ZIP；0 warnings、layout validation 與 ZIP parity 通過、輸出 HTML 使用 frame player 且無 `<video>` fallback、ZIP 解出後的 cache index 存在。這仍不是完整 Electron／file://／真人驗收。
 - 啟動回歸修正：sandboxed preload 不再依賴 Node／project-local `require`；啟動時會依 `lastOpenedAt` 自動恢復最近有效草稿，並同步文件清單空狀態。現有草稿資料未被搬移或刪除。
 - Product acceptance：尚未完成；不得標記 requirement VERIFIED。
@@ -126,3 +126,78 @@
 - [x] Export HTML 不依賴 generator runtime、FFmpeg executable、網路或 CDN（static contract evidence）。
 - [x] Bridge、renderer、export focused tests 通過，之後進 full regression。
 - [x] 沒有 runtime/human evidence 時，不標 VERIFIED。
+
+## Wave 20C｜原生播放器 seek 修正（2026-08-20）
+
+### 問題更正
+
+目前把 FFmpeg 完整逐幀 PNG cache 當成編輯器開啟前置條件，與 Samsung Gallery／KMPlayer 類原生播放器的使用方式不同，也直接造成首次開啟數十秒、拖曳無法即時更新與播放落後。這不是繼續加 PNG 預取即可根治的問題。
+
+Samsung Gallery 的實作不是公開原始碼，不能聲稱能照抄其私有程式；本波改採同一類的原生 media seek 架構：影片檔由 Chromium/Electron 原生 `HTMLVideoElement` 讀取，使用容器索引、seekable range、keyframe seek 與硬體解碼器。編輯器不等待 FFmpeg 逐幀解碼；FFmpeg／PNG 只保留給明確的精確影格輸出與離線匯出路徑。
+
+### 五個技術候選方案與評分
+
+| 方案 | 作法 | 評分 | 判斷 |
+|---|---|---:|---|
+| A | 只優化現有完整 PNG cache（預取、批次 IPC、取消） | 5.8/10 | 仍把整支影片解碼當 editor 前置，不採用 |
+| B | FFmpeg 分段／代理 MP4，再餵給 HTML video | 7.1/10 | 仍需轉檔等待，且增加副本與清理複雜度 |
+| C | 原生 HTMLVideoElement editor path；FFmpeg 僅匯出/精確影格 | **9.8/10** | **採用；最接近原生播放器行為且首次使用不被 cache 阻塞** |
+| D | WebCodecs／Worker 自建 decoder | 7.2/10 | 可控但瀏覽器支援、解碼與同步複雜度過高 |
+| E | 重寫播放器與輸出格式 | 5.5/10 | 回歸面最大，無必要 |
+
+### 進度與驗證檢核表
+
+- [ ] 編輯器開啟影片只需 native metadata／source；不得等待完整 FFmpeg cache。
+- [ ] 任意拖曳以 native `currentTime`／seek 立即反映，連續拖曳不排隊讀 PNG。
+- [ ] 播放預設 `playbackRate = 1.0`，使用原生播放時鐘；到尾自動停止。
+- [ ] ArrowLeft／ArrowRight 逐幀；支援 `seekToNextFrame` 時優先使用，否則以影片 FPS 計算時間 fallback。
+- [ ] 按住方向鍵的重複事件不被慢速 IPC 讀影格卡住。
+- [ ] 精確 PNG cache 不再阻塞 editor；仍可供匯出與明確的逐幀精確路徑。
+- [ ] 單片與比較片的 native source、seek、播放、停止都能工作。
+- [ ] folder／ZIP 離線輸出既有 frame cache 與 referenced-only 規則不退化。
+- [ ] `npm test`、`node --check`、本地真 MP4 native smoke；缺少 Electron/file:///真人證據時誠實記錄，不標 VERIFIED。
+
+## Wave 20D｜單片原生 scrubbing／逐幀播放器（2026-08-20）
+
+### 目標與邊界
+
+本波只處理單片影片。比較影片、輸出播放器與速度滑桿 UI 外觀不在本次開工範圍；既有控制項與 playback rate 設定不擴張成新 UI。編輯器觀看路徑不得等待完整 FFmpeg frame cache，不得以 PNG／base64／每幀 IPC 讀檔作為畫面來源。
+
+### 五個最高速平行開發方案與評分
+
+| 方案 | 核心作法 | 評分 | 判斷 |
+|---|---|---:|---|
+| A | 只改現有 renderer，使用 `<video>`／`currentTime` | 5.6/10 | 沒有原生 frame-step／scrub completion，不採用 |
+| B | WebCodecs＋MP4 sample parser／worker | 7.4/10 | 可控但需自行重建 demux、seek、cancel、render lifecycle |
+| C | 嵌入 libmpv／libmpv render API | 7.0/10 | frame-step 有限，精確 drag seek 非 frame-index 且可能慢 |
+| D | Windows Media Foundation Media Session＋原生 video renderer／D3D11 | **9.7/10** | **採用；官方提供 scrubbing completion、frame-step/cancel、硬體 render 路徑** |
+| E | 自建 FFmpeg/libavcodec＋D3D11 native addon | 8.1/10 | 能力完整但需自行維護整個播放器生命週期，整合風險較高 |
+
+### 採用方案 D 的 ownership 與平行線
+
+- **Native playback backend**：單一 writer，負責 Media Foundation Media Session、rate=0 scrubbing、`MESessionScrubSampleComplete`、frame-step/cancel、D3D11/native render surface 與 Electron IPC seam；不得改 renderer controls 或 export。
+- **Single-player editor integration**：只負責 renderer 的單片控制事件、focus/keyboard、狀態與既有 block lifecycle；不再讀 frame PNG，不改比較播放器語意。
+- **Contract/QA monitor**：唯讀檢查 backend／renderer seam、真實 MP4 acceptance matrix、Node syntax、full regression 與 fake-success 風險；不得改產品 source。
+
+### 開工前進度與驗證檢核表
+
+- [ ] native backend 能開啟專案內 MP4，不跑完整 frame cache。
+- [ ] 首幀在 media session ready 後出現在 native render surface。
+- [ ] 拖曳每個滑鼠／手指位置使用 Media Foundation scrub，完成事件只在新畫面已更新後回報。
+- [ ] 拖曳中新的位置可取消／取代尚未完成的 scrub，不提交舊畫面。
+- [ ] 上一幀／下一幀使用原生 frame-step；按住方向鍵可連續操作。
+- [ ] 播放／暫停使用 media session clock，預設 1.0×，到尾停止。
+- [ ] 編輯器畫面路徑不使用 `frame-cache:frame`、PNG、base64 或每幀檔案 IPC。
+- [ ] 單片邊界、來源無效、停止、重開與 cleanup 有明確狀態。
+- [ ] native bridge 來源／sender／path containment 維持既有安全契約。
+- [ ] `npm test`、`node --check`、native helper build／smoke、真實 MP4 scrub／frame-step evidence 完成後，才能升級為 runtime acceptance checkpoint；沒有證據不標 VERIFIED。原始碼與 bridge checkpoint 先保留可恢復進度。
+
+### Wave 20D 實作進度（截至 2026-08-20）
+
+- [x] 單片 editor surface 已切換成 native-player contract；不再以完整 frame cache／PNG／base64 開啟單片影片。
+- [x] main/preload 已加入 trusted sender、專案內來源解析、session/process lifecycle、surface bounds、scrub、step、play、pause、close IPC。
+- [x] native helper source 已加入 Media Foundation Media Session、EVR child surface、rate=0 scrub、`MESessionScrubSampleComplete` completion、metadata、bounds 與 explicit failure protocol。
+- [x] 新位置會在 renderer 端 supersede 舊 scrub；main 端會拒絕已被更新位置取代的 pending request，不提交 stale completion。
+- [x] JavaScript syntax、focused native/renderer contract tests 與既有 regression tests 通過；未把 static evidence 當成 runtime VERIFIED。
+- [ ] native helper 尚未在此環境建立：`native/build-media-foundation-player.ps1` 明確因缺少 `cl.exe`／MSBuild 停止。
+- [ ] 尚無有效 native HWND 與真實 Electron／真實 MP4 的 Media Foundation scrub、方向鍵逐幀、播放到尾停止證據；Wave20D 不建立 VERIFIED checkpoint，等待 Windows Developer PowerShell 的 native build／smoke。

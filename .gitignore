@@ -32,6 +32,7 @@ node_modules/
 dist/
 build/
 coverage/
+native/bin/
 .cache/
 .idea/
 .vscode/
