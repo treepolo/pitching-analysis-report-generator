@@ -34,6 +34,7 @@ build/
 coverage/
 native/bin/
 .cache/
+.runtime/
 .idea/
 .vscode/
 Thumbs.db

@@ -33,11 +33,14 @@ if not exist "node_modules\electron\package.json" goto install_incomplete
 
 :start_app
 set "PITCHING_DISABLE_GPU=1"
+set "PITCHING_USER_DATA=%PROJECT_ROOT%\.runtime\electron-user-data"
 echo [INFO] Starting Pitching Report Generator...
 rem This desktop environment cannot launch Electron's renderer sandbox (exitCode 49).
 rem Keep the renderer's context isolation/preload boundary; disable only Chromium's
 rem OS sandbox so the application can start instead of spinning forever.
-call npm.cmd start -- --disable-gpu --no-sandbox
+rem Keep Electron's writable profile inside the project; the default AppData cache
+rem can be locked by stale Electron processes in this desktop environment.
+call npm.cmd start -- --disable-gpu --no-sandbox --user-data-dir="%PITCHING_USER_DATA%"
 if errorlevel 1 goto start_failed
 set "exitCode=0"
 goto finish
