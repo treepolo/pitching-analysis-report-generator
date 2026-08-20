@@ -43,6 +43,8 @@ test('native helper uses Media Foundation completion rather than image/cache tra
   assert.match(native, /IMFVideoDisplayControl/u);
   assert.match(native, /SetVideoPosition/u);
   assert.match(native, /RepaintVideo/u);
+  assert.match(native, /EnumChildWindows/u);
+  assert.match(native, /Chrome_RenderWidgetHostHWND/u);
   assert.match(native, /set-bounds/u);
   assert.match(native, /std::thread commandReader/u);
   assert.match(native, /PostThreadMessageW/u);

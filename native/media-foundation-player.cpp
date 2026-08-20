@@ -496,6 +496,7 @@ class MediaFoundationPlayer final {
       renderWindow_ = nullptr;
     }
     parentWindow_ = nullptr;
+    surfaceParentWindow_ = nullptr;
   }
 
   LONGLONG FrameCount() const { return frameCount_; }
@@ -599,8 +600,36 @@ class MediaFoundationPlayer final {
     return DefWindowProcW(window, message, wParam, lParam);
   }
 
+  static HWND FindRendererChild(HWND parent) {
+    struct SearchState {
+      HWND candidate = nullptr;
+      long long area = 0;
+    } state;
+    EnumChildWindows(parent, [](HWND window, LPARAM data) -> BOOL {
+      auto* search = reinterpret_cast<SearchState*>(data);
+      wchar_t className[128]{};
+      if (GetClassNameW(window, className, ARRAYSIZE(className)) <= 0
+          || wcscmp(className, L"Chrome_RenderWidgetHostHWND") != 0
+          || !IsWindowVisible(window)) {
+        return TRUE;
+      }
+      RECT bounds{};
+      if (!GetClientRect(window, &bounds)) return TRUE;
+      const long long width = std::max<LONG>(0, bounds.right - bounds.left);
+      const long long height = std::max<LONG>(0, bounds.bottom - bounds.top);
+      const long long area = width * height;
+      if (area > search->area) {
+        search->candidate = window;
+        search->area = area;
+      }
+      return TRUE;
+    }, reinterpret_cast<LPARAM>(&state));
+    return state.candidate ? state.candidate : parent;
+  }
+
   HRESULT CreateRenderSurface(HWND parent) {
     if (!IsWindow(parent)) return E_INVALIDARG;
+    surfaceParentWindow_ = FindRendererChild(parent);
     WNDCLASSW windowClass{};
     windowClass.lpfnWndProc = &MediaFoundationPlayer::SurfaceWindowProc;
     windowClass.hInstance = GetModuleHandleW(nullptr);
@@ -610,7 +639,7 @@ class MediaFoundationPlayer final {
     renderWindow_ = CreateWindowExW(
         WS_EX_NOACTIVATE, kSurfaceClassName, L"", WS_CHILD | WS_VISIBLE
             | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-        0, 0, 1, 1, parent, nullptr, windowClass.hInstance, nullptr);
+        0, 0, 1, 1, surfaceParentWindow_, nullptr, windowClass.hInstance, nullptr);
     return renderWindow_ ? S_OK : HRESULT_FROM_WIN32(GetLastError());
   }
 
@@ -634,6 +663,7 @@ class MediaFoundationPlayer final {
   ComPtr<IMFVideoDisplayControl> displayControl_;
   ComPtr<IVideoFrameStep> frameStep_;
   HWND parentWindow_ = nullptr;
+  HWND surfaceParentWindow_ = nullptr;
   HWND renderWindow_ = nullptr;
   LONGLONG duration100ns_ = 0;
   LONGLONG frameCount_ = 1;
