@@ -32,7 +32,7 @@ if errorlevel 1 goto install_failed
 if not exist "node_modules\electron\package.json" goto install_incomplete
 
 :start_app
-set "PITCHING_DISABLE_GPU=1"
+set "PITCHING_DISABLE_GPU=0"
 set "PITCHING_USER_DATA=%PROJECT_ROOT%\.runtime\electron-user-data"
 echo [INFO] Starting Pitching Report Generator...
 rem This desktop environment cannot launch Electron's renderer sandbox (exitCode 49).
