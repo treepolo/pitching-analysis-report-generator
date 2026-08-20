@@ -1,6 +1,13 @@
 # Current Project State
 
-## Current Wave 20D native single-player implementation (2026-08-21)
+## Current unified browser-video playback rebuild (2026-08-21)
+
+- The editor's single-video and comparison-video blocks now share one renderer-owned `<video>` surface per side. The old Media Foundation/EVR child-window path, native IPC, helper source, helper binaries, and native surface repaint loop have been removed; there is no second HWND/gray-blue layer to drift during scroll.
+- Playback follows the requested media-player behavior: the browser video decoder stays warm, timeline input is coalesced to the latest pointer position on `requestAnimationFrame` and uses approximate `fastSeek` where available, pointer release performs an exact seek and waits for `seeked`/`requestVideoFrameCallback`, arrow/button stepping uses the same exact seek path, and normal playback is driven by the native video clock rather than a renderer timer.
+- Comparison blocks use the same engine on both sides. The configured master side drives the frame index; the follower is aligned through the existing binding offsets/anchors while the frame engine guard prevents legacy binding callbacks from fighting an active seek. A single playback-speed slider controls both sides and the normal rate starts at the block's configured rate.
+- Automated gate for this rebuild: `node --check` passes for main/preload/renderer; focused player tests assert the single pipeline, latest-target scrubbing, exact release/step, keyboard handling, comparison alignment, and absence of native IPC/surfaces. Full `npm test` passes 165 tests with 164 pass, 0 fail, and 1 explicit Electron `file://` runtime-unavailable skip. A manual Electron/media acceptance run is still required for real-frame latency and scroll behavior.
+
+## Historical Wave 20D native single-player implementation (superseded 2026-08-21)
 
 - The latest native surface repair is committed in `8015f65`: the HTML anchor no longer paints a second dark layer, the EVR child handles `WM_PAINT`/`WM_ERASEBKGND`, scroll geometry schedules one coalesced repaint after movement settles, and end-of-stream is treated as a paused boundary so replay/scrub does not time out against an ended Media Session. The source links with the available MinGW-w64 toolchain, and the formal project-local `native/bin/media-foundation-player.exe` was rebuilt at 02:35 after the previous helper session exited. Human reopen/scroll/long-play verification remains pending.
 

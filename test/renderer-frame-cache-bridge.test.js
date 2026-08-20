@@ -57,13 +57,10 @@ test('preload exposes only validated frame-cache requests and contract responses
   assert.doesNotMatch(preload, /ffmpegCommand|ffprobeCommand|sourcePath|absolutePath/u);
 });
 
-test('renderer sends identity-only v1 requests and renders frames through a safe source seam', () => {
-  assert.match(renderer, /projectId: state\.activeProject\.id/u);
-  assert.match(renderer, /assetId,/u);
-  assert.match(renderer, /readFrameCache\(request\)/u);
-  assert.match(renderer, /prepareFrameCache\(request\)/u);
-  assert.match(renderer, /cancelFrameCache\(request\)/u);
-  assert.match(renderer, /getFrameSource\(\{/u);
-  assert.match(renderer, /cacheKey: cache\.cacheKey/u);
-  assert.doesNotMatch(renderer, /framePlayer.*currentTime|currentTime.*framePlayer/iu);
+test('renderer leaves frame-cache transport to export and uses the browser video surface for playback', () => {
+  assert.match(renderer, /resolveMediaSource\(state\.activeProject\.id, assetId\)/u);
+  assert.match(renderer, /video\.src = safeInlineMediaSourceUrl\(source\)/u);
+  assert.match(renderer, /requestAnimationFrame/u);
+  assert.match(renderer, /video\.fastSeek/u);
+  assert.doesNotMatch(renderer, /frameCacheAdapter|readFrameCache|prepareFrameCache|getFrameSource/u);
 });

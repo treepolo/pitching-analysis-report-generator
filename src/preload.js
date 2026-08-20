@@ -34,9 +34,6 @@ const MEDIA_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u;
 const EXPORT_JOB_ID_PATTERN = /^[0-9a-f-]{36}$/iu;
 const FRAME_CACHE_REQUEST_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u;
 const FRAME_CACHE_KEY_PATTERN = /^[a-f0-9]{64}$/iu;
-const NATIVE_PLAYER_SESSION_ID_PATTERN = /^[0-9a-f-]{36}$/iu;
-const NATIVE_PLAYER_REQUEST_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u;
-const NATIVE_PLAYER_SURFACE_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/u;
 const EXPORT_OUTPUT_KINDS = new Set(['folder', 'zip', 'both']);
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 const closeCallbacks = new Set();
@@ -276,131 +273,6 @@ function assertMediaId(value) {
   return value;
 }
 
-function assertNativeSessionId(value) {
-  if (typeof value !== 'string' || !NATIVE_PLAYER_SESSION_ID_PATTERN.test(value)) {
-    throw new Error('Invalid native player session id');
-  }
-  return value;
-}
-
-function assertNativeRequestId(value) {
-  const requestId = value === undefined ? createRequestId() : value;
-  if (typeof requestId !== 'string' || !NATIVE_PLAYER_REQUEST_ID_PATTERN.test(requestId)) {
-    throw new Error('Invalid native player request id');
-  }
-  return requestId;
-}
-
-function assertNativeSurfaceId(value) {
-  if (typeof value !== 'string' || !NATIVE_PLAYER_SURFACE_ID_PATTERN.test(value)) {
-    throw new Error('Invalid native player surface id');
-  }
-  return value;
-}
-
-function assertNativeBounds(value) {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid native player bounds');
-  const integer = (field, min, max) => {
-    if (!Number.isInteger(value[field]) || value[field] < min || value[field] > max) throw new Error(`Invalid native player bounds.${field}`);
-    return value[field];
-  };
-  const devicePixelRatio = value.devicePixelRatio === undefined ? 1 : value.devicePixelRatio;
-  if (typeof devicePixelRatio !== 'number' || !Number.isFinite(devicePixelRatio) || devicePixelRatio < .25 || devicePixelRatio > 8) {
-    throw new Error('Invalid native player bounds.devicePixelRatio');
-  }
-  return {
-    x: integer('x', -100000, 100000),
-    y: integer('y', -100000, 100000),
-    width: integer('width', 1, 16384),
-    height: integer('height', 1, 16384),
-    devicePixelRatio,
-  };
-}
-
-function assertNativeResponse(value) {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)
-    || value.schemaVersion !== 1 || typeof value.status !== 'string') {
-    throw new Error('Invalid native player response');
-  }
-  if (value.ok === false || value.status === 'error') {
-    const error = new Error(typeof value.message === 'string' ? value.message : 'Native player operation failed');
-    if (typeof value.code === 'string') error.code = value.code;
-    throw error;
-  }
-  return value;
-}
-
-const nativePlayerApi = Object.freeze({
-  open: (request) => {
-    if (request === null || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid native player open request');
-    return ipcRenderer.invoke('native-player:open', {
-      projectId: assertProjectId(request.projectId),
-      assetId: assertMediaId(request.assetId),
-      surfaceId: assertNativeSurfaceId(request.surfaceId),
-    }).then(assertNativeResponse);
-  },
-  setBounds: (request) => {
-    if (request === null || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid native player bounds request');
-    return ipcRenderer.invoke('native-player:set-bounds', {
-      sessionId: assertNativeSessionId(request.sessionId),
-      surfaceId: assertNativeSurfaceId(request.surfaceId),
-      requestId: assertNativeRequestId(request.requestId),
-      bounds: assertNativeBounds(request.bounds),
-    }).then(assertNativeResponse);
-  },
-  scrub: (request) => {
-    if (request === null || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid native player scrub request');
-    if (!Number.isInteger(request.frameIndex) || request.frameIndex < 0 || request.frameIndex > 10_000_000) throw new Error('Invalid native player frame index');
-    return ipcRenderer.invoke('native-player:scrub', {
-      sessionId: assertNativeSessionId(request.sessionId),
-      surfaceId: assertNativeSurfaceId(request.surfaceId),
-      requestId: assertNativeRequestId(request.requestId),
-      frameIndex: request.frameIndex,
-    }).then(assertNativeResponse);
-  },
-  step: (request) => {
-    if (request === null || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid native player step request');
-    if (![-1, 1].includes(request.direction)) throw new Error('Invalid native player step direction');
-    return ipcRenderer.invoke('native-player:step', {
-      sessionId: assertNativeSessionId(request.sessionId),
-      surfaceId: assertNativeSurfaceId(request.surfaceId),
-      requestId: assertNativeRequestId(request.requestId),
-      direction: request.direction,
-    }).then(assertNativeResponse);
-  },
-  play: (request) => {
-    if (request === null || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid native player play request');
-    const rate = request.rate ?? request.playbackRate ?? 1;
-    if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0 || rate > 16) throw new Error('Invalid native player playback rate');
-    return ipcRenderer.invoke('native-player:play', {
-      sessionId: assertNativeSessionId(request.sessionId),
-      requestId: assertNativeRequestId(request.requestId),
-      rate,
-    }).then(assertNativeResponse);
-  },
-  pause: (request) => {
-    if (request === null || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid native player pause request');
-    return ipcRenderer.invoke('native-player:pause', {
-      sessionId: assertNativeSessionId(request.sessionId),
-      requestId: assertNativeRequestId(request.requestId),
-    }).then(assertNativeResponse);
-  },
-  close: (request) => {
-    if (request === null || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid native player close request');
-    return ipcRenderer.invoke('native-player:close', {
-      sessionId: assertNativeSessionId(request.sessionId),
-    }).then(assertNativeResponse);
-  },
-  onEvent: (callback) => {
-    if (typeof callback !== 'function') throw new Error('Native player event callback must be a function');
-    const listener = (_event, payload) => {
-      try { callback(assertNativeResponse({ ...payload, ok: true, status: 'event' })); } catch { /* untrusted event ignored */ }
-    };
-    ipcRenderer.on('native-player:event', listener);
-    return () => ipcRenderer.removeListener('native-player:event', listener);
-  },
-});
-
 function assertFrameCacheRequest(value, operation, { requireCacheKey = false } = {}) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('Invalid frame cache request');
@@ -609,7 +481,6 @@ contextBridge.exposeInMainWorld('pitchingApp', Object.freeze({
   cancelExport: (jobId) => ipcRenderer.invoke('export:cancel', assertExportJobId(jobId)),
   retryExport: (jobId) => ipcRenderer.invoke('export:retry', assertExportJobId(jobId)),
   getAppInfo: () => ipcRenderer.invoke('app:info'),
-  nativePlayer: nativePlayerApi,
   frameCache: frameCacheApi,
   sync: syncApi,
   onBeforeClose: (callback) => {
