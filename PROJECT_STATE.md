@@ -2,7 +2,7 @@
 
 ## Current Wave 20B integrator gate (2026-08-20)
 
-- Current provenance tip is `3412ab7` on `worker/desktop-vertical-slice`; the product code tip is `7c2c40c`. The live remote branch resolves to `3412ab7`, matching local HEAD after the docs checkpoint. The successful `git push` updated `origin/worker/desktop-vertical-slice`.
+- Current provenance tip is the latest branch HEAD on `worker/desktop-vertical-slice` (the real-smoke evidence checkpoint is `3412ab7`); the product code tip is `7c2c40c`. The successful `git push` updated `origin/worker/desktop-vertical-slice`.
 - Provenance chain: frame-cache contract=`c8b9790`, editor seam=`4a1f09e`, Media pipeline=`79e196c`, Bridge/Editor=`5525b49`, Portable Export=`342d6e1`, Integrator hardening=`7c2c40c`.
 - Bounded implementation now wires the v1 frame-cache contract through main/preload/renderer, reads only referenced video caches for export, stages ready index/PNG frames into folder/ZIP outputs, enforces frame-directory containment, and rejects comparison partial-ready rendering as success.
 - Independent regression evidence: `npm test` (`node --test`) → 162 tests, 161 pass, 0 fail, 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. `node --check` passes for 47 JavaScript files; product-scope `git diff --check`, tracked-artifact scan, and credential-pattern scan pass.
