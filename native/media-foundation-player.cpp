@@ -34,9 +34,11 @@
 #include <cmath>
 #include <cstdlib>
 #include <cwchar>
+#include <deque>
 #include <functional>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -56,6 +58,7 @@ namespace {
 
 constexpr LONGLONG kHundredNanosecondsPerSecond = 10'000'000;
 constexpr DWORD kOpenTimeoutMs = 15'000;
+constexpr UINT kCommandMessage = WM_APP + 1;
 constexpr wchar_t kSurfaceClassName[] = L"PitchingReportMediaSurface";
 
 // Some MinGW import libraries do not export this SDK GUID even though the
@@ -718,11 +721,36 @@ int Run(const std::wstring& sourcePath, HWND targetWindow) {
        + ",\"fps\":" + std::to_string(player.Fps())
        + ",\"durationSeconds\":" + std::to_string(player.DurationSeconds()));
 
-  std::string line;
-  while (std::getline(std::cin, line)) {
+  // The render surface belongs to this thread.  Keep the command pipe on a
+  // reader thread so this thread can pump the Win32 queue; without that pump
+  // WM_PAINT/WM_NCHITTEST and EVR window messages remain queued forever.
+  struct CommandQueue {
+    std::mutex mutex;
+    std::deque<std::string> lines;
+    std::atomic<bool> inputFinished{false};
+  };
+  const auto commandQueue = std::make_shared<CommandQueue>();
+  const DWORD windowThreadId = GetCurrentThreadId();
+  MSG initialMessage{};
+  PeekMessageW(&initialMessage, nullptr, 0, 0, PM_NOREMOVE);
+  std::thread commandReader([commandQueue, windowThreadId]() {
+    std::string line;
+    while (std::getline(std::cin, line)) {
+      {
+        std::lock_guard<std::mutex> lock(commandQueue->mutex);
+        commandQueue->lines.push_back(std::move(line));
+      }
+      PostThreadMessageW(windowThreadId, kCommandMessage, 0, 0);
+      line.clear();
+    }
+    commandQueue->inputFinished.store(true);
+    PostThreadMessageW(windowThreadId, WM_QUIT, 0, 0);
+  });
+
+  auto processCommand = [&player](const std::string& line, bool* shouldQuit) {
     if (line.size() > 4096) {
       Emit("command-rejected", {}, E_INVALIDARG);
-      continue;
+      return;
     }
     const std::string command = ExtractString(line, "command");
     const std::string requestId = ExtractString(line, "requestId");
@@ -767,15 +795,48 @@ int Run(const std::wstring& sourcePath, HWND targetWindow) {
     } else if (command == "close") {
       player.Close();
       Emit("closed", requestId);
-      break;
+      *shouldQuit = true;
+      return;
     } else {
       Emit("command-rejected", requestId, E_INVALIDARG);
-      continue;
+      return;
     }
     if (FAILED(result) && command != "frame-step" && command != "play"
         && command != "pause" && command != "stop") {
       Emit("command-failed", requestId, result);
     }
+  };
+
+  bool shouldQuit = false;
+  MSG message{};
+  while (!shouldQuit) {
+    const BOOL messageResult = GetMessageW(&message, nullptr, 0, 0);
+    if (messageResult <= 0) break;
+    if (message.message == kCommandMessage) {
+      for (;;) {
+        std::string line;
+        {
+          std::lock_guard<std::mutex> lock(commandQueue->mutex);
+          if (commandQueue->lines.empty()) break;
+          line = std::move(commandQueue->lines.front());
+          commandQueue->lines.pop_front();
+        }
+        processCommand(line, &shouldQuit);
+        if (shouldQuit) break;
+      }
+      continue;
+    }
+    TranslateMessage(&message);
+    DispatchMessageW(&message);
+  }
+
+  if (commandQueue->inputFinished.load()) {
+    commandReader.join();
+  } else {
+    // A close command is sent over a pipe that remains open until Electron
+    // kills the helper. Keep the reader's shared queue alive while the
+    // process exits instead of blocking shutdown on std::getline().
+    commandReader.detach();
   }
 
   player.Close();

@@ -41,5 +41,8 @@ test('native helper uses Media Foundation completion rather than image/cache tra
   assert.match(native, /stopForScrub_/u);
   assert.match(native, /MFVP_MESSAGE_STEP|IVideoFrameStep/u);
   assert.match(native, /set-bounds/u);
+  assert.match(native, /std::thread commandReader/u);
+  assert.match(native, /PostThreadMessageW/u);
+  assert.match(native, /GetMessageW/u);
   assert.doesNotMatch(native, /currentTime|base64|frame-cache/u);
 });
