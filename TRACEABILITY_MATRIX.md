@@ -1,6 +1,14 @@
 # Traceability Matrix
 
-## Current Wave 18A provenance integration (2026-08-15)
+## Current Wave 19G provenance reconciliation (2026-08-20)
+
+- Actual implementation tip is `b118a6321516a2cb17cec33a8da7f3bfd8e21c1c` on `worker/desktop-vertical-slice`; local `origin/worker/desktop-vertical-slice` tracking ref matches and the worktree was clean before the unrelated `AGENTS.md` edit appeared. Live origin SHA is unavailable because `git ls-remote origin` failed with `SEC_E_NO_CREDENTIALS`.
+- Provenance chain: A=`e4e74983eb9dc8a2117a77acd2f699985100303e`, B=`36d32567c8159476d55aedde9003c85051d9acbb`, renderer test=`faea84ae94516021d252d7bb17666b0c82877a18`, export=`b118a6321516a2cb17cec33a8da7f3bfd8e21c1c`.
+- Committed scope covers comparison sync persistence, continuous inline playback binding, renderer autosave contract coverage, and portable export player/rendering/runtime coverage. No uncommitted source/test/package scope remains; current uncommitted scope is the unrelated `AGENTS.md` governance edit.
+- Test command: `npm test` (`node --test`) → 138 total / 137 pass / 0 fail / 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. This is independent automated regression evidence; it does not establish browser/file://, real-media, player/sync-drift, or human acceptance.
+- Evidence layers: worker/commit evidence remains bounded implementation/contract evidence; independent Git/test evidence is recorded above; human evidence is absent; `file://` is an explicit unavailable skip. Requirement rows remain conservative and none are `VERIFIED`.
+
+## Historical Wave 18A provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `42d2a8a2f427eba02db9cb34cd518cb69d1d558e` on `worker/desktop-vertical-slice`; scope is limited to exporter collision resolution and `test/export/app-bridge.test.js`, with no Playback source collision.
 - Repeated folder/ZIP exports select deterministic `name-2`, `name-3`, ... targets, preserve existing outputs, and retain safe staging cleanup; no existing folder or ZIP is overwritten.
@@ -105,7 +113,7 @@
 - QA gate: `CONDITIONAL FAIL / IN_PROGRESS`.
 - Integrated ancestry: `93ffb61` block editor, `56f7159` media lifecycle, `646df8a` block-local sync modes, `121d857` referenced-video-only export, and `4f83eb3` governance protocol. Unresolved evidence remains real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G. GitHub Private remote is configured and verified; no requirement is `VERIFIED`.
 
-目前狀態：**Phase 1/2 planning + implementation in progress**。本矩陣是 Requirement → Artifact → Test/Acceptance → Evidence → Status 的唯一追蹤入口。`fcaa4a6` 已提供部分 implementation/unit/fixture evidence，但沒有任何 requirement 因此改標 `VERIFIED`，也沒有 real-media、browser/file:// pass 或真人 evidence。
+目前狀態：**Phase 1/2 planning + implementation in progress**。本矩陣是 Requirement → Artifact → Test/Acceptance → Evidence → Status 的唯一追蹤入口。Wave 19G 的 A/B、renderer test 與 export commits 提供 bounded implementation/contract/regression evidence；沒有任何 requirement 因此改標 `VERIFIED`，也沒有 real-media、browser/file:// pass 或真人 evidence。
 
 ## Historical integration checkpoint
 

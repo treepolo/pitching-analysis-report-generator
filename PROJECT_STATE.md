@@ -1,6 +1,15 @@
 # Current Project State
 
-## Current Wave 18A provenance integration (2026-08-15)
+## Current Wave 19G provenance reconciliation (2026-08-20)
+
+- Actual implementation tip is `b118a6321516a2cb17cec33a8da7f3bfd8e21c1c` on `worker/desktop-vertical-slice`; local `origin/worker/desktop-vertical-slice` tracking ref matches. Code scope is clean; the current worktree is dirty only with the three provenance docs and an unrelated `AGENTS.md` edit.
+- Provenance chain: A=`e4e74983eb9dc8a2117a77acd2f699985100303e`, B=`36d32567c8159476d55aedde9003c85051d9acbb`, renderer test=`faea84ae94516021d252d7bb17666b0c82877a18`, export=`b118a6321516a2cb17cec33a8da7f3bfd8e21c1c`.
+- Committed scope covers comparison sync persistence, continuous inline playback binding, renderer autosave contract coverage, and portable export player/rendering/runtime coverage. No source/test/package files remain uncommitted; only governance-document edits are pending.
+- Independent regression command: `npm test` (`node --test`) → 138 tests, 137 pass, 0 fail, 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. This is automated regression evidence only; the skip is unavailable evidence, not browser verification.
+- Worker/commit evidence remains bounded implementation/contract evidence; real media/player/sync drift, exported `file://`, native picker, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`.
+- Live GitHub SHA verification is unavailable: `git ls-remote origin` failed with `SEC_E_NO_CREDENTIALS`; do not infer live origin state from the matching local tracking ref.
+
+## Historical Wave 18A provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `42d2a8a2f427eba02db9cb34cd518cb69d1d558e` on `worker/desktop-vertical-slice`; the clean export collision fix contains only `src/export/exporter.js` and `test/export/app-bridge.test.js`. Local and origin HEAD match before this docs-only checkpoint.
 - Repeated folder, ZIP, and complete-package exports now choose deterministic collision-safe names (`name-2`, then `name-3`, and so on) without overwriting prior folders or ZIP files. Existing output remains preserved and temporary staging is cleaned.
@@ -119,11 +128,12 @@
 ## Current repository
 
 - Branch：`worker/desktop-vertical-slice`。
+- Actual HEAD：`b118a6321516a2cb17cec33a8da7f3bfd8e21c1c`; local tracking ref matches; live origin SHA is unavailable because `git ls-remote` authentication failed with `SEC_E_NO_CREDENTIALS`.
 - Shell/Report Model implementation handoff commit：`35c21a430b5c7a16ea065d542fec71a02c47b81b fix: harden report shell persistence boundaries`。
 - `bc0e004 feat: add desktop project vertical slice` 是歷史 implementation baseline；`f678f2e2c1d6601623a08241dc4789b52b426ccc` 是前一個 provenance reconciliation，並非目前整合 HEAD。
-- 目前 code integration checkpoint：`fcaa4a6 feat: integrate media tools and export runtime seams`，承接 app-facing/player checkpoint `d941b5c`，已整合 `src/media/**`、`src/sync/**`、`src/export/**` 及對應 tests。這些 slice 仍只代表可驗證的 contract/domain/export/runtime seam，不代表完整產品驗收。
+- 目前 code integration checkpoint：`b118a63 fix: complete portable export player`，承接 A=`e4e7498`、B=`36d3256` 與 renderer test=`faea84a`；這些 slice 仍只代表 implementation/contract/regression evidence，不代表完整產品驗收。
 - Recoverable pre-retrofit tag：`checkpoint/pre-governance-retrofit-2026-08-14`。
-- `fcaa4a6` 已納入原先三個 owner 的 dirty/untracked media/export slice；目前 code integration commit 為 `fcaa4a6`，本次 provenance 文件變更另行記錄。私人素材、generated report、ZIP 與 `.tmp` artifacts 未進 Git。
+- Wave 19G code scope 已提交且 worktree clean；私人素材、generated report、ZIP 與 `.tmp` artifacts 未進 Git。
 - 本地 checkpoint 可回復被刪除的舊治理檔案。
 
 ## Implemented slice
@@ -138,7 +148,7 @@
 - 真實 media ingest/metadata/normalization、FFmpeg、實際 player/anchor/sync 與長片 drift correction 仍未完成。
 - responsive 與 Scenario A–G 真人驗收。
 - IPC sender/source-frame hardening、project/media symlink realpath containment、tool command/path checks 與 ZIP atomic extraction 已有 focused tests/smoke evidence；完整產品 persistence/recovery acceptance 仍未完成。
-- `fcaa4a6` 整合 evidence：65 pass / 1 skip 的 `npm test`、全部 JS `node --check`、media/export/player targeted tests 23 pass / 1 skip、package/lock consistency、`git diff --check`，以及 app Electron smoke。export `file://` runtime skip 明確保留為 unavailable，未冒充 pass。
+- Wave 19G independent evidence：`npm test` 138 tests / 137 pass / 0 fail / 1 explicit Electron `file://` unavailable skip；code scope clean；local tracking ref equals HEAD. Current worktree remains dirty with the three provenance docs and unrelated `AGENTS.md`; live origin SHA is unavailable due to credential failure. Historical worker evidence is not promoted.
 - 沒有 requirement 可只因程式存在而標 `VERIFIED`。
 
 ## Execution

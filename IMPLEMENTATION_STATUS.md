@@ -1,6 +1,14 @@
 # Implementation Status
 
-## Current Wave 18A provenance integration (2026-08-15)
+## Current Wave 19G provenance reconciliation (2026-08-20)
+
+- Actual implementation tip is `b118a6321516a2cb17cec33a8da7f3bfd8e21c1c` on `worker/desktop-vertical-slice`; local `origin/worker/desktop-vertical-slice` tracking ref matches. Code scope is clean; the current worktree is dirty only with the three provenance docs and an unrelated `AGENTS.md` edit. Live origin SHA is unavailable because `git ls-remote origin` failed with `SEC_E_NO_CREDENTIALS`.
+- Provenance chain: A=`e4e74983eb9dc8a2117a77acd2f699985100303e`, B=`36d32567c8159476d55aedde9003c85051d9acbb`, renderer test=`faea84ae94516021d252d7bb17666b0c82877a18`, export=`b118a6321516a2cb17cec33a8da7f3bfd8e21c1c`.
+- A/B provide comparison sync persistence and continuous inline playback binding; `faea84a` aligns the renderer autosave test contract; `b118a63` delivers the portable export player and export renderer/runtime tests. No uncommitted source/test/package scope remains; only governance-document edits are pending.
+- Independent command evidence: `npm test` (`node --test`) reports 138 tests, 137 pass, 0 fail, 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. This is regression/contract evidence, not real browser, media, player, or human acceptance.
+- Worker/commit evidence is bounded to implementation and focused contracts; `file://` remains unavailable; real media/player/sync drift, native picker, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement may be marked `VERIFIED`.
+
+## Historical Wave 18A provenance integration (superseded, 2026-08-15)
 
 - Current implementation tip is `42d2a8a2f427eba02db9cb34cd518cb69d1d558e` on `worker/desktop-vertical-slice`; it contains only the exporter collision-resolution implementation and app-bridge regression coverage. This is a docs-only reconciliation.
 - Repeated folder/ZIP/`both` exports resolve deterministic `-2`, `-3`, ... names when the base target exists, preserving earlier outputs and avoiding overwrite while retaining output-root containment and staging cleanup.
@@ -104,11 +112,11 @@
 - Startup provenance: `dfef829` normalized the Windows launcher to ASCII/CRLF label/goto syntax; `5bbd845` added opt-in `disable-gpu`/`in-process-gpu` switches and `app.disableHardwareAcceleration()` before app ready.
 - Exact launch verification kept `cmd.exe /d /c call start-pitching-report.bat` alive for more than 16 seconds without GPU fatal; `node --check src/main.js` and `git diff --check` passed. This does not establish full product acceptance.
 - Wave 2 integrated ancestry: `93ffb61` block editor, `56f7159` media lifecycle, `646df8a` block-local sync modes, `121d857` referenced-video-only export, and `4f83eb3` parallel governance protocol.
-- Current regression evidence: `npm test` 82 total / 81 pass / 1 explicit Electron `file://` runtime skip / 0 fail; 30 JavaScript `node --check`; package/lock consistency; `git diff --check`; Electron smoke with block-editor, persistence/reopen, bridge-security, and responsive-gate assertions; and referenced-asset export tests. The exported `file://` runtime skip remains unavailable evidence, not a pass.
+- Current Wave 19G regression evidence: `npm test` 138 total / 137 pass / 1 explicit Electron `file://` runtime skip / 0 fail. The exported `file://` runtime skip remains unavailable evidence, not a pass; no real media/player/human acceptance is implied.
 - QA gate: `CONDITIONAL FAIL / IN_PROGRESS`. No requirement may be marked `VERIFIED`.
 - Remaining blockers: real video/FFmpeg, real media player/sync, exported `file://`/ZIP runtime, responsive human evidence, and AT-A through AT-G remain incomplete. GitHub Private remote is configured and verified, but requirements remain unverified.
 
-目前狀態：**Implementation in progress**。`bc0e004` 是歷史 Desktop project persistence/editor/preview baseline；Shell/Report Model hardening 在 `35c21a430b5c7a16ea065d542fec71a02c47b81b`，app-facing/player checkpoint 在 `d941b5c`，目前 media/sync/export integration checkpoint 是 `fcaa4a6`。沒有任何完整產品 requirement 可僅因程式存在而標 `VERIFIED`。
+目前狀態：**Implementation in progress**。目前 code tip 是 `b118a63`，承接 A/B=`e4e7498`/`36d3256` 與 renderer test=`faea84a`。這些是 implementation、contract 與 regression evidence，不是完整產品驗收；沒有任何完整產品 requirement 可僅因程式存在而標 `VERIFIED`。
 
 ## Historical Wave 2 integration gate override
 
@@ -135,7 +143,7 @@ No requirement is `VERIFIED`. Human responsive evidence and AT-A through AT-G re
 | Responsive/offline/human acceptance | NOT_STARTED | 尚無真人或完整 file:// evidence。 |
 | GitHub Private remote | AWAITING_USER_SETUP | 需要帳號授權/外部 remote 設定；目前無 origin。 |
 
-`fcaa4a6` 已整合 owner 的 `src/export/`、`src/media/` 與對應 tests，並保留 `d941b5c` 的 app-facing player/sync scope；這些變更不代表 requirement `VERIFIED`。export Electron `file://` runtime 在目前環境明確回報 unavailable/skip，真實 metadata/FFmpeg 與真人 AT-A～G 仍待後續 owner/human checkpoint。
+Wave 19G 的 A/B、renderer test 與 export commits 已整合對應 scope；這些變更不代表 requirement `VERIFIED`。export Electron `file://` runtime 明確回報 unavailable/skip，真實 metadata/FFmpeg、player/sync drift 與真人 AT-A～G 仍待後續 owner/human checkpoint。
 
 ## Current implementation
 
