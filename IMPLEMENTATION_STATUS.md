@@ -2,7 +2,7 @@
 
 ## Current Wave 20B integrator gate (2026-08-20)
 
-- Actual implementation tip is `7c2c40c` on `worker/desktop-vertical-slice`; live `origin/worker/desktop-vertical-slice` resolves to `4a1f09e`, and local is ahead by four commits. The Wave 20 source/test scope is committed; the unrelated `AGENTS.md` edit remains outside the checkpoint.
+- Current provenance tip is `54678f4` on `worker/desktop-vertical-slice`; product code tip is `7c2c40c`. Live `origin/worker/desktop-vertical-slice` resolves to `4a1f09e`, and local is ahead by five commits. The Wave 20 source/test scope is committed; the unrelated `AGENTS.md` edit remains outside the checkpoint.
 - Wave 20B commits are `5525b49` (Bridge/Editor), `342d6e1` (Portable Export), and `7c2c40c` (Integrator export snapshot, frame-directory containment, comparison partial-ready guard, and warning visibility), on top of `79e196c` Media frame-cache pipeline.
 - Evidence: `npm test` 162 total / 161 pass / 1 explicit Electron exported-folder/ZIP `file://` unavailable skip; 47 JavaScript syntax checks; focused bridge/player/export/media tests pass; product diff, tracked-artifact, and credential scans pass.
 - Frame cache remains project-local and referenced-only for export. Non-ready cache states are explicit fallback/warning or strict validation failure; no absolute source paths are exposed to renderer or portable output.
