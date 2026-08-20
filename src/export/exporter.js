@@ -17,6 +17,12 @@ const {
 const { validateExportLayout } = require('./layout-validator');
 const { renderReportHtml, toPortableReportDocument } = require('./report-renderer');
 const { createZipArchive, validateZipParity } = require('./zip-archive');
+const {
+  frameCacheWarning,
+  indexFrameCaches,
+  resolveFrameCacheForAsset,
+  stageFrameCache,
+} = require('./frame-cache');
 
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -297,6 +303,11 @@ function prepareAssetDescriptors(assets, { referencedAssetIds = null } = {}) {
       mediaType: typeof asset.mediaType === 'string' ? asset.mediaType : '',
       sourcePath,
       data,
+      frameCache: asset.frameCacheResponse
+        ?? asset.frameCache
+        ?? asset.frameIndex
+        ?? asset.readyFrameCache
+        ?? null,
     };
   });
 }
@@ -356,7 +367,16 @@ function rendererManifest(stagedAssets) {
   }));
 }
 
-function exportManifest({ reportDocument, safeName, stagedAssets, html, reportFileName = 'report.html' }) {
+function exportManifest({
+  reportDocument,
+  safeName,
+  stagedAssets,
+  html,
+  reportFileName = 'report.html',
+  auxiliaryFiles = [],
+  frameCaches = [],
+  warnings = [],
+}) {
   return {
     format: 'pitching-analysis-report-export',
     schemaVersion: 1,
@@ -385,7 +405,22 @@ function exportManifest({ reportDocument, safeName, stagedAssets, html, reportFi
         byteLength: asset.byteLength,
         sha256: asset.sha256,
       })),
+      ...auxiliaryFiles.map((file) => ({
+        relativePath: file.relativePath,
+        byteLength: file.byteLength,
+        sha256: file.sha256,
+      })),
     ],
+    ...(frameCaches.length > 0 ? {
+      frameCaches: frameCaches.map((entry) => ({
+        assetId: entry.assetId,
+        status: entry.status,
+        cache: entry.cache?.cache ?? null,
+        frameCount: entry.cache?.frameCount ?? 0,
+        indexRelativePath: entry.indexFile?.relativePath ?? null,
+      })),
+    } : {}),
+    ...(warnings.length > 0 ? { warnings: [...warnings] } : {}),
   };
 }
 
@@ -402,6 +437,8 @@ async function exportReport({
   createZip = false,
   outputKind = 'folder',
   zipPath,
+  frameCaches = null,
+  requireReadyFrameCache = false,
   signal,
 } = {}) {
   if (typeof outputDirectory !== 'string' || outputDirectory.length === 0) {
@@ -413,6 +450,7 @@ async function exportReport({
   const { lexicalRoot: projectRootLexical, realRoot: projectRootReal } = await resolveProjectRoots(projectRoot);
   const safeReportDocument = toPortableReportDocument(reportDocument);
   const referencedAssetIds = new Set(collectReferencedVideoAssetIds(safeReportDocument));
+  const indexedFrameCaches = indexFrameCaches(frameCaches, { assetIds: referencedAssetIds });
   const outputRoot = path.resolve(outputDirectory);
   if (typeof outputDirectory !== 'string' || outputDirectory.trim() === '' || !path.isAbsolute(outputDirectory)) {
     throw new ExportValidationError('Export outputDirectory must be an absolute safe path');
@@ -461,25 +499,71 @@ async function exportReport({
     await fs.mkdir(path.join(stagingPath, 'images'), { recursive: true });
     const preparedAssets = prepareAssetDescriptors(assets, { referencedAssetIds });
     const stagedAssets = [];
+    const stagedFrameAssets = [];
+    const stagedFrameFiles = [];
+    const portableFrameCaches = [];
+    const warnings = [];
+    const usedOutputPaths = new Set();
     for (const asset of preparedAssets) {
       throwIfAborted(signal);
-      stagedAssets.push(await stageAsset(asset, stagingPath, {
+      const stagedAsset = await stageAsset(asset, stagingPath, {
         projectRootLexical,
         projectRootReal,
-      }));
+      });
+      stagedAssets.push(stagedAsset);
+      usedOutputPaths.add(portableAssetPathKey(stagedAsset.relativePath));
+
+      if (asset.kind !== 'video') continue;
+      const cacheEntry = resolveFrameCacheForAsset(asset, indexedFrameCaches);
+      if (!cacheEntry?.ready) {
+        if (requireReadyFrameCache) {
+          throw new ExportValidationError(
+            cacheEntry
+              ? `Frame cache for referenced video asset ${asset.id} is not ready: ${cacheEntry.status}`
+              : `Ready frame cache is required for referenced video asset: ${asset.id}`,
+            { assetId: asset.id, status: cacheEntry?.status ?? 'missing' },
+          );
+        }
+        warnings.push(frameCacheWarning(asset.id, cacheEntry));
+        portableFrameCaches.push({
+          assetId: asset.id,
+          status: cacheEntry?.status || 'missing',
+          ready: false,
+          error: cacheEntry?.error || null,
+        });
+        continue;
+      }
+      const stagedFrameCache = await stageFrameCache({
+        asset,
+        cacheEntry,
+        stagingPath,
+        projectRoot: projectRootLexical,
+        projectRootReal,
+        usedPaths: usedOutputPaths,
+      });
+      stagedFrameAssets.push(...stagedFrameCache.frameAssets);
+      stagedFrameFiles.push(stagedFrameCache.indexFile);
+      portableFrameCaches.push(stagedFrameCache);
     }
 
     throwIfAborted(signal);
-    const stagedManifest = rendererManifest(stagedAssets);
+    const stagedManifest = rendererManifest([...stagedAssets, ...stagedFrameAssets]);
     validateReferencedVideoAssetReferences(safeReportDocument, stagedManifest);
-    const html = renderReportHtml(safeReportDocument, { assetManifest: stagedManifest });
+    const html = renderReportHtml(safeReportDocument, {
+      assetManifest: stagedManifest,
+      frameCacheManifest: portableFrameCaches.map((entry) => entry.ready ? entry.cache : entry),
+      frameCacheWarnings: warnings,
+    });
     await fs.writeFile(path.join(stagingPath, reportFileName), html, 'utf8');
     const manifest = exportManifest({
       reportDocument: safeReportDocument,
       safeName,
-      stagedAssets,
+      stagedAssets: [...stagedAssets, ...stagedFrameAssets],
       html,
       reportFileName,
+      auxiliaryFiles: stagedFrameFiles,
+      frameCaches: portableFrameCaches,
+      warnings,
     });
     await writeJson(path.join(stagingPath, 'export-manifest.json'), manifest);
 
@@ -520,6 +604,7 @@ async function exportReport({
       manifest,
       validation,
       zip,
+      warnings,
     };
   } catch (error) {
     await fs.rm(temporaryRoot, { recursive: true, force: true });

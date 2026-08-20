@@ -248,6 +248,7 @@ module.exports = {
   normalizeAssetKind,
   normalizeAssetManifest,
   normalizeRelativeAssetPath,
+  portableAssetPathKey,
   safeAssetFilename,
   safeReportName,
   sanitizePortableName,

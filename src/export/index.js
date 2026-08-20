@@ -4,6 +4,7 @@ module.exports = {
   ...require('./app-bridge'),
   ...require('./asset-paths'),
   ...require('./exporter'),
+  ...require('./frame-cache'),
   ...require('./layout-validator'),
   ...require('./report-renderer'),
   ...require('./runtime-smoke'),
