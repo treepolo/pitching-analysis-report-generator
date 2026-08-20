@@ -20,6 +20,20 @@ const {
   ExportJobController,
   validatePickedExportDirectory,
 } = require('./export/app-bridge');
+const {
+  FRAME_CACHE_BRIDGE_METHODS,
+  FRAME_CACHE_CONTRACT_VERSION,
+  FRAME_CACHE_RESPONSE_STATUS,
+  FrameCacheContractError,
+  cleanupFrameCache,
+  createCancelResponse,
+  createCleanupResponse,
+  normalizeFrameCacheRequest,
+  normalizeFrameCacheResponse,
+  prepareFrameCache,
+  readFrameCache,
+} = require('./media');
+const { resolveProjectRelativePath } = require('./media/path-policy');
 
 const APP_ROOT = path.resolve(app.getAppPath());
 const configuredProjectRoot = process.env.PITCHING_PROJECT_ROOT;
@@ -39,6 +53,10 @@ if (!isPathInside(APP_ROOT, PROJECT_ROOT)) {
 
 const projectStore = createProjectStore(PROJECT_ROOT, { boundaryRoot: APP_ROOT });
 const exportJobs = new ExportJobController();
+const frameCacheOperations = new Map();
+const FRAME_CACHE_PROJECT_ID_PATTERN = /^[a-z0-9-]{1,80}$/u;
+const FRAME_CACHE_REQUEST_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u;
+const FRAME_CACHE_MAX_FRAME_BYTES = 32 * 1024 * 1024;
 
 function assertTrustedSender(event) {
   const sender = event?.sender;
@@ -54,6 +72,319 @@ function assertTrustedSender(event) {
     throw new Error('Untrusted IPC frame');
   }
   return senderWindow;
+}
+
+function frameCacheErrorCode(error, fallback = 'FRAME_CACHE_FAILED') {
+  const code = typeof error?.code === 'string' && /^[A-Z0-9_:-]{1,120}$/u.test(error.code)
+    ? error.code
+    : fallback;
+  return code;
+}
+
+function frameCacheErrorMessage(error, fallback = '影格快取操作失敗。') {
+  const raw = typeof error?.message === 'string' && error.message.trim() !== ''
+    ? error.message
+    : fallback;
+  return raw
+    .replace(/[a-zA-Z]:[\\/][^\r\n]*/gu, '[project-path]')
+    .replace(/(^|[\s('"`])\/(?:[^\s'"`)]+(?:[\s][^\r\n]*)?)/gu, '$1[project-path]')
+    .slice(0, 1000);
+}
+
+function frameCacheFailure(request, status, error, sourceIdentity = null) {
+  return normalizeFrameCacheResponse({
+    schemaVersion: FRAME_CACHE_CONTRACT_VERSION,
+    requestId: request.requestId,
+    projectId: request.projectId,
+    assetId: request.assetId,
+    status,
+    sourceIdentity,
+    cache: null,
+    metadata: null,
+    frames: [],
+    reused: false,
+    progress: null,
+    error: status === FRAME_CACHE_RESPONSE_STATUS.CACHE_MISS || status === FRAME_CACHE_RESPONSE_STATUS.PREPARING
+      ? null
+      : {
+        code: frameCacheErrorCode(error),
+        message: frameCacheErrorMessage(error),
+      },
+  });
+}
+
+function frameCacheStatusForError(error) {
+  const code = frameCacheErrorCode(error);
+  if (code === 'CANCELLED' || error?.name === 'AbortError') return FRAME_CACHE_RESPONSE_STATUS.CANCELLED;
+  if (code === 'FFPROBE_UNAVAILABLE' || code === 'FFMPEG_UNAVAILABLE') return FRAME_CACHE_RESPONSE_STATUS.TOOL_MISSING;
+  if (code.startsWith('SOURCE_')
+    || code.startsWith('MEDIA_')
+    || code === 'MEDIA_KIND_UNSUPPORTED'
+    || code === 'PROJECT_NOT_FOUND'
+    || code === 'ASSET_NOT_FOUND') {
+    return FRAME_CACHE_RESPONSE_STATUS.SOURCE_UNAVAILABLE;
+  }
+  return FRAME_CACHE_RESPONSE_STATUS.CACHE_ERROR;
+}
+
+function frameCacheOperationKey(event, requestId) {
+  return `${event.sender.id}:${requestId}`;
+}
+
+async function assertNoFrameCacheSymlinkAncestors(projectRoot, targetPath) {
+  const root = path.resolve(projectRoot);
+  let current = path.resolve(targetPath);
+  while (true) {
+    if (current !== root && !isPathInside(root, current)) {
+      throw new Error('影格來源不在專案範圍內。');
+    }
+    const stats = await fs.lstat(current).catch(() => null);
+    if (stats?.isSymbolicLink()) throw new Error('影格來源不可透過符號連結讀取。');
+    if (current === root) return;
+    const parent = path.dirname(current);
+    if (parent === current) throw new Error('影格來源無法安全解析。');
+    current = parent;
+  }
+}
+
+function normalizeFrameCacheBridgeRequest(value, operation) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new FrameCacheContractError('frame cache request must be an object');
+  }
+  if (value.schemaVersion !== undefined && value.schemaVersion !== FRAME_CACHE_CONTRACT_VERSION) {
+    throw new FrameCacheContractError('frame cache request schemaVersion is unsupported');
+  }
+  if (value.operation !== undefined && value.operation !== operation) {
+    throw new FrameCacheContractError('frame cache operation does not match its bridge channel');
+  }
+
+  // Normalize the identity fields without accepting a renderer-supplied source
+  // path. The trusted source reference is added only after project-store lookup.
+  const normalized = normalizeFrameCacheRequest({
+    requestId: value.requestId,
+    projectId: value.projectId,
+    assetId: value.assetId,
+    cacheKey: value.cacheKey,
+    operation: FRAME_CACHE_BRIDGE_METHODS.CANCEL,
+  });
+  if (!FRAME_CACHE_PROJECT_ID_PATTERN.test(normalized.projectId)) {
+    throw new FrameCacheContractError('projectId is invalid');
+  }
+  if (!FRAME_CACHE_REQUEST_ID_PATTERN.test(normalized.requestId)) {
+    throw new FrameCacheContractError('requestId is invalid');
+  }
+  return {
+    schemaVersion: FRAME_CACHE_CONTRACT_VERSION,
+    operation,
+    requestId: normalized.requestId,
+    projectId: normalized.projectId,
+    assetId: normalized.assetId,
+    ...(normalized.cacheKey ? { cacheKey: normalized.cacheKey } : {}),
+  };
+}
+
+async function resolveFrameCacheAsset(request) {
+  let project;
+  try {
+    project = await projectStore.readProject(request.projectId);
+  } catch (error) {
+    const wrapped = new Error('影格來源所屬專案不存在。');
+    wrapped.code = 'PROJECT_NOT_FOUND';
+    throw wrapped;
+  }
+  const asset = Array.isArray(project.media)
+    ? project.media.find((candidate) => candidate?.id === request.assetId)
+    : null;
+  if (!asset) {
+    const error = new Error('影格來源資產不存在。');
+    error.code = 'ASSET_NOT_FOUND';
+    throw error;
+  }
+  if (asset.mediaKind !== undefined && asset.mediaKind !== 'video') {
+    const error = new Error('只有影片資產可以建立影格快取。');
+    error.code = 'MEDIA_KIND_UNSUPPORTED';
+    throw error;
+  }
+
+  let resolved;
+  try {
+    resolved = await projectStore.resolveMediaAssetSource(request.projectId, request.assetId);
+  } catch (error) {
+    const wrapped = new Error('影格來源無法安全解析。');
+    wrapped.code = error?.code?.startsWith('MEDIA_') ? error.code : 'SOURCE_UNAVAILABLE';
+    throw wrapped;
+  }
+  const selectedReference = asset.normalizedReference?.relativePath === resolved.relativePath
+    ? asset.normalizedReference
+    : asset.sourceReference;
+  const sourceReference = {
+    relativePath: resolved.relativePath,
+  };
+  if (typeof selectedReference?.checksumSha256 === 'string') {
+    sourceReference.checksumSha256 = selectedReference.checksumSha256;
+  }
+  if (Number.isInteger(selectedReference?.byteSize) && selectedReference.byteSize >= 0) {
+    sourceReference.byteSize = selectedReference.byteSize;
+  }
+  return {
+    sourceReference,
+    sourcePath: resolved.sourcePath,
+  };
+}
+
+async function invokeFrameCacheOperation(event, payload, operation, operationFn) {
+  const senderWindow = assertTrustedSender(event);
+  const request = normalizeFrameCacheBridgeRequest(payload, operation);
+  const operationKey = frameCacheOperationKey(event, request.requestId);
+  if (frameCacheOperations.has(operationKey)) {
+    throw new FrameCacheContractError('A frame cache request with this requestId is already running');
+  }
+
+  const controller = new AbortController();
+  const operationState = { controller, senderId: senderWindow.webContents.id };
+  frameCacheOperations.set(operationKey, operationState);
+  try {
+    let resolved;
+    try {
+      resolved = await resolveFrameCacheAsset(request);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return frameCacheFailure(
+          request,
+          FRAME_CACHE_RESPONSE_STATUS.CANCELLED,
+          { code: 'CANCELLED', message: '影格快取已取消。' },
+        );
+      }
+      return frameCacheFailure(request, frameCacheStatusForError(error), error);
+    }
+    if (controller.signal.aborted) {
+      return frameCacheFailure(
+        request,
+        FRAME_CACHE_RESPONSE_STATUS.CANCELLED,
+        { code: 'CANCELLED', message: '影格快取已取消。' },
+      );
+    }
+    const contractRequest = normalizeFrameCacheRequest({
+      ...request,
+      sourceReference: resolved.sourceReference,
+    });
+    const trustedRequest = {
+      ...contractRequest,
+      projectRoot: projectStore.root,
+    };
+    const result = await operationFn(trustedRequest, controller.signal);
+    const normalizedResult = normalizeFrameCacheResponse(result);
+    if (normalizedResult.status === FRAME_CACHE_RESPONSE_STATUS.CACHE_ERROR
+      && normalizedResult.error?.code?.startsWith('SOURCE_')) {
+      return frameCacheFailure(request, FRAME_CACHE_RESPONSE_STATUS.SOURCE_UNAVAILABLE, normalizedResult.error);
+    }
+    return normalizedResult;
+  } catch (error) {
+    return frameCacheFailure(request, frameCacheStatusForError(error), error);
+  } finally {
+    if (frameCacheOperations.get(operationKey) === operationState) frameCacheOperations.delete(operationKey);
+  }
+}
+
+async function invokeFrameCacheCleanup(event, payload) {
+  assertTrustedSender(event);
+  const request = normalizeFrameCacheBridgeRequest(payload, FRAME_CACHE_BRIDGE_METHODS.CLEANUP);
+  try {
+    const resolved = request.cacheKey ? null : await resolveFrameCacheAsset(request);
+    const cleanupInput = {
+      ...request,
+      projectRoot: projectStore.root,
+      ...(resolved ? { sourceReference: resolved.sourceReference } : {}),
+    };
+    const contractRequest = normalizeFrameCacheRequest(cleanupInput);
+    const result = await cleanupFrameCache({
+      ...contractRequest,
+      projectRoot: projectStore.root,
+    });
+    return createCleanupResponse({
+      ...result,
+      requestId: request.requestId,
+      projectId: request.projectId,
+      assetId: request.assetId,
+    });
+  } catch (error) {
+    return createCleanupResponse({
+      schemaVersion: FRAME_CACHE_CONTRACT_VERSION,
+      requestId: request.requestId,
+      projectId: request.projectId,
+      assetId: request.assetId,
+      status: 'cleanup-failed',
+      error: {
+        code: frameCacheErrorCode(error, 'CACHE_CLEANUP_FAILED'),
+        message: frameCacheErrorMessage(error, '影格快取清理失敗。'),
+      },
+    });
+  }
+}
+
+function invokeFrameCacheCancel(event, payload) {
+  assertTrustedSender(event);
+  const request = normalizeFrameCacheBridgeRequest(payload, FRAME_CACHE_BRIDGE_METHODS.CANCEL);
+  const operation = frameCacheOperations.get(frameCacheOperationKey(event, request.requestId));
+  if (operation) operation.controller.abort();
+  return createCancelResponse({
+    schemaVersion: FRAME_CACHE_CONTRACT_VERSION,
+    requestId: request.requestId,
+    accepted: Boolean(operation),
+  });
+}
+
+async function invokeFrameCacheSource(event, payload) {
+  assertTrustedSender(event);
+  const request = normalizeFrameCacheBridgeRequest(payload, FRAME_CACHE_BRIDGE_METHODS.READ);
+  if (!request.cacheKey) {
+    throw new FrameCacheContractError('frame source request requires cacheKey');
+  }
+  if (!Number.isInteger(payload?.frameNumber) || payload.frameNumber < 0 || payload.frameNumber > 10_000_000) {
+    throw new FrameCacheContractError('frameNumber is invalid');
+  }
+
+  const resolved = await resolveFrameCacheAsset(request);
+  const contractRequest = normalizeFrameCacheRequest({
+    ...request,
+    sourceReference: resolved.sourceReference,
+  });
+  const response = normalizeFrameCacheResponse(await readFrameCache({
+    ...contractRequest,
+    projectRoot: projectStore.root,
+  }));
+  if (response.status !== FRAME_CACHE_RESPONSE_STATUS.READY) {
+    throw new Error(response.error?.message || `影格快取狀態為「${response.status}」。`);
+  }
+  if (response.cache?.key !== request.cacheKey) {
+    throw new Error('影格快取識別不符合目前來源。');
+  }
+  const frame = response.frames[payload.frameNumber];
+  if (!frame || frame.frameNumber !== payload.frameNumber
+    || !/^frame-\d{8}\.png$/u.test(path.basename(frame.relativePath))) {
+    throw new Error('指定影格不存在。');
+  }
+
+  const projectRoot = path.resolve(projectStore.root);
+  const cacheRoot = resolveProjectRelativePath(projectRoot, response.cache.rootRelativePath);
+  const framePath = resolveProjectRelativePath(projectRoot, frame.relativePath);
+  if (!isPathInside(projectRoot, cacheRoot) || !isPathInside(cacheRoot, framePath)) {
+    throw new Error('影格來源不在專案快取範圍內。');
+  }
+  await assertNoFrameCacheSymlinkAncestors(projectRoot, framePath);
+  const stats = await fs.lstat(framePath).catch(() => null);
+  if (!stats?.isFile() || stats.isSymbolicLink() || stats.size <= 0 || stats.size > FRAME_CACHE_MAX_FRAME_BYTES) {
+    throw new Error('影格檔案無法安全讀取。');
+  }
+  const bytes = await fs.readFile(framePath);
+  return {
+    schemaVersion: FRAME_CACHE_CONTRACT_VERSION,
+    requestId: request.requestId,
+    projectId: request.projectId,
+    assetId: request.assetId,
+    frameNumber: payload.frameNumber,
+    dataUrl: `data:image/png;base64,${bytes.toString('base64')}`,
+  };
 }
 
 function guardNavigation(event, navigationUrl) {
@@ -139,6 +470,21 @@ function registerIpc() {
       sourceUrl: pathToFileURL(resolved.sourcePath).href,
     };
   });
+  ipcMain.handle('frame-cache:prepare', (event, payload) => invokeFrameCacheOperation(
+    event,
+    payload,
+    FRAME_CACHE_BRIDGE_METHODS.PREPARE,
+    (request, signal) => prepareFrameCache(request, { signal }),
+  ));
+  ipcMain.handle('frame-cache:read', (event, payload) => invokeFrameCacheOperation(
+    event,
+    payload,
+    FRAME_CACHE_BRIDGE_METHODS.READ,
+    (request, signal) => readFrameCache(request, { signal }),
+  ));
+  ipcMain.handle('frame-cache:cleanup', (event, payload) => invokeFrameCacheCleanup(event, payload));
+  ipcMain.handle('frame-cache:cancel', (event, payload) => invokeFrameCacheCancel(event, payload));
+  ipcMain.handle('frame-cache:frame', (event, payload) => invokeFrameCacheSource(event, payload));
   ipcMain.handle('media:remove', (event, payload) => {
     assertTrustedSender(event);
     return projectStore.removeMediaAsset(payload?.projectId, payload?.assetId);

@@ -103,10 +103,10 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /data-frame-action="previous"/u);
   assert.match(renderer, /data-frame-action="next"/u);
   assert.match(renderer, /frameCacheAdapter/u);
-  assert.match(renderer, /getFrameIndex/u);
+  assert.match(renderer, /readFrameCache/u);
   assert.match(renderer, /getFrameSource/u);
-  assert.match(renderer, /getFrameState/u);
   assert.match(renderer, /prepareFrameCache/u);
+  assert.match(renderer, /cancelFrameCache/u);
   assert.match(renderer, /handleFramePlayerKeydown/u);
   assert.match(renderer, /\['ArrowLeft', 'ArrowRight'\]\.includes\(event\.key\)/u);
   assert.match(renderer, /event\.key === 'ArrowRight'/u);

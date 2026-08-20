@@ -273,35 +273,50 @@ function playerTimingForAsset(asset, duration) {
 // Lane A preparing contract for Wave 20. Keep this adapter local so the
 // bridge handoff changes one seam without changing editor interaction.
 function frameCacheAdapter() {
-  const bridge = window.pitchingApp?.frameCache || window.pitchingApp;
+  const bridge = window.pitchingApp?.frameCache;
   if (!bridge || typeof bridge !== 'object') return null;
   return {
-    getFrameIndex: typeof bridge.getFrameIndex === 'function' ? bridge.getFrameIndex.bind(bridge) : null,
-    getFrameSource: typeof bridge.getFrameSource === 'function' ? bridge.getFrameSource.bind(bridge) : null,
-    getFrameState: typeof bridge.getFrameState === 'function' ? bridge.getFrameState.bind(bridge) : null,
     prepareFrameCache: typeof bridge.prepareFrameCache === 'function' ? bridge.prepareFrameCache.bind(bridge) : null,
+    readFrameCache: typeof bridge.readFrameCache === 'function' ? bridge.readFrameCache.bind(bridge) : null,
+    cleanupFrameCache: typeof bridge.cleanupFrameCache === 'function' ? bridge.cleanupFrameCache.bind(bridge) : null,
+    cancelFrameCache: typeof bridge.cancelFrameCache === 'function' ? bridge.cancelFrameCache.bind(bridge) : null,
+    getFrameSource: typeof bridge.getFrameSource === 'function' ? bridge.getFrameSource.bind(bridge) : null,
   };
 }
 
 function normalizeFrameIndexResult(result) {
-  const frames = Array.isArray(result) ? result : (Array.isArray(result?.frames) ? result.frames : null);
-  const rawCount = result?.frameCount ?? result?.totalFrames ?? frames?.length;
+  const frames = Array.isArray(result?.frames) ? result.frames : null;
+  const metadata = result?.metadata || {};
+  const rawCount = metadata.frameCount ?? result?.frameCount ?? result?.totalFrames ?? frames?.length;
   const frameCount = Number.isInteger(Number(rawCount)) ? Math.max(0, Number(rawCount)) : 0;
   return {
     frameCount,
-    fps: Number.isFinite(Number(result?.fps)) && Number(result.fps) > 0 ? Number(result.fps) : null,
-    duration: Number.isFinite(Number(result?.duration)) ? Number(result.duration) : null,
-    frameTimes: Array.isArray(result?.frameTimes) ? result.frameTimes : null,
+    fps: Number.isFinite(Number(metadata.fps)) && Number(metadata.fps) > 0 ? Number(metadata.fps) : null,
+    duration: Number.isFinite(Number(metadata.durationSeconds)) ? Number(metadata.durationSeconds) : null,
+    frameTimes: frames?.map((frame) => frame.time) || null,
     frames,
   };
 }
 
-function normalizeFrameCacheState(result) {
-  if (typeof result === 'string') return { state: result, message: '' };
+function frameCacheRequestId() {
+  if (typeof window.crypto?.randomUUID === 'function') return window.crypto.randomUUID();
+  return `frame-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function frameCacheResponseMessage(response, fallback = '影格快取操作失敗。') {
+  const message = response?.error?.message;
+  return typeof message === 'string' && message.trim() !== '' ? message : fallback;
+}
+
+function frameCacheStatusLabel(status) {
   return {
-    state: result?.state ?? result?.status ?? 'unknown',
-    message: typeof result?.message === 'string' ? result.message : '',
-  };
+    'tool-missing': '影格工具不可用',
+    'source-unavailable': '影片來源無效或已不存在',
+    'process-failed': '影格解碼失敗',
+    'malformed-output': '影格工具輸出無效',
+    cancelled: '影格快取已取消',
+    'cache-error': '影格快取讀寫失敗',
+  }[status] || '影格快取失敗';
 }
 
 function frameSourceValue(frame) {
@@ -1004,6 +1019,7 @@ function framePlayerRuntimeForCard(card) {
       caches: Object.create(null),
       currentFrameIndex: 0,
       requestSerial: 0,
+      pendingRequests: Object.create(null),
       playing: false,
       playbackTimer: null,
       primarySide: 'single',
@@ -1077,10 +1093,15 @@ function framePlayerIndexForSide(block, runtime, side, primaryIndex) {
 }
 
 async function getCachedFrameSource(assetId, frameIndex, cache) {
-  if (cache.frames?.[frameIndex] !== undefined) return cache.frames[frameIndex];
   const adapter = frameCacheAdapter();
-  if (!adapter?.getFrameSource) throw new Error('影格快取橋接缺少 getFrameSource(assetId, frameIndex)');
-  return adapter.getFrameSource(assetId, frameIndex);
+  if (!adapter?.getFrameSource) throw new Error('影格快取橋接缺少安全影格來源讀取功能。');
+  return adapter.getFrameSource({
+    projectId: cache.projectId,
+    assetId: assetId || cache.assetId,
+    cacheKey: cache.cacheKey,
+    frameNumber: frameIndex,
+    requestId: frameCacheRequestId(),
+  });
 }
 
 async function renderFramePlayerIndex(card, frameIndex) {
@@ -1132,45 +1153,62 @@ async function renderFramePlayerIndex(card, frameIndex) {
   }
 }
 
-async function prepareFramePlayerSide(card, block, side, generation, adapter) {
+async function prepareFramePlayerSide(card, block, side, generation, adapter, runtime) {
   const sideElement = card.querySelector(`[data-inline-side="${side}"]`);
   const assetId = playerAssetIdFor(block, side);
   if (!assetId || !mediaAssetFor(assetId)) {
     setInlineVideoStatus(sideElement, '尚未選擇專案內資產。', 'pending');
     return;
   }
-  if (!adapter || !adapter.getFrameIndex || !adapter.getFrameSource || !adapter.getFrameState || !adapter.prepareFrameCache) {
+  if (!adapter || !adapter.readFrameCache || !adapter.getFrameSource || !adapter.prepareFrameCache) {
     setInlineVideoStatus(sideElement, '影格快取橋接契約尚未提供。', 'error');
     return;
   }
   setInlineVideoStatus(sideElement, '正在準備影格快取…', 'pending');
+  const request = {
+    projectId: state.activeProject.id,
+    assetId,
+    requestId: frameCacheRequestId(),
+  };
+  runtime.pendingRequests[side] = request;
   try {
-    let cacheState = normalizeFrameCacheState(await adapter.getFrameState(assetId));
-    if (cacheState.state !== 'ready') {
-      if (cacheState.state === 'error' || cacheState.state === 'failed') {
-        setInlineVideoStatus(sideElement, `影格快取錯誤：${cacheState.message || '請重試。'}`, 'error');
-      } else {
-        await adapter.prepareFrameCache(assetId);
-        cacheState = normalizeFrameCacheState(await adapter.getFrameState(assetId));
-      }
+    let response = await adapter.readFrameCache(request);
+    if (generation !== state.inlineGeneration || !card.isConnected) return;
+    if (response.status === 'cache-miss') {
+      setInlineVideoStatus(sideElement, '正在準備影格快取…', 'pending');
+      response = await adapter.prepareFrameCache(request);
     }
     if (generation !== state.inlineGeneration || !card.isConnected) return;
-    if (cacheState.state !== 'ready') {
-      if (['queued', 'pending', 'preparing', 'processing', 'running'].includes(cacheState.state)) {
+    if (response.status !== 'ready') {
+      if (response.status === 'preparing') {
         setInlineVideoStatus(sideElement, '影格快取準備中…', 'pending');
         return;
       }
-      throw new Error(cacheState.message || `影格快取狀態為「${cacheState.state}」`);
+      const label = frameCacheStatusLabel(response.status);
+      throw new Error(`${label}：${frameCacheResponseMessage(response)}`);
     }
-    const index = normalizeFrameIndexResult(await adapter.getFrameIndex(assetId));
+    const index = normalizeFrameIndexResult(response);
     if (index.frameCount <= 0) throw new Error('影格索引沒有可用影格');
-    const runtime = framePlayerRuntimeForCard(card);
-    runtime.caches[side] = { ...index, assetId };
+    runtime.caches[side] = {
+      ...index,
+      projectId: state.activeProject.id,
+      assetId,
+      cacheKey: response.cache?.key || null,
+    };
     setInlineVideoStatus(sideElement, `影格快取已就緒 · ${index.frameCount} 幀。`, 'loaded');
   } catch (error) {
     if (generation !== state.inlineGeneration || !card.isConnected) return;
     setInlineVideoStatus(sideElement, `影格快取錯誤：${error?.message || '請重試。'}`, 'error');
+  } finally {
+    if (runtime.pendingRequests[side] === request) delete runtime.pendingRequests[side];
   }
+}
+
+async function cancelPendingFrameCacheRequests(runtime, adapter) {
+  const pending = Object.entries(runtime.pendingRequests);
+  runtime.pendingRequests = Object.create(null);
+  if (!adapter?.cancelFrameCache || !state.activeProject?.id) return;
+  await Promise.all(pending.map(([, request]) => adapter.cancelFrameCache(request).catch(() => null)));
 }
 
 async function prepareFramePlayerCard(card, block, generation) {
@@ -1181,9 +1219,10 @@ async function prepareFramePlayerCard(card, block, generation) {
   runtime.currentFrameIndex = 0;
   runtime.requestSerial += 1;
   runtime.caches = Object.create(null);
+  const adapter = frameCacheAdapter();
+  await cancelPendingFrameCacheRequests(runtime, adapter);
   updateFramePlayerControls(card);
   setFramePlayerStatus(card, '正在準備影格快取…', 'pending');
-  const adapter = frameCacheAdapter();
   if (!adapter) {
     framePlayerSides(block).forEach((side) => {
       setInlineVideoStatus(card.querySelector(`[data-inline-side="${side}"]`), '影格快取橋接尚未提供。', 'error');
@@ -1192,7 +1231,7 @@ async function prepareFramePlayerCard(card, block, generation) {
     updateFramePlayerControls(card);
     return;
   }
-  await Promise.all(framePlayerSides(block).map((side) => prepareFramePlayerSide(card, block, side, generation, adapter)));
+  await Promise.all(framePlayerSides(block).map((side) => prepareFramePlayerSide(card, block, side, generation, adapter, runtime)));
   if (generation !== state.inlineGeneration || !card.isConnected) return;
   if (framePlayerFrameCount(block, runtime) <= 0) {
     setFramePlayerStatus(card, '影格快取尚未完成，請稍後重試。', 'pending');

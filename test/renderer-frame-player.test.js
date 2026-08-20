@@ -33,21 +33,26 @@ test('single and comparison cards share one frame timeline and one toggle', () =
   assert.doesNotMatch(side, /data-inline-action="(?:play|pause)"/u);
 });
 
-test('frame player uses the preparing Lane A adapter and never maps currentTime', () => {
+test('frame player uses the v1 frame-cache response adapter and never maps currentTime', () => {
   const adapter = functionSlice(renderer, 'function frameCacheAdapter(', 'function normalizeFrameIndexResult(');
-  assert.match(adapter, /bridge\.getFrameIndex/u);
+  assert.match(adapter, /bridge\.readFrameCache/u);
   assert.match(adapter, /bridge\.getFrameSource/u);
-  assert.match(adapter, /bridge\.getFrameState/u);
   assert.match(adapter, /bridge\.prepareFrameCache/u);
+  assert.match(adapter, /bridge\.cancelFrameCache/u);
 
   const prepare = functionSlice(renderer, 'async function prepareFramePlayerSide(', 'async function prepareFramePlayerCard(');
-  assert.match(prepare, /adapter\.getFrameState\(assetId\)/u);
-  assert.match(prepare, /adapter\.prepareFrameCache\(assetId\)/u);
-  assert.match(prepare, /adapter\.getFrameIndex\(assetId\)/u);
+  assert.match(prepare, /adapter\.readFrameCache\(request\)/u);
+  assert.match(prepare, /response\.status === 'cache-miss'/u);
+  assert.match(prepare, /adapter\.prepareFrameCache\(request\)/u);
+  assert.match(prepare, /normalizeFrameIndexResult\(response\)/u);
+  assert.match(prepare, /projectId: state\.activeProject\.id/u);
+  assert.match(prepare, /requestId: frameCacheRequestId\(\)/u);
   assert.doesNotMatch(prepare, /resolveMediaSource|currentTime/u);
 
   const source = functionSlice(renderer, 'async function getCachedFrameSource(', 'async function renderFramePlayerIndex(');
-  assert.match(source, /adapter\.getFrameSource\(assetId, frameIndex\)/u);
+  assert.match(source, /adapter\.getFrameSource\(\{/u);
+  assert.match(source, /cacheKey: cache\.cacheKey/u);
+  assert.match(source, /frameNumber: frameIndex/u);
   assert.doesNotMatch(source, /currentTime/u);
 });
 
