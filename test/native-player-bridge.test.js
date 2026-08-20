@@ -46,8 +46,12 @@ test('native helper uses Media Foundation completion rather than image/cache tra
   const scrub = native.slice(native.indexOf('HRESULT Scrub('), native.indexOf('HRESULT SetBounds('));
   assert.doesNotMatch(scrub, /session_->Stop\(\)/u);
   const bounds = native.slice(native.indexOf('HRESULT SetBounds('), native.indexOf('HRESULT FrameStep('));
-  assert.match(bounds, /MoveWindow\(renderWindow_[\s\S]*FALSE\)/u);
-  assert.doesNotMatch(bounds, /RepaintVideo/u);
+  assert.match(bounds, /SetWindowPos\(renderWindow_, HWND_TOP[\s\S]*SWP_NOREDRAW/u);
+  assert.match(bounds, /SetTimer\(renderWindow_, kSurfaceRepaintTimerId/u);
+  assert.match(native, /WM_ERASEBKGND/u);
+  assert.match(native, /WM_PAINT/u);
+  assert.match(native, /RepaintVideo\(\)/u);
+  assert.match(native, /MESessionEnded[\s\S]*paused_ = true/u);
   const play = native.slice(native.indexOf('HRESULT Play('), native.indexOf('HRESULT Pause('));
   assert.match(play, /PauseAndWait\(\)/u);
   assert.match(play, /session_->Start\(&GUID_NULL/u);

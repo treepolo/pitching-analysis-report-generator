@@ -85,6 +85,8 @@ select:focus, input:focus, textarea:focus { border-color: var(--blue); box-shado
 .inline-video-frame { position: relative; overflow: hidden; aspect-ratio: 16 / 9; display: grid; place-items: center; background: #1d2733; border-radius: 8px; }
 .inline-video-frame video, .inline-video-frame img { width: 100%; height: 100%; display: block; object-fit: contain; }
 .inline-frame-surface { outline: none; }
+.inline-frame-surface.native-player-surface { background: transparent; }
+.inline-frame-surface.native-player-surface > .inline-frame-placeholder { position: relative; z-index: 1; pointer-events: none; }
 .inline-frame-surface:focus-visible { box-shadow: 0 0 0 3px rgba(42, 104, 214, .28); }
 .inline-frame-placeholder { padding: 12px; color: #dce7f5; font-size: 12px; text-align: center; }
 .inline-video-status { min-height: 22px; margin: 6px 0; color: var(--muted); font-size: 11px; }

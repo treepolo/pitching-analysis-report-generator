@@ -59,6 +59,8 @@ namespace {
 constexpr LONGLONG kHundredNanosecondsPerSecond = 10'000'000;
 constexpr DWORD kOpenTimeoutMs = 15'000;
 constexpr UINT kCommandMessage = WM_APP + 1;
+constexpr UINT_PTR kSurfaceRepaintTimerId = 1;
+constexpr UINT kSurfaceRepaintDelayMs = 80;
 constexpr wchar_t kSurfaceClassName[] = L"PitchingReportMediaSurface";
 
 // Some MinGW import libraries do not export this SDK GUID even though the
@@ -421,7 +423,10 @@ class MediaFoundationPlayer final {
     // every page scroll. Keep the last presented sample in place while the
     // native child is moved; SetVideoPosition updates the presenter geometry
     // without asking EVR to repaint an unavailable sample.
-    if (!MoveWindow(renderWindow_, scaledX, scaledY, scaledWidth, scaledHeight, FALSE)) {
+    if (!SetWindowPos(renderWindow_, HWND_TOP, scaledX, scaledY, scaledWidth,
+                      scaledHeight,
+                      SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOREDRAW
+                          | SWP_SHOWWINDOW)) {
       const HRESULT error = HRESULT_FROM_WIN32(GetLastError());
       Emit("bounds-applied", requestId, error);
       return error;
@@ -433,6 +438,13 @@ class MediaFoundationPlayer final {
       Emit("bounds-applied", requestId, positionResult);
       return positionResult;
     }
+    // A child window can be moved out of the compositor's visible region by
+    // a page scroll without receiving a useful paint.  Coalesce a repaint
+    // until the geometry settles, then ask EVR to present its latest sample
+    // once.  This avoids both the old per-scroll flash and the permanent
+    // black surface that appeared after the child was uncovered.
+    SetTimer(renderWindow_, kSurfaceRepaintTimerId, kSurfaceRepaintDelayMs,
+             nullptr);
     Emit("bounds-applied", requestId, S_OK,
          "\"x\":" + std::to_string(scaledX) + ",\"y\":" + std::to_string(scaledY)
          + ",\"width\":" + std::to_string(scaledWidth)
@@ -545,6 +557,7 @@ class MediaFoundationPlayer final {
     }
     terminalError_ = S_OK;
     if (renderWindow_) {
+      KillTimer(renderWindow_, kSurfaceRepaintTimerId);
       DestroyWindow(renderWindow_);
       renderWindow_ = nullptr;
     }
@@ -603,6 +616,14 @@ class MediaFoundationPlayer final {
         }
       }
     } else if (type == MESessionEnded) {
+      // Treat end-of-stream as a stable paused boundary for the bridge.  A
+      // later replay or scrub must not issue Pause() against an already-ended
+      // session and then time out before it can start again.
+      {
+        std::lock_guard<std::mutex> lock(readyMutex_);
+        paused_ = true;
+      }
+      readyCondition_.notify_all();
       Emit("ended");
     } else if (type == MESessionClosed) {
       Emit("closed");
@@ -656,6 +677,10 @@ class MediaFoundationPlayer final {
   }
 
  private:
+  void RepaintVideo() {
+    if (displayControl_) displayControl_->RepaintVideo();
+  }
+
   static LRESULT CALLBACK SurfaceWindowProc(HWND window, UINT message,
                                              WPARAM wParam, LPARAM lParam) {
     if (message == WM_NCCREATE) {
@@ -665,6 +690,19 @@ class MediaFoundationPlayer final {
     }
     auto* owner = reinterpret_cast<MediaFoundationPlayer*>(
         GetWindowLongPtrW(window, GWLP_USERDATA));
+    if (message == WM_ERASEBKGND) return 1;
+    if (message == WM_PAINT) {
+      PAINTSTRUCT paint{};
+      BeginPaint(window, &paint);
+      if (owner != nullptr) owner->RepaintVideo();
+      EndPaint(window, &paint);
+      return 0;
+    }
+    if (message == WM_TIMER && wParam == kSurfaceRepaintTimerId) {
+      KillTimer(window, kSurfaceRepaintTimerId);
+      if (owner != nullptr) owner->RepaintVideo();
+      return 0;
+    }
     if (message == WM_LBUTTONDOWN && owner != nullptr) {
       Emit("surface-click");
     }
