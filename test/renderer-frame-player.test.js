@@ -99,22 +99,29 @@ test('single-player editor uses the native surface contract and does not open fr
   assert.match(side, /nativeSingle/u);
   const nativePrepare = functionSlice(renderer, 'async function prepareNativeFramePlayerCard(', 'function closeNativeFramePlayers(');
   assert.match(nativePrepare, /adapter\.open\(request\)/u);
-  assert.match(nativePrepare, /setNativePlayerBounds/u);
+  assert.match(nativePrepare, /scheduleNativePlayerBounds/u);
   assert.match(nativePrepare, /requestNativeScrub/u);
   assert.match(nativePrepare, /closeNativePlayerResponse\(adapter, opened\)/u);
   assert.match(nativePrepare, /closeNativePlayerSession\(runtime, adapter\)/u);
   assert.doesNotMatch(nativePrepare, /frameCacheAdapter|prepareFrameCache|getFrameSource|dataUrl|base64|currentTime/u);
 });
 
-test('native scrubbing supersedes stale completions and keyboard steps use the native bridge', () => {
-  const scrub = functionSlice(renderer, 'async function requestNativeScrub(', 'async function requestNativeStep(');
+test('native scrubbing coalesces stale targets and keyboard steps use the native bridge', () => {
+  const scrub = functionSlice(renderer, 'function requestNativeScrub(', 'function requestNativeStep(');
+  assert.match(scrub, /nativeScrubTarget/u);
+  assert.match(scrub, /ensureNativeScrubLoop/u);
   assert.match(scrub, /nativeScrubSerial/u);
-  assert.match(scrub, /nativePendingScrub/u);
   assert.match(scrub, /previous\.cancelled = true/u);
   assert.match(scrub, /requestId/u);
+  const loop = functionSlice(renderer, 'function ensureNativeScrubLoop(', 'function requestNativeScrub(');
+  assert.match(loop, /await adapter\.scrub/u);
+  assert.match(loop, /runtime\.nativeScrubTarget !== null/u);
   assert.match(renderer, /function nativePlayerOperationCompleted\(response\)/u);
-  const step = functionSlice(renderer, 'async function requestNativeStep(', 'async function prepareNativeFramePlayerCard(');
+  const step = functionSlice(renderer, 'function requestNativeStep(', 'async function prepareNativeFramePlayerCard(');
   assert.match(step, /adapter\.step\(/u);
+  assert.match(step, /enqueueNativeOperation/u);
+  assert.match(renderer, /nativeOperationQueued/u);
+  assert.match(renderer, /nativeOperationBusy/u);
   assert.match(step, /direction/u);
   const controls = functionSlice(renderer, 'function toggleFramePlayer(', 'function handleFramePlayerEvent(');
   assert.match(controls, /adapter\?\.pause|adapter\?\.play/u);
@@ -122,4 +129,5 @@ test('native scrubbing supersedes stale completions and keyboard steps use the n
   const events = functionSlice(renderer, 'function handleFramePlayerEvent(', 'function handleFramePlayerKeydown(');
   assert.match(events, /event\.type !== 'pointermove'/u);
   assert.match(events, /requestNativeScrub\(card, Number\(target\.value\)\)/u);
+  assert.match(events, /event\.type !== 'click'/u);
 });

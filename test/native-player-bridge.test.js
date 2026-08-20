@@ -26,6 +26,8 @@ test('native player bridge exposes a bounded single-video contract', () => {
   assert.match(main, /assertTrustedSender\(event\)/u);
   assert.match(main, /resolveNativePlayerAsset/u);
   assert.match(main, /NATIVE_PLAYER_HELPER_PATH/u);
+  assert.match(main, /NATIVE_PLAYER_CLOSED/u);
+  assert.match(main, /type: 'closed'/u);
   assert.match(preload, /nativePlayer: nativePlayerApi/u);
   assert.match(preload, /assertNativeBounds/u);
   assert.doesNotMatch(preload, /sourcePath|sourceUrl/u);
@@ -45,6 +47,10 @@ test('native helper uses Media Foundation completion rather than image/cache tra
   assert.match(native, /RepaintVideo/u);
   assert.match(native, /EnumChildWindows/u);
   assert.match(native, /Chrome_RenderWidgetHostHWND/u);
+  assert.match(native, /WM_LBUTTONDOWN/u);
+  assert.match(native, /surface-click/u);
+  assert.match(native, /WM_MOUSEACTIVATE/u);
+  assert.match(native, /MA_NOACTIVATE/u);
   assert.match(native, /set-bounds/u);
   assert.match(native, /std::thread commandReader/u);
   assert.match(native, /PostThreadMessageW/u);

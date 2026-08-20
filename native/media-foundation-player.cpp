@@ -596,7 +596,19 @@ class MediaFoundationPlayer final {
  private:
   static LRESULT CALLBACK SurfaceWindowProc(HWND window, UINT message,
                                              WPARAM wParam, LPARAM lParam) {
+    if (message == WM_NCCREATE) {
+      const auto* create = reinterpret_cast<const CREATESTRUCTW*>(lParam);
+      SetWindowLongPtrW(window, GWLP_USERDATA,
+                        reinterpret_cast<LONG_PTR>(create->lpCreateParams));
+    }
+    auto* owner = reinterpret_cast<MediaFoundationPlayer*>(
+        GetWindowLongPtrW(window, GWLP_USERDATA));
+    if (message == WM_LBUTTONDOWN && owner != nullptr) {
+      Emit("surface-click");
+    }
+    if (message == WM_MOUSEACTIVATE) return MA_NOACTIVATE;
     if (message == WM_NCHITTEST) return HTTRANSPARENT;
+    if (message == WM_NCDESTROY) SetWindowLongPtrW(window, GWLP_USERDATA, 0);
     return DefWindowProcW(window, message, wParam, lParam);
   }
 
@@ -639,7 +651,7 @@ class MediaFoundationPlayer final {
     renderWindow_ = CreateWindowExW(
         WS_EX_NOACTIVATE, kSurfaceClassName, L"", WS_CHILD | WS_VISIBLE
             | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-        0, 0, 1, 1, surfaceParentWindow_, nullptr, windowClass.hInstance, nullptr);
+        0, 0, 1, 1, surfaceParentWindow_, nullptr, windowClass.hInstance, this);
     return renderWindow_ ? S_OK : HRESULT_FROM_WIN32(GetLastError());
   }
 

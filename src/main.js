@@ -187,8 +187,18 @@ function rejectNativePlayerPending(session, error) {
 function finishNativePlayerSession(session) {
   if (session.closed) return;
   session.closed = true;
+  session.activeScrubRequest = null;
   rejectNativePlayerPending(session, new Error('Native player process closed'));
   if (session.readyReject) session.readyReject(new Error('Native player process closed'));
+  if (session.window?.webContents && !session.window.webContents.isDestroyed()) {
+    session.window.webContents.send('native-player:event', {
+      schemaVersion: NATIVE_PLAYER_PROTOCOL_VERSION,
+      sessionId: session.id,
+      type: 'closed',
+      code: 'NATIVE_PLAYER_CLOSED',
+      message: 'Native player process closed',
+    });
+  }
   nativePlayerSessions.delete(session.id);
 }
 
@@ -202,6 +212,8 @@ function handleNativePlayerEvent(session, event) {
       ...(typeof event.requestId === 'string' && NATIVE_PLAYER_REQUEST_ID_PATTERN.test(event.requestId)
         ? { requestId: event.requestId } : {}),
       ...(Number.isInteger(event.frameIndex) ? { frameIndex: event.frameIndex } : {}),
+      ...(typeof event.error?.code === 'string' ? { code: event.error.code } : {}),
+      ...(typeof event.error?.message === 'string' ? { message: event.error.message } : {}),
       ...(event.type === 'scrub-complete' ? { surfaceUpdated: true } : {}),
     };
     session.window.webContents.send('native-player:event', forwarded);
@@ -235,6 +247,11 @@ function handleNativePlayerEvent(session, event) {
   }
   if (event.type === 'error' && session.ready) {
     rejectNativePlayerPending(session, nativePlayerEventError(event));
+    // A Media Session error is terminal for this helper. Tear down the
+    // process and publish the lifecycle boundary instead of leaving a dead
+    // session in the map that would only fail subsequent commands by timeout.
+    if (session.child && !session.child.killed) session.child.kill();
+    finishNativePlayerSession(session);
     return;
   }
   const requestId = typeof event.requestId === 'string' ? event.requestId : '';
