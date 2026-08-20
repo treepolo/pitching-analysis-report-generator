@@ -305,6 +305,12 @@ class MediaFoundationPlayer final {
     if (FAILED(rateResult)) return rateResult;
     // Query EVR services only after the Media Session has resolved and
     // activated the topology. Before that point the presenter does not exist.
+    const HRESULT displayResult = MFGetService(session_.Get(),
+                                               kMrVideoRenderService,
+                                               IID_PPV_ARGS(&displayControl_));
+    if (FAILED(displayResult)) return displayResult;
+    const HRESULT windowResult = displayControl_->SetVideoWindow(renderWindow_);
+    if (FAILED(windowResult)) return windowResult;
     MFGetService(session_.Get(), kMrVideoRenderService,
                  IID_PPV_ARGS(&frameStep_));
     const HRESULT scrubResult = rateControl_->SetRate(FALSE, 0.0f);
@@ -388,6 +394,16 @@ class MediaFoundationPlayer final {
       Emit("bounds-applied", requestId, error);
       return error;
     }
+    RECT destination{0, 0, scaledWidth, scaledHeight};
+    const HRESULT positionResult = displayControl_->SetVideoPosition(
+        nullptr, &destination);
+    if (FAILED(positionResult)) {
+      Emit("bounds-applied", requestId, positionResult);
+      return positionResult;
+    }
+    // Repaint after every resize/scroll so the EVR presenter does not leave
+    // the old Chromium child-window backing store in the native surface.
+    displayControl_->RepaintVideo();
     Emit("bounds-applied", requestId, S_OK,
          "\"x\":" + std::to_string(scaledX) + ",\"y\":" + std::to_string(scaledY)
          + ",\"width\":" + std::to_string(scaledWidth)
@@ -460,6 +476,7 @@ class MediaFoundationPlayer final {
       session_.Reset();
     }
     frameStep_.Reset();
+    displayControl_.Reset();
     rateControl_.Reset();
     source_.Reset();
     callback_.Reset();
@@ -614,6 +631,7 @@ class MediaFoundationPlayer final {
   ComPtr<IMFMediaSession> session_;
   ComPtr<IMFMediaSource> source_;
   ComPtr<IMFRateControl> rateControl_;
+  ComPtr<IMFVideoDisplayControl> displayControl_;
   ComPtr<IVideoFrameStep> frameStep_;
   HWND parentWindow_ = nullptr;
   HWND renderWindow_ = nullptr;
