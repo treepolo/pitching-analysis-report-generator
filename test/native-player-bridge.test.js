@@ -34,8 +34,11 @@ test('native player bridge exposes a bounded single-video contract', () => {
 test('native helper uses Media Foundation completion rather than image/cache transport', () => {
   assert.match(native, /IMFMediaSession/u);
   assert.match(native, /MFCreateVideoRendererActivate/u);
+  assert.match(native, /SetObject\(rendererActivate\.Get\(\)\)/u);
   assert.match(native, /SetRate\(FALSE, 0\.0f\)/u);
   assert.match(native, /MESessionScrubSampleComplete/u);
+  assert.match(native, /queuedScrubRequest_/u);
+  assert.match(native, /stopForScrub_/u);
   assert.match(native, /MFVP_MESSAGE_STEP|IVideoFrameStep/u);
   assert.match(native, /set-bounds/u);
   assert.doesNotMatch(native, /currentTime|base64|frame-cache/u);

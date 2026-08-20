@@ -199,5 +199,5 @@ Samsung Gallery 的實作不是公開原始碼，不能聲稱能照抄其私有�
 - [x] native helper source 已加入 Media Foundation Media Session、EVR child surface、rate=0 scrub、`MESessionScrubSampleComplete` completion、metadata、bounds 與 explicit failure protocol。
 - [x] 新位置會在 renderer 端 supersede 舊 scrub；main 端會拒絕已被更新位置取代的 pending request，不提交 stale completion。
 - [x] JavaScript syntax、focused native/renderer contract tests 與既有 regression tests 通過；未把 static evidence 當成 runtime VERIFIED。
-- [ ] native helper 尚未在此環境建立：`native/build-media-foundation-player.ps1` 明確因缺少 `cl.exe`／MSBuild 停止。
-- [ ] 尚無有效 native HWND 與真實 Electron／真實 MP4 的 Media Foundation scrub、方向鍵逐幀、播放到尾停止證據；Wave20D 不建立 VERIFIED checkpoint，等待 Windows Developer PowerShell 的 native build／smoke。
+- [x] native helper source 已在此環境以 MinGW-w64 fallback 完整編譯；Win32 parent-window smoke 開啟專案 MP4、套用 bounds、完成真實 `MESessionScrubSampleComplete`、播放／暫停與到尾 `ended`。
+- [ ] 尚無 Electron HWND 與 renderer-level 真人操作的完整證據；Wave20D 不標 VERIFIED，仍需 Electron/HWND 整合 smoke 與真人拖曳／逐幀驗收。

@@ -11,6 +11,8 @@ The helper uses the following native operations:
 - Scrub: `IMFRateControl::SetRate(FALSE, 0.0f)` followed by
   `IMFMediaSession::Start` with a 100 ns position. A scrub is complete only
   after `MESessionScrubSampleComplete`; `scrub-submitted` is not completion.
+  Media Session seeks are FIFO, so a newer scrub stops the current one and
+  coalesces queued pointer positions to the latest request before starting it.
 - Frame-step capability: EVR `IVideoFrameStep::CanStep`, `Step(1, ...)`, and
   `CancelStep()` are wired for native capability detection. The editor's
   exact previous/next operation currently uses the Media Session scrub path in
@@ -25,17 +27,20 @@ or per-frame file IPC in this path.
 
 ## Build (Windows Developer PowerShell)
 
-Run from the repository root after installing the Windows 10/11 SDK and the
-MSVC C++ workload:
+Run from the repository root after installing the Windows 10/11 SDK and a
+Windows C++ toolchain:
 
 ```powershell
 .\native\build-media-foundation-player.ps1
 ```
 
-The script writes the untracked executable to `native/bin/`. The required
-libraries are part of the Windows SDK (`mf.lib`, `mfplat.lib`, `mfuuid.lib`,
-`evr.lib`, `shlwapi.lib`, `ole32.lib`, and `propsys.lib`). A normal `cl.exe` Developer PowerShell is
-required; MinGW g++ is not a supported linker for this COM/EVR target.
+The script writes the untracked executable to `native/bin/`. It prefers
+`cl.exe` from a Visual Studio Developer PowerShell and falls back to a
+MinGW-w64 `g++` installation when available (including the common
+`C:\msys64\ucrt64\bin\g++.exe` location). The fallback links the C++ runtime
+statically. The required Media Foundation and EVR import libraries are part
+of the Windows SDK (`mf.lib`, `mfplat.lib`, `mfuuid.lib`, `evr.lib`,
+`shlwapi.lib`, `ole32.lib`, and `propsys.lib`).
 
 Equivalent command:
 
@@ -82,8 +87,10 @@ the scaled child rectangle without taking keyboard focus.
 
 ## Current verification boundary
 
-This checkout does not contain a built helper. The available environment has
-the Windows SDK headers but no `cl.exe` or MSBuild, so native compilation and
-real MP4/EVR smoke are pending a Windows Developer PowerShell. The JavaScript
-bridge therefore returns `NATIVE_PLAYER_UNAVAILABLE` until
+The helper can be built in this checkout with the MinGW-w64 fallback. A local
+Win32 parent-window smoke opened a project MP4, applied bounds, completed a
+real `MESessionScrubSampleComplete`, exercised play/pause and observed the
+end-of-media event. Electron HWND integration and renderer-level human
+acceptance are still required before calling the product runtime-verified.
+The JavaScript bridge returns `NATIVE_PLAYER_UNAVAILABLE` until
 `native/bin/media-foundation-player.exe` exists.

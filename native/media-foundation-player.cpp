@@ -229,6 +229,12 @@ class MediaFoundationPlayer final {
       }
     }
     if (!videoStream) return MF_E_INVALIDMEDIATYPE;
+    // The presentation descriptor may expose the video stream as unselected
+    // (for example when the source also contains audio). Select the stream
+    // explicitly before building the source topology; otherwise the Media
+    // Session can wait forever for a topology that has no active video path.
+    result = presentation->SelectStream(videoStreamIndex_);
+    if (FAILED(result)) return result;
 
     ComPtr<IMFTopology> topology;
     result = MFCreateTopology(&topology);
@@ -247,12 +253,16 @@ class MediaFoundationPlayer final {
     result = MFCreateVideoRendererActivate(renderWindow_, &rendererActivate);
     if (SUCCEEDED(result)) result = MFCreateTopologyNode(
         MF_TOPOLOGY_OUTPUT_NODE, &outputNode);
-    ComPtr<IMFMediaSink> sink;
-    if (SUCCEEDED(result)) result = rendererActivate->ActivateObject(
-        IID_PPV_ARGS(&sink));
-    if (SUCCEEDED(result)) result = outputNode->SetObject(sink.Get());
+    // Keep the activation object on the partial topology. The Media Session
+    // must activate EVR itself while resolving the topology; pre-activating a
+    // sink here bypasses the session-owned presenter services and prevents
+    // scrub/frame-step completion from reaching the session event queue.
+    if (SUCCEEDED(result)) result = outputNode->SetObject(rendererActivate.Get());
+    // EVR exposes a single video stream sink with stream id 0. The source
+    // descriptor index may be 1 (when audio is listed first), but that index
+    // must not be copied to the renderer sink node.
     if (SUCCEEDED(result)) result = outputNode->SetUINT32(
-        MF_TOPONODE_STREAMID, videoStreamIndex_);
+        MF_TOPONODE_STREAMID, 0);
     if (SUCCEEDED(result)) result = outputNode->SetUINT32(
         MF_TOPONODE_NOSHUTDOWN_ON_REMOVE, FALSE);
     if (SUCCEEDED(result)) result = topology->AddNode(sourceNode.Get());
@@ -262,31 +272,58 @@ class MediaFoundationPlayer final {
 
     result = session_->SetTopology(0, topology.Get());
     if (FAILED(result)) return result;
+    // A newly-created Media Session is stopped. SetTopology is asynchronous
+    // and a stopped session does not resolve the queued topology until Start
+    // is called, so kick the session once at position zero before waiting for
+    // MF_TOPOSTATUS_READY. The bridge switches to rate=0 before exposing the
+    // opened state, leaving the first decoded sample paused for the editor.
+    PROPVARIANT initialPosition;
+    PropVariantInit(&initialPosition);
+    initialPosition.vt = VT_EMPTY;
+    result = session_->Start(&GUID_NULL, &initialPosition);
+    PropVariantClear(&initialPosition);
+    if (FAILED(result)) return result;
 
     // EVR exposes frame stepping through its render service.  Querying it is
     // intentionally best-effort: codecs without EVR frame-step support remain
     // open, but the bridge returns FRAME_STEP_UNSUPPORTED for that operation.
-    ComPtr<IMFGetService> getService;
-    if (SUCCEEDED(sink.As(&getService))) {
-      getService->GetService(kMrVideoRenderService,
-                             IID_PPV_ARGS(&frameStep_));
-    }
     std::unique_lock<std::mutex> readyLock(readyMutex_);
     const bool ready = readyCondition_.wait_for(
         readyLock, std::chrono::milliseconds(kOpenTimeoutMs),
         [this] { return topologyReady_ || terminalError_ != S_OK; });
     if (!ready) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
     if (terminalError_ != S_OK) return terminalError_;
+    readyLock.unlock();
     // IMFRateControl is exposed as a Media Session service, not necessarily
     // through QueryInterface on the session object. Query it after topology
     // readiness so the service graph is fully initialized.
     const HRESULT rateResult = MFGetService(session_.Get(), MF_RATE_CONTROL_SERVICE,
                                             IID_PPV_ARGS(&rateControl_));
-    return SUCCEEDED(rateResult) ? S_OK : rateResult;
+    if (FAILED(rateResult)) return rateResult;
+    // Query EVR services only after the Media Session has resolved and
+    // activated the topology. Before that point the presenter does not exist.
+    MFGetService(session_.Get(), kMrVideoRenderService,
+                 IID_PPV_ARGS(&frameStep_));
+    const HRESULT scrubResult = rateControl_->SetRate(FALSE, 0.0f);
+    if (FAILED(scrubResult)) return scrubResult;
+    // Pause is asynchronous. Wait for its completion before emitting
+    // `opened`, otherwise an immediate first pointer seek can race the state
+    // transition and lose its scrub completion event.
+    {
+      std::lock_guard<std::mutex> lock(readyMutex_);
+      paused_ = false;
+    }
+    const HRESULT pauseResult = session_->Pause();
+    if (FAILED(pauseResult)) return pauseResult;
+    std::unique_lock<std::mutex> pauseLock(readyMutex_);
+    const bool paused = readyCondition_.wait_for(
+        pauseLock, std::chrono::milliseconds(kOpenTimeoutMs),
+        [this] { return paused_ || terminalError_ != S_OK; });
+    if (!paused) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+    return terminalError_ == S_OK ? S_OK : terminalError_;
   }
 
-  HRESULT Scrub(LONGLONG position, const std::string& requestId) {
-    std::lock_guard<std::mutex> lock(mutex_);
+  HRESULT BeginScrubLocked(LONGLONG position, const std::string& requestId) {
     if (!session_ || !rateControl_) return MF_E_NOT_INITIALIZED;
     if (position < 0) return E_INVALIDARG;
     if (frameStep_) frameStep_->CancelStep();
@@ -301,6 +338,33 @@ class MediaFoundationPlayer final {
       }
       PropVariantClear(&startPosition);
     }
+    if (FAILED(result)) pendingScrubRequest_.clear();
+    return result;
+  }
+
+  HRESULT Scrub(LONGLONG position, const std::string& requestId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!session_ || !rateControl_) return MF_E_NOT_INITIALIZED;
+    if (position < 0) return E_INVALIDARG;
+    // Media Session seek requests are FIFO. Stop the current scrub before
+    // starting a newer pointer position, and keep only that newest request;
+    // otherwise a fast drag would decode every stale position in sequence.
+    if (!pendingScrubRequest_.empty()) {
+      queuedScrubRequest_ = requestId;
+      queuedScrubPosition_ = position;
+      HRESULT result = S_OK;
+      if (!stopForScrub_) {
+        stopForScrub_ = true;
+        result = session_->Stop();
+      }
+      if (SUCCEEDED(result)) {
+        Emit("scrub-submitted", requestId, S_OK,
+             "\"rate\":0,\"position100ns\":" + std::to_string(position)
+             + ",\"queued\":true");
+      }
+      return result;
+    }
+    const HRESULT result = BeginScrubLocked(position, requestId);
     if (SUCCEEDED(result)) {
       Emit("scrub-submitted", requestId, result,
            "\"rate\":0,\"position100ns\":" + std::to_string(position));
@@ -401,6 +465,11 @@ class MediaFoundationPlayer final {
       mfStarted_ = false;
     }
     topologyReady_ = false;
+    paused_ = false;
+    pendingScrubRequest_.clear();
+    queuedScrubRequest_.clear();
+    queuedScrubPosition_ = 0;
+    stopForScrub_ = false;
     terminalError_ = S_OK;
     if (renderWindow_) {
       DestroyWindow(renderWindow_);
@@ -436,17 +505,56 @@ class MediaFoundationPlayer final {
         requestId = pendingScrubRequest_;
         pendingScrubRequest_.clear();
       }
-      Emit("scrub-complete", requestId, S_OK,
-           "\"rate\":0,\"completion\":\"MESessionScrubSampleComplete\"");
+      if (!requestId.empty()) {
+        Emit("scrub-complete", requestId, S_OK,
+             "\"rate\":0,\"completion\":\"MESessionScrubSampleComplete\"");
+      }
     } else if (type == MESessionEnded) {
       Emit("ended");
     } else if (type == MESessionClosed) {
       Emit("closed");
     } else if (type == MESessionStarted) {
+      // Some Media Foundation sources report MESessionStarted without a
+      // separate MF_TOPOSTATUS_READY event for the first topology. Start is
+      // still the documented completion boundary for the stopped session, so
+      // treat it as ready for the open handshake.
+      {
+        std::lock_guard<std::mutex> lock(readyMutex_);
+        topologyReady_ = true;
+      }
+      readyCondition_.notify_all();
+      Emit("ready");
       Emit("started");
     } else if (type == MESessionPaused) {
+      {
+        std::lock_guard<std::mutex> lock(readyMutex_);
+        paused_ = true;
+      }
+      readyCondition_.notify_all();
       Emit("paused");
     } else if (type == MESessionStopped) {
+      std::string queuedRequest;
+      LONGLONG queuedPosition = 0;
+      HRESULT queuedResult = S_OK;
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (stopForScrub_ && !queuedScrubRequest_.empty()) {
+          queuedRequest = queuedScrubRequest_;
+          queuedPosition = queuedScrubPosition_;
+          queuedScrubRequest_.clear();
+          stopForScrub_ = false;
+          queuedResult = BeginScrubLocked(queuedPosition, queuedRequest);
+        }
+      }
+      if (!queuedRequest.empty()) {
+        if (SUCCEEDED(queuedResult)) {
+          Emit("scrub-submitted", queuedRequest, S_OK,
+               "\"rate\":0,\"position100ns\":"
+               + std::to_string(queuedPosition) + ",\"queued\":true");
+        } else {
+          Emit("command-failed", queuedRequest, queuedResult);
+        }
+      }
       Emit("stopped");
     } else if (type == MEError) {
       HRESULT error = S_OK;
@@ -477,7 +585,7 @@ class MediaFoundationPlayer final {
     windowClass.lpfnWndProc = &MediaFoundationPlayer::SurfaceWindowProc;
     windowClass.hInstance = GetModuleHandleW(nullptr);
     windowClass.lpszClassName = kSurfaceClassName;
-    windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    windowClass.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
     RegisterClassW(&windowClass);
     renderWindow_ = CreateWindowExW(
         WS_EX_NOACTIVATE, kSurfaceClassName, L"", WS_CHILD | WS_VISIBLE
@@ -492,9 +600,13 @@ class MediaFoundationPlayer final {
   std::condition_variable readyCondition_;
   bool mfStarted_ = false;
   bool topologyReady_ = false;
+  bool paused_ = false;
   HRESULT terminalError_ = S_OK;
   DWORD videoStreamIndex_ = 0;
   std::string pendingScrubRequest_;
+  std::string queuedScrubRequest_;
+  LONGLONG queuedScrubPosition_ = 0;
+  bool stopForScrub_ = false;
   ComPtr<SessionCallback> callback_;
   ComPtr<IMFMediaSession> session_;
   ComPtr<IMFMediaSource> source_;
