@@ -32,6 +32,7 @@ test('single and comparison cards share one browser video surface and one frame 
   assert.match(block, /data-frame-rate/u);
   assert.match(block, /data-frame-player-status/u);
   assert.match(block, /const sides = comparison \? `\$\{renderInlineVideoSide\(block, 'left'\)\}\$\{renderInlineVideoSide\(block, 'right'\)\}` : renderInlineVideoSide\(block, 'single'\)/u);
+  assert.match(renderer, /function bindFramePlayerActionButtons\(card\)/u);
 });
 
 test('loading uses the native browser video pipeline without frame-cache preparation', () => {
@@ -76,6 +77,7 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.match(keyHandler, /\['ArrowLeft', 'ArrowRight'\]\.includes\(event\.key\)/u);
   assert.match(keyHandler, /stepFramePlayer\(card, event\.key === 'ArrowRight' \? 1 : -1\)/u);
   assert.match(keyHandler, /event\.preventDefault\(\)/u);
+  assert.match(keyHandler, /data-frame-controls/u);
   const legacyKeyHandler = functionSlice(renderer, 'function handleInlineVideoKeydown(', 'function patchInlineVideoCard(');
   assert.match(legacyKeyHandler, /data-frame-player/u);
 
@@ -86,6 +88,8 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.doesNotMatch(controls, /setTimeout|setInterval/u);
   assert.match(renderer, /function waitForPresentedVideoFrame\(video/u);
   assert.match(renderer, /requestVideoFrameCallback/u);
+  const step = functionSlice(renderer, 'async function stepFramePlayer(', 'function handleFramePlayerEvent(');
+  assert.match(step, /影片尚未準備，無法定位影格/u);
 });
 
 test('comparison waits for both browser videos and keeps the follower clock aligned', () => {

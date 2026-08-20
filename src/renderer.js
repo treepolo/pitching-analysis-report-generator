@@ -1049,6 +1049,25 @@ function updateFramePlayerControls(card) {
   if (rateValue) rateValue.textContent = `${rate.toFixed(2)}×`;
 }
 
+function bindFramePlayerActionButtons(card) {
+  card?.querySelectorAll('[data-frame-action="previous"], [data-frame-action="next"], [data-frame-action="toggle"]')
+    .forEach((button) => {
+      if (button.dataset.frameActionBound === 'true') return;
+      button.dataset.frameActionBound = 'true';
+      button.addEventListener('click', (event) => {
+        // These controls have a direct listener so a focus/repaint change in
+        // the block canvas cannot swallow a frame-step click. Stop bubbling
+        // to avoid running the delegated handler a second time.
+        event.stopPropagation();
+        if (button.disabled) return;
+        const action = button.dataset.frameAction;
+        if (action === 'previous') void stepFramePlayer(card, -1);
+        else if (action === 'next') void stepFramePlayer(card, 1);
+        else if (action === 'toggle') void toggleFramePlayer(card);
+      });
+    });
+}
+
 function framePlayerIndexForSide(block, runtime, side, primaryIndex) {
   const cache = runtime.caches[side];
   if (!cache || cache.frameCount <= 1) return 0;
@@ -1284,6 +1303,7 @@ function requestFramePlayerScrub(card, frameIndex, { exact = false } = {}) {
 
 async function prepareFramePlayerCard(card, block, generation) {
   const runtime = framePlayerRuntimeForCard(card);
+  bindFramePlayerActionButtons(card);
   runtime.playing = false;
   runtime.currentFrameIndex = 0;
   runtime.seekSerial += 1;
@@ -1433,7 +1453,13 @@ async function toggleFramePlayer(card) {
 async function stepFramePlayer(card, direction) {
   const runtime = framePlayerRuntimeForCard(card);
   stopFramePlayer(card);
-  const maxIndex = Math.max(0, framePlayerFrameCount(blockForEditorCard(card).block, runtime) - 1);
+  const count = framePlayerFrameCount(blockForEditorCard(card).block, runtime);
+  if (count <= 0) {
+    setFramePlayerStatus(card, '影片尚未準備，無法定位影格。', 'error');
+    updateFramePlayerControls(card);
+    return;
+  }
+  const maxIndex = Math.max(0, count - 1);
   const target = Math.min(maxIndex, Math.max(0, runtime.currentFrameIndex + direction));
   await seekFramePlayerIndex(card, target, { exact: true });
 }
@@ -1491,11 +1517,11 @@ function handleFramePlayerEvent(event) {
     const details = card.querySelector('details');
     if (details) details.open = true;
   } else if (action === 'toggle') {
-    toggleFramePlayer(card);
+    void toggleFramePlayer(card);
   } else if (action === 'previous') {
-    stepFramePlayer(card, -1);
+    void stepFramePlayer(card, -1);
   } else if (action === 'next') {
-    stepFramePlayer(card, 1);
+    void stepFramePlayer(card, 1);
   }
   return true;
 }
@@ -1504,7 +1530,7 @@ function handleFramePlayerKeydown(event) {
   if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
   const card = event.target.closest?.('[data-frame-player]');
   if (!card || event.target.matches('[data-frame-timeline]')) return;
-  if (!event.target.closest?.('[data-frame-surface]')) return;
+  if (!event.target.closest?.('[data-frame-surface], [data-frame-controls]')) return;
   event.preventDefault();
   stepFramePlayer(card, event.key === 'ArrowRight' ? 1 : -1);
 }
