@@ -15,9 +15,8 @@ const {
   validateReferencedVideoAssetReferences,
 } = require('./asset-paths');
 const { validateExportLayout } = require('./layout-validator');
-const { renderReportHtml } = require('./report-renderer');
+const { renderReportHtml, toPortableReportDocument } = require('./report-renderer');
 const { createZipArchive, validateZipParity } = require('./zip-archive');
-const { toReportDocument } = require('../report-contract');
 
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -412,7 +411,7 @@ async function exportReport({
     throw new ExportValidationError('Report document is required');
   }
   const { lexicalRoot: projectRootLexical, realRoot: projectRootReal } = await resolveProjectRoots(projectRoot);
-  const safeReportDocument = toReportDocument(reportDocument);
+  const safeReportDocument = toPortableReportDocument(reportDocument);
   const referencedAssetIds = new Set(collectReferencedVideoAssetIds(safeReportDocument));
   const outputRoot = path.resolve(outputDirectory);
   if (typeof outputDirectory !== 'string' || outputDirectory.trim() === '' || !path.isAbsolute(outputDirectory)) {

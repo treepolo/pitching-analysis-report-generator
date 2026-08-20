@@ -30,7 +30,17 @@ function fixtureReport() {
       blocks: [
         { type: 'rich-text', content: 'file:// smoke' },
         { type: 'image', imageAssetId: 'frame', alt: 'Synthetic frame' },
-        { type: 'singleVideo', mediaAssetId: 'pitch', posterAssetId: 'frame', label: 'Synthetic pitch' },
+        {
+          type: 'singleVideo',
+          mediaAssetId: 'pitch',
+          posterAssetId: 'frame',
+          label: 'Synthetic pitch',
+          segment: { in: 0.25, out: 1.5 },
+          playback: { rate: 1.25 },
+          loop: { enabled: true, start: 0.25, end: 1.5 },
+          sync: { mode: 'time', startAnchor: { observedTime: 0.25, precision: 'time-based' } },
+          anchor: { observedTime: 0.25, precision: 'time-based' },
+        },
       ],
     }],
   };
@@ -127,17 +137,28 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
     assets: fixtureAssets(),
   });
 
+  const folderHtml = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
+  assert.match(folderHtml, /data-segment-in="0\.25"/u);
+  assert.match(folderHtml, /data-segment-out="1\.5"/u);
+  assert.match(folderHtml, /data-playback-rate="1\.25"/u);
+  assert.match(folderHtml, /data-loop-enabled="true"/u);
+  assert.match(folderHtml, /data-player-action="play"/u);
+  assert.match(folderHtml, /時間同步：可在離線 HTML 中運作/u);
+  assert.doesNotMatch(folderHtml, /\bfetch\s*\(/iu);
+
   const folderRuntime = await runLocalFileRuntimeSmoke({
     folderPath: result.folderPath,
     expectedKinds: ['image', 'video'],
   });
-  if (!(await assertRuntimeResult(t, folderRuntime))) return;
+  const folderRuntimeAvailable = await assertRuntimeResult(t, folderRuntime);
 
   const extractedPath = path.join(testRoot, 'runtime-extracted');
   const extracted = await extractZipArchive(result.zipPath, extractedPath);
   assert.equal(extracted.entries.length, result.zip.parity.fileCount);
   const zipParity = await validateZipParity(extractedPath, result.zipPath);
   assert.equal(zipParity.valid, true);
+  const extractedHtml = await fs.readFile(path.join(extractedPath, 'report.html'), 'utf8');
+  assert.equal(extractedHtml, folderHtml);
   const extractedLayout = await validateExportLayout(extractedPath, {
     assetManifest: result.manifest.assets,
     verifyManifest: true,
@@ -149,8 +170,10 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
     folderPath: extractedPath,
     expectedKinds: ['image', 'video'],
   });
-  if (!(await assertRuntimeResult(t, extractedRuntime))) return;
-  assert.deepEqual(mediaSignature(extractedRuntime), mediaSignature(folderRuntime));
+  const extractedRuntimeAvailable = await assertRuntimeResult(t, extractedRuntime);
+  if (folderRuntimeAvailable && extractedRuntimeAvailable) {
+    assert.deepEqual(mediaSignature(extractedRuntime), mediaSignature(folderRuntime));
+  }
 
   const outputEntries = await fs.readdir(outputRoot);
   assert.deepEqual(outputEntries.sort(), ['Runtime Smoke', 'Runtime Smoke_offline.zip'].sort());
