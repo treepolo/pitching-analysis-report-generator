@@ -7,6 +7,7 @@
 - Evidence: `npm test` 162 total / 161 pass / 1 explicit Electron exported-folder/ZIP `file://` unavailable skip; 47 JavaScript syntax checks; focused bridge/player/export/media tests pass; product diff, tracked-artifact, and credential scans pass.
 - Frame cache remains project-local and referenced-only for export. Non-ready cache states are explicit fallback/warning or strict validation failure; no absolute source paths are exposed to renderer or portable output.
 - Bounded real local smoke also passes: generated MP4 → FFmpeg/ffprobe → reused ready cache with 12 CFR frames → referenced-only folder/ZIP export; warnings `0`, layout validation and ZIP parity valid, frame-player HTML present without `<video>`, and extracted cache index present. This does not establish full runtime or human acceptance.
+- Startup/draft recovery fix `ad88896` removes sandbox-incompatible preload imports, keeps `contextIsolation`/`nodeIntegration` disabled with explicit preload sandboxing, exposes a data-only contract mirror, returns `lastOpenedAt` in project summaries, and restores the most recently opened valid draft on bootstrap. The two existing project records were read successfully during this gate.
 - Product acceptance remains conditional fail/in progress. Broader real media/player/sync drift, Electron editor and exported `file://` runtime, native picker, responsive human evidence, and AT-A through AT-G remain pending. No requirement may be marked `VERIFIED`.
 
 ## Current Wave 19G provenance reconciliation (2026-08-20)

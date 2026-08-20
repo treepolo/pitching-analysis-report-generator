@@ -94,6 +94,7 @@
 - 實作：Wave 20A Media frame-cache pipeline（`79e196c`）與 Wave 20B Bridge/Editor（`5525b49`）、Portable Export（`342d6e1`）、Integrator hardening（`7c2c40c`）已完成 bounded implementation/contract gate。
 - 驗證：`npm test` 162 total / 161 pass / 1 explicit Electron `file://` unavailable skip；47 JS syntax checks、focused tests、artifact/credential scans pass。這些不是完整 runtime 或真人驗收。
 - 補充的 bounded real local smoke：專案內產生的 MP4 經 FFmpeg／ffprobe 轉成可重用的 ready cache（12 幀、CFR），再輸出 referenced-only folder／ZIP；0 warnings、layout validation 與 ZIP parity 通過、輸出 HTML 使用 frame player 且無 `<video>` fallback、ZIP 解出後的 cache index 存在。這仍不是完整 Electron／file://／真人驗收。
+- 啟動回歸修正：sandboxed preload 不再依賴 Node／project-local `require`；啟動時會依 `lastOpenedAt` 自動恢復最近有效草稿，並同步文件清單空狀態。現有草稿資料未被搬移或刪除。
 - Product acceptance：尚未完成；不得標記 requirement VERIFIED。
 
 ## Wave 20B｜契約整合與輸出接線計畫
