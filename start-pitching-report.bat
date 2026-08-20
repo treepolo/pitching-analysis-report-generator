@@ -34,7 +34,10 @@ if not exist "node_modules\electron\package.json" goto install_incomplete
 :start_app
 set "PITCHING_DISABLE_GPU=1"
 echo [INFO] Starting Pitching Report Generator...
-call npm.cmd start -- --disable-gpu
+rem This desktop environment cannot launch Electron's renderer sandbox (exitCode 49).
+rem Keep the renderer's context isolation/preload boundary; disable only Chromium's
+rem OS sandbox so the application can start instead of spinning forever.
+call npm.cmd start -- --disable-gpu --no-sandbox
 if errorlevel 1 goto start_failed
 set "exitCode=0"
 goto finish
