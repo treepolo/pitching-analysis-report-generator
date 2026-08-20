@@ -32,10 +32,15 @@ test('main registers the v1 frame-cache channels and resolves sources from proje
   assert.match(main, /frameCaches,/u);
   assert.match(main, /frameDirectoryRelativePath/u);
   assert.match(main, /isPathInside\(frameDirectory, framePath\)/u);
+  assert.match(main, /sandbox: true/u);
   assert.doesNotMatch(main, /payload\?\.sourceReference/u);
 });
 
 test('preload exposes only validated frame-cache requests and contract responses', () => {
+  assert.doesNotMatch(preload, /require\(['"]node:crypto['"]\)/u);
+  assert.doesNotMatch(preload, /require\(['"]\.\//u);
+  assert.match(preload, /globalThis\.crypto[\s\S]*randomUUID/u);
+  assert.match(preload, /createRequestId\(\)/u);
   assert.match(preload, /frameCache: frameCacheApi/u);
   for (const method of [
     'prepareFrameCache',

@@ -37,6 +37,7 @@ test('creates, lists, opens and persists a project inside the projects boundary'
 
   const listed = await store.listProjects();
   assert.deepEqual(listed.map((project) => project.id), [created.id]);
+  assert.equal(listed[0].lastOpenedAt, created.lastOpenedAt);
 
   const opened = await store.openProject(created.id);
   assert.equal(opened.id, created.id);

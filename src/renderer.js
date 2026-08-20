@@ -34,6 +34,7 @@ const state = {
 const elements = {
   projectList: document.querySelector('#project-list, #project-picker'),
   projectPicker: document.querySelector('#project-picker, #project-list'),
+  projectEmpty: document.querySelector('#project-empty'),
   documentCommandBar: document.querySelector('#document-command-bar, .document-command-bar'),
   editorEmpty: document.querySelector('#editor-empty'),
   editor: document.querySelector('#editor'),
@@ -817,6 +818,7 @@ async function retryReportExport() {
 function renderProjects() {
   const control = elements.projectList || elements.projectPicker;
   if (!control) return;
+  if (elements.projectEmpty) elements.projectEmpty.hidden = state.projects.length > 0;
   if (control.tagName === 'SELECT') {
     control.innerHTML = state.projects.length > 0
       ? state.projects.map((project) => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.displayName)}</option>`).join('')
@@ -2145,6 +2147,14 @@ async function refreshProjects() {
   renderProjects();
 }
 
+function mostRecentlyOpenedProject() {
+  return [...state.projects].sort((left, right) => {
+    const leftTimestamp = left.lastOpenedAt || left.updatedAt || '';
+    const rightTimestamp = right.lastOpenedAt || right.updatedAt || '';
+    return rightTimestamp.localeCompare(leftTimestamp);
+  })[0] || null;
+}
+
 async function persistActiveProject() {
   if (!state.activeProject) return null;
   if (state.saveInFlight) {
@@ -2417,6 +2427,8 @@ if (typeof window.pitchingApp?.onBeforeClose === 'function') {
     state.projectRoot = info.projectRoot;
     if (elements.rootPath) elements.rootPath.textContent = info.projectRoot;
     await refreshProjects();
+    const recentProject = mostRecentlyOpenedProject();
+    if (recentProject) await openProject(recentProject.id);
     renderEditor();
     renderPreview();
   } catch (error) {

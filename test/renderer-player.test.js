@@ -73,6 +73,10 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /data-block-path="sync\.mode"/u);
   assert.match(renderer, /明確影格模式/u);
   assert.match(renderer, /requestFullscreen/u);
+  assert.match(renderer, /projectEmpty\.hidden = state\.projects\.length > 0/u);
+  assert.match(renderer, /function mostRecentlyOpenedProject\(\)/u);
+  assert.match(renderer, /const recentProject = mostRecentlyOpenedProject\(\)/u);
+  assert.match(renderer, /await openProject\(recentProject\.id\)/u);
   assert.match(renderer, /startExport\(request\)/u);
   assert.match(renderer, /pickExportDirectory/u);
   assert.match(renderer, /normalizeExportDirectoryPick/u);

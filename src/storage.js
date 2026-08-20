@@ -756,13 +756,18 @@ function createProjectStore(projectRoot, { boundaryRoot = null } = {}) {
           id: project.id,
           displayName: project.displayName,
           updatedAt: project.updatedAt,
+          lastOpenedAt: project.lastOpenedAt,
           sectionCount: project.sections.length,
         });
       } catch {
         // Ignore incomplete or invalid folders; they are never presented as projects.
       }
     }
-    return projects.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    return projects.sort((left, right) => {
+      const leftTimestamp = left.lastOpenedAt || left.updatedAt;
+      const rightTimestamp = right.lastOpenedAt || right.updatedAt;
+      return rightTimestamp.localeCompare(leftTimestamp);
+    });
   }
 
   async function createProject(displayName) {

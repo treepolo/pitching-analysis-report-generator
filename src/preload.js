@@ -1,14 +1,33 @@
 'use strict';
 
 const { contextBridge, ipcRenderer } = require('electron');
-const { randomUUID } = require('node:crypto');
-const {
-  FRAME_CACHE_BRIDGE_METHODS,
-  FRAME_CACHE_CONTRACT_VERSION,
-  createCancelResponse,
-  createCleanupResponse,
-  normalizeFrameCacheResponse,
-} = require('./media/frame-cache-contract');
+
+// Sandboxed Electron preloads can require Electron's bridge modules, but they
+// cannot load project-local CommonJS modules. Keep this small, data-only
+// contract mirror local to the preload; the main process remains authoritative
+// for source resolution, cache identity, and filesystem safety.
+const FRAME_CACHE_CONTRACT_VERSION = 1;
+const FRAME_CACHE_BRIDGE_METHODS = Object.freeze({
+  PREPARE: 'prepareFrameCache',
+  READ: 'readFrameCache',
+  CLEANUP: 'cleanupFrameCache',
+  CANCEL: 'cancelFrameCache',
+});
+const FRAME_CACHE_RESPONSE_STATUS = Object.freeze({
+  PREPARING: 'preparing',
+  READY: 'ready',
+  CACHE_MISS: 'cache-miss',
+  TOOL_MISSING: 'tool-missing',
+  PROCESS_FAILED: 'process-failed',
+  MALFORMED_OUTPUT: 'malformed-output',
+  CANCELLED: 'cancelled',
+  SOURCE_UNAVAILABLE: 'source-unavailable',
+  CACHE_ERROR: 'cache-error',
+});
+const FRAME_CACHE_READY_STATUS = FRAME_CACHE_RESPONSE_STATUS.READY;
+const FRAME_CACHE_NON_READY_STATUSES = new Set(
+  Object.values(FRAME_CACHE_RESPONSE_STATUS).filter((value) => value !== FRAME_CACHE_READY_STATUS),
+);
 
 const PROJECT_ID_PATTERN = /^[a-z0-9-]{1,80}$/u;
 const MEDIA_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u;
@@ -18,6 +37,205 @@ const FRAME_CACHE_KEY_PATTERN = /^[a-f0-9]{64}$/iu;
 const EXPORT_OUTPUT_KINDS = new Set(['folder', 'zip', 'both']);
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 const closeCallbacks = new Set();
+
+// Electron sandboxed preloads do not expose Node built-ins such as
+// `node:crypto`. Prefer the Web Crypto API and retain a small local fallback
+// so the bridge can initialize in both sandboxed and unsandboxed runtimes.
+function createRequestId() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `request-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+}
+
+function isFrameCacheRecord(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function requireFrameCacheRecord(value, name) {
+  if (!isFrameCacheRecord(value)) throw new Error(`${name} must be an object`);
+  return value;
+}
+
+function requireFrameCacheText(value, name, maxLength = 500) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > maxLength
+    || CONTROL_CHARACTER_PATTERN.test(value)) {
+    throw new Error(`${name} is invalid`);
+  }
+  return value;
+}
+
+function normalizeFrameCacheRelativePath(value, name) {
+  const raw = requireFrameCacheText(value, name, 2048).replaceAll('\\', '/');
+  if (raw.startsWith('/') || /^[a-zA-Z]:\//u.test(raw) || raw.startsWith('//')) {
+    throw new Error(`${name} must be project-relative`);
+  }
+  const segments = raw.split('/');
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+    throw new Error(`${name} must not contain traversal`);
+  }
+  return segments.join('/');
+}
+
+function normalizeFrameCacheSourceIdentity(value) {
+  requireFrameCacheRecord(value, 'sourceIdentity');
+  const relativePath = normalizeFrameCacheRelativePath(value.relativePath, 'sourceIdentity.relativePath');
+  if (!/^[a-f0-9]{64}$/iu.test(value.checksumSha256)) {
+    throw new Error('sourceIdentity.checksumSha256 is invalid');
+  }
+  if (!Number.isInteger(value.byteSize) || value.byteSize < 0) {
+    throw new Error('sourceIdentity.byteSize is invalid');
+  }
+  if (typeof value.mtimeMs !== 'number' || !Number.isFinite(value.mtimeMs) || value.mtimeMs < 0) {
+    throw new Error('sourceIdentity.mtimeMs is invalid');
+  }
+  return {
+    relativePath,
+    checksumSha256: value.checksumSha256.toLowerCase(),
+    byteSize: value.byteSize,
+    mtimeMs: value.mtimeMs,
+  };
+}
+
+function normalizeFrameCacheDescriptor(value) {
+  if (value === null) return null;
+  requireFrameCacheRecord(value, 'cache');
+  if (typeof value.key !== 'string' || !/^[a-f0-9]{64}$/iu.test(value.key)) {
+    throw new Error('cache.key is invalid');
+  }
+  return {
+    key: value.key.toLowerCase(),
+    rootRelativePath: normalizeFrameCacheRelativePath(value.rootRelativePath, 'cache.rootRelativePath'),
+    indexRelativePath: normalizeFrameCacheRelativePath(value.indexRelativePath, 'cache.indexRelativePath'),
+    frameDirectoryRelativePath: normalizeFrameCacheRelativePath(
+      value.frameDirectoryRelativePath,
+      'cache.frameDirectoryRelativePath',
+    ),
+    format: value.format === 'png' ? 'png' : (() => { throw new Error('cache.format is invalid'); })(),
+  };
+}
+
+function normalizeFrameCacheMetadata(value) {
+  if (value === null) return null;
+  requireFrameCacheRecord(value, 'metadata');
+  const numericNullable = (field) => value[field] === null ? null : (
+    typeof value[field] === 'number' && Number.isFinite(value[field])
+      ? value[field]
+      : (() => { throw new Error(`metadata.${field} is invalid`); })()
+  );
+  const integerNullable = (field) => value[field] === null ? null : (
+    Number.isInteger(value[field]) && value[field] >= 0
+      ? value[field]
+      : (() => { throw new Error(`metadata.${field} is invalid`); })()
+  );
+  if (!['cfr', 'vfr', 'unknown'].includes(value.frameTiming)) {
+    throw new Error('metadata.frameTiming is invalid');
+  }
+  return {
+    durationSeconds: numericNullable('durationSeconds'),
+    width: integerNullable('width'),
+    height: integerNullable('height'),
+    fps: numericNullable('fps'),
+    averageFps: numericNullable('averageFps'),
+    rawFps: numericNullable('rawFps'),
+    frameTiming: value.frameTiming,
+    timebase: value.timebase === null ? null : requireFrameCacheText(value.timebase, 'metadata.timebase', 32),
+    frameCount: integerNullable('frameCount'),
+  };
+}
+
+function normalizeFrameCacheFrame(value, index) {
+  requireFrameCacheRecord(value, `frames[${index}]`);
+  if (value.frameNumber !== index) throw new Error(`frames[${index}].frameNumber is not ordered`);
+  const numericNullable = (field) => value[field] === null ? null : (
+    typeof value[field] === 'number' && Number.isFinite(value[field])
+      ? value[field]
+      : (() => { throw new Error(`frames[${index}].${field} is invalid`); })()
+  );
+  const integerNullable = (field) => value[field] === null ? null : (
+    Number.isInteger(value[field]) && value[field] >= 0
+      ? value[field]
+      : (() => { throw new Error(`frames[${index}].${field} is invalid`); })()
+  );
+  return {
+    frameNumber: index,
+    pts: numericNullable('pts'),
+    time: numericNullable('time'),
+    width: integerNullable('width'),
+    height: integerNullable('height'),
+    relativePath: normalizeFrameCacheRelativePath(value.relativePath, `frames[${index}].relativePath`),
+  };
+}
+
+function normalizeFrameCacheError(value, required) {
+  if (value === null || value === undefined) {
+    if (required) throw new Error('error is required for this status');
+    return null;
+  }
+  requireFrameCacheRecord(value, 'error');
+  return {
+    code: requireFrameCacheText(value.code, 'error.code', 120),
+    message: requireFrameCacheText(value.message, 'error.message', 1000),
+  };
+}
+
+function normalizeFrameCacheResponse(input) {
+  requireFrameCacheRecord(input, 'frame cache response');
+  if (input.schemaVersion !== FRAME_CACHE_CONTRACT_VERSION) throw new Error('Unsupported frame cache schema version');
+  if (!Object.values(FRAME_CACHE_RESPONSE_STATUS).includes(input.status)) throw new Error('Invalid frame cache status');
+  const ready = input.status === FRAME_CACHE_READY_STATUS;
+  const frames = Array.isArray(input.frames) ? input.frames.map(normalizeFrameCacheFrame) : [];
+  if (ready && frames.length === 0) throw new Error('Ready response requires frames');
+  if (!ready && frames.length > 0) throw new Error('Non-ready response cannot expose frames');
+  const error = normalizeFrameCacheError(
+    input.error,
+    FRAME_CACHE_NON_READY_STATUSES.has(input.status)
+      && ![FRAME_CACHE_RESPONSE_STATUS.PREPARING, FRAME_CACHE_RESPONSE_STATUS.CACHE_MISS].includes(input.status),
+  );
+  if (ready && error !== null) throw new Error('Ready response cannot contain an error');
+  return {
+    schemaVersion: FRAME_CACHE_CONTRACT_VERSION,
+    requestId: requireFrameCacheText(input.requestId, 'requestId', 128),
+    projectId: requireFrameCacheText(input.projectId, 'projectId', 128),
+    assetId: requireFrameCacheText(input.assetId, 'assetId', 128),
+    status: input.status,
+    sourceIdentity: input.sourceIdentity === null ? null : normalizeFrameCacheSourceIdentity(input.sourceIdentity),
+    cache: normalizeFrameCacheDescriptor(input.cache),
+    metadata: normalizeFrameCacheMetadata(input.metadata),
+    frames,
+    reused: input.reused === true,
+    progress: input.progress === null || input.progress === undefined
+      ? null
+      : requireFrameCacheRecord(input.progress, 'progress'),
+    error,
+  };
+}
+
+function createCleanupResponse(input) {
+  requireFrameCacheRecord(input, 'frame cache cleanup response');
+  if (input.schemaVersion !== FRAME_CACHE_CONTRACT_VERSION) throw new Error('Unsupported cleanup schema version');
+  return {
+    schemaVersion: FRAME_CACHE_CONTRACT_VERSION,
+    requestId: requireFrameCacheText(input.requestId, 'requestId', 128),
+    projectId: requireFrameCacheText(input.projectId, 'projectId', 128),
+    assetId: requireFrameCacheText(input.assetId, 'assetId', 128),
+    status: input.status === 'cleaned' ? 'cleaned' : 'cleanup-failed',
+    error: input.status === 'cleaned' ? null : normalizeFrameCacheError(input.error, true),
+  };
+}
+
+function createCancelResponse(input) {
+  requireFrameCacheRecord(input, 'frame cache cancel response');
+  if (input.schemaVersion !== FRAME_CACHE_CONTRACT_VERSION) throw new Error('Unsupported cancel schema version');
+  return {
+    schemaVersion: FRAME_CACHE_CONTRACT_VERSION,
+    requestId: requireFrameCacheText(input.requestId, 'requestId', 128),
+    accepted: input.accepted === true,
+  };
+}
+
 const syncApi = Object.freeze({
   alignComparisonAtRelativeTime: (sides, relativeTime, options) => ipcRenderer.invoke('sync:align', {
     sides,
@@ -65,7 +283,7 @@ function assertFrameCacheRequest(value, operation, { requireCacheKey = false } =
   if (value.operation !== undefined && value.operation !== operation) {
     throw new Error('Invalid frame cache operation');
   }
-  const requestId = value.requestId === undefined ? randomUUID() : value.requestId;
+  const requestId = value.requestId === undefined ? createRequestId() : value.requestId;
   if (typeof requestId !== 'string' || !FRAME_CACHE_REQUEST_ID_PATTERN.test(requestId)) {
     throw new Error('Invalid frame cache request id');
   }
