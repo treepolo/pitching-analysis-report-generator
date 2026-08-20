@@ -48,11 +48,33 @@ test('text input and video settings keep persistence without input-time redraw',
   );
   assert.match(pathHandler, /if \(!\['input', 'change'\]\.includes\(event\.type\)\) return;/u);
   assert.match(pathHandler, /setEditorPath\(block, target\.dataset\.blockPath, editorControlValue\(target\)\)/u);
-  assert.match(pathHandler, /patchInlineVideoCard\(card, block\)/u);
+  assert.match(pathHandler, /refreshInlineBindingAfterEditorChange\(card, block, target\.dataset\.blockPath\)/u);
   assert.match(pathHandler, /target\.dataset\.blockPath\.endsWith\('mediaAssetId'\)/u);
   assert.match(pathHandler, /hydrateInlineVideoCards\(\)/u);
   assert.doesNotMatch(pathHandler, /renderBlockCanvas\s*\(/u);
   assert.match(pathHandler, /scheduleSave\(\)/u);
+
+  const refreshHandler = functionSlice(
+    renderer,
+    'function refreshInlineBindingAfterEditorChange(',
+    'function handleBlockEditorEvent(',
+  );
+  assert.match(refreshHandler, /bindingPatch\.sides = \{ \[side\]: inlineBindingForBlock\(block\)\.sides\[side\] \}/u);
+  assert.match(refreshHandler, /pathValue\.endsWith\('playback\.rate'\)/u);
+  assert.match(refreshHandler, /applyInlineSideSettings\(card, block, side\)/u);
+  assert.match(refreshHandler, /queueInlineBindingSync\(card, block, binding\.masterSide, \{ force: true \}\)/u);
+  assert.match(refreshHandler, /patchInlineVideoCard\(card, block\)/u);
+
+  const sideSettings = functionSlice(renderer, 'function applyInlineSideSettings(', 'async function propagateInlinePlayback(');
+  assert.match(sideSettings, /video\.loop = config\.loop\?\.enabled === true;/u);
+  assert.match(sideSettings, /video\.playbackRate =/u);
+
+  const bindingSource = functionSlice(renderer, 'function inlineBindingSource(', 'function setInlineBindingStatus(');
+  assert.match(bindingSource, /segment: binding\.sides\[side\]\.segment/u);
+
+  const bindingPersistence = functionSlice(renderer, 'function persistInlineBinding(', 'function inlineBindingSummary(');
+  assert.match(bindingPersistence, /const current = inlineBindingForBlock\(block\);/u);
+  assert.match(bindingPersistence, /\.\.\.current,[\s\S]*\.\.\.patch,/u);
 });
 
 test('native select interaction never replaces the active block canvas', () => {
