@@ -1,7 +1,8 @@
 'use strict';
 
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
-if (process.env.PITCHING_DISABLE_GPU === '1') {
+const gpuDisabled = process.env.PITCHING_DISABLE_GPU === '1' || process.argv.includes('--disable-gpu');
+if (gpuDisabled) {
   app.commandLine.appendSwitch('disable-gpu');
   app.commandLine.appendSwitch('in-process-gpu');
   app.disableHardwareAcceleration();

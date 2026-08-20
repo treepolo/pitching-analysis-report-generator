@@ -32,7 +32,7 @@ if errorlevel 1 goto install_failed
 if not exist "node_modules\electron\package.json" goto install_incomplete
 
 :start_app
-set "PITCHING_DISABLE_GPU=0"
+set "PITCHING_DISABLE_GPU=1"
 rem Keep the command-line path ASCII-only. Electron resolves this relative to
 rem the project directory after pushd; passing the Chinese absolute path
 rem through cmd/npm can create mojibake folders beside the project.
