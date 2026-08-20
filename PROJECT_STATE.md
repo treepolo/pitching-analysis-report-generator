@@ -1,5 +1,14 @@
 # Current Project State
 
+## Current Wave 20B integrator gate (2026-08-20)
+
+- Actual implementation tip is `7c2c40c` on `worker/desktop-vertical-slice`; the live remote branch currently resolves to `4a1f09e`, so local contains the Wave 20 frame-cache work and is ahead by four commits. `git ls-remote origin refs/heads/worker/desktop-vertical-slice` was available during this gate.
+- Provenance chain: frame-cache contract=`c8b9790`, editor seam=`4a1f09e`, Media pipeline=`79e196c`, Bridge/Editor=`5525b49`, Portable Export=`342d6e1`, Integrator hardening=`7c2c40c`.
+- Bounded implementation now wires the v1 frame-cache contract through main/preload/renderer, reads only referenced video caches for export, stages ready index/PNG frames into folder/ZIP outputs, enforces frame-directory containment, and rejects comparison partial-ready rendering as success.
+- Independent regression evidence: `npm test` (`node --test`) → 162 tests, 161 pass, 0 fail, 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. `node --check` passes for 47 JavaScript files; product-scope `git diff --check`, tracked-artifact scan, and credential-pattern scan pass.
+- This is bounded implementation/contract evidence only. Real FFmpeg/media fixtures, Electron editor runtime, exported `file://`, native picker, responsive human evidence, and AT-A through AT-G remain incomplete or unavailable. No requirement is `VERIFIED`.
+- Current worktree retains an unrelated pre-existing `AGENTS.md` edit; all current Wave 20 source/test changes are committed. The generated planning file `WAVE_20_FRAME_CACHE_PLAN.md` is kept inside the project and is reconciled in the next docs checkpoint.
+
 ## Current Wave 19G provenance reconciliation (2026-08-20)
 
 - Actual implementation tip is `b118a6321516a2cb17cec33a8da7f3bfd8e21c1c` on `worker/desktop-vertical-slice`; local `origin/worker/desktop-vertical-slice` tracking ref matches. Code scope is clean; the current worktree is dirty only with the three provenance docs and an unrelated `AGENTS.md` edit.
