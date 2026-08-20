@@ -49,12 +49,17 @@ test('drag is latest-target-wins approximate seek, release is exact seek', () =>
   assert.match(scrub, /runtime\.dragTarget = target/u);
   assert.match(scrub, /requestAnimationFrame/u);
   assert.match(scrub, /seekFramePlayerIndex\(card, latest, \{ exact: false/u);
-  assert.match(scrub, /if \(exact\) return seekFramePlayerIndex\(card, target, \{ exact: true/u);
+  assert.match(scrub, /if \(exact\) \{/u);
+  assert.match(scrub, /exactScrubTarget/u);
+  assert.match(scrub, /exactScrubPromise/u);
 
   const seek = functionSlice(renderer, 'async function seekFramePlayerIndex(', 'function requestFramePlayerScrub(');
   assert.match(seek, /video\.fastSeek|video\.currentTime/u);
+  assert.match(seek, /video\.seeking/u);
   assert.match(seek, /seekVideoExact\(video, targetTime/u);
   assert.match(seek, /runtime\.seekSerial/u);
+  assert.match(seek, /cancelPendingVideoSeek/u);
+  assert.match(seek, /scrubActive/u);
 
   const events = functionSlice(renderer, 'function handleFramePlayerEvent(', 'function handleFramePlayerKeydown(');
   assert.match(events, /event\.type === 'pointerup'/u);
@@ -69,6 +74,8 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.match(keyHandler, /\['ArrowLeft', 'ArrowRight'\]\.includes\(event\.key\)/u);
   assert.match(keyHandler, /stepFramePlayer\(card, event\.key === 'ArrowRight' \? 1 : -1\)/u);
   assert.match(keyHandler, /event\.preventDefault\(\)/u);
+  const legacyKeyHandler = functionSlice(renderer, 'function handleInlineVideoKeydown(', 'function patchInlineVideoCard(');
+  assert.match(legacyKeyHandler, /data-frame-player/u);
 
   const controls = functionSlice(renderer, 'async function toggleFramePlayer(', 'function handleFramePlayerEvent(');
   assert.match(controls, /video\.play\(\)/u);
@@ -86,4 +93,12 @@ test('comparison waits for both browser videos and keeps the follower clock alig
   assert.match(renderer, /function syncFramePlayerSides\(card, block, masterSide\)/u);
   assert.match(renderer, /follower\.currentTime/u);
   assert.match(renderer, /frameEngineGuard/u);
+});
+
+test('launcher leaves GPU enabled by default for browser video composition', () => {
+  const launcher = fs.readFileSync(path.join(repositoryRoot, 'start-pitching-report.bat'), 'utf8');
+  assert.doesNotMatch(launcher, /set "PITCHING_DISABLE_GPU=1"/u);
+  assert.doesNotMatch(launcher, /--disable-gpu/u);
+  assert.match(renderer, /pendingSeeks: new Map\(\)/u);
+  assert.match(renderer, /playerRuntime\.exactSeek === null/u);
 });

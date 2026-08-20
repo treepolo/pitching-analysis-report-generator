@@ -965,6 +965,10 @@ function framePlayerRuntimeForCard(card) {
       dragFrame: null,
       seekSerial: 0,
       exactSeek: null,
+      scrubActive: false,
+      pendingSeeks: new Map(),
+      exactScrubTarget: null,
+      exactScrubPromise: null,
       playbackRate: 1,
       frameEngineGuard: false,
       primarySide: 'single',
@@ -1072,46 +1076,97 @@ function framePlayerTimeForSide(runtime, side, index) {
   return Math.max(0, Math.min(Math.max(0, duration - 0.0001), index / fps));
 }
 
-function waitForPresentedVideoFrame(video, timeout = 500) {
-  if (!video || typeof video.requestVideoFrameCallback !== 'function') return Promise.resolve();
+function waitForPresentedVideoFrame(video, targetTime = null, tolerance = 0.05, timeout = 500) {
+  if (!video || typeof video.requestVideoFrameCallback !== 'function') return Promise.resolve(true);
   return new Promise((resolve) => {
     let done = false;
-    const finish = () => {
+    let callbackId = null;
+    const finish = (presented) => {
       if (done) return;
       done = true;
-      resolve();
-    };
-    const timer = setTimeout(finish, timeout);
-    video.requestVideoFrameCallback(() => {
       clearTimeout(timer);
-      finish();
-    });
+      if (!presented && callbackId !== null && typeof video.cancelVideoFrameCallback === 'function') {
+        video.cancelVideoFrameCallback(callbackId);
+      }
+      resolve(presented);
+    };
+    const timer = setTimeout(() => finish(false), timeout);
+    const onFrame = (_now, metadata) => {
+      if (done) return;
+      const mediaTime = Number(metadata?.mediaTime);
+      const currentTime = Number(video.currentTime);
+      const atTarget = targetTime === null
+        || (Number.isFinite(mediaTime) && Math.abs(mediaTime - targetTime) <= tolerance)
+        || (!video.seeking && Number.isFinite(currentTime) && Math.abs(currentTime - targetTime) <= tolerance);
+      if (atTarget) {
+        finish(true);
+        return;
+      }
+      callbackId = video.requestVideoFrameCallback(onFrame);
+    };
+    callbackId = video.requestVideoFrameCallback(onFrame);
   });
 }
 
-function seekVideoExact(video, targetTime, serial, runtime) {
+function cancelPendingVideoSeek(runtime, video) {
+  const pending = runtime?.pendingSeeks?.get(video);
+  if (pending) pending.cancel();
+}
+
+function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
   if (!video) return Promise.resolve(false);
+  cancelPendingVideoSeek(runtime, video);
   return new Promise((resolve) => {
     let finished = false;
-    const finish = async () => {
+    let frameWait = null;
+    const operation = { cancel: () => finish(false) };
+    const finish = async (success) => {
       if (finished) return;
       finished = true;
       video.removeEventListener('seeked', onSeeked);
       clearTimeout(timer);
-      if (serial === runtime.seekSerial) await waitForPresentedVideoFrame(video);
-      resolve(serial === runtime.seekSerial);
+      if (runtime.pendingSeeks?.get(video) === operation) runtime.pendingSeeks.delete(video);
+      if (frameWait) await frameWait;
+      resolve(Boolean(success) && serial === runtime.seekSerial);
     };
-    const onSeeked = () => { void finish(); };
-    const timer = setTimeout(() => { void finish(); }, 1_500);
-    video.addEventListener('seeked', onSeeked, { once: true });
+    const waitForFrame = () => {
+      if (serial !== runtime.seekSerial) {
+        void finish(false);
+        return;
+      }
+      if (typeof video.requestVideoFrameCallback !== 'function') {
+        void finish(!video.seeking && Math.abs((Number(video.currentTime) || 0) - targetTime) <= tolerance);
+        return;
+      }
+      frameWait = waitForPresentedVideoFrame(video, targetTime, tolerance, 500);
+      void frameWait.then((presented) => finish(presented));
+    };
+    const onSeeked = () => {
+      if (serial !== runtime.seekSerial) {
+        void finish(false);
+        return;
+      }
+      if (Math.abs((Number(video.currentTime) || 0) - targetTime) > tolerance) {
+        try {
+          video.currentTime = targetTime;
+        } catch {
+          void finish(false);
+        }
+        return;
+      }
+      waitForFrame();
+    };
+    const timer = setTimeout(() => { void finish(false); }, 1_500);
+    runtime.pendingSeeks?.set(video, operation);
+    video.addEventListener('seeked', onSeeked);
     if (Math.abs((Number(video.currentTime) || 0) - targetTime) < 0.0001 && video.readyState >= 2) {
-      void finish();
+      waitForFrame();
       return;
     }
     try {
       video.currentTime = targetTime;
     } catch {
-      void finish();
+      void finish(false);
     }
   });
 }
@@ -1127,10 +1182,23 @@ async function seekFramePlayerIndex(card, frameIndex, { exact = true, status = t
     cancelAnimationFrame(runtime.dragFrame);
     runtime.dragFrame = null;
   }
+  const previousFrameIndex = runtime.currentFrameIndex;
   const serial = ++runtime.seekSerial;
   runtime.currentFrameIndex = target;
   runtime.playing = false;
-  framePlayerSides(entry.block).forEach((side) => framePlayerVideoForSide(card, side)?.pause());
+  if (exact) runtime.exactSeek = serial;
+  else {
+    runtime.exactSeek = null;
+    runtime.scrubActive = true;
+  }
+  const previousGuard = runtime.frameEngineGuard;
+  runtime.frameEngineGuard = true;
+  framePlayerSides(entry.block).forEach((side) => {
+    const video = framePlayerVideoForSide(card, side);
+    cancelPendingVideoSeek(runtime, video);
+    video?.pause();
+  });
+  runtime.frameEngineGuard = previousGuard;
   updateFramePlayerControls(card);
   if (status) setFramePlayerStatus(card, `正在定位第 ${target + 1} 幀…`, 'pending');
   const results = await Promise.all(framePlayerSides(entry.block).map(async (side) => {
@@ -1140,21 +1208,28 @@ async function seekFramePlayerIndex(card, frameIndex, { exact = true, status = t
     if (!video) return false;
     if (!exact) {
       try {
-        if (typeof video.fastSeek === 'function') video.fastSeek(targetTime);
-        else video.currentTime = targetTime;
+        // While a seek is already in flight, assigning currentTime retargets
+        // that operation. Calling fastSeek repeatedly can enqueue stale
+        // keyframe seeks and is the source of the drag backlog.
+        if (video.seeking || typeof video.fastSeek !== 'function') video.currentTime = targetTime;
+        else video.fastSeek(targetTime);
         return true;
       } catch {
         return false;
       }
     }
-    return seekVideoExact(video, targetTime, serial, runtime);
+    const fps = Number(runtime.caches[side]?.fps) > 0 ? Number(runtime.caches[side].fps) : 30;
+    return seekVideoExact(video, targetTime, serial, runtime, Math.max(0.02, (0.5 / fps) + 0.01));
   }));
   if (serial !== runtime.seekSerial || !card.isConnected) return false;
+  if (runtime.exactSeek === serial) runtime.exactSeek = null;
   if (results.every(Boolean)) {
     updateFramePlayerControls(card);
     if (status) setFramePlayerStatus(card, `已顯示第 ${target + 1} 幀。`, 'loaded');
     return true;
   }
+  runtime.currentFrameIndex = previousFrameIndex;
+  updateFramePlayerControls(card);
   if (status) setFramePlayerStatus(card, '影片定位未完成，請重試。', 'error');
   return false;
 }
@@ -1168,7 +1243,25 @@ function requestFramePlayerScrub(card, frameIndex, { exact = false } = {}) {
   const timeline = card.querySelector('[data-frame-timeline]');
   if (timeline) timeline.value = String(target);
   runtime.dragTarget = target;
-  if (exact) return seekFramePlayerIndex(card, target, { exact: true });
+  if (exact) {
+    runtime.scrubActive = false;
+    if (runtime.exactScrubTarget === target && runtime.exactScrubPromise) return runtime.exactScrubPromise;
+    const promise = seekFramePlayerIndex(card, target, { exact: true });
+    runtime.exactScrubTarget = target;
+    runtime.exactScrubPromise = promise;
+    void promise.then(() => {
+      if (runtime.exactScrubPromise === promise) {
+        runtime.exactScrubPromise = null;
+        runtime.exactScrubTarget = null;
+      }
+    }, () => {
+      if (runtime.exactScrubPromise === promise) {
+        runtime.exactScrubPromise = null;
+        runtime.exactScrubTarget = null;
+      }
+    });
+    return promise;
+  }
   if (runtime.dragFrame !== null) return Promise.resolve(true);
   const schedule = typeof window.requestAnimationFrame === 'function'
     ? window.requestAnimationFrame.bind(window)
@@ -1188,6 +1281,8 @@ async function prepareFramePlayerCard(card, block, generation) {
   runtime.playing = false;
   runtime.currentFrameIndex = 0;
   runtime.seekSerial += 1;
+  runtime.exactSeek = null;
+  runtime.scrubActive = false;
   runtime.caches = Object.create(null);
   runtime.lifecycle = 'loading';
   if (runtime.dragFrame !== null) cancelAnimationFrame(runtime.dragFrame);
@@ -1195,6 +1290,7 @@ async function prepareFramePlayerCard(card, block, generation) {
   framePlayerSides(block).forEach((side) => {
     const video = framePlayerVideoForSide(card, side);
     if (video) {
+      cancelPendingVideoSeek(runtime, video);
       video.pause();
       video.removeAttribute('src');
       video.load();
@@ -1281,7 +1377,13 @@ function stopFramePlayer(card) {
   const runtime = framePlayerRuntimeForCard(card);
   runtime.playing = false;
   runtime.seekSerial += 1;
-  framePlayerSides(blockForEditorCard(card).block).forEach((side) => framePlayerVideoForSide(card, side)?.pause());
+  runtime.exactSeek = null;
+  runtime.scrubActive = false;
+  framePlayerSides(blockForEditorCard(card).block).forEach((side) => {
+    const video = framePlayerVideoForSide(card, side);
+    cancelPendingVideoSeek(runtime, video);
+    video?.pause();
+  });
   runtime.lifecycle = 'paused';
   updateFramePlayerControls(card);
 }
@@ -1647,7 +1749,8 @@ function bindInlineVideoRuntime(card, block, side, video) {
     if (current?.type === 'singleVideo' || current?.type === 'comparisonVideo') {
       const playerRuntime = framePlayerRuntimeForCard(card);
       const cache = playerRuntime.caches[side];
-      if (cache && side === playerRuntime.primarySide) {
+      if (cache && side === playerRuntime.primarySide
+        && !playerRuntime.scrubActive && playerRuntime.exactSeek === null) {
         const fps = Number(cache.fps) > 0 ? Number(cache.fps) : 30;
         playerRuntime.currentFrameIndex = Math.max(0, Math.min(
           cache.frameCount - 1,
@@ -1872,6 +1975,9 @@ function handleInlineVideoKeydown(event) {
   if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
   const video = event.target.closest?.('[data-inline-video]');
   if (!video) return;
+  // Frame-player cards have their own keyboard worker. Do not let the
+  // legacy inline stepper start a second seek for the same Arrow key.
+  if (video.closest('[data-frame-player]')) return;
   const sideElement = video.closest('[data-inline-side]');
   const card = video.closest('[data-inline-video-block]');
   const side = sideElement?.dataset.inlineSide;

@@ -10,7 +10,7 @@ Remove-Item -LiteralPath $smokeUserDataPath -Recurse -Force -ErrorAction Silentl
 
 $env:PITCHING_PROJECT_ROOT = $smokeProjectRoot
 $env:PITCHING_SMOKE = '1'
-& $electronCommand '--no-sandbox' '--disable-gpu' '--disable-dev-shm-usage' "--user-data-dir=$smokeUserDataPath" '.'
+& $electronCommand '--no-sandbox' '--disable-dev-shm-usage' "--user-data-dir=$smokeUserDataPath" '.'
 $exitCode = $LASTEXITCODE
 
 Remove-Item -LiteralPath $smokeUserDataPath -Recurse -Force -ErrorAction SilentlyContinue
