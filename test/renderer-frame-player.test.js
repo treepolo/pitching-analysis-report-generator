@@ -101,6 +101,8 @@ test('single-player editor uses the native surface contract and does not open fr
   assert.match(nativePrepare, /adapter\.open\(request\)/u);
   assert.match(nativePrepare, /setNativePlayerBounds/u);
   assert.match(nativePrepare, /requestNativeScrub/u);
+  assert.match(nativePrepare, /closeNativePlayerResponse\(adapter, opened\)/u);
+  assert.match(nativePrepare, /closeNativePlayerSession\(runtime, adapter\)/u);
   assert.doesNotMatch(nativePrepare, /frameCacheAdapter|prepareFrameCache|getFrameSource|dataUrl|base64|currentTime/u);
 });
 

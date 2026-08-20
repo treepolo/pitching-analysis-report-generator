@@ -1256,6 +1256,17 @@ async function closeNativePlayerSession(runtime, adapter) {
   runtime.nativeLifecycle = 'closed';
 }
 
+async function closeNativePlayerResponse(adapter, response) {
+  const sessionId = typeof response?.sessionId === 'string' ? response.sessionId : '';
+  if (!sessionId || !adapter?.close) return;
+  try {
+    await adapter.close({ sessionId });
+  } catch {
+    // A stale open response is best-effort cleanup; the main process also
+    // closes sessions when the owning window is destroyed.
+  }
+}
+
 async function setNativePlayerBounds(card, runtime, adapter) {
   const session = runtime?.nativeSession;
   if (!session || !adapter?.setBounds) return false;
@@ -1397,9 +1408,13 @@ async function prepareNativeFramePlayerCard(card, block, generation, runtime) {
     assetId,
     surfaceId,
   };
+  let opened = null;
   try {
-    const opened = await adapter.open(request);
-    if (generation !== state.inlineGeneration || !card.isConnected) return;
+    opened = await adapter.open(request);
+    if (generation !== state.inlineGeneration || !card.isConnected) {
+      await closeNativePlayerResponse(adapter, opened);
+      return;
+    }
     const session = normalizeNativePlayerSession(opened, request);
     runtime.nativeSession = session;
     runtime.nativeLifecycle = 'ready';
@@ -1410,12 +1425,18 @@ async function prepareNativeFramePlayerCard(card, block, generation, runtime) {
       assetId,
     };
     await setNativePlayerBounds(card, runtime, adapter);
-    if (generation !== state.inlineGeneration || !card.isConnected) return;
+    if (generation !== state.inlineGeneration || !card.isConnected) {
+      await closeNativePlayerSession(runtime, adapter);
+      return;
+    }
     setInlineVideoStatus(card.querySelector('[data-inline-side="single"]'), '原生播放器已就緒。', 'loaded');
     updateFramePlayerControls(card);
     await requestNativeScrub(card, session.currentFrameIndex);
   } catch (error) {
-    if (generation !== state.inlineGeneration || !card.isConnected) return;
+    if (generation !== state.inlineGeneration || !card.isConnected) {
+      await closeNativePlayerSession(runtime, adapter);
+      return;
+    }
     runtime.nativeLifecycle = 'error';
     runtime.nativeSession = null;
     setInlineVideoStatus(card.querySelector('[data-inline-side="single"]'), `原生播放器錯誤：${error?.message || '無法開啟影片。'}`, 'error');
@@ -2860,8 +2881,6 @@ window.addEventListener('scroll', refreshNativePlayerBounds, { passive: true, ca
     await refreshProjects();
     const recentProject = mostRecentlyOpenedProject();
     if (recentProject) await openProject(recentProject.id);
-    renderEditor();
-    renderPreview();
   } catch (error) {
     if (elements.rootPath) elements.rootPath.textContent = '無法讀取';
     setSaveState('啟動失敗', 'error');
