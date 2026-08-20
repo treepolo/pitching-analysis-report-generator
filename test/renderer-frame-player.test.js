@@ -60,6 +60,8 @@ test('drag is latest-target-wins approximate seek, release is exact seek', () =>
   assert.match(seek, /runtime\.seekSerial/u);
   assert.match(seek, /cancelPendingVideoSeek/u);
   assert.match(seek, /scrubActive/u);
+  assert.match(renderer, /readyAtTarget/u);
+  assert.match(renderer, /presented \|\| readyAtTarget\(\)/u);
 
   const events = functionSlice(renderer, 'function handleFramePlayerEvent(', 'function handleFramePlayerKeydown(');
   assert.match(events, /event\.type === 'pointerup'/u);

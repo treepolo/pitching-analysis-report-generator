@@ -1119,7 +1119,11 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
   return new Promise((resolve) => {
     let finished = false;
     let frameWait = null;
+    let waitingForFrame = false;
     const operation = { cancel: () => finish(false) };
+    const readyAtTarget = () => !video.seeking
+      && video.readyState >= 2
+      && Math.abs((Number(video.currentTime) || 0) - targetTime) <= tolerance;
     const finish = async (success) => {
       if (finished) return;
       finished = true;
@@ -1135,11 +1139,13 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
         return;
       }
       if (typeof video.requestVideoFrameCallback !== 'function') {
-        void finish(!video.seeking && Math.abs((Number(video.currentTime) || 0) - targetTime) <= tolerance);
+        void finish(readyAtTarget());
         return;
       }
+      if (waitingForFrame) return;
+      waitingForFrame = true;
       frameWait = waitForPresentedVideoFrame(video, targetTime, tolerance, 500);
-      void frameWait.then((presented) => finish(presented));
+      void frameWait.then((presented) => finish(presented || readyAtTarget()));
     };
     const onSeeked = () => {
       if (serial !== runtime.seekSerial) {
@@ -1156,7 +1162,7 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
       }
       waitForFrame();
     };
-    const timer = setTimeout(() => { void finish(false); }, 1_500);
+    const timer = setTimeout(() => { void finish(readyAtTarget()); }, 1_500);
     runtime.pendingSeeks?.set(video, operation);
     video.addEventListener('seeked', onSeeked);
     if (Math.abs((Number(video.currentTime) || 0) - targetTime) < 0.0001 && video.readyState >= 2) {
