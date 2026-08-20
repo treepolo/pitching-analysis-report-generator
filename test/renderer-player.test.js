@@ -97,18 +97,27 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /持續綁定/u);
   assert.match(renderer, /控制側/u);
   assert.match(renderer, /data-inline-action="capture-anchor"/u);
-  assert.match(renderer, /data-inline-action="step-prev"/u);
-  assert.match(renderer, /data-inline-action="step-next"/u);
-  assert.match(renderer, /handleInlineVideoKeydown/u);
+  assert.match(renderer, /data-frame-player/u);
+  assert.match(renderer, /data-frame-timeline/u);
+  assert.match(renderer, /data-frame-action="toggle"/u);
+  assert.match(renderer, /data-frame-action="previous"/u);
+  assert.match(renderer, /data-frame-action="next"/u);
+  assert.match(renderer, /frameCacheAdapter/u);
+  assert.match(renderer, /getFrameIndex/u);
+  assert.match(renderer, /getFrameSource/u);
+  assert.match(renderer, /getFrameState/u);
+  assert.match(renderer, /prepareFrameCache/u);
+  assert.match(renderer, /handleFramePlayerKeydown/u);
   assert.match(renderer, /\['ArrowLeft', 'ArrowRight'\]\.includes\(event\.key\)/u);
   assert.match(renderer, /event\.key === 'ArrowRight'/u);
-  assert.match(renderer, /requestVideoFrameCallback/u);
-  assert.match(renderer, /seekToNextFrame/u);
-  assert.match(renderer, /inlineRuntimeByCard: new WeakMap\(\)/u);
+  assert.match(renderer, /framePlayerByCard: new WeakMap\(\)/u);
+  assert.match(renderer, /影格快取橋接尚未提供/u);
   assert.match(renderer, /無法使用畫面層橋接/u);
   assert.match(renderer, /elements\.appError\) return/u);
   assert.doesNotMatch(renderer, /elements\.(mediaLibrary|playerPanel|preview|sectionList)\s*=|document\.querySelector\('#(?:media-library|player-panel|preview|section-list)'\)/u);
   assert.match(styles, /\.export-directory-status/u);
+  assert.match(styles, /\.inline-frame-controls/u);
+  assert.match(indexHtml, /img-src 'self' data: blob: file:/u);
 });
 
 test('renderer source never constructs a media URL from a filesystem path', () => {

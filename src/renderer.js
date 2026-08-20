@@ -21,6 +21,7 @@ const state = {
   },
   inlineGeneration: 0,
   inlineRuntimeByCard: new WeakMap(),
+  framePlayerByCard: new WeakMap(),
   blockCanvasRenderQueued: false,
   player: {
     selectedBlockId: null,
@@ -267,6 +268,58 @@ function playerTimingForAsset(asset, duration) {
   }
   if (frameTiming === 'vfr') return { kind: 'vfr', duration };
   return { kind: 'unknown', duration };
+}
+
+// Lane A preparing contract for Wave 20. Keep this adapter local so the
+// bridge handoff changes one seam without changing editor interaction.
+function frameCacheAdapter() {
+  const bridge = window.pitchingApp?.frameCache || window.pitchingApp;
+  if (!bridge || typeof bridge !== 'object') return null;
+  return {
+    getFrameIndex: typeof bridge.getFrameIndex === 'function' ? bridge.getFrameIndex.bind(bridge) : null,
+    getFrameSource: typeof bridge.getFrameSource === 'function' ? bridge.getFrameSource.bind(bridge) : null,
+    getFrameState: typeof bridge.getFrameState === 'function' ? bridge.getFrameState.bind(bridge) : null,
+    prepareFrameCache: typeof bridge.prepareFrameCache === 'function' ? bridge.prepareFrameCache.bind(bridge) : null,
+  };
+}
+
+function normalizeFrameIndexResult(result) {
+  const frames = Array.isArray(result) ? result : (Array.isArray(result?.frames) ? result.frames : null);
+  const rawCount = result?.frameCount ?? result?.totalFrames ?? frames?.length;
+  const frameCount = Number.isInteger(Number(rawCount)) ? Math.max(0, Number(rawCount)) : 0;
+  return {
+    frameCount,
+    fps: Number.isFinite(Number(result?.fps)) && Number(result.fps) > 0 ? Number(result.fps) : null,
+    duration: Number.isFinite(Number(result?.duration)) ? Number(result.duration) : null,
+    frameTimes: Array.isArray(result?.frameTimes) ? result.frameTimes : null,
+    frames,
+  };
+}
+
+function normalizeFrameCacheState(result) {
+  if (typeof result === 'string') return { state: result, message: '' };
+  return {
+    state: result?.state ?? result?.status ?? 'unknown',
+    message: typeof result?.message === 'string' ? result.message : '',
+  };
+}
+
+function frameSourceValue(frame) {
+  if (typeof frame === 'string') return frame;
+  return frame?.dataUrl ?? frame?.imageData ?? frame?.url ?? frame?.sourceUrl ?? null;
+}
+
+function safeInlineFrameSourceUrl(frame) {
+  const source = frameSourceValue(frame);
+  if (typeof source !== 'string' || source.trim() === '') return null;
+  try {
+    const parsed = new URL(source, window.location.href);
+    if (!['data:', 'blob:', 'file:'].includes(parsed.protocol)) return null;
+    if (parsed.protocol === 'data:' && !/^data:image\//iu.test(parsed.href)) return null;
+    return parsed.href;
+  } catch {
+    return null;
+  }
 }
 
 function inlineBindingSegment(config) {
@@ -858,17 +911,11 @@ function renderInlineVideoSide(block, side) {
   return `
     <div class="inline-video-side" data-inline-side="${side}">
       <h3>${label}</h3>
-      <div class="inline-video-frame"><video data-inline-video tabindex="0" playsinline preload="metadata"></video></div>
-      <p class="inline-video-status" data-inline-status role="status">尚未載入；請選擇專案內資產。</p>
-      <div class="inline-video-controls">
-        <button class="button button-quiet" type="button" data-inline-action="play">播放</button>
-        <button class="button button-quiet" type="button" data-inline-action="pause">暫停</button>
-        <button class="button button-quiet" type="button" data-inline-action="step-prev">上一幀</button>
-        <button class="button button-quiet" type="button" data-inline-action="step-next">下一幀</button>
-        <input class="inline-video-seek" data-inline-seek type="range" min="0" max="0" step="0.001" value="0" disabled aria-label="${label}時間軸" />
-        <output class="inline-video-time" data-inline-time>0.00s</output>
-        <button class="button button-quiet" type="button" data-inline-action="fullscreen">全螢幕</button>
+      <div class="inline-video-frame inline-frame-surface" data-frame-surface tabindex="0" aria-label="${label}影格畫面">
+        <img data-inline-frame alt="${label}目前影格" hidden />
+        <span class="inline-frame-placeholder" data-frame-placeholder>尚未準備影格快取</span>
       </div>
+      <p class="inline-video-status" data-inline-status role="status">尚未準備；等待影格快取。</p>
     </div>`;
 }
 
@@ -878,17 +925,23 @@ function renderInlineVideoBlock(section, block) {
   const sides = comparison ? `${renderInlineVideoSide(block, 'left')}${renderInlineVideoSide(block, 'right')}` : renderInlineVideoSide(block, 'single');
   const syncMode = inlineBindingSummary(block);
   return `
-    <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block>
+    <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block data-frame-player>
       <header class="inline-video-header">
         <div class="inline-video-title"><strong>${escapeHtml(block.label || (comparison ? '影片比較' : '影片區塊'))}</strong><span>${comparison ? `${escapeHtml(syncMode)} · ${layout === 'stacked' ? '堆疊' : '並排'}` : '單一來源 · 專案內媒體'}</span></div>
         <div class="inline-video-actions">
-          <button class="button button-quiet" type="button" data-inline-action="open">開啟控制項</button>
-          <button class="button button-secondary" type="button" data-inline-action="play-all">播放</button>
-          <button class="button button-quiet" type="button" data-inline-action="pause-all">暫停</button>
+          <button class="button button-quiet" type="button" data-frame-action="open" data-inline-action="open">開啟控制項</button>
           ${comparison ? '<button class="button button-quiet" type="button" data-inline-action="align-zero">對齊 0 秒</button>' : ''}
         </div>
       </header>
       <div class="inline-video-grid" data-layout="${layout}">${sides}</div>
+      <div class="inline-frame-controls" data-frame-controls aria-label="影格播放器控制">
+        <button class="button button-quiet" type="button" data-frame-action="previous" disabled>上一幀</button>
+        <input class="inline-frame-timeline" data-frame-timeline type="range" min="0" max="0" step="1" value="0" disabled aria-label="主影格時間軸" />
+        <button class="button button-quiet" type="button" data-frame-action="next" disabled>下一幀</button>
+        <output class="inline-frame-position" data-frame-position>尚未準備</output>
+        <button class="button button-secondary" type="button" data-frame-action="toggle" disabled aria-pressed="false">播放</button>
+        <span class="inline-frame-player-status" data-frame-player-status role="status" data-state="pending">正在準備影格快取…</span>
+      </div>
       <details class="inline-video-details"><summary>區塊設定</summary>${renderVideoBlockEditor(block)}</details>
     </article>`;
 }
@@ -942,6 +995,292 @@ function inlineRuntimeForCard(card) {
     state.inlineRuntimeByCard.set(card, runtime);
   }
   return runtime;
+}
+
+function framePlayerRuntimeForCard(card) {
+  let runtime = state.framePlayerByCard.get(card);
+  if (!runtime) {
+    runtime = {
+      caches: Object.create(null),
+      currentFrameIndex: 0,
+      requestSerial: 0,
+      playing: false,
+      playbackTimer: null,
+      primarySide: 'single',
+    };
+    state.framePlayerByCard.set(card, runtime);
+  }
+  return runtime;
+}
+
+function framePlayerSides(block) {
+  return block?.type === 'comparisonVideo' ? ['left', 'right'] : ['single'];
+}
+
+function framePlayerPrimarySide(block, runtime) {
+  if (block?.type !== 'comparisonVideo') return 'single';
+  const configured = inlineBindingForBlock(block).masterSide;
+  if (runtime.caches[configured]) return configured;
+  return runtime.caches.left ? 'left' : runtime.caches.right ? 'right' : configured;
+}
+
+function framePlayerFrameCount(block, runtime) {
+  const primary = framePlayerPrimarySide(block, runtime);
+  const primaryCount = runtime.caches[primary]?.frameCount || 0;
+  if (primaryCount > 0) return primaryCount;
+  return framePlayerSides(block).reduce((highest, side) => Math.max(highest, runtime.caches[side]?.frameCount || 0), 0);
+}
+
+function setFramePlayerStatus(card, message, stateName = '') {
+  const status = card?.querySelector('[data-frame-player-status]');
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.state = stateName;
+}
+
+function updateFramePlayerControls(card) {
+  const entry = blockForEditorCard(card);
+  const runtime = framePlayerRuntimeForCard(card);
+  const count = framePlayerFrameCount(entry.block, runtime);
+  const maxIndex = Math.max(0, count - 1);
+  const index = Math.min(Math.max(0, runtime.currentFrameIndex), maxIndex);
+  runtime.currentFrameIndex = index;
+  runtime.primarySide = framePlayerPrimarySide(entry.block, runtime);
+  const timeline = card.querySelector('[data-frame-timeline]');
+  const position = card.querySelector('[data-frame-position]');
+  const previous = card.querySelector('[data-frame-action="previous"]');
+  const next = card.querySelector('[data-frame-action="next"]');
+  const toggle = card.querySelector('[data-frame-action="toggle"]');
+  const available = count > 0;
+  if (timeline) {
+    timeline.max = String(maxIndex);
+    timeline.value = String(index);
+    timeline.disabled = !available;
+  }
+  if (position) position.textContent = available ? `第 ${index + 1} / ${count} 幀` : '尚未準備';
+  if (previous) previous.disabled = !available || index <= 0;
+  if (next) next.disabled = !available || index >= maxIndex;
+  if (toggle) {
+    toggle.disabled = !available;
+    toggle.textContent = runtime.playing ? '暫停' : '播放';
+    toggle.setAttribute('aria-pressed', runtime.playing ? 'true' : 'false');
+  }
+}
+
+function framePlayerIndexForSide(block, runtime, side, primaryIndex) {
+  const cache = runtime.caches[side];
+  if (!cache || cache.frameCount <= 1) return 0;
+  const primary = framePlayerPrimarySide(block, runtime);
+  const primaryCount = runtime.caches[primary]?.frameCount || cache.frameCount;
+  if (side === primary || primaryCount <= 1) return Math.min(primaryIndex, cache.frameCount - 1);
+  return Math.min(cache.frameCount - 1, Math.max(0, Math.round((primaryIndex / (primaryCount - 1)) * (cache.frameCount - 1))));
+}
+
+async function getCachedFrameSource(assetId, frameIndex, cache) {
+  if (cache.frames?.[frameIndex] !== undefined) return cache.frames[frameIndex];
+  const adapter = frameCacheAdapter();
+  if (!adapter?.getFrameSource) throw new Error('影格快取橋接缺少 getFrameSource(assetId, frameIndex)');
+  return adapter.getFrameSource(assetId, frameIndex);
+}
+
+async function renderFramePlayerIndex(card, frameIndex) {
+  const entry = blockForEditorCard(card);
+  const runtime = framePlayerRuntimeForCard(card);
+  const count = framePlayerFrameCount(entry.block, runtime);
+  if (count <= 0) {
+    setFramePlayerStatus(card, '影格快取尚未準備，無法顯示影格。', 'error');
+    updateFramePlayerControls(card);
+    return;
+  }
+  const maxIndex = count - 1;
+  runtime.currentFrameIndex = Math.min(Math.max(0, Math.round(Number(frameIndex) || 0)), maxIndex);
+  const requestSerial = ++runtime.requestSerial;
+  updateFramePlayerControls(card);
+  setFramePlayerStatus(card, `正在顯示第 ${runtime.currentFrameIndex + 1} 幀…`, 'pending');
+  const results = await Promise.all(framePlayerSides(entry.block).map(async (side) => {
+    const cache = runtime.caches[side];
+    const sideElement = card.querySelector(`[data-inline-side="${side}"]`);
+    if (!cache) {
+      setInlineVideoStatus(sideElement, '此側影格快取尚未準備。', 'pending');
+      return false;
+    }
+    const sideIndex = framePlayerIndexForSide(entry.block, runtime, side, runtime.currentFrameIndex);
+    try {
+      const frame = await getCachedFrameSource(cache.assetId, sideIndex, cache);
+      if (requestSerial !== runtime.requestSerial || !card.isConnected) return false;
+      const source = safeInlineFrameSourceUrl(frame);
+      if (!source) throw new Error('影格快取回傳無法顯示的影格來源');
+      const image = sideElement?.querySelector('[data-inline-frame]');
+      const placeholder = sideElement?.querySelector('[data-frame-placeholder]');
+      if (!image) throw new Error('影格畫面元素不存在');
+      image.src = source;
+      image.hidden = false;
+      if (placeholder) placeholder.hidden = true;
+      setInlineVideoStatus(sideElement, `已顯示第 ${sideIndex + 1} 幀。`, 'loaded');
+      return true;
+    } catch (error) {
+      if (requestSerial !== runtime.requestSerial) return false;
+      setInlineVideoStatus(sideElement, `影格載入失敗：${error?.message || '來源無效'}`, 'error');
+      return false;
+    }
+  }));
+  if (requestSerial !== runtime.requestSerial) return;
+  if (results.some(Boolean)) {
+    setFramePlayerStatus(card, `已顯示第 ${runtime.currentFrameIndex + 1} 幀。`, 'loaded');
+  } else {
+    setFramePlayerStatus(card, '影格無法顯示，請重試影格快取。', 'error');
+  }
+}
+
+async function prepareFramePlayerSide(card, block, side, generation, adapter) {
+  const sideElement = card.querySelector(`[data-inline-side="${side}"]`);
+  const assetId = playerAssetIdFor(block, side);
+  if (!assetId || !mediaAssetFor(assetId)) {
+    setInlineVideoStatus(sideElement, '尚未選擇專案內資產。', 'pending');
+    return;
+  }
+  if (!adapter || !adapter.getFrameIndex || !adapter.getFrameSource || !adapter.getFrameState || !adapter.prepareFrameCache) {
+    setInlineVideoStatus(sideElement, '影格快取橋接契約尚未提供。', 'error');
+    return;
+  }
+  setInlineVideoStatus(sideElement, '正在準備影格快取…', 'pending');
+  try {
+    let cacheState = normalizeFrameCacheState(await adapter.getFrameState(assetId));
+    if (cacheState.state !== 'ready') {
+      if (cacheState.state === 'error' || cacheState.state === 'failed') {
+        setInlineVideoStatus(sideElement, `影格快取錯誤：${cacheState.message || '請重試。'}`, 'error');
+      } else {
+        await adapter.prepareFrameCache(assetId);
+        cacheState = normalizeFrameCacheState(await adapter.getFrameState(assetId));
+      }
+    }
+    if (generation !== state.inlineGeneration || !card.isConnected) return;
+    if (cacheState.state !== 'ready') {
+      if (['queued', 'pending', 'preparing', 'processing', 'running'].includes(cacheState.state)) {
+        setInlineVideoStatus(sideElement, '影格快取準備中…', 'pending');
+        return;
+      }
+      throw new Error(cacheState.message || `影格快取狀態為「${cacheState.state}」`);
+    }
+    const index = normalizeFrameIndexResult(await adapter.getFrameIndex(assetId));
+    if (index.frameCount <= 0) throw new Error('影格索引沒有可用影格');
+    const runtime = framePlayerRuntimeForCard(card);
+    runtime.caches[side] = { ...index, assetId };
+    setInlineVideoStatus(sideElement, `影格快取已就緒 · ${index.frameCount} 幀。`, 'loaded');
+  } catch (error) {
+    if (generation !== state.inlineGeneration || !card.isConnected) return;
+    setInlineVideoStatus(sideElement, `影格快取錯誤：${error?.message || '請重試。'}`, 'error');
+  }
+}
+
+async function prepareFramePlayerCard(card, block, generation) {
+  const runtime = framePlayerRuntimeForCard(card);
+  if (runtime.playbackTimer) clearTimeout(runtime.playbackTimer);
+  runtime.playbackTimer = null;
+  runtime.playing = false;
+  runtime.currentFrameIndex = 0;
+  runtime.requestSerial += 1;
+  runtime.caches = Object.create(null);
+  updateFramePlayerControls(card);
+  setFramePlayerStatus(card, '正在準備影格快取…', 'pending');
+  const adapter = frameCacheAdapter();
+  if (!adapter) {
+    framePlayerSides(block).forEach((side) => {
+      setInlineVideoStatus(card.querySelector(`[data-inline-side="${side}"]`), '影格快取橋接尚未提供。', 'error');
+    });
+    setFramePlayerStatus(card, '影格快取橋接尚未提供；等待 Lane A。', 'error');
+    updateFramePlayerControls(card);
+    return;
+  }
+  await Promise.all(framePlayerSides(block).map((side) => prepareFramePlayerSide(card, block, side, generation, adapter)));
+  if (generation !== state.inlineGeneration || !card.isConnected) return;
+  if (framePlayerFrameCount(block, runtime) <= 0) {
+    setFramePlayerStatus(card, '影格快取尚未完成，請稍後重試。', 'pending');
+    updateFramePlayerControls(card);
+    return;
+  }
+  updateFramePlayerControls(card);
+  void renderFramePlayerIndex(card, 0);
+}
+
+function stopFramePlayer(card) {
+  const runtime = framePlayerRuntimeForCard(card);
+  runtime.playing = false;
+  if (runtime.playbackTimer) clearTimeout(runtime.playbackTimer);
+  runtime.playbackTimer = null;
+  updateFramePlayerControls(card);
+}
+
+function scheduleFramePlayerTick(card) {
+  const entry = blockForEditorCard(card);
+  const runtime = framePlayerRuntimeForCard(card);
+  if (!runtime.playing) return;
+  const count = framePlayerFrameCount(entry.block, runtime);
+  if (runtime.currentFrameIndex >= count - 1) {
+    stopFramePlayer(card);
+    setFramePlayerStatus(card, '已到達最後一幀。', 'loaded');
+    return;
+  }
+  const primary = runtime.caches[framePlayerPrimarySide(entry.block, runtime)];
+  const fps = primary?.fps || 30;
+  runtime.playbackTimer = setTimeout(async () => {
+    if (!runtime.playing) return;
+    await renderFramePlayerIndex(card, runtime.currentFrameIndex + 1);
+    scheduleFramePlayerTick(card);
+  }, Math.max(16, Math.round(1000 / fps)));
+}
+
+function toggleFramePlayer(card) {
+  const runtime = framePlayerRuntimeForCard(card);
+  if (framePlayerFrameCount(blockForEditorCard(card).block, runtime) <= 0) {
+    setFramePlayerStatus(card, '影格快取尚未準備，無法播放。', 'error');
+    return;
+  }
+  runtime.playing = !runtime.playing;
+  updateFramePlayerControls(card);
+  setFramePlayerStatus(card, runtime.playing ? '播放中。' : '已暫停。', 'loaded');
+  if (runtime.playing) scheduleFramePlayerTick(card);
+  else if (runtime.playbackTimer) clearTimeout(runtime.playbackTimer);
+}
+
+function stepFramePlayer(card, direction) {
+  stopFramePlayer(card);
+  const runtime = framePlayerRuntimeForCard(card);
+  const maxIndex = Math.max(0, framePlayerFrameCount(blockForEditorCard(card).block, runtime) - 1);
+  const target = Math.min(maxIndex, Math.max(0, runtime.currentFrameIndex + direction));
+  void renderFramePlayerIndex(card, target);
+}
+
+function handleFramePlayerEvent(event) {
+  const target = event.target;
+  const card = target.closest('[data-frame-player]');
+  if (!card) return false;
+  if (target.matches('[data-frame-timeline]')) {
+    void renderFramePlayerIndex(card, Number(target.value));
+    return true;
+  }
+  const action = target.closest('[data-frame-action]')?.dataset.frameAction;
+  if (!action) return false;
+  if (action === 'open') {
+    const details = card.querySelector('details');
+    if (details) details.open = true;
+  } else if (action === 'toggle') {
+    toggleFramePlayer(card);
+  } else if (action === 'previous') {
+    stepFramePlayer(card, -1);
+  } else if (action === 'next') {
+    stepFramePlayer(card, 1);
+  }
+  return true;
+}
+
+function handleFramePlayerKeydown(event) {
+  if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+  const card = event.target.closest?.('[data-frame-player]');
+  if (!card || event.target.matches('[data-frame-timeline]')) return;
+  if (!event.target.closest?.('[data-frame-surface]')) return;
+  event.preventDefault();
+  stepFramePlayer(card, event.key === 'ArrowRight' ? 1 : -1);
 }
 
 function scheduleInlineRuntimeTask(callback) {
@@ -1266,8 +1605,7 @@ function hydrateInlineVideoCards() {
   elements.blockCanvas.querySelectorAll('[data-inline-video-block]').forEach((card) => {
     const entry = blockForEditorCard(card);
     if (!entry.block) return;
-    const sides = entry.block.type === 'comparisonVideo' ? ['left', 'right'] : ['single'];
-    sides.forEach((side) => { void loadInlineVideoSide(card, entry.block, side, generation); });
+    void prepareFramePlayerCard(card, entry.block, generation);
   });
 }
 
@@ -1631,6 +1969,11 @@ function refreshInlineBindingAfterEditorChange(card, block, pathValue) {
 
 function handleBlockEditorEvent(event) {
   const target = event.target;
+  if (target.closest('[data-frame-player]')
+    && (target.matches('[data-frame-timeline]') || target.closest('[data-frame-action]'))) {
+    handleFramePlayerEvent(event);
+    return;
+  }
   if (target.closest('[data-inline-video-block]') && (target.matches('[data-inline-seek]') || target.closest('[data-inline-action]'))) {
     handleInlineVideoEvent(event);
     return;
@@ -1993,6 +2336,7 @@ elements.blockCanvas?.addEventListener('input', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('change', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('click', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('keydown', handleInlineVideoKeydown);
+elements.blockCanvas?.addEventListener('keydown', handleFramePlayerKeydown);
 elements.blockCanvas?.addEventListener('focusout', () => {
   setTimeout(flushQueuedBlockCanvasRender, 0);
 });
