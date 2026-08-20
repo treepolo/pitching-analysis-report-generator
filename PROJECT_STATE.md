@@ -2,12 +2,13 @@
 
 ## Current Wave 20B integrator gate (2026-08-20)
 
-- Current provenance tip is `54678f4` on `worker/desktop-vertical-slice`; the product code tip is `7c2c40c`. The live remote branch currently resolves to `4a1f09e`, so local contains the Wave 20 frame-cache work and is ahead by five commits. `git ls-remote origin refs/heads/worker/desktop-vertical-slice` was available during this gate.
+- Current provenance tip is `6bd52a6` on `worker/desktop-vertical-slice`; the product code tip is `7c2c40c`. The live remote branch resolves to `6bd52a6`, matching local HEAD. `git ls-remote origin refs/heads/worker/desktop-vertical-slice` was available during this gate.
 - Provenance chain: frame-cache contract=`c8b9790`, editor seam=`4a1f09e`, Media pipeline=`79e196c`, Bridge/Editor=`5525b49`, Portable Export=`342d6e1`, Integrator hardening=`7c2c40c`.
 - Bounded implementation now wires the v1 frame-cache contract through main/preload/renderer, reads only referenced video caches for export, stages ready index/PNG frames into folder/ZIP outputs, enforces frame-directory containment, and rejects comparison partial-ready rendering as success.
 - Independent regression evidence: `npm test` (`node --test`) → 162 tests, 161 pass, 0 fail, 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. `node --check` passes for 47 JavaScript files; product-scope `git diff --check`, tracked-artifact scan, and credential-pattern scan pass.
-- This is bounded implementation/contract evidence only. Real FFmpeg/media fixtures, Electron editor runtime, exported `file://`, native picker, responsive human evidence, and AT-A through AT-G remain incomplete or unavailable. No requirement is `VERIFIED`.
-- Current worktree retains an unrelated pre-existing `AGENTS.md` edit; all current Wave 20 source/test changes are committed. The generated planning file `WAVE_20_FRAME_CACHE_PLAN.md` is kept inside the project and is reconciled in the next docs checkpoint.
+- Additional bounded real local smoke: a project-local generated MP4 was processed by the installed FFmpeg/ffprobe tools into a reused ready cache (`12` CFR frames), then exported as referenced-only folder and ZIP with `0` warnings, valid folder/ZIP parity, a self-contained frame-player HTML (no `<video>` fallback), `12` PNG frames, and an extracted cache index. This is one fixture/tool run, not full product acceptance.
+- Broader real media/player/sync drift, Electron editor runtime, exported `file://`, native picker, responsive human evidence, and AT-A through AT-G remain incomplete or unavailable. No requirement is `VERIFIED`.
+- Current worktree retains an unrelated pre-existing `AGENTS.md` edit; all current Wave 20 source/test/docs changes are committed. The generated planning file `WAVE_20_FRAME_CACHE_PLAN.md` is kept inside the project.
 
 ## Current Wave 19G provenance reconciliation (2026-08-20)
 
