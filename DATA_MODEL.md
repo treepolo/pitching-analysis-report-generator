@@ -3,12 +3,12 @@
 ## Canonical model decision: block document and derived export references (2026-08-14)
 
 - `ReportProject` is a long-form ordered document. Sections/regions, where retained for navigation, contain ordered `ContentBlock` instances; the former fixed-form field layout is not canonical and is not a compatibility mode.
-- `ContentBlock` is the editing unit. A project may contain many independent text blocks and video blocks. Each video block owns its single/comparison selection, layout, in/out/playback settings, and block-local sync data.
-- `MediaAsset` remains project-scoped reusable source metadata. It never owns block-specific anchors, playback state, or export inclusion state.
+- `ContentBlock` is the editing unit. A project may contain many independent text blocks and video blocks. Each video block owns its single/dual selection, and each video side owns its in/out/playback settings.
+- `MediaAsset` remains project-scoped reusable source metadata. It never owns block-specific playback state or export inclusion state.
 - Export derives `referencedAssetIds` by traversing video blocks in a read-only snapshot. Only those assets receive export copies; originals and unused library assets are untouched and excluded.
 - This model decision changes the canonical target only; migration, persistence, and acceptance remain implementation work and are not verified here.
 
-目前狀態：**Phase 2 planning**。Desktop architecture 與 project-root storage direction 已由使用者確認；本文件定義 renderer、editor、media、sync 與 export 共用的語意模型，實際 storage adapter 仍待 implementation。
+目前狀態：**Phase 2 planning**。Desktop architecture 與 project-root storage direction 已由使用者確認；目前同步資料結構與同步 IPC 已移除，待未來另行設計後再加入本文件。
 
 ## 1. Canonical entities
 
@@ -16,10 +16,9 @@
 |---|---|---|---|
 | ReportProject | create/list/open/edit/rename/save/duplicate/delete/reopen | Report Model / Editor | 擁有 sections、media assets、jobs |
 | Section | create/edit/reorder/delete | Report Model / Editor | 屬於一個 project |
-| ContentBlock | create/edit/reorder/delete | Report Model / Editor | 屬於 section；可為 text、image、single video、comparison |
+| ContentBlock | create/edit/reorder/delete | Report Model / Editor | 屬於 section；可為 text、image、single video、dual video |
 | MediaAsset | import/inspect/normalize/list/rename/disable/delete | Media Pipeline | 屬於 project，被 blocks reference |
-| PlayerBlockConfig | block-local playback / loop / labels | Playback / Sync | reference 一或多個 MediaAsset |
-| SyncAnchor | set/update/delete/validate | Playback / Sync | 屬於 comparison block instance 與 side |
+| PlayerBlockConfig | block-local playback / loop / labels | Playback | reference 一或多個 MediaAsset |
 | ExportJob | start/progress/cancel/retry/complete/fail/recover | Renderer / Export | 讀取 source project，不改寫 source |
 | JobEvent | append-only phase/error/result record | Job owner | 隸屬 ExportJob 或 media job |
 
@@ -59,8 +58,8 @@ ContentBlock 必須以 discriminated type 表示：
 
 - text：結構化 rich text／安全 markup，不接受任意 script。
 - image：一個 project-local MediaAsset reference 與可選 caption/alt。
-- singleVideo：一個 MediaAsset reference、label、playback options、loop range。
-- comparisonVideo：兩個 side references；每側 asset、label、anchor、loop range、precision state。
+- singleVideo：一個 MediaAsset reference、label、playback options、segment loop。
+- comparisonVideo（使用者介面稱雙影片）：兩個 side references；每側 filename、source title、segment、playback 與 loop。兩側是獨立的單影片播放器。
 
 空 title、空 optional fields 不應在 export renderer 產生空白 section 或裝飾性 placeholder。
 
@@ -77,24 +76,11 @@ ContentBlock 必須以 discriminated type 表示：
 - lifecycle status：ready、processing、failed、disabled、missing
 - reference count／由查詢推導的 usage list
 
-MediaAsset 不得保存 block-specific sync anchor、loop、label 或播放狀態。
+MediaAsset 不得保存 block-specific loop、label 或播放狀態。
 
-## 6. PlayerBlockConfig / SyncAnchor
+## 6. PlayerBlockConfig
 
-PlayerBlockConfig 保存使用情境；同一 MediaAsset 被不同 block 使用時，設定互不污染。
-
-SyncAnchor 最小語意欄位：
-
-- comparisonBlockId
-- side id（left/right）
-- mediaAssetId
-- observed frame index（可空）
-- observed media time
-- precision：frame-aware、time-based、unknown
-- source timing metadata snapshot
-- createdAt、updatedAt
-
-anchor 的 validity 由 block instance、asset metadata 與 loop range 一起判斷，不由 MediaAsset 上的全域旗標判斷。
+PlayerBlockConfig 保存使用情境；同一 MediaAsset 被不同 block 使用時，設定互不污染。雙影片兩側的 PlayerBlockConfig 完全獨立；目前不保存舊同步錨點、相對偏移或綁定模式。
 
 ## 7. ExportJob / JobEvent
 
@@ -118,12 +104,11 @@ JobEvent 是 append-only；不可把取消、失敗覆寫成成功。reload 後�
 | ReportProject | 必須 | 必須 | recovery | 可選 archive | 必須，含 impact | updated/recovery |
 | Section/Block | 必須 | 必須 | 不適用 | 不適用 | 必須 | source revision |
 | MediaAsset | 必須 | rename/metadata status | normalization retry | 必須可停用 | 必須含 references | import/job history |
-| SyncAnchor | set/list/view | 必須 | 重新設定 | 不適用 | 必須 | block revision |
 | ExportJob | start/list/view | 不直接編輯 | 必須 retry/recover | cancel | history retention policy | 必須 |
 
 ## 9. Persistence and integrity boundary
 
 - 正式 application data storage policy 已決定為 `PROJECT_ROOT/projects/<project-id>/`；技術 adapter、atomic save 與 recovery implementation 尚未開始。
-- storage adapter 必須將 project、media references、anchors、export settings、job metadata 與 recovery state 以可重開方式保存。
+- storage adapter 必須將 project、media references、playback settings、export settings、job metadata 與 recovery state 以可重開方式保存。
 - export 不可使用 temporary mutation 破壞 source；中斷時 temporary output 只能留在 PROJECT_ROOT/.tmp 下並可辨識為未完成。
 - model read/write 要可測試，不把 UI state 直接當 canonical persisted model。

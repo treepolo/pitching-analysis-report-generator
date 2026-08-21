@@ -17,7 +17,6 @@ const {
   isPathInside,
   validateProjectRoot,
 } = require('./storage');
-const syncDomain = require('./sync/domain');
 const {
   ExportJobController,
   validatePickedExportDirectory,
@@ -458,26 +457,6 @@ function registerIpc() {
     assertTrustedSender(event);
     return projectStore.insertTextBlock(payload?.projectId, payload);
   });
-  ipcMain.handle('sync:align', (event, payload) => {
-    assertTrustedSender(event);
-    return syncDomain.alignComparisonAtRelativeTime(payload?.sides, payload?.relativeTime, payload?.options);
-  });
-  ipcMain.handle('sync:capture', (event, payload) => {
-    assertTrustedSender(event);
-    return syncDomain.captureSyncAnchor(payload);
-  });
-  ipcMain.handle('sync:create-player', (event, payload) => {
-    assertTrustedSender(event);
-    return syncDomain.createPlayerBlock(payload);
-  });
-  ipcMain.handle('sync:map-anchor', (event, payload) => {
-    assertTrustedSender(event);
-    return syncDomain.mapAnchorToRelativeTime(payload?.anchor, payload?.relativeTime, payload?.options);
-  });
-  ipcMain.handle('sync:frame-step', (event, payload) => {
-    assertTrustedSender(event);
-    return syncDomain.planFrameStep(payload);
-  });
   ipcMain.handle('media:list', async (event, projectId) => {
     assertTrustedSender(event);
     const project = await projectStore.readProject(projectId);
@@ -761,20 +740,6 @@ async function runElectronSmoke() {
           || !document.querySelector('#add-editor-comparison-video')) {
           throw new Error('canonical block editor UI is not rendered');
         }
-        if (typeof window.pitchingApp.sync?.planFrameStep !== 'function') {
-          throw new Error('sync frame-step bridge is missing');
-        }
-        const unknownStep = await window.pitchingApp.sync.planFrameStep({
-          timing: { kind: 'unknown' },
-          duration: 2.5,
-          currentTime: 0,
-          direction: 1,
-          capability: false,
-        });
-        if (!unknownStep.fallback || unknownStep.resolution !== 'unsupported') {
-          throw new Error('unknown frame-step capability did not remain an explicit fallback');
-        }
-
         sectionTitle.value = 'Close flush section';
         sectionTitle.dispatchEvent(new Event('input', { bubbles: true }));
         sectionContent.value = 'Saved while closing the application';
@@ -798,7 +763,6 @@ async function runElectronSmoke() {
           blockEditorUiVerified: true,
           editorControlsVerified: true,
           mediaListVerified: true,
-          syncFallbackVerified: true,
           bridgeSecurityVerified: true,
           invalidProjectRejected,
         };

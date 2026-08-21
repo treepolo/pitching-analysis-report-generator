@@ -5,8 +5,8 @@
 This decision supersedes the earlier fixed-form/editor UI configuration. The old visible workflow is historical only and must not remain as an in-product compatibility mode.
 
 - The canonical report is a long-form document made of many ordered text blocks and many independent video blocks. Text-editor features are limited to the content needs of those text blocks; video players are inserted as blocks.
-- Each video block independently selects one asset or an asset pair, supports single/comparison mode, side-by-side or stacked presentation, and owns its playback segment, in/out range, labels, and playback settings.
-- Comparison sync is block-local: time mode uses a shared elapsed-time playhead with each source's own timebase/FPS; explicit frame mode is separate; anchors are separate from playback relationship; frame stepping uses each source's valid timestamps/timebase.
+- Each video block independently selects one file or a file pair, supports single/dual mode, and owns its playback segment, in/out range, titles, and playback settings. The layout selector appears only for dual mode.
+- Each dual-video side uses the single-video player independently. The former comparison synchronisation mechanism is removed and deferred until a future data/UX design is explicitly approved.
 - Export produces `report.html` plus copies of only the media assets referenced by video blocks. Unused Media Library assets are excluded, originals remain untouched, and folder/ZIP outputs are self-contained and offline-capable.
 - This is a planning/scope decision. No requirement status is changed to `VERIFIED` by this text update.
 
@@ -14,7 +14,7 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 
 ## 1. 產品目的與成功條件
 
-投球教練完成分析文字與影片準備後，能在同一個工具內建立可重開的報告專案、編輯或導入內容、管理媒體、把媒體插入分析段落、建立單影片或兩影片比較、以投球事件設定同步 anchor、預覽學生看到的成品，並一次輸出可部署的靜態資料夾與可永久保存的離線 ZIP。
+投球教練完成分析文字與影片準備後，能在同一個工具內建立可重開的報告專案、編輯或導入內容、管理媒體、把媒體插入分析段落、建立單影片或雙影片、分別設定兩側播放、預覽學生看到的成品，並一次輸出可部署的靜態資料夾與可永久保存的離線 ZIP。
 
 成功不是「產生一個 HTML」；成功是教練不需改 HTML、不需手算 FPS/offset、不需管理相對路徑或手動壓 ZIP，就能得到可重複編輯、可驗證、可離線保存且可原樣部署的完整報告。
 
@@ -39,19 +39,19 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 | PROJ-003 | user display name 與 filesystem-safe project name 分離。 | 不安全字元被轉換並保留可讀顯示名稱。 | NOT_STARTED |
 | EDIT-001 | 編輯器支援段落、標題、粗體、清單、引用與連結，不要求使用者寫 HTML。 | Desktop、narrow、mobile 與 keyboard 操作可用。 | NOT_STARTED |
 | EDIT-002 | 可貼上純文字及匯入 `.txt`、`.md`，匯入後可繼續編輯。 | Scenario A import 後可修改並持久化。 | NOT_STARTED |
-| EDIT-003 | 可將圖片、單影片、比較影片 block 插入指定 section/issue。 | block 位置、排序與 references 可恢復。 | NOT_STARTED |
+| EDIT-003 | 可將圖片、單影片、雙影片 block 插入指定 section/issue。 | block 位置、排序與 references 可恢復。 | NOT_STARTED |
 | MEDIA-001 | 每個 project 有自己的 Media Library，支援 MP4 與常見圖片。 | 匯入、列出、預覽、重新命名、刪除/保護皆可測。 | NOT_STARTED |
 | MEDIA-002 | 系統取得顯示名稱、長度、FPS/frame timing、解析度、codec compatibility、normalization 狀態。 | metadata 不要求使用者重填；缺資料顯示原因。 | NOT_STARTED |
-| MEDIA-003 | Media Asset 與 Player Block 分離；同一 asset 可被多個 single/comparison blocks 重複使用。 | Scenario C 的 anchors/labels/loops 互不污染。 | NOT_STARTED |
+| MEDIA-003 | Media Asset 與 Player Block 分離；同一檔案可被多個單／雙影片區塊重複使用。 | 各區塊的 titles/loops 互不污染。 | NOT_STARTED |
 | MEDIA-004 | 不支援或 VFR 來源先偵測並可產生 normalized copy；來源不被覆寫。 | Scenario E 有真 progress、原始檔保留與失敗恢復。 | NOT_STARTED |
 | PLAYER-001 | Single Video Block 支援 play/pause、seek、playback rate、上一幀/下一幀、fullscreen、可選 loop。 | Scenario B 與 touch/keyboard evidence。 | NOT_STARTED |
-| PLAYER-002 | Comparison Video Block 第一版支援兩支影片，兩邊各有 asset、label、anchor、loop range。 | 寬螢幕左右排、窄螢幕上下排且 controls 可達。 | NOT_STARTED |
+| PLAYER-002 | 雙影片區塊支援兩支影片，兩邊各有檔名、來源標題、segment、播放速度與循環；並排／堆疊只在雙影片顯示。 | 寬螢幕左右排、窄螢幕上下排且 controls 可達。 | IN_PROGRESS |
 | PLAYER-003 | 同一 block 可顯示合理的媒體缺失、不可播放、超界與 loop validation 狀態。 | 錯誤不會靜默 export。 | NOT_STARTED |
-| SYNC-001 | 使用者以播放器拖曳/逐幀移動後按「設為同步點」；不手打秒數。 | 兩支影片各保存實際 frame/time evidence。 | NOT_STARTED |
-| SYNC-002 | sync anchor 屬於 Player/Comparison Block instance，不存於 Media Asset。 | Scenario C 不同 comparison anchor 不互相污染。 | NOT_STARTED |
-| SYNC-003 | 同步語意以共同投球事件的 relative time 為主，吸收不同起始時間、長度與 FPS。 | Scenario D 顯示合理對齊；不要求 frame number 相同。 | NOT_STARTED |
-| SYNC-004 | Comparison playback 支援同步 play/pause/seek/上一幀/下一幀/rate/回 anchor/loop，並有合理 drift correction。 | 兩支真實影片長時間播放後仍在允許誤差內。 | NOT_STARTED |
-| SYNC-005 | frame-aware 能力不足時提供 time-based fallback 並清楚揭露精度限制。 | VFR/incompatible fixture 與真人 evidence 分開記錄。 | NOT_STARTED |
+| SYNC-001 | 舊同步錨點機制已移除；未來重新設計時另訂資料與互動契約。 | 新需求與新驗收完成前不提供同步控制。 | DEFERRED |
+| SYNC-002 | 舊同步綁定／控制側／相對偏移狀態已移除。 | 儲存、IPC、匯出不得產生舊欄位。 | DEFERRED |
+| SYNC-003 | 未來同步語意需由新產品設計明確定義。 | 新方案通過後再建立驗收。 | DEFERRED |
+| SYNC-004 | 目前雙影片兩側不得同步播放、同步 seek 或 drift correction。 | 兩側操作保持獨立。 | DEFERRED |
+| SYNC-005 | 未來若支援 frame/time fallback，需另建能力與精度契約。 | 新需求與 fixture/真人 evidence 分開記錄。 | DEFERRED |
 | PREVIEW-001 | preview 與 export 共用 renderer/data contract，避免 editor/export 分歧。 | 同一 fixture 的 preview/export structural comparison。 | NOT_STARTED |
 | PREVIEW-002 | preview 可檢查 desktop、narrow desktop、mobile width。 | Scenario F 的 layout/controls evidence。 | NOT_STARTED |
 | EXPORT-001 | 可輸出包含 `index.html`、`videos/`、`images/` 的 self-contained folder。 | `file://` 直接開啟且相對路徑通過驗證。 | NOT_STARTED |
@@ -61,7 +61,7 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 | OFFLINE-002 | offline support boundary 明確標記 desktop 正式支援、mobile local-file 風險。 | 文件與 UI capability statement 一致。 | NOT_STARTED |
 | RESP-001 | 報告與產生器在 desktop wide、narrow、iPhone、Android viewport 無 overlap/水平爆版。 | Scenario F visual evidence。 | NOT_STARTED |
 | RESP-002 | responsive 不刪除正式功能；比較 controls、playback、frame controls 在窄螢幕可觸控。 | mobile reachability map 與 touch test。 | NOT_STARTED |
-| PERSIST-001 | autosave/explicit save 保存內容、media references、anchors、export settings。 | 關閉/重開後資料一致。 | NOT_STARTED |
+| PERSIST-001 | autosave/explicit save 保存內容、media references、playback settings、export settings。 | 關閉/重開後資料一致，舊同步欄位被清除。 | IN_PROGRESS |
 | PERSIST-002 | crash/reload recovery 可辨識未完成變更或 job，且不破壞 source project。 | recovery fixture 與 evidence。 | NOT_STARTED |
 | PERSIST-003 | export 是 source project 的讀取衍生流程，不改壞原始資料。 | export 前後 canonical model hash/semantic comparison。 | NOT_STARTED |
 | ASYNC-001 | import/inspection/normalization/transcode/ZIP/export 依實際耗時建模為 short async 或 persisted long job。 | phase、processed/total、success/skipped/failed 可觀察。 | NOT_STARTED |

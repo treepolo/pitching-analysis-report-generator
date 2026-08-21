@@ -95,62 +95,6 @@
     return Object.keys(segment).length > 0 ? segment : undefined;
   }
 
-  function cloneSyncConfig(value) {
-    if (!isRecord(value)) return undefined;
-    const sync = {};
-    if (value.mode === 'time' || value.mode === 'frame') sync.mode = value.mode;
-    const startAnchor = cloneAnchor(value.startAnchor);
-    if (startAnchor) sync.startAnchor = startAnchor;
-    return Object.keys(sync).length > 0 ? sync : undefined;
-  }
-
-  function cloneBindingAnchor(value) {
-    if (value === null) return null;
-    return cloneAnchor(value);
-  }
-
-  function cloneBindingConfig(value) {
-    if (!isRecord(value)) return undefined;
-    const binding = {};
-    copyBoolean(value, binding, 'enabled');
-    if (value.masterSide === 'left' || value.masterSide === 'right' || value.masterSide === 'shared') {
-      binding.masterSide = value.masterSide;
-    }
-    if (value.mode === 'time' || value.mode === 'frame') binding.mode = value.mode;
-
-    if (isRecord(value.anchors)) {
-      const anchors = {};
-      if (Object.prototype.hasOwnProperty.call(value.anchors, 'left')) {
-        const left = cloneBindingAnchor(value.anchors.left);
-        if (left !== undefined) anchors.left = left;
-      }
-      if (Object.prototype.hasOwnProperty.call(value.anchors, 'right')) {
-        const right = cloneBindingAnchor(value.anchors.right);
-        if (right !== undefined) anchors.right = right;
-      }
-      if (Object.keys(anchors).length > 0) binding.anchors = anchors;
-    }
-
-    if (isRecord(value.sides)) {
-      const sides = {};
-      const leftSegment = cloneSegmentConfig(value.sides.left?.segment);
-      const rightSegment = cloneSegmentConfig(value.sides.right?.segment);
-      if (leftSegment) sides.left = { segment: leftSegment };
-      if (rightSegment) sides.right = { segment: rightSegment };
-      if (Object.keys(sides).length > 0) binding.sides = sides;
-    }
-    if (['unknown', 'time', 'frame', 'estimated', 'exact'].includes(value.fallbackPrecision)) {
-      binding.fallbackPrecision = value.fallbackPrecision;
-    }
-    if (value.segmentRelation === 'independent' || value.segmentRelation === 'shared') {
-      binding.segmentRelation = value.segmentRelation;
-    }
-    if (value.loopRelation === 'independent' || value.loopRelation === 'shared') {
-      binding.loopRelation = value.loopRelation;
-    }
-    return Object.keys(binding).length > 0 ? binding : undefined;
-  }
-
   function clonePlaybackConfig(value) {
     if (!isRecord(value)) return undefined;
     const playback = {};
@@ -167,37 +111,11 @@
     return Object.keys(playback).length > 0 ? playback : undefined;
   }
 
-  function cloneTimingMetadata(value) {
-    if (!isRecord(value)) return undefined;
-    const metadata = {};
-    copyFiniteNumber(value, metadata, 'fps');
-    copyFiniteNumber(value, metadata, 'duration');
-    copyBoolean(value, metadata, 'isVfr');
-    copyString(value, metadata, 'normalizationState');
-    return Object.keys(metadata).length > 0 ? metadata : undefined;
-  }
-
-  function cloneAnchor(value) {
-    if (!isRecord(value)) return undefined;
-    const anchor = {};
-    copyFiniteNumber(value, anchor, 'observedTime');
-    copyFiniteNumber(value, anchor, 'frameIndex');
-    copyString(value, anchor, 'precision');
-    copyString(value, anchor, 'capturedAt');
-    const timingMetadata = cloneTimingMetadata(value.timingMetadata);
-    if (timingMetadata) anchor.timingMetadata = timingMetadata;
-    return Object.keys(anchor).length > 0 ? anchor : undefined;
-  }
-
   function cloneSideConfig(value) {
     if (!isRecord(value)) return undefined;
     const side = {};
     copyAssetReferences(value, side);
     copyString(value, side, 'label');
-    copyString(value, side, 'precision');
-    copyString(value, side, 'precisionState');
-    const anchor = cloneAnchor(value.anchor);
-    if (anchor) side.anchor = anchor;
     const legacyLoop = value.loop ?? value.loopRange ?? value.playback?.loop ?? value.playback?.loopRange;
     const loop = cloneLoopConfig(value.loop);
     if (loop) side.loop = loop;
@@ -232,14 +150,9 @@
       copyAssetReferences(block, output);
       copyString(block, output, 'label');
       copyString(block, output, 'caption');
-      copyString(block, output, 'layout');
       const legacyLoop = block.loop ?? block.loopRange ?? block.playback?.loop ?? block.playback?.loopRange;
       const segment = cloneSegmentConfig(block.segment, legacyLoop);
       if (segment) output.segment = segment;
-      const sync = cloneSyncConfig(block.sync);
-      if (sync) output.sync = sync;
-      const anchor = cloneAnchor(block.anchor);
-      if (anchor) output.anchor = anchor;
       const playback = clonePlaybackConfig(block.playback);
       if (playback) output.playback = playback;
       const playbackOptions = clonePlaybackConfig(block.playbackOptions);
@@ -258,21 +171,9 @@
       if (left) output.left = left;
       const right = cloneSideConfig(block.right);
       if (right) output.right = right;
-      if (isRecord(block.sides)) {
-        const sides = {};
-        const sideLeft = cloneSideConfig(block.sides.left);
-        if (sideLeft) sides.left = sideLeft;
-        const sideRight = cloneSideConfig(block.sides.right);
-        if (sideRight) sides.right = sideRight;
-        if (Object.keys(sides).length > 0) output.sides = sides;
-      }
       copyString(block, output, 'label');
       copyString(block, output, 'caption');
       copyString(block, output, 'layout');
-      const sync = cloneSyncConfig(block.sync);
-      if (sync) output.sync = sync;
-      const binding = cloneBindingConfig(block.binding);
-      if (binding) output.binding = binding;
       copyStringArray(block, output, 'labels');
     }
 

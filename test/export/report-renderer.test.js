@@ -70,7 +70,7 @@ test('fails before rendering when a block contains an empty asset reference', ()
   );
 });
 
-test('renders editor playback, loop, comparison layout, and sync fallback settings into portable controls', () => {
+test('renders independent video playback, loop, and comparison layout settings into portable controls', () => {
   const html = renderReportHtml({
     schemaVersion: 1,
     title: '可攜式播放器設定',
@@ -133,15 +133,13 @@ test('renders editor playback, loop, comparison layout, and sync fallback settin
   assert.match(html, /data-segment-in="1"[\s\S]*data-segment-out="3"/u);
   assert.match(html, /data-playback-rate="1\.5"/u);
   assert.match(html, /data-loop-enabled="true"/u);
-  assert.match(html, /data-anchor-time="2"/u);
-  assert.doesNotMatch(html, /data-sync-offset|data-loop-start|data-loop-end/u);
-  assert.match(html, /明確影格模式（可攜式時間同步 fallback）/u);
-  assert.match(html, /同步綁定：已啟用；主控側：右側/u);
-  assert.match(html, /同步播放/u);
+  assert.doesNotMatch(html, /data-anchor-time|data-sync-offset|data-loop-start|data-loop-end|同步|綁定|錨點/u);
+  assert.match(html, /雙影片播放器/u);
+  assert.doesNotMatch(html, /同步播放/u);
   assert.match(html, /回到區段起點/u);
   assert.match(html, /播放速率/u);
   assert.match(html, /循環/u);
-  assert.match(html, /data-player-runtime-status/iu);
+  assert.doesNotMatch(html, /data-player-runtime-status/iu);
   assert.match(html, /<script>\s*\(\(\) =>/u);
   assert.match(html, /ArrowLeft/u);
   assert.match(html, /ArrowRight/u);
@@ -149,7 +147,7 @@ test('renders editor playback, loop, comparison layout, and sync fallback settin
   assert.doesNotMatch(html, /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b/iu);
 });
 
-test('renders canonical allowlisted binding without exposing editor-only fields', () => {
+test('drops retired binding state without exposing editor-only fields', () => {
   const html = renderReportHtml({
     schemaVersion: 1,
     title: 'Canonical binding',
@@ -195,8 +193,7 @@ test('renders canonical allowlisted binding without exposing editor-only fields'
     ],
   });
 
-  assert.doesNotMatch(html, /data-sync-offset|data-loop-start|data-loop-end/u);
-  assert.match(html, /同步綁定：已啟用；主控側：右側/u);
+  assert.doesNotMatch(html, /data-sync-offset|data-loop-start|data-loop-end|同步|綁定|錨點/u);
   assert.doesNotMatch(html, /data-asset-id/iu);
   assert.doesNotMatch(html, /comparison-internal-id|asset-left-internal|asset-right-internal|private\/temporary\.mp4|private\/left\.mp4|private\/right\.mp4/u);
 });

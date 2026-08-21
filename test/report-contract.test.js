@@ -92,7 +92,6 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
     left: {
       mediaAssetId: 'asset-1',
       label: 'Front',
-      anchor: { observedTime: 1.25, frameIndex: 30, precision: 'frame-aware' },
     },
     right: {
       mediaAssetId: 'asset-2',
@@ -112,7 +111,6 @@ test('preserves block-local video settings in the shared report contract', () =>
         type: 'singleVideo',
         mediaAssetId: 'asset-front',
         label: 'Front view',
-        layout: 'stacked',
         segment: { in: 0.25, out: 2.5, editorOnly: 'drop' },
         playback: { rate: 0.75 },
         sync: { mode: 'frame', startAnchor: { observedTime: 0.5, frameIndex: 15, editorOnly: 'drop' } },
@@ -154,38 +152,20 @@ test('preserves block-local video settings in the shared report contract', () =>
     type: 'singleVideo',
     mediaAssetId: 'asset-front',
     label: 'Front view',
-    layout: 'stacked',
     segment: { in: 0.25, out: 2.5 },
     playback: { rate: 0.75 },
-    sync: { mode: 'frame', startAnchor: { observedTime: 0.5, frameIndex: 15 } },
-    anchor: { observedTime: 1.25, frameIndex: 38, precision: 'frame-aware' },
   }, {
     type: 'comparisonVideo',
     layout: 'side-by-side',
-    sync: { mode: 'time', startAnchor: { observedTime: 0.75 } },
-    binding: {
-      enabled: true,
-      masterSide: 'right',
-      mode: 'time',
-      anchors: {
-        left: { observedTime: 1.1, frameIndex: 33, precision: 'time' },
-        right: { observedTime: 1.4, frameIndex: 42, precision: 'frame' },
-      },
-      fallbackPrecision: 'estimated',
-      segmentRelation: 'independent',
-      loopRelation: 'shared',
-    },
     left: {
       mediaAssetId: 'asset-front',
       segment: { in: 0, out: 3 },
       playback: { rate: 0.5 },
-      anchor: { observedTime: 1.1 },
     },
     right: {
       mediaAssetId: 'asset-side',
       segment: { in: 0.1, out: 2.9 },
       playback: { rate: 0.5 },
-      anchor: { observedTime: 1.4 },
     },
   }]);
 });

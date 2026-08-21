@@ -115,7 +115,7 @@ test('preserves media metadata and export settings as future vertical-slice seam
   assert.deepEqual(partialSave.futureReportExtension, { sourceRevision: 3, owner: 'report-model' });
 });
 
-test('persists block-local video editor configuration across reopen', async () => {
+test('persists independent video settings and clears retired sync state across reopen', async () => {
   const created = await store.createProject('Block editor video config');
   const snapshot = await store.openProject(created.id);
   snapshot.sections[0].blocks.push({
@@ -123,9 +123,9 @@ test('persists block-local video editor configuration across reopen', async () =
     type: 'singleVideo',
     mediaAssetId: 'asset-front',
     label: 'Front view',
-    layout: 'stacked',
     playback: { rate: 0.75 },
     segment: { in: 0.25, out: 2.5 },
+    relativeOffset: 1.5,
     sync: { mode: 'frame', startAnchor: { observedTime: 0.5, frameIndex: 15 } },
     anchor: { observedTime: 1.25, frameIndex: 38, precision: 'frame-aware' },
   });
@@ -135,20 +135,6 @@ test('persists block-local video editor configuration across reopen', async () =
     label: 'Front and side',
     layout: 'side-by-side',
     playback: { rate: 1 },
-    sync: { mode: 'time', startAnchor: { observedTime: 0.75 } },
-    binding: {
-      enabled: true,
-      masterSide: 'right',
-      mode: 'frame',
-      anchors: {
-        left: { observedTime: 1.1, frameIndex: 33, precision: 'frame' },
-        right: { observedTime: 1.4, frameIndex: 42, precision: 'frame' },
-      },
-      offsets: { left: -0.1, right: 0.2 },
-      fallbackPrecision: 'frame',
-      segmentRelation: 'shared',
-      loopRelation: 'independent',
-    },
     left: {
       mediaAssetId: 'asset-front',
       label: 'Front',
@@ -168,28 +154,20 @@ test('persists block-local video editor configuration across reopen', async () =
   const saved = await store.saveProject(snapshot);
   const reopened = await store.openProject(created.id);
   assert.deepEqual(reopened.sections[0].blocks.slice(-2), saved.sections[0].blocks.slice(-2));
-  assert.equal(reopened.sections[0].blocks.at(-2).sync.mode, 'frame');
+  assert.equal('layout' in reopened.sections[0].blocks.at(-2), false);
+  assert.equal('sync' in reopened.sections[0].blocks.at(-2), false);
+  assert.equal('anchor' in reopened.sections[0].blocks.at(-2), false);
+  assert.equal('relativeOffset' in reopened.sections[0].blocks.at(-2), false);
   assert.equal(reopened.sections[0].blocks.at(-1).left.segment.out, 3);
-  assert.equal(reopened.sections[0].blocks.at(-1).right.anchor.observedTime, 1.4);
-  assert.deepEqual(reopened.sections[0].blocks.at(-1).binding, {
-    enabled: true,
-    masterSide: 'right',
-    mode: 'frame',
-    anchors: {
-      left: { observedTime: 1.1, frameIndex: 33, precision: 'frame' },
-      right: { observedTime: 1.4, frameIndex: 42, precision: 'frame' },
-    },
-    sides: {
-      left: { segment: { in: 0, out: 3 } },
-      right: { segment: { in: 0.1, out: 2.9 } },
-    },
-    fallbackPrecision: 'frame',
-    segmentRelation: 'shared',
-    loopRelation: 'independent',
-  });
+  assert.equal('anchor' in reopened.sections[0].blocks.at(-1).left, false);
+  assert.equal('anchor' in reopened.sections[0].blocks.at(-1).right, false);
+  assert.equal('sync' in reopened.sections[0].blocks.at(-1), false);
+  assert.equal('binding' in reopened.sections[0].blocks.at(-1), false);
+  assert.equal('playback' in reopened.sections[0].blocks.at(-1), false);
+  assert.equal('segment' in reopened.sections[0].blocks.at(-1), false);
 });
 
-test('migrates legacy comparison sync and side anchors into deterministic binding defaults', async () => {
+test('clears legacy comparison sync and side anchors without creating replacement state', async () => {
   const created = await store.createProject('Legacy binding migration');
   const snapshot = await store.openProject(created.id);
   snapshot.sections[0].blocks.push({
@@ -201,24 +179,13 @@ test('migrates legacy comparison sync and side anchors into deterministic bindin
   });
 
   const saved = await store.saveProject(snapshot);
-  assert.deepEqual(saved.sections[0].blocks.at(-1).binding, {
-    enabled: true,
-    masterSide: 'left',
-    mode: 'frame',
-    anchors: {
-      left: { observedTime: 1.1, frameIndex: 33 },
-      right: { observedTime: 1.4, frameIndex: 42 },
-    },
-    sides: {
-      left: { segment: { in: 0, out: null } },
-      right: { segment: { in: 0, out: null } },
-    },
-    fallbackPrecision: 'unknown',
-    segmentRelation: 'independent',
-    loopRelation: 'independent',
-  });
+  assert.equal('binding' in saved.sections[0].blocks.at(-1), false);
+  assert.equal('sync' in saved.sections[0].blocks.at(-1), false);
+  assert.equal('anchor' in saved.sections[0].blocks.at(-1).left, false);
+  assert.equal('anchor' in saved.sections[0].blocks.at(-1).right, false);
   const reopened = await store.openProject(created.id);
-  assert.deepEqual(reopened.sections[0].blocks.at(-1).binding, saved.sections[0].blocks.at(-1).binding);
+  assert.equal('binding' in reopened.sections[0].blocks.at(-1), false);
+  assert.equal('sync' in reopened.sections[0].blocks.at(-1), false);
 });
 
 test('previews strict UTF-8 txt/md imports and persists imported content across reopen', async () => {

@@ -29,10 +29,6 @@ const SUPPORTED_BLOCK_TYPES = new Set([
   'singleVideo',
   'comparisonVideo',
 ]);
-const BINDING_MASTER_SIDES = new Set(['left', 'right', 'shared']);
-const BINDING_MODES = new Set(['time', 'frame']);
-const BINDING_PRECISIONS = new Set(['unknown', 'time', 'frame', 'estimated', 'exact']);
-const BINDING_RELATIONS = new Set(['independent', 'shared']);
 const PROJECT_FIELDS = new Set([
   'schemaVersion',
   'id',
@@ -141,19 +137,6 @@ function normalizeOptionalNonNegative(value, fieldName) {
   return value;
 }
 
-function normalizeAnchor(value, fieldName) {
-  if (value === null || value === undefined) return null;
-  if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
-  const anchor = cloneJson(value);
-  anchor.observedTime = normalizeOptionalNonNegative(anchor.observedTime, `${fieldName}.observedTime`);
-  if (anchor.frameIndex !== null && anchor.frameIndex !== undefined) {
-    if (!Number.isInteger(anchor.frameIndex) || anchor.frameIndex < 0) {
-      throw new Error(`${fieldName}.frameIndex is invalid`);
-    }
-  }
-  return anchor;
-}
-
 function normalizeSegment(value, fieldName) {
   if (value === null || value === undefined) return { in: 0, out: null };
   if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
@@ -206,6 +189,9 @@ function normalizeLoopAndSegment(value, fieldName) {
   delete value.loopRange;
   delete value.offsetSeconds;
   delete value.offset;
+  delete value.relativeOffset;
+  delete value.relativeTimeOffset;
+  delete value.syncOffset;
 }
 
 function normalizeVideoSide(value, fieldName) {
@@ -219,124 +205,24 @@ function normalizeVideoSide(value, fieldName) {
   if (side.label !== undefined) side.label = safeOptionalText(side.label, `${fieldName}.label`, 160);
   if (side.segment !== undefined) side.segment = normalizeSegment(side.segment, `${fieldName}.segment`);
   if (side.playback !== undefined) side.playback = normalizePlayback(side.playback, `${fieldName}.playback`);
-  if (side.anchor !== undefined) side.anchor = normalizeAnchor(side.anchor, `${fieldName}.anchor`);
+  // Anchors belong to the retired comparison synchronisation mechanism.
+  delete side.anchor;
   return side;
-}
-
-function normalizeBindingAnchor(value, fieldName) {
-  if (value === null || value === undefined) return null;
-  const anchor = normalizeAnchor(value, fieldName);
-  const normalized = {};
-  for (const key of ['observedTime', 'frameIndex', 'precision', 'capturedAt']) {
-    if (anchor[key] !== undefined) normalized[key] = anchor[key];
-  }
-  if (isPlainRecord(anchor.timingMetadata)) {
-    const timingMetadata = {};
-    if (typeof anchor.timingMetadata.fps === 'number' && Number.isFinite(anchor.timingMetadata.fps)) {
-      timingMetadata.fps = anchor.timingMetadata.fps;
-    }
-    if (typeof anchor.timingMetadata.duration === 'number' && Number.isFinite(anchor.timingMetadata.duration)) {
-      timingMetadata.duration = anchor.timingMetadata.duration;
-    }
-    if (typeof anchor.timingMetadata.isVfr === 'boolean') timingMetadata.isVfr = anchor.timingMetadata.isVfr;
-    if (typeof anchor.timingMetadata.normalizationState === 'string') {
-      timingMetadata.normalizationState = anchor.timingMetadata.normalizationState;
-    }
-    if (Object.keys(timingMetadata).length > 0) normalized.timingMetadata = timingMetadata;
-  }
-  return normalized;
-}
-
-function normalizeBindingEnum(value, allowed, fallback) {
-  return allowed.has(value) ? value : fallback;
-}
-
-function normalizeVideoBinding(value, block, fieldName) {
-  if (value !== undefined && !isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
-  const binding = isPlainRecord(value) ? value : {};
-  const legacySync = isPlainRecord(block.sync) ? block.sync : {};
-  const hasLegacySync = isPlainRecord(block.sync);
-  const explicitBinding = value !== undefined;
-  const masterSide = normalizeBindingEnum(
-    binding.masterSide ?? legacySync.masterSide,
-    BINDING_MASTER_SIDES,
-    'left',
-  );
-  const mode = normalizeBindingEnum(binding.mode ?? legacySync.mode, BINDING_MODES, 'time');
-  const bindingAnchors = isPlainRecord(binding.anchors) ? binding.anchors : {};
-  const legacyLeft = isPlainRecord(block.left) ? block.left : {};
-  const legacyRight = isPlainRecord(block.right) ? block.right : {};
-  let leftAnchor = normalizeBindingAnchor(
-    bindingAnchors.left ?? legacyLeft.anchor,
-    `${fieldName}.anchors.left`,
-  );
-  let rightAnchor = normalizeBindingAnchor(
-    bindingAnchors.right ?? legacyRight.anchor,
-    `${fieldName}.anchors.right`,
-  );
-  const legacyStartAnchor = normalizeBindingAnchor(legacySync.startAnchor, `${fieldName}.legacyStartAnchor`);
-  if (legacyStartAnchor && (masterSide === 'right' ? rightAnchor === null : leftAnchor === null)) {
-    if (masterSide === 'right') rightAnchor = legacyStartAnchor;
-    else leftAnchor = legacyStartAnchor;
-  }
-
-  const rawSides = isPlainRecord(binding.sides) ? binding.sides : {};
-  const leftSegment = normalizeSegment(
-    rawSides.left?.segment ?? legacyLeft.segment,
-    `${fieldName}.sides.left.segment`,
-  );
-  const rightSegment = normalizeSegment(
-    rawSides.right?.segment ?? legacyRight.segment,
-    `${fieldName}.sides.right.segment`,
-  );
-  const inferredPrecision = [leftAnchor, rightAnchor]
-    .map((anchor) => anchor && anchor.precision)
-    .find((precision) => BINDING_PRECISIONS.has(precision));
-  const fallbackPrecision = normalizeBindingEnum(
-    binding.fallbackPrecision ?? legacySync.fallbackPrecision ?? inferredPrecision,
-    BINDING_PRECISIONS,
-    'unknown',
-  );
-
-  return {
-    enabled: typeof binding.enabled === 'boolean' ? binding.enabled : (explicitBinding || hasLegacySync),
-    masterSide,
-    mode,
-    anchors: { left: leftAnchor, right: rightAnchor },
-    sides: {
-      left: { segment: leftSegment },
-      right: { segment: rightSegment },
-    },
-    fallbackPrecision,
-    segmentRelation: normalizeBindingEnum(
-      binding.segmentRelation ?? legacySync.segmentRelation,
-      BINDING_RELATIONS,
-      'independent',
-    ),
-    loopRelation: normalizeBindingEnum(
-      binding.loopRelation ?? legacySync.loopRelation,
-      BINDING_RELATIONS,
-      'independent',
-    ),
-  };
 }
 
 function normalizeVideoBlock(block) {
   const normalized = { ...cloneJson(block) };
   normalizeLoopAndSegment(normalized, 'Video block');
+  // The previous comparison synchronisation contract is intentionally not
+  // migrated.  Keep only media/playback configuration for the next design.
+  delete normalized.sync;
+  delete normalized.binding;
+  delete normalized.anchor;
   if (normalized.label !== undefined) normalized.label = safeOptionalText(normalized.label, 'Video block label', 160);
   if (normalized.layout !== undefined) normalized.layout = normalized.layout === 'stacked' ? 'stacked' : 'side-by-side';
   if (normalized.playback !== undefined) normalized.playback = normalizePlayback(normalized.playback, 'Video block playback');
-  if (normalized.sync !== undefined) {
-    if (!isPlainRecord(normalized.sync)) throw new Error('Video block sync is invalid');
-    normalized.sync = cloneJson(normalized.sync);
-    normalized.sync.mode = normalized.sync.mode === 'frame' ? 'frame' : 'time';
-    delete normalized.sync.offsets;
-    if (normalized.sync.startAnchor !== undefined) {
-      normalized.sync.startAnchor = normalizeAnchor(normalized.sync.startAnchor, 'Video block sync.startAnchor');
-    }
-  }
   if (normalized.type === 'singleVideo') {
+    delete normalized.layout;
     if (normalized.mediaAssetId !== undefined || normalized.videoAssetId !== undefined || normalized.assetId !== undefined) {
       normalized.mediaAssetId = normalizeOptionalAssetId(
         normalized.mediaAssetId ?? normalized.videoAssetId ?? normalized.assetId,
@@ -344,16 +230,19 @@ function normalizeVideoBlock(block) {
       );
     }
     if (normalized.segment !== undefined) normalized.segment = normalizeSegment(normalized.segment, 'Video block segment');
-    if (normalized.anchor !== undefined) normalized.anchor = normalizeAnchor(normalized.anchor, 'Video block anchor');
   } else {
+    // Dual-video settings live on the two sides.  Do not retain the former
+    // shared media/segment/playback fields when an old payload is reopened.
+    delete normalized.mediaAssetId;
+    delete normalized.videoAssetId;
+    delete normalized.assetId;
+    delete normalized.segment;
+    delete normalized.playback;
+    delete normalized.loop;
     const left = normalizeVideoSide(normalized.left, 'Video block left');
     const right = normalizeVideoSide(normalized.right, 'Video block right');
     if (left !== undefined) normalized.left = left;
     if (right !== undefined) normalized.right = right;
-    normalized.binding = normalizeVideoBinding(normalized.binding, normalized, 'Video block binding');
-    if (isPlainRecord(normalized.sync?.binding)) {
-      normalized.sync.binding = normalizeVideoBinding(normalized.sync.binding, normalized, 'Video block sync.binding');
-    }
   }
   return normalized;
 }
@@ -479,7 +368,11 @@ function normalizeSections(value) {
         normalizedBlock.content = safeContent(block.content);
       }
       if (block.type === 'singleVideo' || block.type === 'comparisonVideo') {
-        Object.assign(normalizedBlock, normalizeVideoBlock(normalizedBlock));
+        const normalizedVideo = normalizeVideoBlock(normalizedBlock);
+        Object.keys(normalizedBlock).forEach((key) => {
+          if (key !== 'id' && key !== 'type') delete normalizedBlock[key];
+        });
+        Object.assign(normalizedBlock, normalizedVideo, { id: blockId, type: block.type });
       }
       return normalizedBlock;
     });

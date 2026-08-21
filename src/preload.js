@@ -236,22 +236,6 @@ function createCancelResponse(input) {
   };
 }
 
-const syncApi = Object.freeze({
-  alignComparisonAtRelativeTime: (sides, relativeTime, options) => ipcRenderer.invoke('sync:align', {
-    sides,
-    relativeTime,
-    options,
-  }),
-  captureAnchor: (input) => ipcRenderer.invoke('sync:capture', input),
-  createPlayerBlock: (input) => ipcRenderer.invoke('sync:create-player', input),
-  mapAnchorToRelativeTime: (anchor, relativeTime, options) => ipcRenderer.invoke('sync:map-anchor', {
-    anchor,
-    relativeTime,
-    options,
-  }),
-  planFrameStep: (input) => ipcRenderer.invoke('sync:frame-step', input),
-});
-
 function assertProjectId(value) {
   if (typeof value !== 'string' || !PROJECT_ID_PATTERN.test(value)) {
     throw new Error('Invalid project id');
@@ -482,7 +466,6 @@ contextBridge.exposeInMainWorld('pitchingApp', Object.freeze({
   retryExport: (jobId) => ipcRenderer.invoke('export:retry', assertExportJobId(jobId)),
   getAppInfo: () => ipcRenderer.invoke('app:info'),
   frameCache: frameCacheApi,
-  sync: syncApi,
   onBeforeClose: (callback) => {
     if (typeof callback !== 'function') throw new Error('Close callback must be a function');
     closeCallbacks.add(callback);

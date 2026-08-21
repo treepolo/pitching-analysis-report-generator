@@ -144,7 +144,8 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
   assert.match(folderHtml, /data-playback-rate="1\.25"/u);
   assert.match(folderHtml, /data-loop-enabled="true"/u);
   assert.match(folderHtml, /data-player-action="play"/u);
-  assert.match(folderHtml, /時間同步：可在離線 HTML 中運作/u);
+  assert.match(folderHtml, /單一影片播放器/u);
+  assert.doesNotMatch(folderHtml, /同步|綁定|錨點/u);
   assert.doesNotMatch(folderHtml, /\bfetch\s*\(/iu);
 
   const folderRuntime = await runLocalFileRuntimeSmoke({

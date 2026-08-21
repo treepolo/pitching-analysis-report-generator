@@ -1,11 +1,11 @@
 # Current Project State
 
-## Current unified browser-video playback rebuild (2026-08-21)
+## Current dual-video simplification (2026-08-21)
 
-- The editor's single-video and comparison-video blocks now share one renderer-owned `<video>` surface per side. The old Media Foundation/EVR child-window path, native IPC, helper source, helper binaries, and native surface repaint loop have been removed; there is no second HWND/gray-blue layer to drift during scroll.
-- Playback follows the requested media-player behavior: the browser video decoder stays warm, timeline input is coalesced to the latest pointer position on `requestAnimationFrame` and uses approximate `fastSeek` only when no seek is already in flight (otherwise `currentTime` retargets the active seek), pointer release performs one deduplicated exact seek and verifies the presented frame time, arrow/button stepping uses the same guarded exact seek path, and normal playback is driven by the native video clock rather than a renderer timer.
-- Comparison blocks use the same engine on both sides. The configured master side drives the frame index; the follower is aligned from each side's anchor and playback segment while the frame engine guard prevents legacy binding callbacks from fighting an active seek. A single playback-speed slider controls both sides and the normal rate starts at the block's configured rate.
-- Video block labels are explicit: the block label is the visible upper-left title, each source label is the source title, and the source selector displays the referenced filename. Renderer updates patch the block title, each side title, and related accessible labels immediately on editor input without rebuilding the active editor. Loop playback has no independent loop bounds; when enabled it uses the source segment's `in`/`out` values. The former loop start/end and relative-offset fields are stripped during save/contract normalization and are not used by runtime synchronization.
+- The editor's single-video and dual-video blocks use the same renderer-owned browser `<video>` surface and frame controls. Each dual-video side is its own player card; play, pause, seek, stepping, rate, and loop state never propagate to the other side.
+- The current comparison synchronisation implementation has been removed from the app-facing frontend, preload bridge, main-process IPC, persistence contract, report contract, and portable export. This is a removal of the current mechanism only; a future synchronisation data model can be designed and implemented after a new user instruction.
+- The user-facing block mode is `雙影片`; the persisted internal discriminator remains `comparisonVideo` for compatibility. `並排` means two columns in one row, while `堆疊` means one column with the two players vertically ordered. The layout selector is rendered only for dual-video blocks.
+- Video block labels are explicit: the block label is the visible upper-left title, each source label is the source title, and the source selector displays the referenced filename. Renderer updates patch the block title, each side title, and related accessible labels immediately on editor input without rebuilding the active editor. Loop playback uses the same `起點`/`終點` segment values; the former independent loop-bound and relative-offset fields are removed during save/contract normalization.
 - Launcher stability: the production launcher and Electron smoke now leave GPU enabled by default; `src/main.js` still accepts an explicit `PITCHING_DISABLE_GPU=1`/`--disable-gpu` fallback for machines that genuinely cannot start with GPU. GPU-enabled Electron smoke exits successfully; the remaining `os_crypt` line is a non-fatal profile-encryption warning.
 - The frame player now suppresses legacy inline keyboard handling on frame-player cards, cancels stale exact-seek listeners at the renderer boundary, retargets an active approximate seek instead of stacking `fastSeek` calls, and accepts a verified `seeked`/ready current frame when a paused Chromium video does not emit a follow-up `requestVideoFrameCallback`; a seek that is still seeking or lacks current data remains an error. Automated focused tests cover these guards; a manual Electron/media acceptance run is still required for real-frame latency and scroll behavior.
 - Previous/next/toggle frame controls now also have one-time direct card listeners, so a block-canvas focus or repaint cannot swallow their click; unavailable media reports an explicit status instead of silently doing nothing. Arrow stepping is accepted from either the video surface or the frame-control row.
@@ -117,7 +117,7 @@
 ## Canonical scope/architecture decision (2026-08-14)
 
 - The former fixed-form/editor UI is superseded. It must not remain as an in-product compatibility mode; the canonical UI is a block-based long-form editor.
-- The canonical document contains many text blocks and independent video blocks. Each video block owns one/pair asset selection, single/comparison mode, layout, in/out/playback settings, and block-local sync.
+- The canonical document contains many text blocks and independent video blocks. Each video block owns one/pair asset selection, single/dual mode, layout, in/out/playback settings, and per-side independent controls; the former block-local sync mechanism is removed pending a future redesign.
 - Export copies only assets referenced by video blocks into self-contained folder/ZIP outputs; unused Media Library assets are excluded and originals remain untouched.
 - Dependency graph: Report Model/Editor defines block schema and persistence; Media Pipeline supplies project-local asset metadata/status; Playback/Sync consumes block-local video configuration; Renderer/Export derives the referenced set and portable output; Shell/QA owns security, recovery, and acceptance gates.
 - This is a planning decision only. Existing implementation evidence does not mark any requirement `VERIFIED`.
@@ -145,7 +145,7 @@
 ## Product
 
 - 產品：供投球教練本人建立投球動作分析報告的 Desktop application。
-- 核心結果：可持續編輯的報告專案，包含文字、圖片、單影片與兩影片比較，最後輸出可線上部署與 desktop `file://` 離線閱讀的 HTML folder/ZIP。
+- 核心結果：可持續編輯的報告專案，包含文字、圖片、單影片與雙影片，最後輸出可線上部署與 desktop `file://` 離線閱讀的 HTML folder/ZIP。
 - 不做：AI 自動判讀或寫作、登入/會員/CRM/付款、雲端 DB/同步/OAuth、學生互動、醫療診斷、自動部署、Google Drive API、自動寄送與 analytics。
 
 ## Decisions and boundaries
@@ -168,14 +168,14 @@
 
 ## Implemented slice
 
-目前已有 Electron shell、隔離 preload/IPC、project list/create/open/save、project-root persistence、autosave/explicit save/close flush/reopen、最小 section editor、`.txt`/`.md` import persistence、media register/list/remove seam、renderer-only report contract/preview、app-facing single/comparison player/sync runtime；另已整合 media contract/path policy、read-only signature inspection、realpath/symlink tool boundary、FFprobe/FFmpeg adapter verification-pending seam，以及帶 allowlist、project-root realpath/symlink boundary、folder/ZIP checksum/parity、atomic extraction、file URL runtime smoke 的 export slice。這些是 implementation 與 automated evidence，不等於所有 requirement 已驗證。
+目前已有 Electron shell、隔離 preload/IPC、project list/create/open/save、project-root persistence、autosave/explicit save/close flush/reopen、最小 section editor、`.txt`/`.md` import persistence、media register/list/remove seam、renderer-only report contract/preview、app-facing 單影片／雙影片獨立播放器；另已整合 media contract/path policy、read-only signature inspection、realpath/symlink tool boundary、FFprobe/FFmpeg adapter verification-pending seam，以及帶 allowlist、project-root realpath/symlink boundary、folder/ZIP checksum/parity、atomic extraction、file URL runtime smoke 的 export slice。這些是 implementation 與 automated evidence，不等於所有 requirement 已驗證。
 
 ## Not yet complete or not yet verified
 
 - 真實圖片/影片 metadata、normalization 與可播放 media pipeline。
-- app-facing Single Video、Comparison Video、sync anchor、逐幀 fallback、不同 FPS/VFR relative-time runtime seam 已存在；real video/frame/drift acceptance 仍未完成。
+- app-facing 單影片／雙影片獨立播放、逐幀控制與 segment loop 已存在；目前的同步錨點、同步播放與綁定模式已移除，待未來重新設計後再評估 real video/frame acceptance。
 - self-contained report folder、offline `file://`、ZIP/完整交付包與 export consumer 仍未完成產品驗收；目前有 fixture-based folder/ZIP seam、atomic recovery 與 explicit Electron `file://` runtime check，但該 runtime 在本環境 unavailable 而 skip，沒有 real-media/browser/human acceptance evidence。
-- 真實 media ingest/metadata/normalization、FFmpeg、實際 player/anchor/sync 與長片 drift correction 仍未完成。
+- 真實 media ingest/metadata/normalization、FFmpeg 與實際播放器 acceptance 仍未完成；同步資料結構與 drift correction 不屬於目前版本。
 - responsive 與 Scenario A–G 真人驗收。
 - IPC sender/source-frame hardening、project/media symlink realpath containment、tool command/path checks 與 ZIP atomic extraction 已有 focused tests/smoke evidence；完整產品 persistence/recovery acceptance 仍未完成。
 - Wave 19G independent evidence：`npm test` 138 tests / 137 pass / 0 fail / 1 explicit Electron `file://` unavailable skip；code scope clean；local tracking ref equals HEAD. Current worktree remains dirty with the three provenance docs and unrelated `AGENTS.md`; live origin SHA is unavailable due to credential failure. Historical worker evidence is not promoted.

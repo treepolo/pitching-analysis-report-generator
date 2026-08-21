@@ -1,5 +1,12 @@
 # Implementation Status
 
+## Current dual-video simplification (2026-08-21)
+
+- The user-facing mode is `雙影片`; the persisted discriminator remains `comparisonVideo` for compatibility. Both sides use the single-video browser player independently, including play/pause, seek, frame stepping, rate, segment loop, and layout.
+- The former sync anchors, sync playback, binding modes, control-side state, relative offsets, and their persistence/IPC/export paths are removed. A future sync design is explicitly deferred until a new product instruction.
+- Block title, source title, and source filename are now distinct and bound to their visible card/title surfaces. The dual-only layout selector defines `並排` as two columns in one row and `堆疊` as one vertical column.
+- Automated evidence for this checkpoint: `npm test` → 137 total, 136 pass, 0 fail, 1 explicit Electron `file://` unavailable skip; focused JavaScript syntax checks pass. No real-media/browser/human acceptance is claimed.
+
 ## Current Wave 20B integrator gate (2026-08-20)
 
 - Current provenance tip is the latest branch HEAD on `worker/desktop-vertical-slice` (the real-smoke evidence checkpoint is `3412ab7`); product code tip is `7c2c40c`. The Wave 20 source/test/docs scope is committed; the unrelated `AGENTS.md` edit remains outside the checkpoint.

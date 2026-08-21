@@ -5,8 +5,8 @@
 The previous fixed-form/editor configuration is superseded and must not remain as a visible compatibility workflow.
 
 - The primary Editor surface is a long-form block canvas, not a fixed report form. Users can add, edit, reorder, duplicate, and remove many text blocks and many independent video blocks.
-- Text blocks expose only necessary text-editor features. Video blocks expose asset selection, single/comparison mode, side-by-side or stacked layout, per-block in/out/playback settings, and explicit state when media is unavailable.
-- Comparison controls and sync configuration belong to the block instance. Time mode uses shared elapsed time and source-local timebases/FPS; frame mode and frame stepping are explicit capabilities, never raw cross-source frame-index mapping.
+- Text blocks expose only necessary text-editor features. Video blocks expose filename selection, single/dual mode, per-side titles, per-side in/out/playback settings, and explicit state when media is unavailable.
+- Dual-video blocks expose `並排` (two columns in one row) or `堆疊` (one column); each side is an independent copy of the single-video player. The current synchronisation controls are removed and reserved for a future design.
 - Preview and export consume the same canonical block document. Export UI must communicate that only video-block-referenced assets are copied; unused library assets and originals remain outside the output.
 
 目前狀態：**Phase 1/2 planning**。本文件把產品需求轉成可驗收的互動與資訊架構；產生器採 local browser application 或 desktop application 尚未由使用者核准，故不指定不可逆的 framework 或 shell。
@@ -15,9 +15,9 @@ The previous fixed-form/editor configuration is superseded and must not remain a
 
 - 主要使用者是投球教練／分析者本人；學生只閱讀輸出報告。
 - 使用者的工作核心是分析內容，不是管理 HTML、FPS、offset、相對路徑、codec 或 ZIP。
-- 系統自動推導 internal ID、safe filename、sort index、媒體 metadata、relative time 與 asset reference usage。
+- 系統自動推導 internal ID、safe filename、sort index、媒體 metadata 與 asset reference usage。
 - 空欄位不在報告中顯示；低頻能力採 progressive disclosure。
-- 不能因 responsive 版面而刪除比較、逐幀、loop、export 或 recovery 能力。
+- 不能因 responsive 版面而刪除雙影片、逐幀、loop、export 或 recovery 能力。
 - UI 不得加入登入、帳號、雲端同步、AI 判讀、學生互動或其他 NOT_IN_SCOPE 能力。
 
 ## 2. 導航與 Reachability Map
@@ -27,7 +27,7 @@ The previous fixed-form/editor configuration is superseded and must not remain a
 | Projects list / create | 主導航 Projects | Projects tab + primary action | workspace header back | 可列出、開啟、新建 |
 | Editor | workspace primary tab | Editor tab | section breadcrumb | section/block 可管理 |
 | Media Library | workspace secondary nav | More → Media Library 或插入媒體的 contextual entry | 回到觸發 section/block | project scope 不混用 |
-| Sync setup | Comparison block 的設定同步 | block controls → Sync sheet | 回到 comparison block | 兩側 anchor 可達 |
+| Dual-video layout | 雙影片區塊的版面選擇 | block settings → layout | 回到雙影片區塊 | 並排／堆疊可達 |
 | Preview | workspace primary tab | Preview tab | 回 Editor 保留 context | viewport 可切換 |
 | Export | workspace action + Preview action | More/Preview action | Jobs/History | folder、ZIP、完整包皆可達 |
 | Jobs / History | workspace status + Projects history | More → Jobs | 回到 project/export | 可看狀態、錯誤、重試 |
@@ -61,11 +61,11 @@ The previous fixed-form/editor configuration is superseded and must not remain a
 - 被引用 asset 刪除前顯示使用它的 section/block 清單；提供移除引用、停用或取消刪除。
 - 原始檔與 normalized copy 角色分離，來源不可被 normalization 覆寫。
 
-### Comparison block / Sync sheet
+### Dual-video block
 
-- 第一版只提供兩支影片的明確左右／上下比較，不暴露任意 N 支影片 UI。
-- 每側可獨立 seek、上一幀、下一幀；anchor 以目前播放器位置設定，不手打秒數。
-- 顯示 frame、time、precision metadata 與 fallback 限制；invalid anchor/loop 時阻止成功 export。
+- 只提供兩支影片的明確左右／上下排列，不暴露任意 N 支影片 UI。
+- 每側完整提供單影片播放器的播放、seek、上一幀、下一幀、速度與循環控制；任何操作都不會控制另一側。
+- 來源選擇以檔名呈現，來源標題直接綁定該側播放器標題；區塊標題直接綁定卡片左上角標題。
 
 ### Preview / Export / Jobs
 
@@ -81,7 +81,7 @@ The previous fixed-form/editor configuration is superseded and must not remain a
 | Text import | 副檔名檢查、解析預覽、block 建立 | 是否匯入、插入位置 | 保留原文、顯示原因、避免靜默覆寫 |
 | Media import | metadata、compatibility 判斷、normalized copy、job 狀態 | 選檔案、是否採用結果 | retry/cancel，original 保留 |
 | Insert media | asset filtering、reference 建立 | 選哪個 asset、插入位置 | missing asset 顯示影響 |
-| Set sync anchor | frame/time 讀取、relative time、精度判斷 | 哪個投球事件、各側目前位置 | invalid/out-of-range 即時阻止 |
+| Edit dual-video side | 來源檔名、來源標題、起點／終點、速度、循環 | 每側要使用的影片與播放設定 | missing media 或超界區段即時標示 |
 | Preview | renderer、viewport layout、capability statement | viewport、是否回編輯 | preview 不修改 source |
 | Export | assets、relative paths、HTML、ZIP、驗證 | 輸出位置與形式 | phase error、retry、source safety |
 
@@ -96,9 +96,8 @@ The previous fixed-form/editor configuration is superseded and must not remain a
 | section sort index | 否 | 系統維護 | 否 | drag-and-drop |
 | issue schema 欄位 | 否 | 空欄位省略 | 是 | progressive disclosure |
 | media metadata | 否 | 由檔案讀取 | 只讀 | 不要求重填 |
-| playback FPS / offset | 否 | 由 pipeline／anchor 推導 | 不作手打欄位 | 顯示證據 |
-| comparison labels | 否 | 可由 asset name 預設 | 是 | 只有有意義時編輯 |
-| sync timestamp | 否 | 由播放器位置取得 | 否 | 禁止手打秒數 |
+| playback FPS / offset | 否 | 由媒體／播放器推導 | 不作手打欄位 | 不在目前表單暴露 |
+| dual-video side titles | 否 | 可由檔名預設 | 是 | 只有有意義時編輯 |
 | loop range | 否 | 未設定即整段播放 | 是 | player contextual control |
 | export path | 執行時必要 | 無安全預設 | 否 | 在 export action 決定 |
 
@@ -106,10 +105,10 @@ The previous fixed-form/editor configuration is superseded and must not remain a
 
 | Context | Layout | 控制項要求 | Evidence |
 |---|---|---|---|
-| Desktop wide | 多欄、comparison 左右 | keyboard、mouse、可讀 metadata | visual + interaction |
-| Narrow desktop | 可折疊 panel、comparison 可上下 | 不水平爆版，所有 controls 可達 | visual + keyboard |
+| Desktop wide | 多欄、雙影片左右 | keyboard、mouse、可讀 metadata | visual + interaction |
+| Narrow desktop | 可折疊 panel、雙影片上下 | 不水平爆版，所有 controls 可達 | visual + keyboard |
 | Phone / tablet generator | tab、More、bottom sheet、contextual action | touch target、返回路徑、不得藏 capability | reachability + touch |
-| Online report | responsive report layout | playback、comparison、frame controls | E2E + visual |
+| Online report | responsive report layout | playback、雙影片、frame controls | E2E + visual |
 | Offline file report | desktop-first | 明確顯示 mobile local-file boundary | file:// evidence |
 
 Keyboard 必須支援 focus order、Enter/Space action、Esc 關閉 sheet/dialog、可見 focus；touch 不依賴 hover。所有 busy、empty、error、success 狀態都要可理解。
@@ -117,7 +116,7 @@ Keyboard 必須支援 focus order、Enter/Space action、Esc 關閉 sheet/dialog
 ## 7. Accessibility / State Requirements
 
 - 按鈕名稱表達 action，不只使用 icon。
-- disabled control 說明原因；invalid anchor、missing media 與 export blocker 不得只用顏色。
+- disabled control 說明原因；missing media、超界區段與 export blocker 不得只用顏色。
 - loading state 說明目前 phase；不得以無語意的假百分比冒充 progress。
 - empty state 提供下一個合理 action。
 - error state 指出 phase、影響、可否 retry/cancel 與 source 是否安全。

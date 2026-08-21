@@ -2,7 +2,8 @@
 
 ## Canonical output decision: referenced media only (2026-08-14)
 
-- The canonical source is the block-based long-form report document. `report.html` and its output renderer must preserve text blocks and independent single/comparison video blocks without editor-only state.
+- The canonical source is the block-based long-form report document. `report.html` and its output renderer must preserve text blocks and independent single/dual video blocks without editor-only state.
+- A dual-video block is two independent single-video players. Each side keeps its own source filename, source title, segment, playback rate, and loop settings; the current synchronisation/anchoring/binding mechanism is not part of the output contract and may be redesigned only by a future explicit requirement.
 - Before staging, export computes the set of MediaAsset IDs referenced by video blocks. The folder and ZIP contain copies of only that set; unused Media Library assets are excluded.
 - Originals remain untouched. Output copies live under the self-contained export tree with portable relative paths; the same referenced set and content must be used for folder and ZIP variants.
 - A missing/invalid referenced asset blocks export. An unused asset is not included and is not a reason to fail an otherwise valid report.
@@ -57,14 +58,14 @@ Result 必須分別回報 folder 與 ZIP 位置、檔案數、warnings、validat
 - 不依賴 internet、CDN、server-side API、database、Service Worker 或 runtime fetch 取得必要 report data。
 - 必要 CSS/JavaScript 原則上 inline 或以可靠 relative static asset 提供。
 - media 使用 relative paths；影片不以 Base64 內嵌。
-- report text、image、single video、comparison video、playback rate、loop、frame controls 在正式支援範圍內可驗證。
+- report text、image、single video、dual video、playback rate、loop、frame controls 在正式支援範圍內可驗證；dual sides remain independent.
 
 Online static report 正式支援 desktop modern browsers、iPhone/iPad Safari、Android Chrome。Offline extracted report 主要正式支援 desktop modern browsers；mobile local-file 僅宣告盡可能相容，不宣稱與 online 等價。
 
 ## 4. Export phases
 
 1. snapshot source project
-2. validate project/blocks/media/anchors/loops
+2. validate project/blocks/media/segments/loops
 3. inspect or prepare normalized media
 4. stage videos/images
 5. render index.html

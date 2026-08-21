@@ -30,71 +30,8 @@ function assertReportDocument(reportDocument) {
   }
 }
 
-function clonePortableAnchor(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-  const anchor = {};
-  for (const key of ['observedTime', 'frameIndex']) {
-    const number = finiteSetting(value[key], null);
-    if (number !== null) anchor[key] = number;
-  }
-  for (const key of ['precision', 'capturedAt']) {
-    if (typeof value[key] === 'string') anchor[key] = value[key];
-  }
-  return Object.keys(anchor).length > 0 ? anchor : undefined;
-}
-
-function clonePortableBinding(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-  const binding = {};
-  if (typeof value.enabled === 'boolean') binding.enabled = value.enabled;
-  if (value.masterSide === 'left' || value.masterSide === 'right' || value.masterSide === 'shared') {
-    binding.masterSide = value.masterSide;
-  }
-  if (value.mode === 'time' || value.mode === 'frame') binding.mode = value.mode;
-  if (['unknown', 'time', 'frame', 'estimated', 'exact', 'time-based', 'frame-aware'].includes(value.fallbackPrecision)) {
-    binding.fallbackPrecision = value.fallbackPrecision;
-  }
-  const playbackRate = finiteSetting(value.playbackRate ?? value.rate, null);
-  if (playbackRate !== null) binding.playbackRate = playbackRate;
-
-  const anchors = {};
-  for (const side of ['left', 'right']) {
-    const anchor = clonePortableAnchor(value.anchors?.[side]);
-    if (anchor) anchors[side] = anchor;
-  }
-  if (Object.keys(anchors).length > 0) binding.anchors = anchors;
-
-  const sides = {};
-  for (const side of ['left', 'right']) {
-    const source = value.sides?.[side] || {};
-    if (!source || typeof source !== 'object' || Array.isArray(source)) continue;
-    const output = {};
-    const segment = source.segment === undefined ? undefined : normalizeSegment(source.segment);
-    if (segment) output.segment = segment;
-    if (Object.keys(output).length > 0) sides[side] = output;
-  }
-  if (Object.keys(sides).length > 0) binding.sides = sides;
-  return Object.keys(binding).length > 0 ? binding : undefined;
-}
-
 function toPortableReportDocument(reportDocument) {
-  const safeReportDocument = toReportDocument(reportDocument);
-  const rawSections = Array.isArray(reportDocument.sections) ? reportDocument.sections : [];
-  safeReportDocument.sections.forEach((safeSection, sectionIndex) => {
-    const rawBlocks = Array.isArray(rawSections[sectionIndex]?.blocks) ? rawSections[sectionIndex].blocks : [];
-    safeSection.blocks.forEach((safeBlock, blockIndex) => {
-      if (!['singleVideo', 'comparisonVideo'].includes(safeBlock.type)) return;
-      const rawBlock = rawBlocks[blockIndex];
-      // Prefer the report-contract-sanitized canonical binding.  The raw sync
-      // mirror is only a fallback for older editor snapshots that kept the
-      // runtime binding under sync.binding.
-      const binding = clonePortableBinding(
-        safeBlock.binding ?? rawBlock?.sync?.binding ?? rawBlock?.binding,
-      );
-      if (binding) safeBlock.sync = { ...(safeBlock.sync || {}), binding };
-    });
-  });
-  return safeReportDocument;
+  return toReportDocument(reportDocument);
 }
 
 function referenceId(value) {
@@ -214,21 +151,20 @@ function normalizeLoop(value, segment) {
   };
 }
 
-function playbackSettings(config, binding = null, side = null) {
+function playbackSettings(config) {
   const source = config && typeof config === 'object' ? config : {};
   const playback = source.playback && typeof source.playback === 'object' ? source.playback : {};
   const playbackOptions = source.playbackOptions && typeof source.playbackOptions === 'object'
     ? source.playbackOptions
     : {};
-  const bindingSide = binding?.sides?.[side];
-  const segment = normalizeSegment(source.segment ?? bindingSide?.segment);
+  const segment = normalizeSegment(source.segment);
   const loopSource = source.loop
     ?? playback.loop
     ?? playbackOptions.loop;
   const explicitRate = finiteSetting(playback.rate ?? playbackOptions.rate, null);
   return {
     segment,
-    rate: Math.max(0.1, Math.min(8, explicitRate ?? finiteSetting(binding?.playbackRate, 1))),
+    rate: Math.max(0.1, Math.min(8, explicitRate ?? 1)),
     loop: normalizeLoop(loopSource, segment),
   };
 }
@@ -236,10 +172,6 @@ function playbackSettings(config, binding = null, side = null) {
 function sideConfig(block, side) {
   if (side === 'single') return block;
   return block[side] || block.sides?.[side] || {};
-}
-
-function bindingConfig(block) {
-  return block.sync?.binding || block.binding || null;
 }
 
 function sideAssetId(block, side) {
@@ -270,42 +202,20 @@ function formatLoop(loop, segment = { in: 0, out: null }) {
     : `開啟（${formatSeconds(segment.in)}–${formatSeconds(segment.out)}）`;
 }
 
-function formatAnchor(anchor) {
-  if (!anchor || typeof anchor !== 'object') return '未設定';
-  const time = finiteSetting(anchor.observedTime, null);
-  const precision = typeof anchor.precision === 'string' ? anchor.precision : 'unknown';
-  const precisionLabel = precision === 'frame-aware' ? '影格' : precision === 'time-based' ? '時間' : '未知精度';
-  return `${formatSeconds(time)}（${precisionLabel}）`;
-}
-
-function syncModeLabel(block) {
-  if ((bindingConfig(block)?.mode ?? block.sync?.mode) === 'frame') {
-    return '明確影格模式（可攜式時間同步 fallback）';
-  }
-  return '時間／經過時間同步';
-}
-
-function fallbackPrecisionLabel(value) {
-  if (value === 'frame-aware' || value === 'frame' || value === 'exact') return '影格精度';
-  if (value === 'time-based' || value === 'time' || value === 'estimated') return '時間精度';
-  return '未知精度';
-}
-
 function renderPlayerSettings(block, side, asset, settings, comparison) {
   const config = sideConfig(block, side);
-  const binding = bindingConfig(block);
-  const anchor = binding?.anchors?.[side] || config.anchor || (side === 'single' ? block.anchor : null);
+  const fileName = asset
+    ? (asset.fileName || asset.originalFileName || asset.label || asset.relativePath?.split('/').pop() || '')
+    : '';
   const assetBindingLabel = asset
-    ? `已綁定${asset.label ? `：${asset.label}` : ''}`
-    : '未綁定影片資產';
+    ? `已載入${fileName ? `：${fileName}` : ''}`
+    : '未載入影片檔案';
   const sideLabel = side === 'left' ? '左側' : side === 'right' ? '右側' : '影片';
   return `<dl class="portable-player-settings" data-player-settings="${side}">
-    <div><dt>來源綁定</dt><dd>${escapeHtml(`${sideLabel}；${assetBindingLabel}`)}</dd></div>
+    <div><dt>影片來源</dt><dd>${escapeHtml(`${sideLabel}；${assetBindingLabel}`)}</dd></div>
     <div><dt>播放區段</dt><dd>${escapeHtml(`${formatSeconds(settings.segment.in)} 至 ${formatSeconds(settings.segment.out)}`)}</dd></div>
     <div><dt>播放速率</dt><dd>${escapeHtml(`${settings.rate.toFixed(2)} 倍`)}</dd></div>
     <div><dt>循環播放</dt><dd>${escapeHtml(formatLoop(settings.loop, settings.segment))}</dd></div>
-    <div><dt>同步錨點</dt><dd>${escapeHtml(formatAnchor(anchor))}</dd></div>
-    ${comparison ? `<div><dt>同步模式</dt><dd>${escapeHtml(syncModeLabel(block))}</dd></div>` : ''}
   </dl>`;
 }
 
@@ -320,14 +230,11 @@ function renderImage(asset, label) {
 function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
   if (!asset) return '';
   const config = sideConfig(block, side);
-  const binding = bindingConfig(block);
-  const settings = playbackSettings(config, binding, side);
-  const anchor = binding?.anchors?.[side] || config.anchor || (side === 'single' ? block.anchor : null);
+  const settings = playbackSettings(config);
   const label = typeof config.label === 'string' && config.label
     ? config.label
     : (asset.label || (side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : '單一影片'));
   const poster = posterAsset ? ` poster="${escapeHtml(encodeAssetPath(posterAsset.relativePath))}"` : '';
-  const anchorTime = finiteSetting(anchor?.observedTime, 0);
   const segmentOut = settings.segment.out === null ? '' : String(settings.segment.out);
   const sideLabel = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
   return `<div class="portable-player-side" data-player-side="${side}"
@@ -335,7 +242,6 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     data-segment-out="${escapeHtml(segmentOut)}"
     data-playback-rate="${escapeHtml(String(settings.rate))}"
     data-loop-enabled="${settings.loop.enabled ? 'true' : 'false'}"
-    data-anchor-time="${escapeHtml(String(anchorTime))}"
     >
     <div class="portable-player-side-heading">
       <h3>${escapeHtml(sideLabel)}</h3>
@@ -507,9 +413,7 @@ function frameCacheJson(cache) {
 function renderFramePlayerSide(block, side, frameBinding, comparison) {
   const { asset, cache } = frameBinding;
   const config = sideConfig(block, side);
-  const binding = bindingConfig(block);
-  const settings = playbackSettings(config, binding, side);
-  const anchor = binding?.anchors?.[side] || config.anchor || (side === 'single' ? block.anchor : null);
+  const settings = playbackSettings(config);
   const label = typeof config.label === 'string' && config.label
     ? config.label
     : (asset.label || (side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : '單一影片'));
@@ -521,7 +425,6 @@ function renderFramePlayerSide(block, side, frameBinding, comparison) {
     data-segment-out="${escapeHtml(segmentOut)}"
     data-playback-rate="${escapeHtml(String(settings.rate))}"
     data-loop-enabled="${settings.loop.enabled ? 'true' : 'false'}"
-    data-anchor-time="${escapeHtml(String(finiteSetting(anchor?.observedTime, 0)))}"
     data-frame-index="${frameCacheJson(cache)}"
     data-frame-index-path="${escapeHtml(cache.cache.indexRelativePath)}"
     data-frame-count="${cache.frames.length}"
@@ -541,35 +444,29 @@ function renderFramePlayer(block, byId, comparison, frameCaches) {
   const sides = comparison ? ['left', 'right'] : ['single'];
   const bindings = sides.map((side) => frameCacheForSide(block, side, byId, frameCaches));
   if (bindings.some((binding) => !binding)) return '';
-  const renderedSides = bindings.map((binding, index) => renderFramePlayerSide(block, sides[index], binding, comparison)).join('');
-  const primaryCache = comparison
-    ? (bindingConfig(block)?.masterSide === 'right' ? bindings[1].cache : bindings[0].cache)
-    : bindings[0].cache;
-  const count = primaryCache.frames.length;
   const layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
   const blockLabel = typeof block.label === 'string' && block.label
     ? block.label
-    : (comparison ? '影片比較' : '單一影片');
-  const binding = bindingConfig(block);
-  const syncStartAnchor = formatAnchor(binding?.anchors?.left || block.sync?.startAnchor);
-  const syncMode = binding?.mode ?? block.sync?.mode;
-  const fallbackPrecision = fallbackPrecisionLabel(binding?.fallbackPrecision);
-  const bindingStatus = binding
-    ? `${binding.enabled === false ? '已設定但未啟用' : '已啟用'}；主控側：${binding.masterSide === 'right' ? '右側' : binding.masterSide === 'shared' ? '共享' : '左側'}`
-    : '使用區塊本身的來源與錨點綁定';
-  const masterSide = binding?.masterSide === 'right' ? 'right' : 'left';
-  return `<figure class="report-media report-video portable-player portable-frame-player" data-portable-player data-frame-player data-frame-mode="cache" tabindex="0" aria-label="${escapeHtml(`${blockLabel}播放器`)}" data-player-layout="${layout}" data-sync-mode="${syncMode === 'frame' ? 'frame' : 'time'}" data-master-side="${masterSide}" data-binding-enabled="${binding ? (binding.enabled === false ? 'false' : 'true') : 'true'}">
-    <header class="portable-player-header"><div><p class="portable-player-eyebrow">${comparison ? '影片比較播放器' : '單一影片播放器'}</p><h3>${escapeHtml(blockLabel)}</h3></div><span class="portable-player-layout">${layout === 'stacked' ? '堆疊版面' : '並排版面'}</span></header>
-    <div class="portable-player-grid portable-player-grid-${layout}">${renderedSides}</div>
-    <div class="portable-frame-controls" data-frame-controls role="group" aria-label="影格播放器控制">
-      <button type="button" data-frame-action="previous">上一幀</button>
-      <input data-frame-timeline type="range" min="0" max="${Math.max(0, count - 1)}" step="1" value="0" aria-label="主影格時間軸">
-      <button type="button" data-frame-action="next">下一幀</button>
-      <output data-frame-position>第 1 / ${count} 幀</output>
-      <button type="button" data-frame-action="toggle" aria-pressed="false">播放</button>
-      <span data-frame-player-status role="status" data-state="loaded">影格快取已就緒；可逐幀播放。</span>
-    </div>
-    <div class="portable-player-sync-summary"><span>同步模式：${escapeHtml(syncModeLabel(block))}</span><span>同步起點錨點：${escapeHtml(syncStartAnchor)}</span><span>同步綁定：${escapeHtml(bindingStatus)}</span><span data-portable-frame-status role="status">${escapeHtml(syncMode === 'frame' ? `明確影格模式；每側使用自己的影格索引（${fallbackPrecision}）。` : '時間／經過時間模式；播放表面使用逐幀快取。')}</span></div>
+    : (comparison ? '雙影片' : '單一影片');
+  const renderedPlayers = bindings.map((binding, index) => {
+    const side = sides[index];
+    const count = binding.cache.frames.length;
+    const sideLabel = side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : blockLabel;
+    return `<div class="portable-player portable-frame-player" data-portable-player data-frame-player data-frame-mode="cache" tabindex="0" aria-label="${escapeHtml(`${sideLabel}播放器`)}">
+      ${renderFramePlayerSide(block, side, binding, comparison)}
+      <div class="portable-frame-controls" data-frame-controls role="group" aria-label="${escapeHtml(`${sideLabel}影格播放器控制`)}">
+        <button type="button" data-frame-action="previous">上一幀</button>
+        <input data-frame-timeline type="range" min="0" max="${Math.max(0, count - 1)}" step="1" value="0" aria-label="${escapeHtml(`${sideLabel}影格時間軸`)}">
+        <button type="button" data-frame-action="next">下一幀</button>
+        <output data-frame-position>第 1 / ${count} 幀</output>
+        <button type="button" data-frame-action="toggle" aria-pressed="false">播放</button>
+        <span data-frame-player-status role="status" data-state="loaded">影格快取已就緒；可獨立逐幀播放。</span>
+      </div>
+    </div>`;
+  }).join('');
+  return `<figure class="report-media report-video portable-player portable-dual-player" data-portable-player aria-label="${escapeHtml(`${blockLabel}播放器`)}" data-player-layout="${layout}">
+    <header class="portable-player-header"><div><p class="portable-player-eyebrow">${comparison ? '雙影片播放器' : '單一影片播放器'}</p><h3>${escapeHtml(blockLabel)}</h3></div>${comparison ? `<span class="portable-player-layout">${layout === 'stacked' ? '堆疊版面' : '並排版面'}</span>` : ''}</header>
+    <div class="portable-player-grid portable-player-grid-${layout}">${renderedPlayers}</div>
     ${renderCaption(blockLabel)}
   </figure>`;
 }
@@ -590,39 +487,23 @@ function renderPlayer(block, byId, comparison, frameCaches) {
   const layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
   const blockLabel = typeof block.label === 'string' && block.label
     ? block.label
-    : (comparison ? '影片比較' : '單一影片');
-  const binding = bindingConfig(block);
-  const syncStartAnchor = formatAnchor(binding?.anchors?.left || block.sync?.startAnchor);
-  const syncMode = binding?.mode ?? block.sync?.mode;
-  const fallbackPrecision = fallbackPrecisionLabel(binding?.fallbackPrecision);
-  const syncStatus = syncMode === 'frame'
-    ? `影格同步：離線播放器使用時間同步 fallback（${fallbackPrecision}）。`
-    : `時間同步：可在離線 HTML 中運作（fallback：${fallbackPrecision}）。`;
-  const bindingStatus = binding
-    ? `${binding.enabled === false ? '已設定但未啟用' : '已啟用'}；主控側：${binding.masterSide === 'right' ? '右側' : binding.masterSide === 'shared' ? '共享' : '左側'}`
-    : '使用區塊本身的來源與錨點綁定';
-  const masterSide = binding?.masterSide === 'right' ? 'right' : 'left';
+    : (comparison ? '雙影片' : '單一影片');
   const fallback = frameCacheFallbackStatus(block, frameCaches);
   const fallbackNotice = fallback
     ? `<p class="portable-frame-fallback" data-frame-cache-status="${escapeHtml(fallback.status || 'not-ready')}" role="status">影格快取未就緒，已降級為影片播放（${escapeHtml(fallback.status || 'unknown')}）。</p>`
     : '';
-  return `<figure class="report-media report-video portable-player" data-portable-player tabindex="0" aria-label="${escapeHtml(`${blockLabel}播放器`)}" data-player-layout="${layout}" data-sync-mode="${syncMode === 'frame' ? 'frame' : 'time'}" data-master-side="${masterSide}" data-binding-enabled="${binding ? (binding.enabled === false ? 'false' : 'true') : 'true'}">
+  const actions = comparison ? '' : `<div class="portable-player-actions" role="group" aria-label="${escapeHtml(`${blockLabel}播放器控制`)}">
+      <button type="button" data-player-action="play">播放</button>
+      <button type="button" data-player-action="pause">暫停</button>
+      <button type="button" data-player-action="reset">回到區段起點</button>
+    </div>`;
+  return `<figure class="report-media report-video portable-player" data-portable-player tabindex="0" aria-label="${escapeHtml(`${blockLabel}播放器`)}" data-player-layout="${layout}">
     <header class="portable-player-header">
-      <div><p class="portable-player-eyebrow">${comparison ? '影片比較播放器' : '單一影片播放器'}</p><h3>${escapeHtml(blockLabel)}</h3></div>
-      <span class="portable-player-layout">${layout === 'stacked' ? '堆疊版面' : '並排版面'}</span>
+      <div><p class="portable-player-eyebrow">${comparison ? '雙影片播放器' : '單一影片播放器'}</p><h3>${escapeHtml(blockLabel)}</h3></div>
+      ${comparison ? `<span class="portable-player-layout">${layout === 'stacked' ? '堆疊版面' : '並排版面'}</span>` : ''}
     </header>
     <div class="portable-player-grid portable-player-grid-${layout}">${renderedSides}</div>
-    <div class="portable-player-actions" role="group" aria-label="${escapeHtml(`${blockLabel}播放器控制`)}">
-      <button type="button" data-player-action="play">${comparison ? '同步播放' : '播放'}</button>
-      <button type="button" data-player-action="pause">${comparison ? '同步暫停' : '暫停'}</button>
-      <button type="button" data-player-action="reset">回到區段起點</button>
-    </div>
-    <div class="portable-player-sync-summary">
-      <span>同步模式：${escapeHtml(syncModeLabel(block))}</span>
-      <span>同步起點錨點：${escapeHtml(syncStartAnchor)}</span>
-      <span>同步綁定：${escapeHtml(bindingStatus)}</span>
-      <span data-player-runtime-status role="status">${escapeHtml(syncStatus)}</span>
-    </div>
+    ${actions}
     ${fallbackNotice}
     ${renderCaption(blockLabel)}
   </figure>`;
@@ -682,7 +563,7 @@ function renderStyles() {
     figcaption { margin-top: .5rem; color: #596780; font-size: .9rem; }
     .comparison-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
     .portable-player { padding: 1rem; border: 1px solid #ccd6e5; border-radius: .9rem; background: #fbfcff; }
-    .portable-player-header, .portable-player-side-heading, .portable-player-actions, .portable-player-sync-summary { display: flex; align-items: center; gap: .75rem; }
+    .portable-player-header, .portable-player-side-heading, .portable-player-actions { display: flex; align-items: center; gap: .75rem; }
     .portable-player-header { justify-content: space-between; margin-bottom: .75rem; }
     .portable-player-header h3, .portable-player-side-heading h3 { margin: 0; }
     .portable-player-eyebrow { margin: 0 0 .25rem; color: #596780; font-size: .75rem; font-weight: 700; }
@@ -712,8 +593,6 @@ function renderStyles() {
     .portable-player-actions { margin-top: .8rem; }
     .portable-player-actions button { padding: .45rem .7rem; border: 1px solid #b9c5d8; border-radius: .45rem; background: #fff; color: #172033; cursor: pointer; }
     .portable-player-actions button:hover { background: #eef3fa; }
-    .portable-player-sync-summary { flex-wrap: wrap; margin-top: .75rem; color: #596780; font-size: .82rem; }
-    .portable-player-sync-summary span { padding: .25rem .45rem; border-radius: .35rem; background: #eef3fa; }
     .portable-player-settings { display: grid; gap: .3rem; margin: .7rem 0 0; color: #596780; font-size: .8rem; }
     .portable-player-settings div { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: .5rem; }
     .portable-player-settings dt { font-weight: 700; }
@@ -725,20 +604,16 @@ function renderStyles() {
 function renderFramePlayerScript() {
   return `
   document.querySelectorAll('[data-frame-player]').forEach((player) => {
-    const sides = [...player.querySelectorAll('[data-player-side]')];
-    const states = sides.map((side) => ({
-      side,
-      frames: JSON.parse(side.dataset.frameIndex || '[]'),
-      image: side.querySelector('[data-player-frame]'),
-      status: side.querySelector('[data-frame-side-status]'),
-      start: numberValue(side.dataset.segmentIn, 0),
-      end: numberValue(side.dataset.segmentOut),
-      rate: clamp(numberValue(side.dataset.playbackRate, 1), .1, 8),
-      loopEnabled: side.dataset.loopEnabled === 'true',
-    }));
-    const primaryName = player.dataset.masterSide === 'right' ? 'right' : 'left';
-    const primary = states.find((state) => state.side.dataset.playerSide === primaryName) || states[0];
-    const count = primary?.frames.length || 0;
+    const side = player.querySelector('[data-player-side]');
+    if (!side) return;
+    const frames = JSON.parse(side.dataset.frameIndex || '[]');
+    const image = side.querySelector('[data-player-frame]');
+    const sideStatus = side.querySelector('[data-frame-side-status]');
+    const start = numberValue(side.dataset.segmentIn, 0);
+    const end = numberValue(side.dataset.segmentOut);
+    const rate = clamp(numberValue(side.dataset.playbackRate, 1), .1, 8);
+    const loopEnabled = side.dataset.loopEnabled === 'true';
+    const count = frames.length;
     const timeline = player.querySelector('[data-frame-timeline]');
     const position = player.querySelector('[data-frame-position]');
     const status = player.querySelector('[data-frame-player-status]');
@@ -747,13 +622,9 @@ function renderFramePlayerScript() {
     let playing = false;
     let timer = null;
     const setStatus = (message) => { if (status) status.textContent = message; };
-    const frameTime = (state, value) => {
-      const frame = state?.frames?.[value];
-      return Number.isFinite(frame?.time) ? frame.time : value / Math.max(1, numberValue(state?.side?.dataset?.frameFps, 30));
-    };
-    const indexFor = (state, value) => {
-      if (!state || state.frames.length <= 1 || state === primary || !primary || primary.frames.length <= 1) return Math.min(value, Math.max(0, state?.frames.length - 1 || 0));
-      return Math.min(state.frames.length - 1, Math.max(0, Math.round((value / (primary.frames.length - 1)) * (state.frames.length - 1))));
+    const frameTime = (value) => {
+      const frame = frames[value];
+      return Number.isFinite(frame?.time) ? frame.time : value / Math.max(1, numberValue(side.dataset.frameFps, 30));
     };
     const updateControls = () => {
       const maximum = Math.max(0, count - 1);
@@ -768,30 +639,26 @@ function renderFramePlayerScript() {
     const renderIndex = (nextIndex) => {
       if (count <= 0) return;
       index = Math.min(Math.max(0, Math.round(nextIndex)), count - 1);
-      states.forEach((state) => {
-        const frame = state.frames[indexFor(state, index)];
-        if (!frame || !state.image) return;
-        state.image.src = frame.relativePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
-        if (state.status) state.status.textContent = '已顯示第 ' + (indexFor(state, index) + 1) + ' 幀。';
-      });
+      const frame = frames[index];
+      if (frame && image) image.src = frame.relativePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+      if (sideStatus) sideStatus.textContent = '已顯示第 ' + (index + 1) + ' 幀。';
       updateControls();
     };
     const stop = (message) => { playing = false; if (timer) clearTimeout(timer); timer = null; updateControls(); if (message) setStatus(message); };
     const tick = () => {
       if (!playing || count <= 0) return;
       const nextIndex = index + 1;
-      const loop = primary.loopEnabled;
-      const loopStartIndex = primary.frames.findIndex((frame) => frame.time !== null && frame.time >= primary.start);
-      const loopEndIndex = primary.end === null
+      const loopStartIndex = frames.findIndex((frame) => frame.time !== null && frame.time >= start);
+      const loopEndIndex = end === null
         ? -1
-        : primary.frames.findIndex((frame) => frame.time !== null && frame.time >= primary.end);
-      if (nextIndex >= count || (loop && loopEndIndex >= 0 && nextIndex >= loopEndIndex)) {
-        if (loop) renderIndex(loopStartIndex >= 0 ? loopStartIndex : 0);
+        : frames.findIndex((frame) => frame.time !== null && frame.time >= end);
+      if (nextIndex >= count || (loopEnabled && loopEndIndex >= 0 && nextIndex >= loopEndIndex)) {
+        if (loopEnabled) renderIndex(loopStartIndex >= 0 ? loopStartIndex : 0);
         else { renderIndex(count - 1); stop('已到達最後一幀。'); return; }
       } else renderIndex(nextIndex);
-      const currentFrameTime = frameTime(primary, index);
-      const nextFrameTime = frameTime(primary, Math.min(count - 1, index + 1));
-      timer = setTimeout(tick, Math.max(16, Math.round(Math.max(.016, nextFrameTime - currentFrameTime) * 1000 / primary.rate)));
+      const currentFrameTime = frameTime(index);
+      const nextFrameTime = frameTime(Math.min(count - 1, index + 1));
+      timer = setTimeout(tick, Math.max(16, Math.round(Math.max(.016, nextFrameTime - currentFrameTime) * 1000 / rate)));
     };
     player.querySelector('[data-frame-action="previous"]')?.addEventListener('click', () => { stop(); renderIndex(index - 1); setStatus('已顯示上一幀。'); });
     player.querySelector('[data-frame-action="next"]')?.addEventListener('click', () => { stop(); renderIndex(index + 1); setStatus('已顯示下一幀。'); });
@@ -801,7 +668,7 @@ function renderFramePlayerScript() {
       if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
       event.preventDefault(); stop(); renderIndex(index + (event.key === 'ArrowLeft' ? -1 : 1)); setStatus('已用鍵盤逐幀切換。');
     });
-    const segmentStartIndex = primary?.frames?.findIndex((frame) => frame.time !== null && frame.time >= primary.start) ?? -1;
+    const segmentStartIndex = frames.findIndex((frame) => frame.time !== null && frame.time >= start);
     renderIndex(segmentStartIndex >= 0 ? segmentStartIndex : 0);
     updateControls();
   });`;
@@ -811,29 +678,42 @@ function renderLegacyPlayerScript() {
   return `
   document.querySelectorAll('[data-portable-player]:not([data-frame-player])').forEach((player) => {
     const sides = [...player.querySelectorAll('[data-player-side]')];
-    const videos = sides.map((side) => side.querySelector('[data-player-video]')).filter(Boolean);
-    const status = player.querySelector('[data-player-runtime-status]');
-    const syncMode = player.dataset.syncMode === 'frame' ? 'frame' : 'time';
-    const masterSide = player.dataset.masterSide === 'right' ? 'right' : 'left';
-    const bindingEnabled = player.dataset.bindingEnabled !== 'false';
     const settingsFor = (side) => {
       const video = side.querySelector('[data-player-video]');
       const rateInput = side.querySelector('[data-player-rate]');
       const loopInput = side.querySelector('[data-player-loop]');
-      return { side, video, rateInput, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: clamp(numberValue(side.dataset.playbackRate, 1), .1, 8), loopEnabled: side.dataset.loopEnabled === 'true', anchor: numberValue(side.dataset.anchorTime, 0) };
+      return { side, video, rateInput, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: clamp(numberValue(side.dataset.playbackRate, 1), .1, 8), loopEnabled: side.dataset.loopEnabled === 'true' };
     };
-    const allSettings = () => sides.map(settingsFor);
-    const setStatus = (message) => { if (status) status.textContent = message; };
     const updateSide = (settings) => { const { video, side } = settings; if (!video) return; const seek = side.querySelector('[data-player-seek]'); const output = side.querySelector('[data-player-time]'); const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : settings.end; if (seek) { seek.min = String(settings.start); seek.max = String(Math.max(settings.start, settings.end ?? duration ?? settings.start)); seek.value = String(clamp(video.currentTime || settings.start, settings.start, Number(seek.max))); seek.disabled = false; } if (output) output.textContent = String((video.currentTime || 0).toFixed(2)) + ' 秒'; };
     const applySettings = (settings, seekToStart = true) => { if (!settings.video) return; settings.video.playbackRate = settings.rate; if (settings.rateInput) settings.rateInput.value = String(settings.rate); if (settings.loopInput) settings.loopInput.checked = settings.loopEnabled; if (seekToStart && Number.isFinite(settings.start)) settings.video.currentTime = settings.start; updateSide(settings); };
-    const syncFrom = (sourceSettings) => { if (!bindingEnabled || videos.length < 2 || sourceSettings.side.dataset.playerSide !== masterSide || player.dataset.syncing === 'true') return; player.dataset.syncing = 'true'; const relative = sourceSettings.video.currentTime - sourceSettings.anchor; allSettings().forEach((target) => { if (target.video === sourceSettings.video || !target.video) return; const duration = Number.isFinite(target.video.duration) && target.video.duration > 0 ? target.video.duration : target.end; const maximum = target.end ?? duration; const targetTime = clamp(target.anchor + relative, target.start, Math.max(target.start, maximum || target.start)); if (Math.abs(target.video.currentTime - targetTime) > .08) target.video.currentTime = targetTime; }); player.dataset.syncing = 'false'; };
-    const playAll = () => { allSettings().forEach((settings) => settings.video?.play().catch(() => setStatus('瀏覽器拒絕自動播放；請按影片上的播放控制。'))); setStatus(syncMode === 'frame' ? '已播放；影格同步使用時間同步 fallback。' : '已同步播放。'); };
-    const pauseAll = () => { videos.forEach((video) => video.pause()); setStatus('已暫停。'); };
-    const resetAll = () => { allSettings().forEach((settings) => { settings.video.pause(); settings.video.currentTime = settings.start; updateSide(settings); }); setStatus('已回到各影片區段起點。'); };
-    const stepAll = (direction) => { const settingsList = allSettings(); const source = bindingEnabled && videos.length > 1 ? settingsList.find((settings) => settings.side.dataset.playerSide === masterSide) : settingsList[0]; if (!source?.video) return; const stepSeconds = syncMode === 'frame' ? (1 / 30) : 0.1; const duration = Number.isFinite(source.video.duration) && source.video.duration > 0 ? source.video.duration : source.end; const maximum = source.end ?? duration ?? source.start; source.video.currentTime = clamp(source.video.currentTime + direction * stepSeconds, source.start, Math.max(source.start, maximum)); syncFrom(source); setStatus('已用時間同步 fallback ' + (direction < 0 ? '向前' : '向後') + ' ' + stepSeconds.toFixed(3) + ' 秒。'); updateSide(source); };
-    sides.forEach((side) => { const settings = settingsFor(side); applySettings(settings); settings.video?.addEventListener('loadedmetadata', () => { applySettings(settings); setStatus('媒體已載入；編輯器播放器設定已套用。'); }); settings.video?.addEventListener('timeupdate', () => { const loopEnabled = settings.loopInput?.checked; if (settings.end !== null && settings.video.currentTime >= settings.end) { if (loopEnabled) { settings.video.currentTime = settings.start; settings.video.play().catch(() => {}); } else { settings.video.currentTime = settings.end; settings.video.pause(); setStatus('已到達區段終點。'); } } updateSide(settings); if (syncMode === 'time' || syncMode === 'frame') syncFrom(settings); }); settings.video?.addEventListener('ended', () => { if (settings.loopInput?.checked) { settings.video.currentTime = settings.start; settings.video.play().catch(() => {}); } }); settings.video?.addEventListener('error', () => setStatus('媒體載入失敗；請確認 export 內的相對路徑。')); side.querySelector('[data-player-seek]')?.addEventListener('input', (event) => { settings.video.currentTime = numberValue(event.target.value, settings.start); updateSide(settings); syncFrom(settings); }); settings.rateInput?.addEventListener('change', (event) => { settings.rate = clamp(numberValue(event.target.value, settings.rate), .1, 8); settings.video.playbackRate = settings.rate; event.target.value = String(settings.rate); setStatus('播放速率已調整為 ' + settings.rate.toFixed(2) + ' 倍。'); }); settings.loopInput?.addEventListener('change', () => { setStatus(settings.loopInput.checked ? '已開啟循環播放。' : '已關閉循環播放。'); }); });
-    player.addEventListener('keydown', (event) => { if (event.target !== player || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return; event.preventDefault(); stepAll(event.key === 'ArrowLeft' ? -1 : 1); });
-    player.querySelectorAll('[data-player-action]').forEach((button) => { button.addEventListener('click', () => { if (button.dataset.playerAction === 'play') playAll(); if (button.dataset.playerAction === 'pause') pauseAll(); if (button.dataset.playerAction === 'reset') resetAll(); }); });
+    sides.forEach((side) => {
+      const settings = settingsFor(side);
+      applySettings(settings);
+      settings.video?.addEventListener('loadedmetadata', () => applySettings(settings));
+      settings.video?.addEventListener('timeupdate', () => {
+        const loopEnabled = settings.loopInput?.checked;
+        if (settings.end !== null && settings.video.currentTime >= settings.end) {
+          if (loopEnabled) { settings.video.currentTime = settings.start; settings.video.play().catch(() => {}); }
+          else { settings.video.currentTime = settings.end; settings.video.pause(); }
+        }
+        updateSide(settings);
+      });
+      settings.video?.addEventListener('ended', () => {
+        if (settings.loopInput?.checked) { settings.video.currentTime = settings.start; settings.video.play().catch(() => {}); }
+      });
+      settings.video?.addEventListener('error', () => { const status = side.querySelector('[data-player-time]'); if (status) status.textContent = '媒體載入失敗'; });
+      side.querySelector('[data-player-seek]')?.addEventListener('input', (event) => { settings.video.currentTime = numberValue(event.target.value, settings.start); updateSide(settings); });
+      settings.rateInput?.addEventListener('change', (event) => { settings.rate = clamp(numberValue(event.target.value, settings.rate), .1, 8); settings.video.playbackRate = settings.rate; event.target.value = String(settings.rate); });
+      settings.loopInput?.addEventListener('change', () => { settings.loopEnabled = settings.loopInput.checked; });
+    });
+    const primary = sides.length === 1 ? settingsFor(sides[0]) : null;
+    if (primary?.video) {
+      const reset = () => { primary.video.pause(); primary.video.currentTime = primary.start; updateSide(primary); };
+      player.querySelector('[data-player-action="play"]')?.addEventListener('click', () => primary.video.play().catch(() => {}));
+      player.querySelector('[data-player-action="pause"]')?.addEventListener('click', () => primary.video.pause());
+      player.querySelector('[data-player-action="reset"]')?.addEventListener('click', reset);
+      player.addEventListener('keydown', (event) => { if (event.target !== player || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return; event.preventDefault(); const duration = Number.isFinite(primary.video.duration) && primary.video.duration > 0 ? primary.video.duration : primary.end; const maximum = primary.end ?? duration ?? primary.start; primary.video.currentTime = clamp(primary.video.currentTime + (event.key === 'ArrowLeft' ? -1 : 1) * 0.1, primary.start, Math.max(primary.start, maximum)); updateSide(primary); });
+    }
   });`;
 }
 

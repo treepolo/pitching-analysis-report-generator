@@ -16,7 +16,7 @@ function functionSlice(source, start, end) {
   return source.slice(startIndex, endIndex);
 }
 
-test('single and comparison cards share one browser video surface and one frame timeline', () => {
+test('single and dual cards use the same browser video surface and independent controls', () => {
   const side = functionSlice(renderer, 'function renderInlineVideoSide(', 'function renderInlineVideoBlock(');
   const block = functionSlice(renderer, 'function renderInlineVideoBlock(', 'function setInlineVideoStatus(');
 
@@ -25,16 +25,15 @@ test('single and comparison cards share one browser video surface and one frame 
   assert.match(side, /data-frame-placeholder/u);
   assert.doesNotMatch(side, /native-player|HWND|EVR/u);
   assert.match(block, /data-frame-player/u);
-  assert.equal((block.match(/data-frame-timeline/g) || []).length, 1);
-  assert.equal((block.match(/data-frame-action="toggle"/g) || []).length, 1);
-  assert.match(block, /data-frame-action="previous"/u);
-  assert.match(block, /data-frame-action="next"/u);
-  assert.match(block, /data-frame-rate/u);
-  assert.match(block, /data-frame-action="reset-rate"/u);
-  assert.match(block, /重置播放速度為 1 倍/u);
-  assert.match(block, /↻/u);
-  assert.match(block, /data-frame-player-status/u);
-  assert.match(block, /const sides = comparison \? `\$\{renderInlineVideoSide\(block, 'left'\)\}\$\{renderInlineVideoSide\(block, 'right'\)\}` : renderInlineVideoSide\(block, 'single'\)/u);
+  assert.match(block, /renderInlineVideoSide\(block, 'left', \{ playerCard: true \}\)/u);
+  assert.match(block, /renderInlineVideoSide\(block, 'right', \{ playerCard: true \}\)/u);
+  assert.match(side, /renderFramePlayerControls\(title\)/u);
+  const controls = functionSlice(renderer, 'function renderFramePlayerControls(', 'function renderInlineVideoSide(');
+  assert.match(controls, /data-frame-rate/u);
+  assert.match(controls, /data-frame-action="reset-rate"/u);
+  assert.match(controls, /重置播放速度為 1 倍/u);
+  assert.match(controls, /data-frame-player-status/u);
+  assert.match(side, /data-frame-player-side="\$\{side\}"/u);
   assert.match(renderer, /function bindFramePlayerActionButtons\(card\)/u);
 });
 
@@ -43,7 +42,7 @@ test('loading uses the native browser video pipeline without frame-cache prepara
   assert.match(prepare, /resolveMediaSource\(state\.activeProject\.id, assetId\)/u);
   assert.match(prepare, /loadedmetadata/u);
   assert.match(prepare, /video\.preload = 'auto'/u);
-  assert.match(prepare, /seekFramePlayerIndex\(card, framePlayerSegmentStartIndex\(block, runtime\), \{ exact: true/u);
+  assert.match(prepare, /seekFramePlayerIndex\(card, framePlayerSegmentStartIndex\(block, runtime, card\), \{ exact: true/u);
   assert.doesNotMatch(prepare, /frameCache|prepareFrameCache|readFrameCache|base64|dataUrl/u);
   assert.doesNotMatch(renderer, /nativePlayer|native-frame-player|native-player-surface|Media Foundation/u);
 });
@@ -76,13 +75,12 @@ test('drag is latest-target-wins approximate seek, release is exact seek', () =>
 });
 
 test('keyboard stepping is one exact frame and playback uses video clock/rate', () => {
-  const keyHandler = functionSlice(renderer, 'function handleFramePlayerKeydown(', 'function scheduleInlineRuntimeTask(');
+  const keyHandler = functionSlice(renderer, 'function handleFramePlayerKeydown(', 'function inlinePlaybackBounds(');
   assert.match(keyHandler, /\['ArrowLeft', 'ArrowRight'\]\.includes\(event\.key\)/u);
   assert.match(keyHandler, /stepFramePlayer\(card, event\.key === 'ArrowRight' \? 1 : -1\)/u);
   assert.match(keyHandler, /event\.preventDefault\(\)/u);
   assert.match(keyHandler, /data-frame-controls/u);
-  const legacyKeyHandler = functionSlice(renderer, 'function handleInlineVideoKeydown(', 'function patchInlineVideoCard(');
-  assert.match(legacyKeyHandler, /data-frame-player/u);
+  assert.doesNotMatch(renderer, /function handleInlineVideoKeydown\(/u);
 
   const controls = functionSlice(renderer, 'async function toggleFramePlayer(', 'function handleFramePlayerEvent(');
   assert.match(controls, /video\.play\(\)/u);
@@ -100,12 +98,12 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.match(step, /影片尚未準備，無法定位影格/u);
 });
 
-test('comparison waits for both browser videos and keeps the follower clock aligned', () => {
-  assert.match(renderer, /function framePlayerReady\(block, runtime\)/u);
-  assert.match(renderer, /framePlayerSides\(block\)\.every\(\(side\)/u);
+test('dual players initialize and run independently without a follower clock', () => {
+  assert.match(renderer, /function framePlayerReady\(block, runtime, card\)/u);
+  assert.match(renderer, /function videoBlockSides\(block\)/u);
   assert.match(renderer, /results\.every\(Boolean\)/u);
-  assert.match(renderer, /function syncFramePlayerSides\(card, block, masterSide\)/u);
-  assert.match(renderer, /follower\.currentTime/u);
+  assert.doesNotMatch(renderer, /function syncFramePlayerSides\(/u);
+  assert.doesNotMatch(renderer, /follower\.currentTime/u);
   assert.match(renderer, /frameEngineGuard/u);
 });
 

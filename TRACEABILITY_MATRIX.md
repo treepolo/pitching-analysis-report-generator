@@ -1,5 +1,10 @@
 # Traceability Matrix
 
+## Current dual-video simplification (2026-08-21)
+
+- Current implementation removes the former sync/anchor/binding/control-side/relative-offset contract from renderer, storage normalization, report contract, preload, main IPC, and export. `雙影片` remains persisted as `comparisonVideo` for compatibility and is two independent single-video players.
+- Current automated checkpoint: `npm test` → 137 total, 136 pass, 0 fail, 1 explicit Electron `file://` unavailable skip. Real media, browser/file://, responsive human, and AT-A–G evidence remain unavailable; no requirement is `VERIFIED` by this checkpoint.
+
 ## Current Wave 19G provenance reconciliation (2026-08-20)
 
 - Actual implementation tip is `b118a6321516a2cb17cec33a8da7f3bfd8e21c1c` on `worker/desktop-vertical-slice`; local `origin/worker/desktop-vertical-slice` tracking ref matches and the worktree was clean before the unrelated `AGENTS.md` edit appeared. Live origin SHA is unavailable because `git ls-remote origin` failed with `SEC_E_NO_CREDENTIALS`.
@@ -144,11 +149,11 @@ The historical checkpoint text below is superseded by this current Wave 2 reconc
 | PLAYER-001 | DATA_AND_SYNC、UI_UX_SPEC / Playback owner | AT-A、AT-B、AT-F | play/seek/rate/frame/fullscreen/loop interaction | NOT_STARTED |
 | PLAYER-002 | DATA_MODEL、UI_UX_SPEC / Playback owner | AT-A、AT-B、AT-F | two-side layout and controls evidence | NOT_STARTED |
 | PLAYER-003 | DATA_MODEL、DATA_AND_SYNC / Playback owner | AT-G | missing/unplayable/range validation evidence | NOT_STARTED |
-| SYNC-001 | DATA_AND_SYNC / Playback owner | AT-A、AT-D | real anchor capture frame/time evidence | NOT_STARTED |
-| SYNC-002 | DATA_MODEL、DATA_AND_SYNC / Playback owner | AT-C | block-local anchor isolation evidence | NOT_STARTED |
-| SYNC-003 | DATA_AND_SYNC / Playback owner | AT-D | different FPS relative-time evidence | NOT_STARTED |
-| SYNC-004 | DATA_AND_SYNC / Playback owner | AT-B、AT-D | long-play drift correction evidence | NOT_STARTED |
-| SYNC-005 | DATA_AND_SYNC、MEDIA_PIPELINE / Playback + Media | AT-E | VFR/incompatible fallback precision evidence | NOT_STARTED |
+| SYNC-001 | DATA_AND_SYNC / Playback owner | Future design | Former sync anchors removed; new contract requires explicit product instruction | DEFERRED |
+| SYNC-002 | DATA_MODEL、DATA_AND_SYNC / Playback owner | Future design | Former binding/control-side/relative-offset state removed | DEFERRED |
+| SYNC-003 | DATA_AND_SYNC / Playback owner | Future design | Future sync semantics are not part of the current block model | DEFERRED |
+| SYNC-004 | DATA_MODEL、UI_UX_SPEC / Playback owner | AT-A、AT-B、AT-C、AT-D | Current dual sides remain independent; no sync/drift correction | DEFERRED |
+| SYNC-005 | DATA_AND_SYNC、MEDIA_PIPELINE / Playback + Media | Future design | Future precision/fallback contract awaits new sync design | DEFERRED |
 | PREVIEW-001 | REPORT_OUTPUT_SPEC / Renderer owner | AT-A | preview/export structural comparison | NOT_STARTED |
 | PREVIEW-002 | UI_UX_SPEC、REPORT_OUTPUT_SPEC / Shell + Renderer | AT-F | desktop/narrow/mobile preview evidence | NOT_STARTED |
 | EXPORT-001 | REPORT_OUTPUT_SPEC / Renderer owner | AT-A、AT-B | self-contained folder and file:// evidence | NOT_STARTED |
@@ -158,7 +163,7 @@ The historical checkpoint text below is superseded by this current Wave 2 reconc
 | OFFLINE-002 | REPORT_OUTPUT_SPEC、UI_UX_SPEC / Renderer + UX | AT-B、AT-F | support-boundary statement and test evidence | NOT_STARTED |
 | RESP-001 | UI_UX_SPEC、REPORT_OUTPUT_SPEC / Shell + Renderer | AT-F | four viewport visual evidence | NOT_STARTED |
 | RESP-002 | UI_UX_SPEC、DATA_AND_SYNC / Shell + Playback | AT-F | touch reachability and capability map | NOT_STARTED |
-| PERSIST-001 | DATA_MODEL、DATA_AND_SYNC / Report Model | AT-A | autosave/reopen references/anchors/settings | NOT_STARTED |
+| PERSIST-001 | DATA_MODEL、REPORT_OUTPUT_SPEC / Report Model | AT-A | autosave/reopen references/playback settings; retired sync fields cleared | IN_PROGRESS |
 | PERSIST-002 | DATA_MODEL、OPERATIONS / Report Model | AT-G | crash/reload recovery fixture evidence | NOT_STARTED |
 | PERSIST-003 | DATA_MODEL、REPORT_OUTPUT_SPEC / Renderer | AT-A、AT-B | pre/post export semantic comparison | NOT_STARTED |
 | ASYNC-001 | MEDIA_PIPELINE、DATA_MODEL / Job owners | AT-A、AT-E | phase and processed/total evidence | NOT_STARTED |

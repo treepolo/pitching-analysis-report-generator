@@ -1,6 +1,8 @@
 # Data and Sync Contract
 
-## Canonical block-local sync decision (2026-08-14)
+> Current status (2026-08-21): the former synchronization anchors, binding modes, control-side state, relative offsets, and sync IPC are removed from the product. The material below is retained as historical design context only; it is not an active storage, renderer, export, or backend contract. A future synchronization redesign requires a new explicit product decision.
+
+## Historical block-local sync proposal (superseded 2026-08-21)
 
 - Sync configuration belongs to each comparison video block instance, never to a shared form or global MediaAsset record.
 - Default time mode uses a shared elapsed-time playhead and maps each source through its own timebase/FPS and anchor time. It must not map 60fps and 30fps sources one-to-one by raw frame index.

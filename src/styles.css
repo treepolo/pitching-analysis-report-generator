@@ -120,7 +120,7 @@ select:focus, input:focus, textarea:focus { border-color: var(--blue); box-shado
 .video-side-configs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .video-side-config { min-width: 0; display: grid; gap: 8px; margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
 .video-side-config legend { padding: 0 5px; color: var(--ink); font-size: 12px; font-weight: 800; }
-.block-inline-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.block-inline-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
 .block-inline-fields label { font-size: 11px; }
 .block-inline-fields input { width: 100%; }
 .empty-state { padding: 28px 4px; color: var(--muted); text-align: center; }
