@@ -79,23 +79,19 @@
   }
 
   function cloneLoopConfig(value) {
+    if (value === true) return { enabled: true };
     if (!isRecord(value)) return undefined;
-    const loop = {};
-    copyBoolean(value, loop, 'enabled');
-    copyFiniteNumber(value, loop, 'start');
-    copyFiniteNumber(value, loop, 'end');
-    copyFiniteNumber(value, loop, 'startTime');
-    copyFiniteNumber(value, loop, 'endTime');
-    return Object.keys(loop).length > 0 ? loop : undefined;
+    return { enabled: value.enabled !== false };
   }
 
-  function cloneSegmentConfig(value) {
-    if (!isRecord(value)) return undefined;
+  function cloneSegmentConfig(value, legacyLoop) {
+    const source = isRecord(value) ? value : isRecord(legacyLoop) ? legacyLoop : undefined;
+    if (!source) return undefined;
     const segment = {};
-    copyFiniteNumber(value, segment, 'in');
-    copyFiniteNumber(value, segment, 'out');
-    copyFiniteNumber(value, segment, 'start');
-    copyFiniteNumber(value, segment, 'end');
+    const start = source.in ?? source.start ?? source.startTime;
+    const end = source.out ?? source.end ?? source.endTime;
+    if (typeof start === 'number' && Number.isFinite(start)) segment.in = start;
+    if (typeof end === 'number' && Number.isFinite(end)) segment.out = end;
     return Object.keys(segment).length > 0 ? segment : undefined;
   }
 
@@ -135,11 +131,13 @@
       if (Object.keys(anchors).length > 0) binding.anchors = anchors;
     }
 
-    if (isRecord(value.offsets)) {
-      const offsets = {};
-      copyFiniteNumber(value.offsets, offsets, 'left');
-      copyFiniteNumber(value.offsets, offsets, 'right');
-      if (Object.keys(offsets).length > 0) binding.offsets = offsets;
+    if (isRecord(value.sides)) {
+      const sides = {};
+      const leftSegment = cloneSegmentConfig(value.sides.left?.segment);
+      const rightSegment = cloneSegmentConfig(value.sides.right?.segment);
+      if (leftSegment) sides.left = { segment: leftSegment };
+      if (rightSegment) sides.right = { segment: rightSegment };
+      if (Object.keys(sides).length > 0) binding.sides = sides;
     }
     if (['unknown', 'time', 'frame', 'estimated', 'exact'].includes(value.fallbackPrecision)) {
       binding.fallbackPrecision = value.fallbackPrecision;
@@ -162,8 +160,10 @@
     copyBoolean(value, playback, 'muted');
     const loop = cloneLoopConfig(value.loop);
     if (loop) playback.loop = loop;
-    const loopRange = cloneLoopConfig(value.loopRange);
-    if (loopRange) playback.loopRange = loopRange;
+    else {
+      const legacyLoop = cloneLoopConfig(value.loopRange);
+      if (legacyLoop) playback.loop = legacyLoop;
+    }
     return Object.keys(playback).length > 0 ? playback : undefined;
   }
 
@@ -198,11 +198,14 @@
     copyString(value, side, 'precisionState');
     const anchor = cloneAnchor(value.anchor);
     if (anchor) side.anchor = anchor;
+    const legacyLoop = value.loop ?? value.loopRange ?? value.playback?.loop ?? value.playback?.loopRange;
     const loop = cloneLoopConfig(value.loop);
     if (loop) side.loop = loop;
-    const loopRange = cloneLoopConfig(value.loopRange);
-    if (loopRange) side.loopRange = loopRange;
-    const segment = cloneSegmentConfig(value.segment);
+    else {
+      const legacyLoopConfig = cloneLoopConfig(legacyLoop);
+      if (legacyLoopConfig) side.loop = legacyLoopConfig;
+    }
+    const segment = cloneSegmentConfig(value.segment, legacyLoop);
     if (segment) side.segment = segment;
     const playback = clonePlaybackConfig(value.playback);
     if (playback) side.playback = playback;
@@ -230,7 +233,8 @@
       copyString(block, output, 'label');
       copyString(block, output, 'caption');
       copyString(block, output, 'layout');
-      const segment = cloneSegmentConfig(block.segment);
+      const legacyLoop = block.loop ?? block.loopRange ?? block.playback?.loop ?? block.playback?.loopRange;
+      const segment = cloneSegmentConfig(block.segment, legacyLoop);
       if (segment) output.segment = segment;
       const sync = cloneSyncConfig(block.sync);
       if (sync) output.sync = sync;
@@ -242,8 +246,10 @@
       if (playbackOptions) output.playbackOptions = playbackOptions;
       const loop = cloneLoopConfig(block.loop);
       if (loop) output.loop = loop;
-      const loopRange = cloneLoopConfig(block.loopRange);
-      if (loopRange) output.loopRange = loopRange;
+      else {
+        const legacyLoopConfig = cloneLoopConfig(legacyLoop);
+        if (legacyLoopConfig) output.loop = legacyLoopConfig;
+      }
     }
 
     if (type === 'comparisonVideo') {

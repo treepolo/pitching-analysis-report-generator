@@ -64,20 +64,21 @@ test('player state, loop and anchor are block-local and transitions do not mutat
     duration: 3,
     timing: cfr(30, 90, 3),
     currentTime: 1.8,
-    loop: { enabled: true, start: 1, end: 2 },
+    segment: { in: 1, out: 2 },
+    loop: { enabled: true },
     anchor: anchor(),
   });
 
   const advanced = advancePlayer(player, 0.5);
   assert.ok(Math.abs(advanced.currentTime - 1.3) < 1e-12);
   assert.equal(advanced.anchor.comparisonBlockId, 'comparison-1');
-  assert.equal(advanced.loop.start, 1);
+  assert.deepEqual(advanced.segment, { in: 1, out: 2 });
   assert.equal(player.currentTime, 1.8);
   assert.equal(player.anchor.observedTime, 1);
 
   const disabled = setPlayerLoop(advanced, null);
-  assert.deepEqual(disabled.loop, { enabled: false, start: 0, end: 0 });
-  assert.deepEqual(player.loop, { enabled: true, start: 1, end: 2 });
+  assert.deepEqual(disabled.loop, { enabled: false });
+  assert.deepEqual(player.loop, { enabled: true });
 });
 
 test('loop boundaries wrap deterministically in both directions without zero-step movement', () => {
@@ -87,7 +88,8 @@ test('loop boundaries wrap deterministically in both directions without zero-ste
     duration: 3,
     currentTime: 1.5,
     status: PLAYER_STATUS.PLAYING,
-    loop: { enabled: true, start: 1, end: 2 },
+    segment: { in: 1, out: 2 },
+    loop: { enabled: true },
   });
   const reverseWrapped = advancePlayer(reverseBoundary, -0.5);
   assert.equal(reverseWrapped.currentTime, 2);
@@ -100,7 +102,8 @@ test('loop boundaries wrap deterministically in both directions without zero-ste
     mediaAssetId: 'asset-right',
     duration: 3,
     currentTime: 2,
-    loop: { enabled: true, start: 1, end: 2 },
+    segment: { in: 1, out: 2 },
+    loop: { enabled: true },
   });
   assert.equal(advancePlayer(atEnd, 0).currentTime, 2);
 
@@ -109,7 +112,8 @@ test('loop boundaries wrap deterministically in both directions without zero-ste
     mediaAssetId: 'asset-outside',
     duration: 3,
     currentTime: 0.25,
-    loop: { enabled: true, start: 1, end: 2 },
+    segment: { in: 1, out: 2 },
+    loop: { enabled: true },
   });
   assert.equal(advancePlayer(outsideLoop, 0.1).currentTime, 1.1);
 });
@@ -223,7 +227,8 @@ test('player block instance validation prevents an anchor from crossing block-lo
     mediaAssetId: 'asset-shared',
     duration: 3,
     timing: cfr(30, 90, 3),
-    loop: { enabled: true, start: 0.5, end: 1.5 },
+    segment: { in: 0.5, out: 1.5 },
+    loop: { enabled: true },
     playbackRate: 0.5,
     anchor: anchor({ mediaAssetId: 'asset-shared' }),
   });
@@ -234,15 +239,16 @@ test('player block instance validation prevents an anchor from crossing block-lo
     mediaAssetId: 'asset-shared',
     duration: 3,
     timing: cfr(30, 90, 3),
-    loop: { enabled: true, start: 1.5, end: 2.5 },
+    segment: { in: 1.5, out: 2.5 },
+    loop: { enabled: true },
     playbackRate: 2,
     anchor: anchor({ comparisonBlockId: 'comparison-2', mediaAssetId: 'asset-shared' }),
   });
   const advanced = advancePlayer(first, 1);
   assert.equal(first.playbackRate, 0.5);
   assert.equal(second.playbackRate, 2);
-  assert.equal(first.loop.start, 0.5);
-  assert.equal(second.loop.start, 1.5);
+  assert.equal(first.segment.in, 0.5);
+  assert.equal(second.segment.in, 1.5);
   assert.equal(advanced.anchor.comparisonBlockId, 'comparison-1');
   assert.equal(second.anchor.comparisonBlockId, 'comparison-2');
 });
@@ -365,7 +371,7 @@ test('start anchors and playback relationship update independently per compariso
   assert.equal(initial.playback.relativeTime, 0);
 });
 
-test('continuous binding persists control side, anchors, segment offsets and playback independently', () => {
+test('continuous binding persists control side, anchors, and segments independently', () => {
   const leftAnchor = anchor({
     comparisonBlockId: 'comparison-binding',
     observedTime: 1,
@@ -396,7 +402,7 @@ test('continuous binding persists control side, anchors, segment offsets and pla
   assert.equal(state.binding.masterSide, 'right');
   assert.equal(state.binding.mode, SYNC_MODE.TIME);
   assert.equal(state.binding.anchors.left.observedTime, 1);
-  assert.equal(state.binding.sides.left.offsetSeconds, 0.1);
+  assert.equal('offsetSeconds' in state.binding.sides.left, false);
   assert.deepEqual(state.binding.sides.right.segment, { in: 1, out: 3 });
   assert.equal(state.playback.clockSide, 'right');
 
@@ -416,15 +422,15 @@ test('continuous binding persists control side, anchors, segment offsets and pla
       offsets: { left: 0.15, right: -0.25 },
     },
   });
-  assert.equal(canonicalState.binding.sides.left.offsetSeconds, 0.15);
-  assert.equal(canonicalState.binding.sides.right.offsetSeconds, -0.25);
+  assert.equal('offsetSeconds' in canonicalState.binding.sides.left, false);
+  assert.equal('offsetSeconds' in canonicalState.binding.sides.right, false);
 
   const mapped = mapComparisonSyncState(state, {
     left: { timing: cfr(30, 90, 3), duration: 3 },
     right: { timing: cfr(60, 180, 3), duration: 3 },
   });
-  assert.equal(mapped.sides.left.targetTime, 1.35);
-  assert.equal(mapped.sides.right.targetTime, 2.05);
+  assert.equal(mapped.sides.left.targetTime, 1.25);
+  assert.equal(mapped.sides.right.targetTime, 2.25);
   assert.equal(mapped.binding.fallbackPrecision, PRECISION.TIME_BASED);
 
   const changed = setPlaybackRelationship(state, {
@@ -493,11 +499,11 @@ test('binding updates keep anchors and side settings block-local', () => {
     sides: { right: { offsetSeconds: 0.35, segment: { in: 0.2, out: 1.8 } } },
   });
   assert.equal(updated.binding.enabled, true);
-  assert.equal(updated.binding.sides.right.offsetSeconds, 0.35);
-  assert.deepEqual(updated.binding.sides.left, { segment: { in: 0, out: null }, offsetSeconds: 0 });
+  assert.equal('offsetSeconds' in updated.binding.sides.right, false);
+  assert.deepEqual(updated.binding.sides.left, { segment: { in: 0, out: null } });
   assert.equal(updated.startAnchors.left.comparisonBlockId, 'comparison-binding-isolated');
   assert.equal(state.binding.enabled, false);
-  assert.equal(state.binding.sides.right.offsetSeconds, 0);
+  assert.equal('offsetSeconds' in state.binding.sides.right, false);
   assert.throws(
     () => createSyncBinding({ masterSide: 'center' }),
     /masterSide must be left or right/,
@@ -1087,12 +1093,9 @@ test('comparison drift uses frame-resolved playback targets independently per si
   assert.equal(aligned.sides.right.playbackTime, 2.5);
 });
 
-test('validation rejects malformed loop and frame-aware anchor evidence', () => {
-  assert.equal(validateLoopRange({ enabled: true, start: 2, end: 1 }, 3).valid, false);
-  assert.throws(
-    () => createLoop({ enabled: true, start: 2, end: 1 }),
-    /loop.end must be greater than loop.start/,
-  );
+test('loop bounds are supplied by the player segment and frame-aware anchor evidence remains strict', () => {
+  assert.deepEqual(validateLoopRange({ enabled: true, start: 2, end: 1 }, 3).normalized, { enabled: true });
+  assert.deepEqual(createLoop({ enabled: true, start: 2, end: 1 }), { enabled: true });
 
   const invalidAnchor = {
     comparisonBlockId: 'comparison-1',

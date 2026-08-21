@@ -71,8 +71,6 @@ function clonePortableBinding(value) {
     const output = {};
     const segment = source.segment === undefined ? undefined : normalizeSegment(source.segment);
     if (segment) output.segment = segment;
-    const offsetSeconds = finiteSetting(source.offsetSeconds ?? source.offset ?? value.offsets?.[side], null);
-    if (offsetSeconds !== null) output.offsetSeconds = offsetSeconds;
     if (Object.keys(output).length > 0) sides[side] = output;
   }
   if (Object.keys(sides).length > 0) binding.sides = sides;
@@ -209,14 +207,10 @@ function normalizeSegment(value) {
 function normalizeLoop(value, segment) {
   const loop = value && typeof value === 'object' ? value : null;
   if (!loop && value !== true) {
-    return { enabled: false, start: segment.in, end: segment.out };
+    return { enabled: false };
   }
-  const start = Math.max(0, finiteSetting(loop?.start ?? loop?.startTime, segment.in));
-  const endValue = finiteSetting(loop?.end ?? loop?.endTime, segment.out);
   return {
     enabled: loop ? loop.enabled !== false : true,
-    start,
-    end: endValue !== null && endValue > start ? endValue : null,
   };
 }
 
@@ -230,16 +224,12 @@ function playbackSettings(config, binding = null, side = null) {
   const segment = normalizeSegment(source.segment ?? bindingSide?.segment);
   const loopSource = source.loop
     ?? playback.loop
-    ?? source.loopRange
-    ?? playback.loopRange
-    ?? playbackOptions.loop
-    ?? playbackOptions.loopRange;
+    ?? playbackOptions.loop;
   const explicitRate = finiteSetting(playback.rate ?? playbackOptions.rate, null);
   return {
     segment,
     rate: Math.max(0.1, Math.min(8, explicitRate ?? finiteSetting(binding?.playbackRate, 1))),
     loop: normalizeLoop(loopSource, segment),
-    offsetSeconds: finiteSetting(bindingSide?.offsetSeconds, 0),
   };
 }
 
@@ -273,11 +263,11 @@ function formatSeconds(value) {
   return value === null || value === undefined ? '未設定' : `${Number(value).toFixed(2)} 秒`;
 }
 
-function formatLoop(loop) {
+function formatLoop(loop, segment = { in: 0, out: null }) {
   if (!loop.enabled) return '關閉';
-  return loop.end === null
-    ? `開啟（${formatSeconds(loop.start)}起）`
-    : `開啟（${formatSeconds(loop.start)}–${formatSeconds(loop.end)}）`;
+  return segment.out === null
+    ? `開啟（${formatSeconds(segment.in)}起）`
+    : `開啟（${formatSeconds(segment.in)}–${formatSeconds(segment.out)}）`;
 }
 
 function formatAnchor(anchor) {
@@ -313,9 +303,8 @@ function renderPlayerSettings(block, side, asset, settings, comparison) {
     <div><dt>來源綁定</dt><dd>${escapeHtml(`${sideLabel}；${assetBindingLabel}`)}</dd></div>
     <div><dt>播放區段</dt><dd>${escapeHtml(`${formatSeconds(settings.segment.in)} 至 ${formatSeconds(settings.segment.out)}`)}</dd></div>
     <div><dt>播放速率</dt><dd>${escapeHtml(`${settings.rate.toFixed(2)} 倍`)}</dd></div>
-    <div><dt>循環播放</dt><dd>${escapeHtml(formatLoop(settings.loop))}</dd></div>
+    <div><dt>循環播放</dt><dd>${escapeHtml(formatLoop(settings.loop, settings.segment))}</dd></div>
     <div><dt>同步錨點</dt><dd>${escapeHtml(formatAnchor(anchor))}</dd></div>
-    <div><dt>同步偏移</dt><dd>${escapeHtml(formatSeconds(settings.offsetSeconds))}</dd></div>
     ${comparison ? `<div><dt>同步模式</dt><dd>${escapeHtml(syncModeLabel(block))}</dd></div>` : ''}
   </dl>`;
 }
@@ -339,7 +328,6 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     : (asset.label || (side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : '單一影片'));
   const poster = posterAsset ? ` poster="${escapeHtml(encodeAssetPath(posterAsset.relativePath))}"` : '';
   const anchorTime = finiteSetting(anchor?.observedTime, 0);
-  const loopEnd = settings.loop.end === null ? '' : String(settings.loop.end);
   const segmentOut = settings.segment.out === null ? '' : String(settings.segment.out);
   const sideLabel = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
   return `<div class="portable-player-side" data-player-side="${side}"
@@ -347,10 +335,7 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     data-segment-out="${escapeHtml(segmentOut)}"
     data-playback-rate="${escapeHtml(String(settings.rate))}"
     data-loop-enabled="${settings.loop.enabled ? 'true' : 'false'}"
-    data-loop-start="${escapeHtml(String(settings.loop.start))}"
-    data-loop-end="${escapeHtml(loopEnd)}"
     data-anchor-time="${escapeHtml(String(anchorTime))}"
-    data-sync-offset="${escapeHtml(String(settings.offsetSeconds))}"
     >
     <div class="portable-player-side-heading">
       <h3>${escapeHtml(sideLabel)}</h3>
@@ -530,17 +515,13 @@ function renderFramePlayerSide(block, side, frameBinding, comparison) {
     : (asset.label || (side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : '單一影片'));
   const firstFrame = cache.frames[0];
   const sideLabel = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
-  const loopEnd = settings.loop.end === null ? '' : String(settings.loop.end);
   const segmentOut = settings.segment.out === null ? '' : String(settings.segment.out);
   return `<div class="portable-player-side portable-frame-side" data-player-side="${side}"
     data-segment-in="${escapeHtml(String(settings.segment.in))}"
     data-segment-out="${escapeHtml(segmentOut)}"
     data-playback-rate="${escapeHtml(String(settings.rate))}"
     data-loop-enabled="${settings.loop.enabled ? 'true' : 'false'}"
-    data-loop-start="${escapeHtml(String(settings.loop.start))}"
-    data-loop-end="${escapeHtml(loopEnd)}"
     data-anchor-time="${escapeHtml(String(finiteSetting(anchor?.observedTime, 0)))}"
-    data-sync-offset="${escapeHtml(String(settings.offsetSeconds))}"
     data-frame-index="${frameCacheJson(cache)}"
     data-frame-index-path="${escapeHtml(cache.cache.indexRelativePath)}"
     data-frame-count="${cache.frames.length}"
@@ -753,8 +734,6 @@ function renderFramePlayerScript() {
       start: numberValue(side.dataset.segmentIn, 0),
       end: numberValue(side.dataset.segmentOut),
       rate: clamp(numberValue(side.dataset.playbackRate, 1), .1, 8),
-      loopStart: numberValue(side.dataset.loopStart, numberValue(side.dataset.segmentIn, 0)),
-      loopEnd: numberValue(side.dataset.loopEnd, numberValue(side.dataset.segmentOut)),
       loopEnabled: side.dataset.loopEnabled === 'true',
     }));
     const primaryName = player.dataset.masterSide === 'right' ? 'right' : 'left';
@@ -801,9 +780,11 @@ function renderFramePlayerScript() {
     const tick = () => {
       if (!playing || count <= 0) return;
       const nextIndex = index + 1;
-      const loop = primary.loopEnabled && primary.loopEnd !== null;
-        const loopStartIndex = primary.frames.findIndex((frame) => frame.time !== null && frame.time >= primary.loopStart);
-        const loopEndIndex = primary.frames.findIndex((frame) => frame.time !== null && frame.time >= primary.loopEnd);
+      const loop = primary.loopEnabled;
+      const loopStartIndex = primary.frames.findIndex((frame) => frame.time !== null && frame.time >= primary.start);
+      const loopEndIndex = primary.end === null
+        ? -1
+        : primary.frames.findIndex((frame) => frame.time !== null && frame.time >= primary.end);
       if (nextIndex >= count || (loop && loopEndIndex >= 0 && nextIndex >= loopEndIndex)) {
         if (loop) renderIndex(loopStartIndex >= 0 ? loopStartIndex : 0);
         else { renderIndex(count - 1); stop('已到達最後一幀。'); return; }
@@ -820,7 +801,8 @@ function renderFramePlayerScript() {
       if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
       event.preventDefault(); stop(); renderIndex(index + (event.key === 'ArrowLeft' ? -1 : 1)); setStatus('已用鍵盤逐幀切換。');
     });
-    renderIndex(0);
+    const segmentStartIndex = primary?.frames?.findIndex((frame) => frame.time !== null && frame.time >= primary.start) ?? -1;
+    renderIndex(segmentStartIndex >= 0 ? segmentStartIndex : 0);
     updateControls();
   });`;
 }
@@ -838,18 +820,18 @@ function renderLegacyPlayerScript() {
       const video = side.querySelector('[data-player-video]');
       const rateInput = side.querySelector('[data-player-rate]');
       const loopInput = side.querySelector('[data-player-loop]');
-      return { side, video, rateInput, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: clamp(numberValue(side.dataset.playbackRate, 1), .1, 8), loopStart: numberValue(side.dataset.loopStart, numberValue(side.dataset.segmentIn, 0)), loopEnd: numberValue(side.dataset.loopEnd, numberValue(side.dataset.segmentOut)), loopEnabled: side.dataset.loopEnabled === 'true', anchor: numberValue(side.dataset.anchorTime, 0), offset: numberValue(side.dataset.syncOffset, 0) };
+      return { side, video, rateInput, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: clamp(numberValue(side.dataset.playbackRate, 1), .1, 8), loopEnabled: side.dataset.loopEnabled === 'true', anchor: numberValue(side.dataset.anchorTime, 0) };
     };
     const allSettings = () => sides.map(settingsFor);
     const setStatus = (message) => { if (status) status.textContent = message; };
     const updateSide = (settings) => { const { video, side } = settings; if (!video) return; const seek = side.querySelector('[data-player-seek]'); const output = side.querySelector('[data-player-time]'); const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : settings.end; if (seek) { seek.min = String(settings.start); seek.max = String(Math.max(settings.start, settings.end ?? duration ?? settings.start)); seek.value = String(clamp(video.currentTime || settings.start, settings.start, Number(seek.max))); seek.disabled = false; } if (output) output.textContent = String((video.currentTime || 0).toFixed(2)) + ' 秒'; };
     const applySettings = (settings, seekToStart = true) => { if (!settings.video) return; settings.video.playbackRate = settings.rate; if (settings.rateInput) settings.rateInput.value = String(settings.rate); if (settings.loopInput) settings.loopInput.checked = settings.loopEnabled; if (seekToStart && Number.isFinite(settings.start)) settings.video.currentTime = settings.start; updateSide(settings); };
-    const syncFrom = (sourceSettings) => { if (!bindingEnabled || videos.length < 2 || sourceSettings.side.dataset.playerSide !== masterSide || player.dataset.syncing === 'true') return; player.dataset.syncing = 'true'; const relative = sourceSettings.video.currentTime - sourceSettings.anchor - sourceSettings.offset; allSettings().forEach((target) => { if (target.video === sourceSettings.video || !target.video) return; const duration = Number.isFinite(target.video.duration) && target.video.duration > 0 ? target.video.duration : target.end; const maximum = target.end ?? duration; const targetTime = clamp(target.anchor + relative + target.offset, target.start, Math.max(target.start, maximum || target.start)); if (Math.abs(target.video.currentTime - targetTime) > .08) target.video.currentTime = targetTime; }); player.dataset.syncing = 'false'; };
+    const syncFrom = (sourceSettings) => { if (!bindingEnabled || videos.length < 2 || sourceSettings.side.dataset.playerSide !== masterSide || player.dataset.syncing === 'true') return; player.dataset.syncing = 'true'; const relative = sourceSettings.video.currentTime - sourceSettings.anchor; allSettings().forEach((target) => { if (target.video === sourceSettings.video || !target.video) return; const duration = Number.isFinite(target.video.duration) && target.video.duration > 0 ? target.video.duration : target.end; const maximum = target.end ?? duration; const targetTime = clamp(target.anchor + relative, target.start, Math.max(target.start, maximum || target.start)); if (Math.abs(target.video.currentTime - targetTime) > .08) target.video.currentTime = targetTime; }); player.dataset.syncing = 'false'; };
     const playAll = () => { allSettings().forEach((settings) => settings.video?.play().catch(() => setStatus('瀏覽器拒絕自動播放；請按影片上的播放控制。'))); setStatus(syncMode === 'frame' ? '已播放；影格同步使用時間同步 fallback。' : '已同步播放。'); };
     const pauseAll = () => { videos.forEach((video) => video.pause()); setStatus('已暫停。'); };
     const resetAll = () => { allSettings().forEach((settings) => { settings.video.pause(); settings.video.currentTime = settings.start; updateSide(settings); }); setStatus('已回到各影片區段起點。'); };
     const stepAll = (direction) => { const settingsList = allSettings(); const source = bindingEnabled && videos.length > 1 ? settingsList.find((settings) => settings.side.dataset.playerSide === masterSide) : settingsList[0]; if (!source?.video) return; const stepSeconds = syncMode === 'frame' ? (1 / 30) : 0.1; const duration = Number.isFinite(source.video.duration) && source.video.duration > 0 ? source.video.duration : source.end; const maximum = source.end ?? duration ?? source.start; source.video.currentTime = clamp(source.video.currentTime + direction * stepSeconds, source.start, Math.max(source.start, maximum)); syncFrom(source); setStatus('已用時間同步 fallback ' + (direction < 0 ? '向前' : '向後') + ' ' + stepSeconds.toFixed(3) + ' 秒。'); updateSide(source); };
-    sides.forEach((side) => { const settings = settingsFor(side); applySettings(settings); settings.video?.addEventListener('loadedmetadata', () => { applySettings(settings); setStatus('媒體已載入；編輯器播放器設定已套用。'); }); settings.video?.addEventListener('timeupdate', () => { const loopEnabled = settings.loopInput?.checked && settings.loopEnd !== null; if (settings.end !== null && settings.video.currentTime >= settings.end) { if (loopEnabled) { settings.video.currentTime = settings.loopStart; settings.video.play().catch(() => {}); } else { settings.video.currentTime = settings.end; settings.video.pause(); setStatus('已到達區段終點。'); } } else if (loopEnabled && settings.video.currentTime >= settings.loopEnd) settings.video.currentTime = settings.loopStart; updateSide(settings); if (syncMode === 'time' || syncMode === 'frame') syncFrom(settings); }); settings.video?.addEventListener('error', () => setStatus('媒體載入失敗；請確認 export 內的相對路徑。')); side.querySelector('[data-player-seek]')?.addEventListener('input', (event) => { settings.video.currentTime = numberValue(event.target.value, settings.start); updateSide(settings); syncFrom(settings); }); settings.rateInput?.addEventListener('change', (event) => { settings.rate = clamp(numberValue(event.target.value, settings.rate), .1, 8); settings.video.playbackRate = settings.rate; event.target.value = String(settings.rate); setStatus('播放速率已調整為 ' + settings.rate.toFixed(2) + ' 倍。'); }); settings.loopInput?.addEventListener('change', () => { setStatus(settings.loopInput.checked ? '已開啟循環播放。' : '已關閉循環播放。'); }); });
+    sides.forEach((side) => { const settings = settingsFor(side); applySettings(settings); settings.video?.addEventListener('loadedmetadata', () => { applySettings(settings); setStatus('媒體已載入；編輯器播放器設定已套用。'); }); settings.video?.addEventListener('timeupdate', () => { const loopEnabled = settings.loopInput?.checked; if (settings.end !== null && settings.video.currentTime >= settings.end) { if (loopEnabled) { settings.video.currentTime = settings.start; settings.video.play().catch(() => {}); } else { settings.video.currentTime = settings.end; settings.video.pause(); setStatus('已到達區段終點。'); } } updateSide(settings); if (syncMode === 'time' || syncMode === 'frame') syncFrom(settings); }); settings.video?.addEventListener('ended', () => { if (settings.loopInput?.checked) { settings.video.currentTime = settings.start; settings.video.play().catch(() => {}); } }); settings.video?.addEventListener('error', () => setStatus('媒體載入失敗；請確認 export 內的相對路徑。')); side.querySelector('[data-player-seek]')?.addEventListener('input', (event) => { settings.video.currentTime = numberValue(event.target.value, settings.start); updateSide(settings); syncFrom(settings); }); settings.rateInput?.addEventListener('change', (event) => { settings.rate = clamp(numberValue(event.target.value, settings.rate), .1, 8); settings.video.playbackRate = settings.rate; event.target.value = String(settings.rate); setStatus('播放速率已調整為 ' + settings.rate.toFixed(2) + ' 倍。'); }); settings.loopInput?.addEventListener('change', () => { setStatus(settings.loopInput.checked ? '已開啟循環播放。' : '已關閉循環播放。'); }); });
     player.addEventListener('keydown', (event) => { if (event.target !== player || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return; event.preventDefault(); stepAll(event.key === 'ArrowLeft' ? -1 : 1); });
     player.querySelectorAll('[data-player-action]').forEach((button) => { button.addEventListener('click', () => { if (button.dataset.playerAction === 'play') playAll(); if (button.dataset.playerAction === 'pause') pauseAll(); if (button.dataset.playerAction === 'reset') resetAll(); }); });
   });`;

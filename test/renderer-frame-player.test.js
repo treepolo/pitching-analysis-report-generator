@@ -43,7 +43,7 @@ test('loading uses the native browser video pipeline without frame-cache prepara
   assert.match(prepare, /resolveMediaSource\(state\.activeProject\.id, assetId\)/u);
   assert.match(prepare, /loadedmetadata/u);
   assert.match(prepare, /video\.preload = 'auto'/u);
-  assert.match(prepare, /seekFramePlayerIndex\(card, 0, \{ exact: true/u);
+  assert.match(prepare, /seekFramePlayerIndex\(card, framePlayerSegmentStartIndex\(block, runtime\), \{ exact: true/u);
   assert.doesNotMatch(prepare, /frameCache|prepareFrameCache|readFrameCache|base64|dataUrl/u);
   assert.doesNotMatch(renderer, /nativePlayer|native-frame-player|native-player-surface|Media Foundation/u);
 });

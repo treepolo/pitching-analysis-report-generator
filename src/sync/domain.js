@@ -406,23 +406,11 @@ function precisionForResolution(resolution) {
 function validateLoopRange(loop, duration) {
   if (loop === null || loop === undefined) return { valid: true, issues: [], normalized: null };
   if (!isRecord(loop)) return { valid: false, issues: ['loop must be an object or null'] };
-
-  const issues = [];
   const enabled = loop.enabled !== false;
-  const start = loop.start ?? 0;
-  const end = loop.end ?? 0;
-  if (!Number.isFinite(start) || start < 0) issues.push('loop.start must be a finite number >= 0');
-  if (!Number.isFinite(end) || end < 0) issues.push('loop.end must be a finite number >= 0');
-  if (enabled && Number.isFinite(start) && Number.isFinite(end) && end <= start) {
-    issues.push('loop.end must be greater than loop.start when enabled');
-  }
-  if (duration !== undefined && duration !== null && Number.isFinite(end) && end > duration) {
-    issues.push('loop.end must not exceed media duration');
-  }
   return {
-    valid: issues.length === 0,
-    issues,
-    normalized: issues.length === 0 ? { enabled, start, end } : undefined,
+    valid: true,
+    issues: [],
+    normalized: { enabled },
   };
 }
 
@@ -434,15 +422,17 @@ function createLoop(input = { enabled: false }) {
 }
 
 function wrapLoopTime(time, loop, direction) {
-  const span = loop.end - loop.start;
-  if (span <= 0) return loop.start;
-  let offset = (time - loop.start) % span;
-  if (offset < 0) offset += span;
-  if (Math.abs(offset) <= EPSILON) {
-    if (direction > 0 && time > loop.start) return loop.start;
-    if (direction < 0 && time < loop.end) return loop.end;
+  const start = loop.in ?? 0;
+  const end = loop.out;
+  if (!Number.isFinite(end) || end <= start) return start;
+  const span = end - start;
+  let wrappedDistance = (time - start) % span;
+  if (wrappedDistance < 0) wrappedDistance += span;
+  if (Math.abs(wrappedDistance) <= EPSILON) {
+    if (direction > 0 && time > start) return start;
+    if (direction < 0 && time < end) return end;
   }
-  return loop.start + offset;
+  return start + wrappedDistance;
 }
 
 function validateSyncAnchor(anchor, options = {}) {
@@ -563,19 +553,12 @@ function createSyncBinding(input = {}) {
 
   const rawSides = input.sides ?? {};
   requireRecord(rawSides, 'sync binding.sides');
-  const rawOffsets = input.offsets ?? {};
-  requireRecord(rawOffsets, 'sync binding.offsets');
   const sides = {};
   for (const side of ['left', 'right']) {
-    const sideInput = rawSides[side] ?? {
-      offsetSeconds: rawOffsets[side],
-    };
+    const sideInput = rawSides[side] ?? {};
     requireRecord(sideInput, `sync binding.sides.${side}`);
-    const offsetSeconds = sideInput.offsetSeconds ?? sideInput.offset ?? 0;
-    requireFinite(offsetSeconds, `sync binding.sides.${side}.offsetSeconds`);
     sides[side] = {
       segment: normalizeBindingSegment(sideInput.segment, `sync binding.sides.${side}.segment`),
-      offsetSeconds,
     };
   }
 
@@ -693,10 +676,11 @@ function createPlayerBlock(input) {
     input.timing ?? { kind: TIMING_KIND.UNKNOWN },
     duration,
   );
+  const segment = normalizeBindingSegment(input.segment, 'player block.segment');
   const loop = input.loop === undefined || input.loop === null
     ? createLoop({ enabled: false })
     : createLoop(input.loop);
-  assertValid(validateLoopRange(loop, duration), 'player block loop');
+  assertValid(validateLoopRange(loop), 'player block loop');
 
   const currentTime = clampMediaTime(
     input.currentTime === undefined ? 0 : requireFinite(input.currentTime, 'player block.currentTime'),
@@ -735,6 +719,7 @@ function createPlayerBlock(input) {
     label: input.label === undefined ? '' : String(input.label),
     duration,
     timing,
+    segment,
     currentTime,
     playbackRate,
     status,
@@ -809,17 +794,22 @@ function advancePlayer(player, deltaSeconds) {
   let nextStatus = current.status;
 
   if (current.loop && current.loop.enabled) {
-    const outsideLoop = current.currentTime < current.loop.start
-      || current.currentTime > current.loop.end;
+    const rawLoopSegment = current.segment || { in: 0, out: current.duration };
+    const loopStart = Math.min(current.duration, Math.max(0, rawLoopSegment.in ?? 0));
+    const rawLoopEnd = rawLoopSegment.out ?? current.duration;
+    const loopEnd = Math.min(current.duration, Math.max(loopStart, rawLoopEnd));
+    const loopSegment = { in: loopStart, out: loopEnd };
+    const outsideLoop = current.currentTime < loopSegment.in
+      || (Number.isFinite(loopEnd) && current.currentTime > loopEnd);
     if (outsideLoop && signedDelta !== 0) {
-      const loopEntryTime = signedDelta > 0 ? current.loop.start : current.loop.end;
+      const loopEntryTime = signedDelta > 0 ? loopSegment.in : loopEnd;
       proposed = loopEntryTime + signedDelta;
     }
     const crossedLoopBoundary = (outsideLoop && signedDelta !== 0) || (signedDelta > 0
-      ? proposed >= current.loop.end
-      : signedDelta < 0 && proposed <= current.loop.start);
+      ? proposed >= loopEnd
+      : signedDelta < 0 && proposed <= loopSegment.in);
     if (crossedLoopBoundary) {
-      nextTime = wrapLoopTime(proposed, current.loop, signedDelta >= 0 ? 1 : -1);
+      nextTime = wrapLoopTime(proposed, loopSegment, signedDelta >= 0 ? 1 : -1);
     }
   } else {
     nextTime = clampMediaTime(proposed, current.duration);
@@ -836,12 +826,10 @@ function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
   const requestedMode = normalizeSyncMode(options.mode, 'anchor mapping mode');
   const duration = options.duration ?? anchor.timingSnapshot.duration;
   const timing = normalizeTimingMetadata(options.timing ?? anchor.timingSnapshot, duration);
-  const offsetSeconds = options.offsetSeconds ?? options.offset ?? 0;
-  requireFinite(offsetSeconds, 'mapping offsetSeconds');
   const segment = options.segment === undefined || options.segment === null
     ? null
     : normalizeBindingSegment(options.segment);
-  const requestedTime = anchor.observedTime + relativeTime + offsetSeconds;
+  const requestedTime = anchor.observedTime + relativeTime;
   const targetTime = clampToBindingSegment(requestedTime, segment, duration);
   const capabilityStatus = frameStepCapabilityStatus(options.capability);
   const anchorHasFrameEvidence = anchor.precision === PRECISION.FRAME_AWARE
@@ -869,7 +857,6 @@ function mapAnchorToRelativeTime(anchorInput, relativeTime, options = {}) {
     requestedMode,
     relativeTime,
     anchorTime: anchor.observedTime,
-    offsetSeconds,
     segment,
     requestedTime,
     targetTime,
@@ -923,7 +910,6 @@ function alignComparisonAtRelativeTime(sides, relativeTime, options = {}) {
       timing: entry.timing ?? options.timings?.[side],
       capability: entry.capability ?? options.capabilities?.[side],
       segment: entry.segment ?? options.segments?.[side],
-      offsetSeconds: entry.offsetSeconds ?? options.offsets?.[side],
     });
     if (mapping.side !== side) {
       throw new SyncDomainError(`comparison anchor for ${side} must declare side ${side}`);
@@ -1173,10 +1159,6 @@ function mapComparisonSyncState(stateInput, sources) {
       capability,
       mode: requestedMode,
       segment: source.segment ?? player?.segment ?? state.binding.sides[side].segment,
-      offsetSeconds: source.offsetSeconds
-        ?? source.offset
-        ?? player?.offsetSeconds
-        ?? state.binding.sides[side].offsetSeconds,
     });
     sides[side] = {
       ...mapping,

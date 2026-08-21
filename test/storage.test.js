@@ -179,7 +179,10 @@ test('persists block-local video editor configuration across reopen', async () =
       left: { observedTime: 1.1, frameIndex: 33, precision: 'frame' },
       right: { observedTime: 1.4, frameIndex: 42, precision: 'frame' },
     },
-    offsets: { left: -0.1, right: 0.2 },
+    sides: {
+      left: { segment: { in: 0, out: 3 } },
+      right: { segment: { in: 0.1, out: 2.9 } },
+    },
     fallbackPrecision: 'frame',
     segmentRelation: 'shared',
     loopRelation: 'independent',
@@ -206,7 +209,10 @@ test('migrates legacy comparison sync and side anchors into deterministic bindin
       left: { observedTime: 1.1, frameIndex: 33 },
       right: { observedTime: 1.4, frameIndex: 42 },
     },
-    offsets: { left: 0, right: 0 },
+    sides: {
+      left: { segment: { in: 0, out: null } },
+      right: { segment: { in: 0, out: null } },
+    },
     fallbackPrecision: 'unknown',
     segmentRelation: 'independent',
     loopRelation: 'independent',

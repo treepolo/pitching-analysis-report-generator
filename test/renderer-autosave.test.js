@@ -66,7 +66,8 @@ test('text input and video settings keep persistence without input-time redraw',
   assert.match(refreshHandler, /patchInlineVideoCard\(card, block\)/u);
 
   const sideSettings = functionSlice(renderer, 'function applyInlineSideSettings(', 'async function propagateInlinePlayback(');
-  assert.match(sideSettings, /video\.loop = config\.loop\?\.enabled === true;/u);
+  assert.match(sideSettings, /video\.loop = false;/u);
+  assert.match(sideSettings, /enforceInlinePlaybackBounds\(block, side, video\)/u);
   assert.match(sideSettings, /video\.playbackRate =/u);
 
   const bindingSource = functionSlice(renderer, 'function inlineBindingSource(', 'function setInlineBindingStatus(');

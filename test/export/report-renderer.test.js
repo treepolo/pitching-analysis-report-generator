@@ -81,7 +81,7 @@ test('renders editor playback, loop, comparison layout, and sync fallback settin
         label: '單一投球',
         segment: { in: 1, out: 3 },
         playback: { rate: 1.5 },
-        loop: { enabled: true, start: 1, end: 3 },
+        loop: { enabled: true },
         anchor: { observedTime: 1, precision: 'time-based' },
       }, {
         type: 'comparisonVideo',
@@ -100,7 +100,7 @@ test('renders editor playback, loop, comparison layout, and sync fallback settin
               right: { observedTime: 1.5, precision: 'time-based' },
             },
             sides: {
-              right: { offsetSeconds: 0.25, segment: { in: 0.5, out: 2.5 } },
+              right: { segment: { in: 0.5, out: 2.5 } },
             },
           },
         },
@@ -114,8 +114,9 @@ test('renders editor playback, loop, comparison layout, and sync fallback settin
         right: {
           mediaAssetId: 'comparison',
           label: '後側',
+          segment: { in: 0, out: 2 },
           playback: { rate: 1.25 },
-          loop: { enabled: true, start: 0, end: 2 },
+          loop: { enabled: true },
           anchor: { observedTime: 1.5, precision: 'time-based' },
         },
       }],
@@ -133,7 +134,7 @@ test('renders editor playback, loop, comparison layout, and sync fallback settin
   assert.match(html, /data-playback-rate="1\.5"/u);
   assert.match(html, /data-loop-enabled="true"/u);
   assert.match(html, /data-anchor-time="2"/u);
-  assert.match(html, /data-sync-offset="0\.25"/u);
+  assert.doesNotMatch(html, /data-sync-offset|data-loop-start|data-loop-end/u);
   assert.match(html, /明確影格模式（可攜式時間同步 fallback）/u);
   assert.match(html, /同步綁定：已啟用；主控側：右側/u);
   assert.match(html, /同步播放/u);
@@ -148,7 +149,7 @@ test('renders editor playback, loop, comparison layout, and sync fallback settin
   assert.doesNotMatch(html, /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b/iu);
 });
 
-test('renders canonical allowlisted binding offsets without exposing editor-only fields', () => {
+test('renders canonical allowlisted binding without exposing editor-only fields', () => {
   const html = renderReportHtml({
     schemaVersion: 1,
     title: 'Canonical binding',
@@ -166,7 +167,10 @@ test('renders canonical allowlisted binding offsets without exposing editor-only
             left: { observedTime: 1, precision: 'frame-aware' },
             right: { observedTime: 2, precision: 'time-based' },
           },
-          offsets: { left: -0.125, right: 0.25 },
+          sides: {
+            left: { segment: { in: 1, out: 3 } },
+            right: { segment: { in: 2, out: 4 } },
+          },
           segmentRelation: 'independent',
           loopRelation: 'independent',
         },
@@ -191,8 +195,7 @@ test('renders canonical allowlisted binding offsets without exposing editor-only
     ],
   });
 
-  assert.match(html, /data-sync-offset="-0\.125"/u);
-  assert.match(html, /data-sync-offset="0\.25"/u);
+  assert.doesNotMatch(html, /data-sync-offset|data-loop-start|data-loop-end/u);
   assert.match(html, /同步綁定：已啟用；主控側：右側/u);
   assert.doesNotMatch(html, /data-asset-id/iu);
   assert.doesNotMatch(html, /comparison-internal-id|asset-left-internal|asset-right-internal|private\/temporary\.mp4|private\/left\.mp4|private\/right\.mp4/u);

@@ -96,11 +96,17 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /sync\.binding\.enabled/u);
   assert.match(renderer, /sync\.binding\.masterSide/u);
   assert.match(renderer, /block\.binding = portableBinding/u);
-  assert.match(renderer, /stored\.offsets\?\.\[side\]/u);
+  assert.doesNotMatch(renderer, /stored\.offsets\?\.\[side\]/u);
+  assert.doesNotMatch(renderer, /data-block-path="[^"]*offsetSeconds/u);
+  assert.doesNotMatch(renderer, /循環起點|循環終點/u);
   assert.match(renderer, /function inlineBindingAnchor\(block, side, rawAnchor\)/u);
   assert.match(renderer, /持續綁定/u);
   assert.match(renderer, /控制側/u);
   assert.match(renderer, /data-inline-action="capture-anchor"/u);
+  assert.match(renderer, /影片區塊標題/u);
+  assert.match(renderer, /影片區塊左上角標題/u);
+  assert.match(renderer, /const fileName = asset\.metadata\?\.fileName \|\| asset\.displayName/u);
+  assert.match(renderer, /來源標題/u);
   assert.match(renderer, /data-frame-player/u);
   assert.match(renderer, /data-frame-timeline/u);
   assert.match(renderer, /data-frame-action="toggle"/u);

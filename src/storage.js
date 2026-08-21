@@ -157,11 +157,10 @@ function normalizeAnchor(value, fieldName) {
 function normalizeSegment(value, fieldName) {
   if (value === null || value === undefined) return { in: 0, out: null };
   if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
-  const segment = cloneJson(value);
-  segment.in = normalizeOptionalNonNegative(segment.in ?? segment.start, `${fieldName}.in`) ?? 0;
-  segment.out = normalizeOptionalNonNegative(segment.out ?? segment.end, `${fieldName}.out`);
-  if (segment.out !== null && segment.out < segment.in) throw new Error(`${fieldName} range is invalid`);
-  return segment;
+  const start = normalizeOptionalNonNegative(value.in ?? value.start ?? value.startTime, `${fieldName}.in`) ?? 0;
+  const end = normalizeOptionalNonNegative(value.out ?? value.end ?? value.endTime, `${fieldName}.out`);
+  if (end !== null && end < start) throw new Error(`${fieldName} range is invalid`);
+  return { in: start, out: end };
 }
 
 function normalizePlayback(value, fieldName) {
@@ -172,13 +171,48 @@ function normalizePlayback(value, fieldName) {
   if (typeof playback.rate !== 'number' || !Number.isFinite(playback.rate) || playback.rate <= 0 || playback.rate > 8) {
     throw new Error(`${fieldName}.rate is invalid`);
   }
+  const legacyLoop = playback.loop ?? playback.loopRange;
+  if (legacyLoop !== undefined) playback.loop = normalizeLoopConfig(legacyLoop, `${fieldName}.loop`);
+  delete playback.loopRange;
   return playback;
+}
+
+function normalizeLoopConfig(value, fieldName) {
+  if (value === null) return { enabled: false };
+  if (value === true) return { enabled: true };
+  if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
+  return { enabled: value.enabled !== false };
+}
+
+function legacyLoopSegment(value) {
+  const loop = value && typeof value === 'object'
+    ? (value.loop ?? value.loopRange ?? value.playback?.loop ?? value.playback?.loopRange)
+    : null;
+  if (!isPlainRecord(loop)) return null;
+  const start = loop.start ?? loop.startTime;
+  const end = loop.end ?? loop.endTime;
+  if (start === undefined && end === undefined) return null;
+  return { in: start ?? 0, out: end ?? null };
+}
+
+function normalizeLoopAndSegment(value, fieldName) {
+  if (!isPlainRecord(value)) return;
+  if (value.segment === undefined) {
+    const migratedSegment = legacyLoopSegment(value);
+    if (migratedSegment) value.segment = normalizeSegment(migratedSegment, `${fieldName}.segment`);
+  }
+  const legacyLoop = value.loop ?? value.loopRange;
+  if (legacyLoop !== undefined) value.loop = normalizeLoopConfig(legacyLoop, `${fieldName}.loop`);
+  delete value.loopRange;
+  delete value.offsetSeconds;
+  delete value.offset;
 }
 
 function normalizeVideoSide(value, fieldName) {
   if (value === undefined || value === null) return undefined;
   if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
   const side = cloneJson(value);
+  normalizeLoopAndSegment(side, fieldName);
   if (side.mediaAssetId !== undefined || side.videoAssetId !== undefined || side.assetId !== undefined) {
     side.mediaAssetId = normalizeOptionalAssetId(side.mediaAssetId ?? side.videoAssetId ?? side.assetId, `${fieldName}.mediaAssetId`);
   }
@@ -211,12 +245,6 @@ function normalizeBindingAnchor(value, fieldName) {
     if (Object.keys(timingMetadata).length > 0) normalized.timingMetadata = timingMetadata;
   }
   return normalized;
-}
-
-function normalizeBindingOffset(value, fieldName) {
-  if (value === undefined || value === null) return 0;
-  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${fieldName} is invalid`);
-  return value;
 }
 
 function normalizeBindingEnum(value, allowed, fallback) {
@@ -252,15 +280,14 @@ function normalizeVideoBinding(value, block, fieldName) {
     else leftAnchor = legacyStartAnchor;
   }
 
-  const bindingOffsets = isPlainRecord(binding.offsets) ? binding.offsets : {};
-  const legacyOffsets = isPlainRecord(legacySync.offsets) ? legacySync.offsets : {};
-  const leftOffset = normalizeBindingOffset(
-    bindingOffsets.left ?? legacyOffsets.left ?? legacyLeft.offset,
-    `${fieldName}.offsets.left`,
+  const rawSides = isPlainRecord(binding.sides) ? binding.sides : {};
+  const leftSegment = normalizeSegment(
+    rawSides.left?.segment ?? legacyLeft.segment,
+    `${fieldName}.sides.left.segment`,
   );
-  const rightOffset = normalizeBindingOffset(
-    bindingOffsets.right ?? legacyOffsets.right ?? legacyRight.offset,
-    `${fieldName}.offsets.right`,
+  const rightSegment = normalizeSegment(
+    rawSides.right?.segment ?? legacyRight.segment,
+    `${fieldName}.sides.right.segment`,
   );
   const inferredPrecision = [leftAnchor, rightAnchor]
     .map((anchor) => anchor && anchor.precision)
@@ -276,7 +303,10 @@ function normalizeVideoBinding(value, block, fieldName) {
     masterSide,
     mode,
     anchors: { left: leftAnchor, right: rightAnchor },
-    offsets: { left: leftOffset, right: rightOffset },
+    sides: {
+      left: { segment: leftSegment },
+      right: { segment: rightSegment },
+    },
     fallbackPrecision,
     segmentRelation: normalizeBindingEnum(
       binding.segmentRelation ?? legacySync.segmentRelation,
@@ -293,6 +323,7 @@ function normalizeVideoBinding(value, block, fieldName) {
 
 function normalizeVideoBlock(block) {
   const normalized = { ...cloneJson(block) };
+  normalizeLoopAndSegment(normalized, 'Video block');
   if (normalized.label !== undefined) normalized.label = safeOptionalText(normalized.label, 'Video block label', 160);
   if (normalized.layout !== undefined) normalized.layout = normalized.layout === 'stacked' ? 'stacked' : 'side-by-side';
   if (normalized.playback !== undefined) normalized.playback = normalizePlayback(normalized.playback, 'Video block playback');
@@ -300,6 +331,7 @@ function normalizeVideoBlock(block) {
     if (!isPlainRecord(normalized.sync)) throw new Error('Video block sync is invalid');
     normalized.sync = cloneJson(normalized.sync);
     normalized.sync.mode = normalized.sync.mode === 'frame' ? 'frame' : 'time';
+    delete normalized.sync.offsets;
     if (normalized.sync.startAnchor !== undefined) {
       normalized.sync.startAnchor = normalizeAnchor(normalized.sync.startAnchor, 'Video block sync.startAnchor');
     }
@@ -319,6 +351,9 @@ function normalizeVideoBlock(block) {
     if (left !== undefined) normalized.left = left;
     if (right !== undefined) normalized.right = right;
     normalized.binding = normalizeVideoBinding(normalized.binding, normalized, 'Video block binding');
+    if (isPlainRecord(normalized.sync?.binding)) {
+      normalized.sync.binding = normalizeVideoBinding(normalized.sync.binding, normalized, 'Video block sync.binding');
+    }
   }
   return normalized;
 }

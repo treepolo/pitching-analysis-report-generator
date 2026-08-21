@@ -48,11 +48,12 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
       title: 'Media',
       blocks: [{
         id: 'video-block-id',
-        type: 'singleVideo',
-        mediaAssetId: 'asset-1',
-        label: 'Front view',
-        playback: { rate: 0.5, controls: true, internalState: 'drop' },
-        loop: { start: 1, end: 2, temporaryPath: 'drop.tmp' },
+    type: 'singleVideo',
+    mediaAssetId: 'asset-1',
+    label: 'Front view',
+    segment: { in: 1, out: 2 },
+    playback: { rate: 0.5, controls: true, internalState: 'drop' },
+    loop: { start: 1, end: 2, temporaryPath: 'drop.tmp' },
         temporaryPath: 'drop.tmp',
         internalId: 'drop',
       }, {
@@ -83,8 +84,9 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
     type: 'singleVideo',
     mediaAssetId: 'asset-1',
     label: 'Front view',
+    segment: { in: 1, out: 2 },
     playback: { rate: 0.5, controls: true },
-    loop: { start: 1, end: 2 },
+    loop: { enabled: true },
   }, {
     type: 'comparisonVideo',
     left: {
@@ -95,7 +97,8 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
     right: {
       mediaAssetId: 'asset-2',
       label: 'Side',
-      loop: { start: 0, end: 3 },
+      segment: { in: 0, out: 3 },
+      loop: { enabled: true },
     },
   }]);
 });
@@ -126,7 +129,6 @@ test('preserves block-local video settings in the shared report contract', () =>
             left: { observedTime: 1.1, frameIndex: 33, precision: 'time', editorOnly: 'drop' },
             right: { observedTime: 1.4, frameIndex: 42, precision: 'frame', temporaryPath: 'drop.tmp' },
           },
-          offsets: { left: -0.1, right: 0.2, internalState: 'drop' },
           fallbackPrecision: 'estimated',
           segmentRelation: 'independent',
           loopRelation: 'shared',
@@ -169,7 +171,6 @@ test('preserves block-local video settings in the shared report contract', () =>
         left: { observedTime: 1.1, frameIndex: 33, precision: 'time' },
         right: { observedTime: 1.4, frameIndex: 42, precision: 'frame' },
       },
-      offsets: { left: -0.1, right: 0.2 },
       fallbackPrecision: 'estimated',
       segmentRelation: 'independent',
       loopRelation: 'shared',

@@ -45,11 +45,12 @@ test('public sync contract validates a synthetic single-video player and frame s
     timing,
     currentTime: 1.2,
     playbackRate: 0.75,
-    loop: { enabled: true, start: 0.5, end: 2.5 },
+    segment: { in: 0.5, out: 2.5 },
+    loop: { enabled: true },
   });
   assert.equal(player.mediaAssetId, 'synthetic-single');
   assert.equal(player.playbackRate, 0.75);
-  assert.deepEqual(player.loop, { enabled: true, start: 0.5, end: 2.5 });
+  assert.deepEqual(player.loop, { enabled: true });
 
   const previous = sync.planFrameStep({
     timing,
