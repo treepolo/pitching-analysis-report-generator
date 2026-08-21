@@ -258,6 +258,21 @@ function playerAssetIdFor(block, side) {
   );
 }
 
+function playerSideFallbackLabel(side) {
+  if (side === 'left') return '左側來源';
+  if (side === 'right') return '右側來源';
+  return '影片來源';
+}
+
+function playerSideTitle(block, side) {
+  const config = playerSideConfig(block, side);
+  const configuredLabel = typeof config.label === 'string' ? config.label : '';
+  if (configuredLabel.trim() !== '') return configuredLabel;
+  const asset = mediaAssetFor(playerAssetIdFor(block, side));
+  const fileName = asset?.metadata?.fileName || asset?.displayName || asset?.id;
+  return fileName || playerSideFallbackLabel(side);
+}
+
 function playerTimingForAsset(asset, duration) {
   const metadata = asset?.metadata || {};
   const fps = Number(metadata.fps);
@@ -848,12 +863,13 @@ function renderVideoBlockEditor(block) {
 }
 
 function renderInlineVideoSide(block, side) {
-  const label = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
+  const title = playerSideTitle(block, side);
+  const escapedTitle = escapeHtml(title);
   return `
     <div class="inline-video-side" data-inline-side="${side}">
-      <h3>${label}</h3>
-      <div class="inline-video-frame inline-frame-surface" data-frame-surface tabindex="0" aria-label="${label}影格畫面">
-        <video data-inline-video preload="auto" playsinline aria-label="${label}影片"></video>
+      <h3 data-inline-side-title>${escapedTitle}</h3>
+      <div class="inline-video-frame inline-frame-surface" data-frame-surface tabindex="0" aria-label="${escapedTitle}影格畫面">
+        <video data-inline-video preload="auto" playsinline aria-label="${escapedTitle}影片"></video>
         <span class="inline-frame-placeholder" data-frame-placeholder>正在載入第一幀…</span>
       </div>
       <p class="inline-video-status" data-inline-status role="status">尚未準備；等待影片來源。</p>
@@ -2152,6 +2168,16 @@ function patchInlineVideoCard(card, block) {
   if (grid) grid.dataset.layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
   const bindingStatus = card.querySelector('[data-inline-binding-status]');
   if (bindingStatus) bindingStatus.textContent = inlineBindingSummary(block);
+  for (const side of framePlayerSides(block)) {
+    const sideTitle = playerSideTitle(block, side);
+    const sideElement = card.querySelector(`[data-inline-side="${side}"]`);
+    const sideTitleElement = sideElement?.querySelector('[data-inline-side-title]');
+    const surface = sideElement?.querySelector('[data-frame-surface]');
+    const video = sideElement?.querySelector('[data-inline-video]');
+    if (sideTitleElement) sideTitleElement.textContent = sideTitle;
+    if (surface) surface.setAttribute('aria-label', `${sideTitle}影格畫面`);
+    if (video) video.setAttribute('aria-label', `${sideTitle}影片`);
+  }
   for (const side of ['left', 'right']) {
     const anchorInput = card.querySelector(`[data-inline-anchor-value="${side}"]`);
     const anchorTime = inlineBindingForBlock(block).anchors[side]?.observedTime;
@@ -2338,28 +2364,35 @@ function inlineSideFromPath(pathValue) {
 }
 
 function refreshInlineBindingAfterEditorChange(card, block, pathValue) {
-  if (block.type !== 'comparisonVideo') return;
-  const bindingPatch = {};
-  if (pathValue === 'sync.mode') bindingPatch.mode = block.sync?.mode === 'frame' ? 'frame' : 'time';
-  if (pathValue === 'sync.binding.enabled') bindingPatch.enabled = block.sync?.binding?.enabled === true;
-  if (pathValue === 'sync.binding.masterSide') bindingPatch.masterSide = block.sync?.binding?.masterSide;
-  if (pathValue === 'sync.binding.playbackRate') bindingPatch.playbackRate = block.sync?.binding?.playbackRate;
-  const side = inlineSideFromPath(pathValue);
-  if (side) {
-    bindingPatch.sides = { [side]: inlineBindingForBlock(block).sides[side] };
-    if (pathValue.endsWith('playback.rate')) {
-      const sideRate = Number(playerSideConfig(block, side).playback?.rate);
-      if (Number.isFinite(sideRate) && sideRate > 0) bindingPatch.playbackRate = sideRate;
+  if (!block) return;
+  const comparison = block.type === 'comparisonVideo';
+  let binding = inlineBindingForBlock(block);
+  if (comparison) {
+    const bindingPatch = {};
+    if (pathValue === 'sync.mode') bindingPatch.mode = block.sync?.mode === 'frame' ? 'frame' : 'time';
+    if (pathValue === 'sync.binding.enabled') bindingPatch.enabled = block.sync?.binding?.enabled === true;
+    if (pathValue === 'sync.binding.masterSide') bindingPatch.masterSide = block.sync?.binding?.masterSide;
+    if (pathValue === 'sync.binding.playbackRate') bindingPatch.playbackRate = block.sync?.binding?.playbackRate;
+    const side = inlineSideFromPath(pathValue);
+    if (side) {
+      bindingPatch.sides = { [side]: inlineBindingForBlock(block).sides[side] };
+      if (pathValue.endsWith('playback.rate')) {
+        const sideRate = Number(playerSideConfig(block, side).playback?.rate);
+        if (Number.isFinite(sideRate) && sideRate > 0) bindingPatch.playbackRate = sideRate;
+      }
     }
-  }
-  const binding = Object.keys(bindingPatch).length > 0
-    ? persistInlineBinding(block, bindingPatch)
-    : inlineBindingForBlock(block);
-  if (side) applyInlineSideSettings(card, block, side);
-  if (binding.enabled && block.type === 'comparisonVideo') {
-    applyInlineSideSettings(card, block, 'left');
-    applyInlineSideSettings(card, block, 'right');
-    queueInlineBindingSync(card, block, binding.masterSide, { force: true });
+    binding = Object.keys(bindingPatch).length > 0
+      ? persistInlineBinding(block, bindingPatch)
+      : inlineBindingForBlock(block);
+
+    if (side) applyInlineSideSettings(card, block, side);
+    if (binding.enabled) {
+      applyInlineSideSettings(card, block, 'left');
+      applyInlineSideSettings(card, block, 'right');
+      queueInlineBindingSync(card, block, binding.masterSide, { force: true });
+    }
+  } else {
+    applyInlineSideSettings(card, block, 'single');
   }
   patchInlineVideoCard(card, block);
 }

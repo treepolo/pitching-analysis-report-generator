@@ -88,6 +88,9 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /outputKind: elements\.exportKind\?\.value \|\| 'folder'/u);
   assert.match(renderer, /state\.export\.outputDirectory \|\| defaultExportDirectory\(\)/u);
   assert.match(renderer, /data-inline-video-block/u);
+  assert.match(renderer, /function playerSideTitle\(block, side\)/u);
+  assert.match(renderer, /const configuredLabel = typeof config\.label === 'string' \? config\.label : ''/u);
+  assert.match(renderer, /data-inline-side-title/u);
   assert.match(renderer, /elements\.blockCanvas\?\.addEventListener\('click'/u);
   assert.match(renderer, /function safeInlineMediaSourceUrl\(source\)/u);
   assert.match(renderer, /parsed\.protocol !== 'file:'/u);
@@ -121,6 +124,8 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /\['ArrowLeft', 'ArrowRight'\]\.includes\(event\.key\)/u);
   assert.match(renderer, /event\.key === 'ArrowRight'/u);
   assert.match(renderer, /framePlayerByCard: new WeakMap\(\)/u);
+  assert.match(renderer, /sideTitleElement\.textContent = sideTitle/u);
+  assert.match(renderer, /surface\.setAttribute\('aria-label', `\$\{sideTitle\}影格畫面`\)/u);
   assert.match(renderer, /影片尚未全部準備完成/u);
   assert.match(renderer, /無法使用畫面層橋接/u);
   assert.match(renderer, /elements\.appError\) return/u);

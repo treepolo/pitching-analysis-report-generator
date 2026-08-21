@@ -59,6 +59,8 @@ test('text input and video settings keep persistence without input-time redraw',
     'function refreshInlineBindingAfterEditorChange(',
     'function handleBlockEditorEvent(',
   );
+  assert.doesNotMatch(refreshHandler, /if \(block\.type !== 'comparisonVideo'\) return;/u);
+  assert.match(refreshHandler, /applyInlineSideSettings\(card, block, 'single'\)/u);
   assert.match(refreshHandler, /bindingPatch\.sides = \{ \[side\]: inlineBindingForBlock\(block\)\.sides\[side\] \}/u);
   assert.match(refreshHandler, /pathValue\.endsWith\('playback\.rate'\)/u);
   assert.match(refreshHandler, /applyInlineSideSettings\(card, block, side\)/u);
