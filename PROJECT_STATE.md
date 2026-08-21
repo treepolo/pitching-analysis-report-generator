@@ -2,6 +2,7 @@
 
 ## Current dual-video simplification (2026-08-21)
 
+- Git checkpoint: `14bf39c` (`refactor: make dual video players independent`). The unrelated pre-existing `AGENTS.md` edit is intentionally outside this checkpoint.
 - The editor's single-video and dual-video blocks use the same renderer-owned browser `<video>` surface and frame controls. Each dual-video side is its own player card; play, pause, seek, stepping, rate, and loop state never propagate to the other side.
 - The current comparison synchronisation implementation has been removed from the app-facing frontend, preload bridge, main-process IPC, persistence contract, report contract, and portable export. This is a removal of the current mechanism only; a future synchronisation data model can be designed and implemented after a new user instruction.
 - The user-facing block mode is `雙影片`; the persisted internal discriminator remains `comparisonVideo` for compatibility. `並排` means two columns in one row, while `堆疊` means one column with the two players vertically ordered. The layout selector is rendered only for dual-video blocks.

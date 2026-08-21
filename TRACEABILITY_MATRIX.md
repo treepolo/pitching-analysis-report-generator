@@ -2,7 +2,7 @@
 
 ## Current dual-video simplification (2026-08-21)
 
-- Current implementation removes the former sync/anchor/binding/control-side/relative-offset contract from renderer, storage normalization, report contract, preload, main IPC, and export. `雙影片` remains persisted as `comparisonVideo` for compatibility and is two independent single-video players.
+- Git checkpoint `14bf39c` records the current implementation. It removes the former sync/anchor/binding/control-side/relative-offset contract from renderer, storage normalization, report contract, preload, main IPC, and export. `雙影片` remains persisted as `comparisonVideo` for compatibility and is two independent single-video players.
 - Current automated checkpoint: `npm test` → 137 total, 136 pass, 0 fail, 1 explicit Electron `file://` unavailable skip. Real media, browser/file://, responsive human, and AT-A–G evidence remain unavailable; no requirement is `VERIFIED` by this checkpoint.
 
 ## Current Wave 19G provenance reconciliation (2026-08-20)

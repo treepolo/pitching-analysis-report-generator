@@ -2,7 +2,7 @@
 
 ## Current dual-video simplification (2026-08-21)
 
-- The user-facing mode is `雙影片`; the persisted discriminator remains `comparisonVideo` for compatibility. Both sides use the single-video browser player independently, including play/pause, seek, frame stepping, rate, segment loop, and layout.
+- Git checkpoint `14bf39c` records this scope. The user-facing mode is `雙影片`; the persisted discriminator remains `comparisonVideo` for compatibility. Both sides use the single-video browser player independently, including play/pause, seek, frame stepping, rate, segment loop, and layout.
 - The former sync anchors, sync playback, binding modes, control-side state, relative offsets, and their persistence/IPC/export paths are removed. A future sync design is explicitly deferred until a new product instruction.
 - Block title, source title, and source filename are now distinct and bound to their visible card/title surfaces. The dual-only layout selector defines `並排` as two columns in one row and `堆疊` as one vertical column.
 - Automated evidence for this checkpoint: `npm test` → 137 total, 136 pass, 0 fail, 1 explicit Electron `file://` unavailable skip; focused JavaScript syntax checks pass. No real-media/browser/human acceptance is claimed.
