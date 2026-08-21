@@ -24,6 +24,33 @@ const {
   stageFrameCache,
 } = require('./frame-cache');
 
+// Export target selection is collision-safe for completed outputs, but two
+// jobs can otherwise observe the same free target before either one commits it.
+// Keep jobs for one destination root in order so a repeated UI action cannot
+// race the final folder rename or ZIP commit on Windows.
+const outputLocks = new Map();
+
+function outputLockKey(outputRoot) {
+  const resolved = path.resolve(outputRoot);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+async function withOutputLock(outputRoot, task) {
+  const key = outputLockKey(outputRoot);
+  const previous = outputLocks.get(key) || Promise.resolve();
+  let release;
+  const current = new Promise((resolve) => { release = resolve; });
+  const queued = previous.then(() => current);
+  outputLocks.set(key, queued);
+  await previous;
+  try {
+    return await task();
+  } finally {
+    release();
+    if (outputLocks.get(key) === queued) outputLocks.delete(key);
+  }
+}
+
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
   if (value && typeof value === 'object') {
@@ -467,33 +494,34 @@ async function exportReport({
   }
   const shouldKeepFolder = outputKind !== 'zip';
   const shouldCreateZip = createZip === true || outputKind === 'zip' || outputKind === 'both';
-  const outputTargets = await resolveOutputTargets({
+  return withOutputLock(outputRoot, async () => {
+    const outputTargets = await resolveOutputTargets({
     outputRoot,
     baseName: safeReportName(reportName ?? safeReportDocument.title),
     shouldKeepFolder,
     shouldCreateZip,
     zipPath,
-  });
-  const { safeName, folderPath, resolvedZipPath } = outputTargets;
-
-  await fs.mkdir(outputRoot, { recursive: true });
-  const realOutputRoot = await fs.realpath(outputRoot);
-  if (shouldCreateZip) {
-    await assertContainedPath({
-      lexicalRoot: outputRoot,
-      realRoot: realOutputRoot,
-      targetPath: path.dirname(resolvedZipPath),
-      description: 'ZIP target directory',
     });
-  }
-  throwIfAborted(signal);
-  const temporaryRoot = await fs.mkdtemp(path.join(outputRoot, '.report-export-'));
-  const stagingPath = path.join(temporaryRoot, safeName);
-  const reportFileName = 'report.html';
-  const outputFolderPath = shouldKeepFolder ? folderPath : stagingPath;
-  let moved = false;
-  let zipCreatedPath = null;
-  try {
+    const { safeName, folderPath, resolvedZipPath } = outputTargets;
+
+    await fs.mkdir(outputRoot, { recursive: true });
+    const realOutputRoot = await fs.realpath(outputRoot);
+    if (shouldCreateZip) {
+      await assertContainedPath({
+        lexicalRoot: outputRoot,
+        realRoot: realOutputRoot,
+        targetPath: path.dirname(resolvedZipPath),
+        description: 'ZIP target directory',
+      });
+    }
+    throwIfAborted(signal);
+    const temporaryRoot = await fs.mkdtemp(path.join(outputRoot, '.report-export-'));
+    const stagingPath = path.join(temporaryRoot, safeName);
+    const reportFileName = 'report.html';
+    const outputFolderPath = shouldKeepFolder ? folderPath : stagingPath;
+    let moved = false;
+    let zipCreatedPath = null;
+    try {
     throwIfAborted(signal);
     await fs.mkdir(path.join(stagingPath, 'videos'), { recursive: true });
     await fs.mkdir(path.join(stagingPath, 'images'), { recursive: true });
@@ -606,12 +634,13 @@ async function exportReport({
       zip,
       warnings,
     };
-  } catch (error) {
-    await fs.rm(temporaryRoot, { recursive: true, force: true });
-    if (moved) await fs.rm(folderPath, { recursive: true, force: true });
-    if (zipCreatedPath) await fs.rm(zipCreatedPath, { force: true });
-    throw error;
-  }
+    } catch (error) {
+      await fs.rm(temporaryRoot, { recursive: true, force: true });
+      if (moved) await fs.rm(folderPath, { recursive: true, force: true });
+      if (zipCreatedPath) await fs.rm(zipCreatedPath, { force: true });
+      throw error;
+    }
+  });
 }
 
 module.exports = {

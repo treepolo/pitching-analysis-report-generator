@@ -396,6 +396,85 @@ test('reruns folder, ZIP, and both exports with collision-free names without ove
   }
 });
 
+test('reuses a deleted output name and serializes overlapping exports per destination', async () => {
+  for (const outputKind of ['folder', 'zip', 'both']) {
+    const outputDirectory = path.join(testRoot, `repeat-delete-${outputKind}`);
+    const requestBase = {
+      projectId: 'project-1',
+      projectRoot: testRoot,
+      reportDocument: {
+        schemaVersion: 1,
+        title: `Delete and repeat ${outputKind}`,
+        sections: [{ blocks: [{ type: 'rich-text', content: 'repeatable' }] }],
+      },
+      assets: [],
+      outputDirectory,
+      reportName: `Delete and repeat ${outputKind}`,
+      outputKind,
+    };
+    const controller = new ExportJobController({ exporter: exportReport });
+    const first = await controller.start(requestBase);
+    const firstCompleted = await controller.wait(first.jobId);
+    assert.equal(firstCompleted.status, 'completed', `${outputKind} initial export failed`);
+
+    const second = await controller.start(requestBase);
+    const secondCompleted = await controller.wait(second.jobId);
+    assert.equal(secondCompleted.status, 'completed', `${outputKind} retained-output repeat failed`);
+    assert.equal(secondCompleted.result.safeName, `${requestBase.reportName}-2`);
+
+    for (const outputPath of [firstCompleted.result.folderPath, firstCompleted.result.zipPath]) {
+      if (!outputPath) continue;
+      await fs.rm(outputPath, { recursive: true, force: true });
+      assert.equal(await fs.lstat(outputPath).catch((error) => error.code), 'ENOENT');
+    }
+
+    const third = await controller.start(requestBase);
+    const thirdCompleted = await controller.wait(third.jobId);
+    assert.equal(thirdCompleted.status, 'completed', `${outputKind} deleted-output repeat failed`);
+    assert.equal(thirdCompleted.result.safeName, requestBase.reportName);
+    if (thirdCompleted.result.folderPath) {
+      assert.equal(await fs.stat(thirdCompleted.result.folderPath).then((stats) => stats.isDirectory()), true);
+    }
+    if (thirdCompleted.result.zipPath) {
+      assert.equal(await fs.stat(thirdCompleted.result.zipPath).then((stats) => stats.isFile()), true);
+    }
+  }
+
+  const outputDirectory = path.join(testRoot, 'repeat-overlap');
+  const requestBase = {
+    projectId: 'project-1',
+    projectRoot: testRoot,
+    reportDocument: {
+      schemaVersion: 1,
+      title: 'Overlapping exports',
+      sections: [{ blocks: [{ type: 'rich-text', content: 'overlap' }] }],
+    },
+    assets: [],
+    outputDirectory,
+    reportName: 'Overlapping exports',
+    outputKind: 'both',
+  };
+  const controller = new ExportJobController({ exporter: exportReport });
+  const started = await Promise.all([
+    controller.start(requestBase),
+    controller.start(requestBase),
+  ]);
+  const completed = await Promise.all(started.map((job) => controller.wait(job.jobId)));
+  assert.deepEqual(completed.map((job) => job.status), ['completed', 'completed']);
+  assert.deepEqual(
+    completed.map((job) => job.result.safeName).sort(),
+    ['Overlapping exports', 'Overlapping exports-2'],
+  );
+  for (const job of completed) {
+    assert.equal(await fs.stat(job.result.folderPath).then((stats) => stats.isDirectory()), true);
+    assert.equal(await fs.stat(job.result.zipPath).then((stats) => stats.isFile()), true);
+  }
+  assert.deepEqual(
+    (await fs.readdir(outputDirectory)).filter((name) => name.startsWith('.report-export-')),
+    [],
+  );
+});
+
 test('exposes running, failure, retry, and completion states with a stable job id contract', async () => {
   let attempts = 0;
   const calls = [];
