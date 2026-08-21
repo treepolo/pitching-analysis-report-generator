@@ -106,6 +106,10 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /來源標題/u);
   assert.match(renderer, /comparison \? `<label>版面/u);
   assert.doesNotMatch(renderer, /singleVideo[\s\S]{0,200}data-block-path="layout"/u);
+  assert.match(renderer, /comparison && block\.layout === 'stacked'/u);
+  assert.match(renderer, /: 'stacked';/u);
+  assert.match(styles, /\.inline-frame-controls \{[^}]*display: flex;[^}]*flex-wrap: wrap;/u);
+  assert.match(styles, /\.inline-frame-player-status \{[^}]*flex: 1 0 100%/u);
   assert.match(renderer, /data-frame-player/u);
   assert.match(renderer, /data-frame-timeline/u);
   assert.match(renderer, /data-frame-action="toggle"/u);

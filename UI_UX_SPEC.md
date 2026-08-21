@@ -6,7 +6,7 @@ The previous fixed-form/editor configuration is superseded and must not remain a
 
 - The primary Editor surface is a long-form block canvas, not a fixed report form. Users can add, edit, reorder, duplicate, and remove many text blocks and many independent video blocks.
 - Text blocks expose only necessary text-editor features. Video blocks expose filename selection, single/dual mode, per-side titles, per-side in/out/playback settings, and explicit state when media is unavailable.
-- Dual-video blocks expose `並排` (two columns in one row) or `堆疊` (one column); each side is an independent copy of the single-video player. The current synchronisation controls are removed and reserved for a future design.
+- Single-video blocks always use one stacked player card; no layout selector is shown. Dual-video blocks expose `並排` (two columns in one row) or `堆疊` (one column); each side is an independent copy of the single-video player. The current synchronisation controls are removed and reserved for a future design.
 - Preview and export consume the same canonical block document. Export UI must communicate that only video-block-referenced assets are copied; unused library assets and originals remain outside the output.
 
 目前狀態：**Phase 1/2 planning**。本文件把產品需求轉成可驗收的互動與資訊架構；產生器採 local browser application 或 desktop application 尚未由使用者核准，故不指定不可逆的 framework 或 shell。

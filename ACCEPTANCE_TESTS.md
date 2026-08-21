@@ -5,7 +5,7 @@
 These checks supersede any assumption that the former fixed-form editor is acceptable; they are planned evidence, not executed evidence.
 
 - Long-form editor: create many text blocks and many independent video blocks, reorder/remove them, reopen, and confirm focused text editing features without a fixed-form compatibility path.
-- Video blocks: independently choose one asset or a pair, switch single/dual and side-by-side/stacked layout (layout is shown only for dual), and preserve per-block and per-side in/out/playback settings.
+- Video blocks: independently choose one asset or a pair; single uses one stacked player card, while dual exposes side-by-side/stacked layout (layout is shown only for dual), and preserves per-block and per-side in/out/playback settings.
 - Dual-video blocks: verify that both sides expose the single-video controls independently; the current synchronisation, anchor, binding, control-side, and relative-offset mechanism is absent from the UI, persistence, IPC, and export contract. Future synchronisation requires a new design and acceptance set.
 - Referenced export: a report with unused Media Library assets exports only video-block-referenced copies; originals remain byte-preserved and folder/ZIP contain the same referenced set.
 

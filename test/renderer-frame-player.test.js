@@ -24,9 +24,12 @@ test('single and dual cards use the same browser video surface and independent c
   assert.match(side, /data-frame-surface/u);
   assert.match(side, /data-frame-placeholder/u);
   assert.doesNotMatch(side, /native-player|HWND|EVR/u);
-  assert.match(block, /data-frame-player/u);
+  assert.match(renderer, /data-frame-player/u);
   assert.match(block, /renderInlineVideoSide\(block, 'left', \{ playerCard: true \}\)/u);
   assert.match(block, /renderInlineVideoSide\(block, 'right', \{ playerCard: true \}\)/u);
+  assert.match(block, /renderInlineVideoSide\(block, 'single', \{ playerCard: true \}\)/u);
+  assert.doesNotMatch(block, /renderFramePlayerControls\(playerSideTitle\(block, 'single'\)\)/u);
+  assert.match(block, /const layout = comparison && block\.layout === 'stacked'/u);
   assert.match(side, /renderFramePlayerControls\(title\)/u);
   const controls = functionSlice(renderer, 'function renderFramePlayerControls(', 'function renderInlineVideoSide(');
   assert.match(controls, /data-frame-rate/u);

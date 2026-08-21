@@ -708,13 +708,14 @@ function renderInlineVideoSide(block, side, { playerCard = false } = {}) {
 
 function renderInlineVideoBlock(section, block) {
   const comparison = block.type === 'comparisonVideo';
-  const layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
+  // A single-video block is always one vertical player card.  Only dual
+  // blocks read the persisted layout choice.
+  const layout = comparison && block.layout === 'stacked' ? 'stacked' : (comparison ? 'side-by-side' : 'stacked');
   const sides = comparison
     ? `${renderInlineVideoSide(block, 'left', { playerCard: true })}${renderInlineVideoSide(block, 'right', { playerCard: true })}`
-    : renderInlineVideoSide(block, 'single');
-  const playerAttribute = comparison ? '' : ' data-frame-player';
+    : renderInlineVideoSide(block, 'single', { playerCard: true });
   return `
-    <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block${playerAttribute}>
+    <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block>
       <header class="inline-video-header">
         <div class="inline-video-title"><strong>${escapeHtml(block.label || (comparison ? '雙影片' : '影片區塊'))}</strong><span>${comparison ? `雙影片 · ${layout === 'stacked' ? '堆疊' : '並排'}` : '單一來源 · 專案內媒體'}</span></div>
         <div class="inline-video-actions">
@@ -722,7 +723,6 @@ function renderInlineVideoBlock(section, block) {
         </div>
       </header>
       <div class="inline-video-grid" data-layout="${layout}">${sides}</div>
-      ${comparison ? '' : renderFramePlayerControls(playerSideTitle(block, 'single'))}
       <details class="inline-video-details"><summary>區塊設定</summary>${renderVideoBlockEditor(block)}</details>
     </article>`;
 }
@@ -1549,13 +1549,15 @@ function hydrateInlineVideoCards() {
 function patchInlineVideoCard(card, block) {
   if (!card || !block || !card.matches('[data-inline-video-block]')) return;
   const comparison = block.type === 'comparisonVideo';
-  const layout = block.layout === 'stacked' ? '堆疊' : '並排';
+  const layout = comparison && block.layout === 'stacked' ? '堆疊' : '並排';
   const title = card.querySelector('.inline-video-title strong');
   const summary = card.querySelector('.inline-video-title span');
   const grid = card.querySelector('.inline-video-grid');
   if (title) title.textContent = block.label || (comparison ? '雙影片' : '影片區塊');
   if (summary) summary.textContent = comparison ? `雙影片 · ${layout}` : '單一來源 · 專案內媒體';
-  if (grid) grid.dataset.layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
+  if (grid) grid.dataset.layout = comparison
+    ? (block.layout === 'stacked' ? 'stacked' : 'side-by-side')
+    : 'stacked';
   for (const side of videoBlockSides(block)) {
     const sideTitle = playerSideTitle(block, side);
     const sideElement = card.querySelector(`[data-inline-side="${side}"]`);
