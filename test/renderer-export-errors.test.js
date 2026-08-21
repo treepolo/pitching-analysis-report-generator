@@ -18,7 +18,11 @@ function functionSlice(source, start, end) {
 test('export and picker codes map to safe Traditional Chinese reasons', () => {
   assert.match(renderer, /const DISPLAY_ERROR_CODE_MAP = Object\.freeze\(/u);
   assert.match(renderer, /EXPORT_VALIDATION_FAILED:[\s\S]*匯出資料驗證失敗/u);
+  assert.match(renderer, /EXPORT_OUTPUT_NOT_WRITABLE:[\s\S]*匯出資料夾目前無法寫入/u);
   assert.match(renderer, /EXPORT_PICKER_FAILED:[\s\S]*資料夾選擇橋接失敗/u);
+  assert.match(renderer, /EXPORT_PHASE_REASON_MAP = Object\.freeze\(/u);
+  assert.match(renderer, /系統：\$\{error\.systemCode\}/u);
+  assert.match(renderer, /error\?\.reasonCode[\s\S]*error\?\.code/u);
   assert.match(renderer, /錯誤碼：\$\{descriptor\.code\}/u);
   assert.match(renderer, /發生未分類錯誤，請重試。/u);
   assert.doesNotMatch(renderer, /操作失敗，請稍後再試。/u);

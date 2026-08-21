@@ -30,6 +30,88 @@ const {
 // race the final folder rename or ZIP commit on Windows.
 const outputLocks = new Map();
 const CLEANUP_RETRYABLE_CODES = new Set(['EACCES', 'EBUSY', 'ENOTEMPTY', 'EPERM']);
+const EXPORT_FS_RETRYABLE_CODES = new Set(['EACCES', 'EBUSY', 'EAGAIN', 'EPERM']);
+
+function annotateExportFsError(error, phase) {
+  if (error && typeof error === 'object'
+    && typeof error.exportPhase !== 'string') {
+    error.exportPhase = phase;
+  }
+  return error;
+}
+
+async function withExportFsRetry(operation, phase, { attempts = 4 } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = annotateExportFsError(error, phase);
+      if (!EXPORT_FS_RETRYABLE_CODES.has(error?.code) || attempt === attempts - 1) throw lastError;
+      await new Promise((resolve) => setTimeout(resolve, 60 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
+async function createTemporaryRoot(outputRoot, projectRoot) {
+  const candidates = [
+    { parent: outputRoot, prefix: '.report-export-', sameDestination: true },
+    { parent: outputRoot, prefix: 'report-export-', sameDestination: true },
+    { parent: path.join(projectRoot, '.tmp'), prefix: '.report-export-', sameDestination: false },
+  ];
+  let lastError = null;
+  for (const candidate of candidates) {
+    try {
+      if (!candidate.sameDestination) {
+        await withExportFsRetry(
+          () => fs.mkdir(candidate.parent, { recursive: true }),
+          'create-staging',
+        );
+      }
+      const root = await withExportFsRetry(
+        () => fs.mkdtemp(path.join(candidate.parent, candidate.prefix)),
+        'create-staging',
+      );
+      return { root, sameDestination: candidate.sameDestination };
+    } catch (error) {
+      lastError = error;
+      if (!EXPORT_FS_RETRYABLE_CODES.has(error?.code)) throw error;
+    }
+  }
+  throw lastError;
+}
+
+async function commitStagingDirectory(stagingPath, folderPath, { sameDestination }) {
+  if (sameDestination) {
+    try {
+      await withExportFsRetry(() => fs.rename(stagingPath, folderPath), 'commit-folder');
+      return;
+    } catch (error) {
+      if (error?.code !== 'EXDEV') throw error;
+    }
+  }
+
+  if (await pathExists(folderPath)) {
+    throw new ExportValidationError(`Export folder already exists: ${folderPath}`);
+  }
+  let copyStarted = false;
+  try {
+    copyStarted = true;
+    await withExportFsRetry(
+      () => fs.cp(stagingPath, folderPath, {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+      }),
+      'commit-folder',
+      { attempts: 1 },
+    );
+  } catch (error) {
+    if (copyStarted) await cleanupExportPath(folderPath);
+    throw error;
+  }
+}
 
 function outputLockKey(outputRoot) {
   const resolved = path.resolve(outputRoot);
@@ -358,7 +440,10 @@ function prepareAssetDescriptors(assets, { referencedAssetIds = null } = {}) {
 
 async function stageAsset(asset, outputRoot, { projectRootLexical, projectRootReal }) {
   const destination = path.join(outputRoot, ...asset.relativePath.split('/'));
-  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await withExportFsRetry(
+    () => fs.mkdir(path.dirname(destination), { recursive: true }),
+    'stage-asset',
+  );
   let data = asset.data;
   if (!data) {
     const sourcePath = path.isAbsolute(asset.sourcePath)
@@ -387,9 +472,9 @@ async function stageAsset(asset, outputRoot, { projectRootLexical, projectRootRe
       targetPath: realSourcePath,
       description: `Source asset ${asset.id}`,
     });
-    data = await fs.readFile(realSourcePath);
+    data = await withExportFsRetry(() => fs.readFile(realSourcePath), 'stage-asset');
   }
-  await fs.writeFile(destination, data);
+  await withExportFsRetry(() => fs.writeFile(destination, data), 'stage-asset');
   return {
     id: asset.id,
     kind: asset.kind,
@@ -468,8 +553,11 @@ function exportManifest({
   };
 }
 
-async function writeJson(filePath, value) {
-  await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+async function writeJson(filePath, value, phase = 'write-manifest') {
+  await withExportFsRetry(
+    () => fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8'),
+    phase,
+  );
 }
 
 async function exportReport({
@@ -521,8 +609,14 @@ async function exportReport({
     });
     const { safeName, folderPath, resolvedZipPath } = outputTargets;
 
-    await fs.mkdir(outputRoot, { recursive: true });
-    const realOutputRoot = await fs.realpath(outputRoot);
+    await withExportFsRetry(
+      () => fs.mkdir(outputRoot, { recursive: true }),
+      'prepare-output',
+    );
+    const realOutputRoot = await withExportFsRetry(
+      () => fs.realpath(outputRoot),
+      'prepare-output',
+    );
     if (shouldCreateZip) {
       await assertContainedPath({
         lexicalRoot: outputRoot,
@@ -532,7 +626,8 @@ async function exportReport({
       });
     }
     throwIfAborted(signal);
-    const temporaryRoot = await fs.mkdtemp(path.join(outputRoot, '.report-export-'));
+    const temporary = await createTemporaryRoot(outputRoot, projectRootLexical);
+    const temporaryRoot = temporary.root;
     const stagingPath = path.join(temporaryRoot, safeName);
     const reportFileName = 'report.html';
     const outputFolderPath = shouldKeepFolder ? folderPath : stagingPath;
@@ -540,8 +635,14 @@ async function exportReport({
     let zipCreatedPath = null;
     try {
     throwIfAborted(signal);
-    await fs.mkdir(path.join(stagingPath, 'videos'), { recursive: true });
-    await fs.mkdir(path.join(stagingPath, 'images'), { recursive: true });
+    await withExportFsRetry(
+      () => fs.mkdir(path.join(stagingPath, 'videos'), { recursive: true }),
+      'create-staging',
+    );
+    await withExportFsRetry(
+      () => fs.mkdir(path.join(stagingPath, 'images'), { recursive: true }),
+      'create-staging',
+    );
     const preparedAssets = prepareAssetDescriptors(assets, { referencedAssetIds });
     const stagedAssets = [];
     const stagedFrameAssets = [];
@@ -578,14 +679,19 @@ async function exportReport({
         });
         continue;
       }
-      const stagedFrameCache = await stageFrameCache({
-        asset,
-        cacheEntry,
-        stagingPath,
-        projectRoot: projectRootLexical,
-        projectRootReal,
-        usedPaths: usedOutputPaths,
-      });
+      let stagedFrameCache;
+      try {
+        stagedFrameCache = await stageFrameCache({
+          asset,
+          cacheEntry,
+          stagingPath,
+          projectRoot: projectRootLexical,
+          projectRootReal,
+          usedPaths: usedOutputPaths,
+        });
+      } catch (error) {
+        throw annotateExportFsError(error, 'stage-frame-cache');
+      }
       stagedFrameAssets.push(...stagedFrameCache.frameAssets);
       stagedFrameFiles.push(stagedFrameCache.indexFile);
       portableFrameCaches.push(stagedFrameCache);
@@ -599,7 +705,10 @@ async function exportReport({
       frameCacheManifest: portableFrameCaches.map((entry) => entry.ready ? entry.cache : entry),
       frameCacheWarnings: warnings,
     });
-    await fs.writeFile(path.join(stagingPath, reportFileName), html, 'utf8');
+    await withExportFsRetry(
+      () => fs.writeFile(path.join(stagingPath, reportFileName), html, 'utf8'),
+      'write-report',
+    );
     const manifest = exportManifest({
       reportDocument: safeReportDocument,
       safeName,
@@ -610,10 +719,12 @@ async function exportReport({
       frameCaches: portableFrameCaches,
       warnings,
     });
-    await writeJson(path.join(stagingPath, 'export-manifest.json'), manifest);
+    await writeJson(path.join(stagingPath, 'export-manifest.json'), manifest, 'write-manifest');
 
     if (shouldKeepFolder) {
-      await fs.rename(stagingPath, folderPath);
+      await commitStagingDirectory(stagingPath, folderPath, {
+        sameDestination: temporary.sameDestination,
+      });
       moved = true;
       const cleanupError = await cleanupExportPath(temporaryRoot);
       if (cleanupError) warnings.push('匯出暫存檔清理稍後重試；輸出內容已完成。');
@@ -631,14 +742,24 @@ async function exportReport({
       assetCount: validation.assetCount,
       referencedAssetCount: validation.referencedAssetCount,
     };
-    await writeJson(path.join(outputFolderPath, 'export-manifest.json'), manifest);
+    await writeJson(path.join(outputFolderPath, 'export-manifest.json'), manifest, 'write-manifest');
 
     let zip = null;
     if (shouldCreateZip) {
       throwIfAborted(signal);
       zipCreatedPath = resolvedZipPath;
-      zip = await createZipArchive(outputFolderPath, resolvedZipPath);
-      zip.parity = await validateZipParity(outputFolderPath, resolvedZipPath);
+      try {
+        zip = await withExportFsRetry(
+          () => createZipArchive(outputFolderPath, resolvedZipPath),
+          'create-zip',
+        );
+        zip.parity = await withExportFsRetry(
+          () => validateZipParity(outputFolderPath, resolvedZipPath),
+          'validate-zip',
+        );
+      } catch (error) {
+        throw annotateExportFsError(error, error?.exportPhase || 'create-zip');
+      }
     }
     throwIfAborted(signal);
     if (!shouldKeepFolder) {

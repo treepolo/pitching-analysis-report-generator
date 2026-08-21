@@ -8,6 +8,7 @@ const test = require('node:test');
 const {
   ExportJobController,
   assertSafeOutputRoot,
+  serializeError,
   validatePickedExportDirectory,
 } = require('../../src/export/app-bridge');
 const { exportReport } = require('../../src/export/exporter');
@@ -188,6 +189,40 @@ test('validates native picker results as existing directories inside the project
   } finally {
     await fs.rm(external, { recursive: true, force: true });
   }
+});
+
+test('preflights selected directory writes and preserves a safe diagnostic code', async () => {
+  const selected = path.join(testRoot, 'write-probe-output');
+  await fs.mkdir(selected, { recursive: true });
+  const originalWriteFile = fs.writeFile;
+  fs.writeFile = async (targetPath, ...args) => {
+    if (String(targetPath).includes('pitching-report-write-')) {
+      const error = new Error('simulated selected directory denial');
+      error.code = 'EPERM';
+      throw error;
+    }
+    return originalWriteFile(targetPath, ...args);
+  };
+
+  try {
+    await assert.rejects(
+      validatePickedExportDirectory(testRoot, selected),
+      (error) => error.reasonCode === 'EXPORT_OUTPUT_NOT_WRITABLE'
+        && error.cause?.code === 'EPERM',
+    );
+  } finally {
+    fs.writeFile = originalWriteFile;
+  }
+
+  const serialized = serializeError(Object.assign(new Error('not writable'), {
+    reasonCode: 'EXPORT_OUTPUT_NOT_WRITABLE',
+    cause: Object.assign(new Error('denied'), { code: 'EPERM' }),
+  }));
+  assert.deepEqual(serialized, {
+    code: 'EXPORT_OUTPUT_NOT_WRITABLE',
+    message: 'not writable',
+    systemCode: 'EPERM',
+  });
 });
 
 test('exports a pure text report to default-style folder and ZIP destinations', async () => {

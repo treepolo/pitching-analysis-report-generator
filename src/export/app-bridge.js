@@ -9,6 +9,47 @@ const { ExportValidationError } = require('./asset-paths');
 const PROJECT_ID_PATTERN = /^[a-z0-9-]{1,80}$/u;
 const OUTPUT_KINDS = new Set(['folder', 'zip', 'both']);
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
+const OUTPUT_NOT_WRITABLE_CODE = 'EXPORT_OUTPUT_NOT_WRITABLE';
+
+function outputNotWritableError(message, cause) {
+  const error = new ExportValidationError(message, {
+    reasonCode: OUTPUT_NOT_WRITABLE_CODE,
+    cause,
+  });
+  error.reasonCode = OUTPUT_NOT_WRITABLE_CODE;
+  error.cause = cause;
+  return error;
+}
+
+async function probeDirectoryWritable(directory, description) {
+  const probePath = path.join(directory, `pitching-report-write-${crypto.randomUUID()}.tmp`);
+  try {
+    await fs.writeFile(probePath, '', { flag: 'wx' });
+  } catch (error) {
+    throw outputNotWritableError(`${description} is not writable`, error);
+  } finally {
+    await fs.rm(probePath, { force: true }).catch(() => {});
+  }
+}
+
+async function assertOutputDirectoryWritable(outputDirectory, description = 'Export output directory') {
+  let targetDirectory = path.resolve(outputDirectory);
+  try {
+    const stats = await fs.stat(targetDirectory);
+    if (!stats.isDirectory()) {
+      throw new ExportValidationError(`${description} must be a directory`);
+    }
+  } catch (error) {
+    if (error instanceof ExportValidationError) throw error;
+    if (error.code !== 'ENOENT') {
+      throw outputNotWritableError(`${description} cannot be inspected`, error);
+    }
+    targetDirectory = await realpathNearestExisting(targetDirectory).catch((ancestorError) => {
+      throw outputNotWritableError(`${description} cannot be inspected`, ancestorError);
+    });
+  }
+  await probeDirectoryWritable(targetDirectory, description);
+}
 
 function isPathInsideOrEqual(rootPath, candidatePath) {
   const relative = path.relative(path.resolve(rootPath), path.resolve(candidatePath));
@@ -96,6 +137,7 @@ async function validatePickedExportDirectory(projectRoot, selectedDirectory) {
   if (!stats.isDirectory()) {
     throw new ExportValidationError('Picked export path must be a directory');
   }
+  await probeDirectoryWritable(safeDirectory, 'Picked export directory');
   return safeDirectory;
 }
 
@@ -129,6 +171,7 @@ async function normalizeExportRequest(request) {
     throw new ExportValidationError('Export outputKind is invalid');
   }
   const outputDirectory = await assertSafeOutputRoot(request.projectRoot, request.outputDirectory);
+  await assertOutputDirectoryWritable(outputDirectory);
   return Object.freeze({
     projectId,
     projectRoot: path.resolve(request.projectRoot),
@@ -145,10 +188,24 @@ async function normalizeExportRequest(request) {
 function serializeError(error) {
   const code = error?.code === 'EXPORT_CANCELLED'
     ? 'EXPORT_CANCELLED'
-    : (error?.code === 'EXPORT_VALIDATION_FAILED' ? 'EXPORT_VALIDATION_FAILED' : 'EXPORT_FAILED');
+    : (error?.reasonCode === OUTPUT_NOT_WRITABLE_CODE || error?.details?.reasonCode === OUTPUT_NOT_WRITABLE_CODE
+      ? OUTPUT_NOT_WRITABLE_CODE
+      : (error?.code === 'EXPORT_VALIDATION_FAILED' ? 'EXPORT_VALIDATION_FAILED' : 'EXPORT_FAILED'));
+  const systemCode = typeof error?.code === 'string' && /^[A-Z][A-Z0-9_]{1,32}$/u.test(error.code)
+    && !error.code.startsWith('EXPORT_')
+    ? error.code
+    : (typeof (error?.cause?.code || error?.details?.cause?.code) === 'string'
+      && /^[A-Z][A-Z0-9_]{1,32}$/u.test(error.cause?.code || error.details.cause.code)
+      ? (error.cause?.code || error.details.cause.code)
+      : null);
+  const phase = typeof error?.exportPhase === 'string' && /^[a-z][a-z0-9-]{1,48}$/u.test(error.exportPhase)
+    ? error.exportPhase
+    : null;
   return {
     code,
     message: String(error?.message || 'Export failed').slice(0, 500),
+    ...(systemCode ? { systemCode } : {}),
+    ...(phase ? { phase } : {}),
   };
 }
 
@@ -259,7 +316,10 @@ class ExportJobController {
 module.exports = {
   ExportJobController,
   assertSafeOutputRoot,
+  assertOutputDirectoryWritable,
   normalizeExportRequest,
+  outputNotWritableError,
+  probeDirectoryWritable,
   validatePickedExportDirectory,
   serializeError,
 };

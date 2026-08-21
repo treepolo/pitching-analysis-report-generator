@@ -6,6 +6,22 @@ const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 const { ExportValidationError, normalizeRelativeAssetPath } = require('./asset-paths');
 
+const ZIP_FS_RETRYABLE_CODES = new Set(['EACCES', 'EBUSY', 'EAGAIN', 'EPERM']);
+
+async function withZipFsRetry(operation, attempts = 4) {
+  let lastError = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!ZIP_FS_RETRYABLE_CODES.has(error?.code) || attempt === attempts - 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 60 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
 const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
   let value = index;
   for (let bit = 0; bit < 8; bit += 1) {
@@ -326,16 +342,34 @@ async function createZipArchive(sourceDirectory, zipPath) {
   chunks.push(...centralHeaders, createEndOfCentralDirectory(entries.length, centralSize, centralOffset));
 
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  const temporaryPath = path.join(
-    path.dirname(targetPath),
-    `.${path.basename(targetPath)}.${process.pid}.${crypto.randomUUID()}.tmp`,
-  );
-  try {
-    await fs.writeFile(temporaryPath, Buffer.concat(chunks), { flag: 'wx' });
-    await fs.rename(temporaryPath, targetPath);
-  } catch (error) {
-    await fs.rm(temporaryPath, { force: true });
-    throw error;
+  const temporaryName = `${path.basename(targetPath)}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  const temporaryPaths = [
+    path.join(path.dirname(targetPath), `.${temporaryName}`),
+    path.join(path.dirname(targetPath), temporaryName),
+  ];
+  let lastError = null;
+  for (const temporaryPath of temporaryPaths) {
+    try {
+      await withZipFsRetry(async () => {
+        await fs.rm(temporaryPath, { force: true });
+        await fs.writeFile(temporaryPath, Buffer.concat(chunks), { flag: 'wx' });
+        try {
+          await fs.rename(temporaryPath, targetPath);
+        } catch (error) {
+          await fs.rm(temporaryPath, { force: true }).catch(() => {});
+          throw error;
+        }
+      });
+      lastError = null;
+      break;
+    } catch (error) {
+      lastError = error;
+      await fs.rm(temporaryPath, { force: true }).catch(() => {});
+      if (!ZIP_FS_RETRYABLE_CODES.has(error?.code)) throw error;
+    }
+  }
+  if (lastError) {
+    throw lastError;
   }
   return {
     zipPath: targetPath,

@@ -322,6 +322,124 @@ test('keeps the completed output when staging cleanup remains locked', async () 
   }
 });
 
+test('falls back to a visible staging directory when hidden staging is denied', async () => {
+  const outputRoot = path.join(testRoot, 'visible-staging-fallback-output');
+  const originalMkdtemp = fs.mkdtemp;
+  let deniedAttempts = 0;
+  fs.mkdtemp = async (prefix) => {
+    if (String(prefix).startsWith(`${outputRoot}${path.sep}.report-export-`)) {
+      deniedAttempts += 1;
+      const error = new Error('simulated hidden staging restriction');
+      error.code = 'EPERM';
+      throw error;
+    }
+    return originalMkdtemp(prefix);
+  };
+
+  let result;
+  try {
+    result = await exportReport({
+      projectRoot: testRoot,
+      outputDirectory: outputRoot,
+      reportName: 'Visible fallback report',
+      reportDocument: {
+        schemaVersion: 1,
+        title: 'Visible fallback report',
+        sections: [{ blocks: [{ type: 'rich-text', content: 'fallback' }] }],
+      },
+    });
+  } finally {
+    fs.mkdtemp = originalMkdtemp;
+  }
+
+  assert.equal(result.validation.valid, true);
+  assert.equal(deniedAttempts, 4);
+  assert.equal(await fs.stat(result.folderPath).then((stats) => stats.isDirectory()), true);
+  assert.deepEqual(
+    (await fs.readdir(outputRoot)).filter((name) => name.includes('report-export-')),
+    [],
+  );
+});
+
+test('commits a project-local staging fallback to an external output root', async () => {
+  const outputRoot = await fs.mkdtemp(path.join(require('node:os').tmpdir(), 'pitch-report-cross-volume-output-'));
+  const originalMkdtemp = fs.mkdtemp;
+  let deniedAttempts = 0;
+  fs.mkdtemp = async (prefix) => {
+    const normalizedPrefix = String(prefix);
+    if (normalizedPrefix.startsWith(`${outputRoot}${path.sep}.report-export-`)
+      || normalizedPrefix.startsWith(`${outputRoot}${path.sep}report-export-`)) {
+      deniedAttempts += 1;
+      const error = new Error('simulated output staging restriction');
+      error.code = 'EPERM';
+      throw error;
+    }
+    return originalMkdtemp(prefix);
+  };
+
+  let result;
+  try {
+    result = await exportReport({
+      projectRoot: testRoot,
+      outputDirectory: outputRoot,
+      reportName: 'Cross volume fallback report',
+      reportDocument: {
+        schemaVersion: 1,
+        title: 'Cross volume fallback report',
+        sections: [{ blocks: [{ type: 'rich-text', content: 'cross volume fallback' }] }],
+      },
+    });
+  } finally {
+    fs.mkdtemp = originalMkdtemp;
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+
+  assert.equal(result.validation.valid, true);
+  assert.equal(deniedAttempts, 8);
+  assert.match(result.folderPath, /cross-volume-output/u);
+});
+
+test('falls back to a visible ZIP temporary file when hidden ZIP files are denied', async () => {
+  const outputRoot = path.join(testRoot, 'zip-visible-temp-output');
+  const zipPath = path.join(outputRoot, 'visible-temp.zip');
+  const originalWriteFile = fs.writeFile;
+  let deniedAttempts = 0;
+  fs.writeFile = async (targetPath, ...args) => {
+    const targetName = path.basename(String(targetPath));
+    if (targetName.startsWith(`.${path.basename(zipPath)}.`)) {
+      deniedAttempts += 1;
+      const error = new Error('simulated hidden ZIP temporary restriction');
+      error.code = 'EPERM';
+      throw error;
+    }
+    return originalWriteFile(targetPath, ...args);
+  };
+
+  let result;
+  try {
+    result = await exportReport({
+      projectRoot: testRoot,
+      outputDirectory: outputRoot,
+      reportName: 'Visible ZIP temp report',
+      outputKind: 'zip',
+      createZip: true,
+      zipPath,
+      reportDocument: {
+        schemaVersion: 1,
+        title: 'Visible ZIP temp report',
+        sections: [{ blocks: [{ type: 'rich-text', content: 'zip fallback' }] }],
+      },
+    });
+  } finally {
+    fs.writeFile = originalWriteFile;
+  }
+
+  assert.equal(result.validation.valid, true);
+  assert.equal(result.zip.parity.valid, true);
+  assert.ok(deniedAttempts >= 1);
+  assert.equal(await fs.stat(result.zipPath).then((stats) => stats.isFile()), true);
+});
+
 test('keeps repeated folder and ZIP exports byte-identical for the same canonical document', async () => {
   const reportDocument = {
     schemaVersion: 1,

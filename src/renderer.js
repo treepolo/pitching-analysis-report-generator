@@ -106,6 +106,10 @@ const DISPLAY_ERROR_CODE_MAP = Object.freeze({
     code: 'EXPORT_FAILED',
     reason: '匯出工作失敗，請檢查輸出資料夾、來源檔案與權限。',
   }),
+  EXPORT_OUTPUT_NOT_WRITABLE: Object.freeze({
+    code: 'EXPORT_OUTPUT_NOT_WRITABLE',
+    reason: '匯出資料夾目前無法寫入；請重新選擇資料夾，或關閉正在使用該資料夾的程式後重試。',
+  }),
   EXPORT_CANCELLED: Object.freeze({
     code: 'EXPORT_CANCELLED',
     reason: '匯出已取消。',
@@ -133,6 +137,17 @@ const DISPLAY_ERROR_CODE_MAP = Object.freeze({
 });
 
 const SAFE_ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_-]{1,48}$/u;
+const EXPORT_PHASE_REASON_MAP = Object.freeze({
+  'prepare-output': '匯出資料夾準備失敗，請確認資料夾仍存在且可寫入。',
+  'create-staging': '匯出暫存區建立失敗，請確認資料夾可建立檔案與子資料夾。',
+  'stage-asset': '來源媒體複製失敗，請確認來源檔案仍存在且未被其他程式鎖定。',
+  'stage-frame-cache': '影格快取複製失敗，請重試匯出。',
+  'write-report': '報告檔寫入失敗，請確認輸出資料夾可寫入。',
+  'write-manifest': '匯出清單寫入失敗，請確認輸出資料夾可寫入。',
+  'commit-folder': '輸出資料夾提交失敗，請關閉正在使用輸出資料夾的程式後重試。',
+  'create-zip': 'ZIP 檔建立失敗，請確認輸出資料夾可寫入且檔案未被鎖定。',
+  'validate-zip': 'ZIP 完整性驗證失敗，請重試匯出。',
+});
 
 function displayStatus(value) {
   if (value === null || value === undefined || value === '') return '未知';
@@ -172,6 +187,9 @@ function displayBlockType(value) {
 
 function errorCodeText(error) {
   const candidates = [
+    error?.reasonCode,
+    error?.error?.reasonCode,
+    error?.details?.reasonCode,
     error?.code,
     error?.error?.code,
     error?.details?.code,
@@ -183,7 +201,16 @@ function errorCodeText(error) {
 function displayErrorMessage(error, fallbackCode = 'APP_ERROR') {
   const explicitCode = errorCodeText(error);
   const descriptor = DISPLAY_ERROR_CODE_MAP[explicitCode];
-  if (descriptor) return `${descriptor.reason}（錯誤碼：${descriptor.code}）`;
+  if (descriptor) {
+    const reason = explicitCode === 'EXPORT_FAILED' && EXPORT_PHASE_REASON_MAP[error?.phase]
+      ? EXPORT_PHASE_REASON_MAP[error.phase]
+      : descriptor.reason;
+    const systemCode = typeof error?.systemCode === 'string'
+      && /^[A-Z][A-Z0-9_]{1,32}$/u.test(error.systemCode)
+      ? `；系統：${error.systemCode}`
+      : '';
+    return `${reason}（錯誤碼：${descriptor.code}${systemCode}）`;
+  }
   const safeCode = SAFE_ERROR_CODE_PATTERN.test(fallbackCode) ? fallbackCode : 'APP_ERROR';
   return `發生未分類錯誤，請重試。（錯誤碼：${safeCode}）`;
 }
