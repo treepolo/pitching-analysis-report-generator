@@ -29,6 +29,7 @@ const {
 // Keep jobs for one destination root in order so a repeated UI action cannot
 // race the final folder rename or ZIP commit on Windows.
 const outputLocks = new Map();
+const CLEANUP_RETRYABLE_CODES = new Set(['EACCES', 'EBUSY', 'ENOTEMPTY', 'EPERM']);
 
 function outputLockKey(outputRoot) {
   const resolved = path.resolve(outputRoot);
@@ -49,6 +50,22 @@ async function withOutputLock(outputRoot, task) {
     release();
     if (outputLocks.get(key) === queued) outputLocks.delete(key);
   }
+}
+
+async function cleanupExportPath(targetPath) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await fs.rm(targetPath, { recursive: true, force: true });
+      return null;
+    } catch (error) {
+      if (error.code === 'ENOENT') return null;
+      lastError = error;
+      if (!CLEANUP_RETRYABLE_CODES.has(error.code) || attempt === 3) return lastError;
+      await new Promise((resolve) => setTimeout(resolve, 40 * (attempt + 1)));
+    }
+  }
+  return lastError;
 }
 
 function stableValue(value) {
@@ -598,7 +615,8 @@ async function exportReport({
     if (shouldKeepFolder) {
       await fs.rename(stagingPath, folderPath);
       moved = true;
-      await fs.rm(temporaryRoot, { recursive: true, force: true });
+      const cleanupError = await cleanupExportPath(temporaryRoot);
+      if (cleanupError) warnings.push('匯出暫存檔清理稍後重試；輸出內容已完成。');
     }
 
     const validation = await validateExportLayout(outputFolderPath, {
@@ -623,7 +641,10 @@ async function exportReport({
       zip.parity = await validateZipParity(outputFolderPath, resolvedZipPath);
     }
     throwIfAborted(signal);
-    if (!shouldKeepFolder) await fs.rm(temporaryRoot, { recursive: true, force: true });
+    if (!shouldKeepFolder) {
+      const cleanupError = await cleanupExportPath(temporaryRoot);
+      if (cleanupError) warnings.push('匯出暫存檔清理稍後重試；輸出內容已完成。');
+    }
     return {
       folderPath: shouldKeepFolder ? folderPath : null,
       zipPath: zip ? zip.zipPath : null,
@@ -635,9 +656,9 @@ async function exportReport({
       warnings,
     };
     } catch (error) {
-      await fs.rm(temporaryRoot, { recursive: true, force: true });
-      if (moved) await fs.rm(folderPath, { recursive: true, force: true });
-      if (zipCreatedPath) await fs.rm(zipCreatedPath, { force: true });
+      await cleanupExportPath(temporaryRoot);
+      if (moved) await cleanupExportPath(folderPath);
+      if (zipCreatedPath) await cleanupExportPath(zipCreatedPath);
       throw error;
     }
   });

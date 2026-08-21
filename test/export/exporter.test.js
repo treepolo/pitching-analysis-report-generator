@@ -242,6 +242,86 @@ test('honors cancellation before staging and leaves no partial export', async ()
   assert.deepEqual(await fs.readdir(outputRoot), []);
 });
 
+test('does not turn a transient staging cleanup lock into an export failure', async () => {
+  const outputRoot = path.join(testRoot, 'transient-cleanup-output');
+  const originalRm = fs.rm;
+  let injected = false;
+  fs.rm = async (targetPath, options) => {
+    if (!injected && String(targetPath).includes('.report-export-')) {
+      injected = true;
+      const error = new Error('simulated temporary staging lock');
+      error.code = 'EPERM';
+      throw error;
+    }
+    return originalRm(targetPath, options);
+  };
+
+  let result;
+  try {
+    result = await exportReport({
+      projectRoot: testRoot,
+      outputDirectory: outputRoot,
+      reportName: 'Transient cleanup report',
+      reportDocument: {
+        schemaVersion: 1,
+        title: 'Transient cleanup report',
+        sections: [{ blocks: [{ type: 'rich-text', content: 'cleanup retry' }] }],
+      },
+      assets: [],
+    });
+  } finally {
+    fs.rm = originalRm;
+  }
+
+  assert.equal(injected, true);
+  assert.equal(result.validation.valid, true);
+  assert.deepEqual(result.warnings, []);
+  assert.equal(await fs.stat(result.folderPath).then((stats) => stats.isDirectory()), true);
+  assert.deepEqual(
+    (await fs.readdir(outputRoot)).filter((name) => name.startsWith('.report-export-')),
+    [],
+  );
+});
+
+test('keeps the completed output when staging cleanup remains locked', async () => {
+  const outputRoot = path.join(testRoot, 'persistent-cleanup-output');
+  const originalRm = fs.rm;
+  fs.rm = async (targetPath, options) => {
+    if (String(targetPath).includes('.report-export-')) {
+      const error = new Error('simulated persistent temporary staging lock');
+      error.code = 'EPERM';
+      throw error;
+    }
+    return originalRm(targetPath, options);
+  };
+
+  let result;
+  try {
+    result = await exportReport({
+      projectRoot: testRoot,
+      outputDirectory: outputRoot,
+      reportName: 'Persistent cleanup report',
+      reportDocument: {
+        schemaVersion: 1,
+        title: 'Persistent cleanup report',
+        sections: [{ blocks: [{ type: 'rich-text', content: 'cleanup warning' }] }],
+      },
+      assets: [],
+    });
+  } finally {
+    fs.rm = originalRm;
+  }
+
+  assert.equal(result.validation.valid, true);
+  assert.match(result.warnings.join(' '), /暫存檔清理稍後重試/u);
+  assert.equal(await fs.stat(result.folderPath).then((stats) => stats.isDirectory()), true);
+  for (const entry of await fs.readdir(outputRoot)) {
+    if (entry.startsWith('.report-export-')) {
+      await fs.rm(path.join(outputRoot, entry), { recursive: true, force: true });
+    }
+  }
+});
+
 test('keeps repeated folder and ZIP exports byte-identical for the same canonical document', async () => {
   const reportDocument = {
     schemaVersion: 1,
