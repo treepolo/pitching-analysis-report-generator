@@ -94,6 +94,40 @@ function sliderValueToPlaybackRate(value) {
   return clampPlaybackRate(2 ** exponent);
 }
 
+function setNativePlaybackRate(video, rate) {
+  if (!video) return false;
+  try {
+    video.playbackRate = rate;
+    const actual = Number(video.playbackRate);
+    return Number.isFinite(actual) && Math.abs(actual - rate) < 0.001;
+  } catch {
+    return false;
+  }
+}
+
+function setSafePlaybackRate(card, video, rate) {
+  const runtime = framePlayerRuntimeForCard(card);
+  runtime.rateSyncGuard = true;
+  try {
+    if (setNativePlaybackRate(video, rate)) return true;
+    // Chromium rejects rates outside its native media range.  Keep the
+    // requested project rate in the frame runtime and hold the video at 1x;
+    // the manual frame clock takes over when playback starts.
+    setNativePlaybackRate(video, PLAYBACK_RATE_DEFAULT);
+    return false;
+  } finally {
+    runtime.rateSyncGuard = false;
+  }
+}
+
+function unsupportedPlaybackRateError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return error?.name === 'NotSupportedError'
+    || message.includes('playbackrate')
+    || message.includes('playback rate')
+    || message.includes('supported playback range');
+}
+
 function formatPlaybackRate(rate) {
   const normalized = clampPlaybackRate(rate);
   if (normalized < 0.1) return normalized.toFixed(4);
@@ -834,6 +868,11 @@ function framePlayerRuntimeForCard(card) {
       exactScrubTarget: null,
       exactScrubPromise: null,
       playbackRate: 1,
+      manualPlayback: false,
+      manualPlaybackFrame: null,
+      manualPlaybackCancel: null,
+      manualPlaybackTimestamp: null,
+      rateSyncGuard: false,
       frameEngineGuard: false,
       primarySide: card?.dataset.framePlayerSide || 'single',
       lifecycle: 'idle',
@@ -962,6 +1001,120 @@ function inlineSideElementForCard(card, side) {
 
 function framePlayerVideoForSide(card, side) {
   return inlineSideElementForCard(card, side)?.querySelector('[data-inline-video]') || null;
+}
+
+function cancelManualFramePlayer(card) {
+  const runtime = framePlayerRuntimeForCard(card);
+  if (runtime.manualPlaybackCancel) runtime.manualPlaybackCancel();
+  runtime.manualPlaybackFrame = null;
+  runtime.manualPlaybackCancel = null;
+  runtime.manualPlaybackTimestamp = null;
+  runtime.manualPlayback = false;
+}
+
+function scheduleManualFramePlayerTick(card, callback) {
+  const runtime = framePlayerRuntimeForCard(card);
+  const now = () => (typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now());
+  if (typeof window.requestAnimationFrame === 'function') {
+    const frame = window.requestAnimationFrame(callback);
+    runtime.manualPlaybackFrame = frame;
+    runtime.manualPlaybackCancel = () => window.cancelAnimationFrame?.(frame);
+    return;
+  }
+  const timer = setTimeout(() => callback(now()), 16);
+  runtime.manualPlaybackFrame = timer;
+  runtime.manualPlaybackCancel = () => clearTimeout(timer);
+}
+
+function startManualFramePlayer(card) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const runtime = framePlayerRuntimeForCard(card);
+  const side = framePlayerPrimarySide(block, runtime, card);
+  const video = framePlayerVideoForSide(card, side);
+  if (!block || !video) return false;
+  cancelManualFramePlayer(card);
+  runtime.manualPlayback = true;
+  runtime.playing = true;
+  runtime.lifecycle = 'playing';
+  runtime.manualPlaybackTimestamp = null;
+  runtime.rateSyncGuard = true;
+  try {
+    video.pause();
+    setNativePlaybackRate(video, PLAYBACK_RATE_DEFAULT);
+  } finally {
+    runtime.rateSyncGuard = false;
+  }
+  const tick = (timestamp) => {
+    if (!runtime.manualPlayback || !runtime.playing || !card.isConnected) {
+      cancelManualFramePlayer(card);
+      return;
+    }
+    const currentBlock = blockForEditorCard(card).block;
+    const currentSide = framePlayerPrimarySide(currentBlock, runtime, card);
+    const currentVideo = framePlayerVideoForSide(card, currentSide);
+    if (!currentBlock || !currentVideo) {
+      cancelManualFramePlayer(card);
+      runtime.playing = false;
+      return;
+    }
+    const now = Number(timestamp);
+    const previous = runtime.manualPlaybackTimestamp;
+    runtime.manualPlaybackTimestamp = Number.isFinite(now)
+      ? now
+      : (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now());
+    const elapsed = Number.isFinite(previous)
+      ? Math.min(0.1, Math.max(0, (runtime.manualPlaybackTimestamp - previous) / 1000))
+      : 0;
+    const config = playerSideConfig(currentBlock, currentSide);
+    const bounds = inlinePlaybackBounds(currentBlock, currentSide, currentVideo);
+    const rate = clampPlaybackRate(runtime.playbackRate);
+    const currentTime = Number.isFinite(currentVideo.currentTime)
+      ? Math.max(bounds.start, currentVideo.currentTime)
+      : bounds.start;
+    let nextTime = currentTime + elapsed * rate;
+    if (bounds.end !== null && bounds.end > bounds.start && nextTime >= bounds.end) {
+      if (config.loop?.enabled === true) {
+        const span = bounds.end - bounds.start;
+        nextTime = bounds.start + ((nextTime - bounds.start) % span);
+      } else {
+        runtime.manualPlayback = false;
+        runtime.playing = false;
+        runtime.lifecycle = 'paused';
+        runtime.rateSyncGuard = true;
+        try {
+          currentVideo.currentTime = bounds.end;
+          currentVideo.pause();
+        } finally {
+          runtime.rateSyncGuard = false;
+        }
+        updateFramePlayerControls(card);
+        setFramePlayerStatus(card, '已到達區段終點。', 'loaded');
+        return;
+      }
+    }
+    runtime.rateSyncGuard = true;
+    try {
+      currentVideo.currentTime = nextTime;
+    } catch {
+      runtime.manualPlayback = false;
+      runtime.playing = false;
+      runtime.lifecycle = 'error';
+      updateFramePlayerControls(card);
+      setFramePlayerStatus(card, '影片定位未完成，請重試。', 'error');
+      runtime.rateSyncGuard = false;
+      return;
+    }
+    runtime.rateSyncGuard = false;
+    syncFramePlayerProgress(card, currentBlock, currentSide, currentVideo);
+    scheduleManualFramePlayerTick(card, tick);
+  };
+  setFramePlayerStatus(card, '播放中（使用擴充速度時鐘）。', 'loaded');
+  scheduleManualFramePlayerTick(card, tick);
+  updateFramePlayerControls(card);
+  return true;
 }
 
 function framePlayerTimeForSide(runtime, side, index) {
@@ -1257,7 +1410,7 @@ async function prepareFramePlayerCard(card, block, generation) {
       if (side === framePlayerPrimarySide(block, runtime, card)) {
         runtime.playbackRate = configuredRate;
       }
-      video.playbackRate = configuredRate;
+      setSafePlaybackRate(card, video, configuredRate);
       setInlineVideoStatus(sideElement, `影片已就緒 · ${frameCount} 幀。`, 'loaded');
       return true;
     } catch (error) {
@@ -1286,6 +1439,7 @@ async function prepareFramePlayerCard(card, block, generation) {
 function stopFramePlayer(card) {
   const runtime = framePlayerRuntimeForCard(card);
   runtime.playing = false;
+  cancelManualFramePlayer(card);
   runtime.seekSerial += 1;
   runtime.exactSeek = null;
   runtime.scrubActive = false;
@@ -1303,6 +1457,31 @@ function scheduleFramePlayerTick(card) {
   // intentionally does not invent a renderer-side timer.
 }
 
+async function playFramePlayer(card) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const runtime = framePlayerRuntimeForCard(card);
+  const videos = framePlayerSides(block, card)
+    .map((side) => framePlayerVideoForSide(card, side))
+    .filter(Boolean);
+  if (!block || videos.length === 0) throw new Error('影片尚未準備。');
+  const rate = clampPlaybackRate(runtime.playbackRate);
+  const nativeRate = videos.every((video) => setSafePlaybackRate(card, video, rate));
+  if (!nativeRate) {
+    if (!startManualFramePlayer(card)) throw new Error('影片尚未準備。');
+    return;
+  }
+  runtime.manualPlayback = false;
+  try {
+    await Promise.all(videos.map((video) => video.play()));
+    runtime.playing = true;
+    runtime.lifecycle = 'playing';
+    setFramePlayerStatus(card, '播放中。', 'loaded');
+  } catch (error) {
+    if (!unsupportedPlaybackRateError(error) || !startManualFramePlayer(card)) throw error;
+  }
+}
+
 async function toggleFramePlayer(card) {
   const runtime = framePlayerRuntimeForCard(card);
   const entry = blockForEditorCard(card);
@@ -1317,14 +1496,15 @@ async function toggleFramePlayer(card) {
     if (desiredPlaying && runtime.currentFrameIndex >= framePlayerFrameCount(entry.block, runtime, card) - 1) {
       await seekFramePlayerIndex(card, framePlayerSegmentStartIndex(entry.block, runtime, card), { exact: true, status: false });
     }
-    const rate = Number(runtime.playbackRate) > 0 ? Number(runtime.playbackRate) : 1;
-    videos.forEach((video) => { video.playbackRate = Number.isFinite(rate) && rate > 0 ? rate : 1; });
-    if (desiredPlaying) await Promise.all(videos.map((video) => video.play()));
-    else videos.forEach((video) => video.pause());
-    runtime.playing = desiredPlaying;
-    runtime.lifecycle = desiredPlaying ? 'playing' : 'paused';
-    setFramePlayerStatus(card, desiredPlaying ? '播放中。' : '已暫停。', 'loaded');
+    if (desiredPlaying) {
+      await playFramePlayer(card);
+    } else {
+      stopFramePlayer(card);
+      runtime.lifecycle = 'paused';
+      setFramePlayerStatus(card, '已暫停。', 'loaded');
+    }
   } catch (error) {
+    cancelManualFramePlayer(card);
     runtime.playing = false;
     runtime.lifecycle = 'error';
     setFramePlayerStatus(card, `播放失敗：${error?.message || '請重試。'}`, 'error');
@@ -1353,16 +1533,8 @@ function resetFramePlayerRate(card) {
   const block = entry.block;
   const runtime = framePlayerRuntimeForCard(card);
   if (!block || framePlayerFrameCount(block, runtime, card) <= 0) return;
-  runtime.playbackRate = PLAYBACK_RATE_DEFAULT;
-  framePlayerSides(block, card).forEach((side) => {
-    const video = framePlayerVideoForSide(card, side);
-    if (video) video.playbackRate = PLAYBACK_RATE_DEFAULT;
-    const config = playerSideConfig(block, side);
-    config.playback = { ...(config.playback || {}), rate: PLAYBACK_RATE_DEFAULT };
-  });
-  updateFramePlayerControls(card);
+  applyFramePlayerRate(card, PLAYBACK_RATE_DEFAULT, { persist: true });
   setFramePlayerStatus(card, '播放速度已重置為 1.00 倍。', 'loaded');
-  scheduleSave();
 }
 
 function applyFramePlayerRate(card, rate, { persist = false } = {}) {
@@ -1371,15 +1543,40 @@ function applyFramePlayerRate(card, rate, { persist = false } = {}) {
   if (!block) return false;
   const normalizedRate = clampPlaybackRate(rate);
   const runtime = framePlayerRuntimeForCard(card);
+  const wasPlaying = runtime.playing;
+  const wasManual = runtime.manualPlayback;
   runtime.playbackRate = normalizedRate;
-  framePlayerSides(block, card).forEach((side) => {
-    const video = framePlayerVideoForSide(card, side);
-    if (video) video.playbackRate = normalizedRate;
-    if (persist) {
+  const videos = framePlayerSides(block, card)
+    .map((side) => framePlayerVideoForSide(card, side))
+    .filter(Boolean);
+  const nativeRate = videos.length === 0 || videos.every((video) => setSafePlaybackRate(card, video, normalizedRate));
+  if (wasManual) {
+    cancelManualFramePlayer(card);
+    runtime.playing = false;
+    videos.forEach((video) => video.pause());
+  }
+  if (!nativeRate) {
+    videos.forEach((video) => setSafePlaybackRate(card, video, PLAYBACK_RATE_DEFAULT));
+    if (wasPlaying) {
+      void playFramePlayer(card).catch((error) => {
+        runtime.playing = false;
+        setFramePlayerStatus(card, `播放失敗：${error?.message || '請重試。'}`, 'error');
+        updateFramePlayerControls(card);
+      });
+    }
+  } else if (wasManual && wasPlaying) {
+    void playFramePlayer(card).catch((error) => {
+      runtime.playing = false;
+      setFramePlayerStatus(card, `播放失敗：${error?.message || '請重試。'}`, 'error');
+      updateFramePlayerControls(card);
+    });
+  }
+  if (persist) {
+    framePlayerSides(block, card).forEach((side) => {
       const config = playerSideConfig(block, side);
       config.playback = { ...(config.playback || {}), rate: normalizedRate };
-    }
-  });
+    });
+  }
   updateFramePlayerControls(card);
   if (persist) scheduleSave();
   return true;
@@ -1490,7 +1687,7 @@ function applyInlineSideSettings(card, block, side) {
   // Native looping always wraps the complete media file.  The editor uses
   // the block's segment.in/segment.out as the only loop bounds instead.
   video.loop = false;
-  video.playbackRate = rate;
+  setSafePlaybackRate(targetCard, video, rate);
   enforceInlinePlaybackBounds(block, side, video);
   updateFramePlayerControls(targetCard);
 }
@@ -1573,6 +1770,7 @@ function bindInlineVideoRuntime(card, block, side, video) {
     if ((current?.type === 'singleVideo' || current?.type === 'comparisonVideo')
       && side === framePlayerPrimarySide(current, frameRuntime, card)
       && !frameRuntime.frameEngineGuard
+      && !frameRuntime.manualPlayback
       && !video.ended) {
       frameRuntime.playing = false;
       frameRuntime.lifecycle = 'paused';
@@ -1582,11 +1780,15 @@ function bindInlineVideoRuntime(card, block, side, video) {
   video.addEventListener('ratechange', () => {
     const current = blockForEditorCard(card).block;
     if (!current || !['singleVideo', 'comparisonVideo'].includes(current.type)) return;
+    const frameRuntime = framePlayerRuntimeForCard(card);
+    if (frameRuntime.rateSyncGuard || frameRuntime.manualPlayback) {
+      updateFramePlayerControls(card);
+      return;
+    }
     const config = playerSideConfig(current, side);
     const rate = clampPlaybackRate(video.playbackRate);
     if (!Number.isFinite(rate) || Math.abs(Number(config.playback?.rate) - rate) < 0.001) return;
     config.playback = { ...(config.playback || {}), rate };
-    const frameRuntime = framePlayerRuntimeForCard(card);
     frameRuntime.playbackRate = rate;
     updateFramePlayerControls(card);
     scheduleSave();

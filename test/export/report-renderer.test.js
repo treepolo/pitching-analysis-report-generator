@@ -139,6 +139,9 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.match(html, /data-player-rate-reset/iu);
   assert.match(html, /<h3>單一投球<\/h3>/u);
   assert.match(html, /<h3>單一來源<\/h3>/u);
+  assert.match(html, /\.portable-frame-rate-row \{ grid-column: 1 \/ -1;/u);
+  assert.match(html, /\.portable-player-rate-row \{ grid-column: 1 \/ -1;/u);
+  assert.match(html, /const setPlaybackRate = \(settings, requested\)/u);
   assert.doesNotMatch(html, /portable-player-settings|portable-player-eyebrow|portable-player-layout/iu);
   assert.doesNotMatch(html, /data-anchor-time|data-sync-offset|data-loop-start|data-loop-end|同步|綁定|錨點/u);
   assert.doesNotMatch(html, /同步播放/u);

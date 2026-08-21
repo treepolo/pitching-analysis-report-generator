@@ -89,10 +89,14 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.doesNotMatch(renderer, /function handleInlineVideoKeydown\(/u);
 
   const controls = functionSlice(renderer, 'async function toggleFramePlayer(', 'function handleFramePlayerEvent(');
-  assert.match(controls, /video\.play\(\)/u);
-  assert.match(controls, /video\.pause\(\)/u);
-  assert.match(controls, /playbackRate/u);
-  assert.doesNotMatch(controls, /setTimeout|setInterval/u);
+  const playback = functionSlice(renderer, 'async function playFramePlayer(', 'async function toggleFramePlayer(');
+  assert.match(playback, /video\.play\(\)/u);
+  assert.match(playback, /playbackRate/u);
+  assert.match(controls, /stopFramePlayer/u);
+  assert.match(renderer, /function startManualFramePlayer\(card\)/u);
+  assert.match(renderer, /setSafePlaybackRate\(card, video, rate\)/u);
+  assert.match(renderer, /!frameRuntime\.manualPlayback/u);
+  assert.match(renderer, /unsupportedPlaybackRateError/u);
   assert.match(renderer, /function waitForPresentedVideoFrame\(video/u);
   assert.match(renderer, /requestVideoFrameCallback/u);
   assert.match(renderer, /function syncFramePlayerProgress\(card, block, side, video\)/u);

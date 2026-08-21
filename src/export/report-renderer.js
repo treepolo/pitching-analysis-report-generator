@@ -592,16 +592,17 @@ function renderStyles() {
     .portable-frame-controls { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content max-content max-content; column-gap: .6rem; row-gap: .6rem; margin-top: .8rem; }
     .portable-frame-navigation { display: contents; }
     .portable-frame-navigation input[type="range"] { grid-column: 2; min-width: 0; width: 100%; }
-    .portable-frame-rate-row { grid-column: 2; display: flex; align-items: center; gap: .6rem; width: 100%; }
+    .portable-frame-rate-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; width: 100%; }
     .portable-frame-rate-row input[type="range"] { flex: 1 1 auto; min-width: 0; }
     .portable-frame-controls button, .portable-player-rate-row button, .portable-frame-rate-row button { padding: .45rem .7rem; border: 1px solid #b9c5d8; border-radius: .45rem; background: #fff; color: #172033; cursor: pointer; }
     .portable-frame-controls button:hover, .portable-player-rate-row button:hover, .portable-frame-rate-row button:hover { background: #eef3fa; }
     .portable-frame-controls output, .portable-player-side-controls output { color: #596780; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .portable-frame-player-status { grid-column: 1 / -1; }
     .portable-player-side-controls { display: grid; grid-template-columns: minmax(0, 1fr) max-content; column-gap: .6rem; row-gap: .6rem; margin-top: .65rem; }
     .portable-player-timeline-row { display: contents; }
     .portable-player-timeline-row input[type="range"] { grid-column: 1; min-width: 0; width: 100%; }
     .portable-player-timeline-row output { grid-column: 2; }
-    .portable-player-rate-row { grid-column: 1; display: flex; align-items: center; gap: .6rem; width: 100%; }
+    .portable-player-rate-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; width: 100%; }
     .portable-player-loop { grid-column: 1 / -1; }
     .portable-player-side-controls label { display: inline-flex; align-items: center; gap: .35rem; color: #33415c; font-size: .85rem; }
     .portable-player-rate-input { flex: 0 0 5.5rem; width: 5.5rem; }
@@ -735,8 +736,29 @@ function renderLegacyPlayerScript() {
       return { side, video, rateInput, rateSlider, resetRate, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: clamp(numberValue(side.dataset.playbackRate, 1), ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}), loopEnabled: side.dataset.loopEnabled === 'true' };
     };
     const updateRateControls = (settings) => { if (settings.rateInput) settings.rateInput.value = settings.rate < .1 ? settings.rate.toFixed(4) : settings.rate < 1 ? settings.rate.toFixed(3) : settings.rate.toFixed(2); if (settings.rateSlider) settings.rateSlider.value = String(Math.log2(settings.rate)); };
+    const setPlaybackRate = (settings, requested) => {
+      const desired = clamp(requested, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
+      const candidates = desired >= 1
+        ? [desired, 16, 8, 4, 2, 1, .5, .25, .125, .0625]
+        : [desired, .0625, .125, .25, .5, 1, 2, 4, 8, 16];
+      for (const candidate of candidates) {
+        try {
+          settings.video.playbackRate = candidate;
+          const actual = Number(settings.video.playbackRate);
+          if (Number.isFinite(actual) && Math.abs(actual - candidate) < 0.001) {
+            settings.rate = actual;
+            updateRateControls(settings);
+            return actual;
+          }
+        } catch {}
+      }
+      settings.rate = 1;
+      try { settings.video.playbackRate = 1; } catch {}
+      updateRateControls(settings);
+      return settings.rate;
+    };
     const updateSide = (settings) => { const { video, side } = settings; if (!video) return; const seek = side.querySelector('[data-player-seek]'); const output = side.querySelector('[data-player-time]'); const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : settings.end; if (seek) { seek.min = String(settings.start); seek.max = String(Math.max(settings.start, settings.end ?? duration ?? settings.start)); seek.value = String(clamp(video.currentTime || settings.start, settings.start, Number(seek.max))); seek.disabled = false; } if (output) output.textContent = String((video.currentTime || 0).toFixed(2)) + ' 秒'; updateRateControls(settings); };
-    const applySettings = (settings, seekToStart = true) => { if (!settings.video) return; settings.video.playbackRate = settings.rate; if (settings.loopInput) settings.loopInput.checked = settings.loopEnabled; if (seekToStart && Number.isFinite(settings.start)) settings.video.currentTime = settings.start; updateSide(settings); };
+    const applySettings = (settings, seekToStart = true) => { if (!settings.video) return; setPlaybackRate(settings, settings.rate); if (settings.loopInput) settings.loopInput.checked = settings.loopEnabled; if (seekToStart && Number.isFinite(settings.start)) settings.video.currentTime = settings.start; updateSide(settings); };
     sides.forEach((side) => {
       const settings = settingsFor(side);
       applySettings(settings);
@@ -754,10 +776,10 @@ function renderLegacyPlayerScript() {
       });
       settings.video?.addEventListener('error', () => { const status = side.querySelector('[data-player-time]'); if (status) status.textContent = '媒體載入失敗'; });
       side.querySelector('[data-player-seek]')?.addEventListener('input', (event) => { settings.video.currentTime = numberValue(event.target.value, settings.start); updateSide(settings); });
-      settings.rateInput?.addEventListener('input', (event) => { const value = numberValue(event.target.value, null); if (value !== null) { settings.rate = clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}); settings.video.playbackRate = settings.rate; updateRateControls(settings); } });
-      settings.rateInput?.addEventListener('change', (event) => { settings.rate = clamp(numberValue(event.target.value, settings.rate), ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}); settings.video.playbackRate = settings.rate; updateRateControls(settings); });
-      settings.rateSlider?.addEventListener('input', (event) => { settings.rate = 2 ** clamp(numberValue(event.target.value, 0), -6, 6); settings.video.playbackRate = settings.rate; updateRateControls(settings); });
-      settings.resetRate?.addEventListener('click', () => { settings.rate = 1; settings.video.playbackRate = 1; updateRateControls(settings); });
+      settings.rateInput?.addEventListener('input', (event) => { const value = numberValue(event.target.value, null); if (value !== null) setPlaybackRate(settings, value); });
+      settings.rateInput?.addEventListener('change', (event) => { setPlaybackRate(settings, numberValue(event.target.value, settings.rate)); });
+      settings.rateSlider?.addEventListener('input', (event) => { setPlaybackRate(settings, 2 ** clamp(numberValue(event.target.value, 0), -6, 6)); });
+      settings.resetRate?.addEventListener('click', () => { setPlaybackRate(settings, 1); });
       settings.loopInput?.addEventListener('change', () => { settings.loopEnabled = settings.loopInput.checked; });
     });
     const primary = sides.length === 1 ? settingsFor(sides[0]) : null;

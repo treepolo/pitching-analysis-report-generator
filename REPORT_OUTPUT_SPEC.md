@@ -58,7 +58,7 @@ Result 必須分別回報 folder 與 ZIP 位置、檔案數、warnings、validat
 - 不依賴 internet、CDN、server-side API、database、Service Worker 或 runtime fetch 取得必要 report data。
 - 必要 CSS/JavaScript 原則上 inline 或以可靠 relative static asset 提供。
 - media 使用 relative paths；影片不以 Base64 內嵌。
-- report text、image、single video、dual video、playback rate、loop、frame controls 在正式支援範圍內可驗證；影片區塊標題與每側來源標題各自只呈現一次，速度控制提供 1/64×–64× 的連續滑桿、數字輸入與 1 倍重設；dual sides remain independent.
+- report text、image、single video、dual video、playback rate、loop、frame controls 在正式支援範圍內可驗證；影片區塊標題與每側來源標題各自只呈現一次，速度控制提供 1/64×–64× 的連續滑桿、數字輸入與 1 倍重設；frame-cache 播放器支援完整範圍，影片 fallback 會選用瀏覽器可接受的鄰近原生速度，避免不支援的 playback rate 造成播放失敗；dual sides remain independent.
 
 Online static report 正式支援 desktop modern browsers、iPhone/iPad Safari、Android Chrome。Offline extracted report 主要正式支援 desktop modern browsers；mobile local-file 僅宣告盡可能相容，不宣稱與 online 等價。
 
