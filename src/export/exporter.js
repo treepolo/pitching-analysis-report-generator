@@ -113,6 +113,13 @@ async function commitStagingDirectory(stagingPath, folderPath, { sameDestination
   }
 }
 
+function shouldFallbackFrameCache({ error, frameCaches, requireReadyFrameCache }) {
+  return requireReadyFrameCache !== true
+    && frameCaches !== null
+    && frameCaches !== undefined
+    && error?.code === 'ENOSPC';
+}
+
 function outputLockKey(outputRoot) {
   const resolved = path.resolve(outputRoot);
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
@@ -571,6 +578,7 @@ async function exportReport({
   zipPath,
   frameCaches = null,
   requireReadyFrameCache = false,
+  frameCacheFallbackReason = null,
   signal,
 } = {}) {
   if (typeof outputDirectory !== 'string' || outputDirectory.length === 0) {
@@ -599,7 +607,7 @@ async function exportReport({
   }
   const shouldKeepFolder = outputKind !== 'zip';
   const shouldCreateZip = createZip === true || outputKind === 'zip' || outputKind === 'both';
-  return withOutputLock(outputRoot, async () => {
+  const runExport = () => withOutputLock(outputRoot, async () => {
     const outputTargets = await resolveOutputTargets({
     outputRoot,
     baseName: safeReportName(reportName ?? safeReportDocument.title),
@@ -670,12 +678,22 @@ async function exportReport({
             { assetId: asset.id, status: cacheEntry?.status ?? 'missing' },
           );
         }
-        warnings.push(frameCacheWarning(asset.id, cacheEntry));
+        if (frameCacheFallbackReason === 'insufficient-disk-space') {
+          warnings.push(
+            `影格快取因輸出磁碟空間不足而略過（資產：${asset.id}）；已改用影片播放。`,
+          );
+        } else {
+          warnings.push(frameCacheWarning(asset.id, cacheEntry));
+        }
         portableFrameCaches.push({
           assetId: asset.id,
-          status: cacheEntry?.status || 'missing',
+          status: frameCacheFallbackReason === 'insufficient-disk-space'
+            ? 'skipped-insufficient-disk-space'
+            : (cacheEntry?.status || 'missing'),
           ready: false,
-          error: cacheEntry?.error || null,
+          error: frameCacheFallbackReason === 'insufficient-disk-space'
+            ? { code: 'ENOSPC', message: 'The output disk has insufficient free space for the ready frame cache.' }
+            : (cacheEntry?.error || null),
         });
         continue;
       }
@@ -783,6 +801,27 @@ async function exportReport({
       throw error;
     }
   });
+  try {
+    return await runExport();
+  } catch (error) {
+    if (shouldFallbackFrameCache({ error, frameCaches, requireReadyFrameCache })) {
+      return exportReport({
+        reportDocument,
+        assets,
+        projectRoot,
+        outputDirectory,
+        reportName,
+        createZip,
+        outputKind,
+        zipPath,
+        frameCaches: null,
+        requireReadyFrameCache,
+        frameCacheFallbackReason: 'insufficient-disk-space',
+        signal,
+      });
+    }
+    throw error;
+  }
 }
 
 module.exports = {

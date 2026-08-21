@@ -154,6 +154,82 @@ test('exports referenced ready frame cache index and PNGs into folder and ZIP', 
   assert.equal(await fs.stat(path.join(extractedPath, 'images/frame-cache/unused')).catch(() => null), null);
 });
 
+test('falls back to video output when ready frame-cache staging runs out of space', async () => {
+  const root = path.join(testRoot, 'enospc-fallback');
+  await fs.mkdir(root, { recursive: true });
+  const ready = await createReadyCache(root, 'pitch', 'media/pitch.mp4', 3);
+  const report = reportFor({ type: 'singleVideo', mediaAssetId: 'pitch' });
+  const outputDirectory = path.join(root, 'output');
+  const originalWriteFile = fs.writeFile;
+  let injected = false;
+  fs.writeFile = async (targetPath, ...args) => {
+    if (!injected && String(targetPath).includes(`${path.sep}images${path.sep}frame-cache${path.sep}`)) {
+      injected = true;
+      const error = new Error('simulated output disk full');
+      error.code = 'ENOSPC';
+      throw error;
+    }
+    return originalWriteFile(targetPath, ...args);
+  };
+
+  let result;
+  try {
+    result = await exportReport({
+      projectRoot: root,
+      outputDirectory,
+      reportDocument: report,
+      assets: [{ id: 'pitch', kind: 'video', sourcePath: 'media/pitch.mp4', displayName: 'pitch.mp4' }],
+      frameCaches: [{ assetId: 'pitch', response: ready.response }],
+    });
+  } finally {
+    fs.writeFile = originalWriteFile;
+  }
+
+  assert.equal(injected, true);
+  assert.equal(result.validation.valid, true);
+  assert.match(result.warnings.join(' '), /輸出磁碟空間不足/u);
+  assert.equal(result.manifest.frameCaches[0].status, 'skipped-insufficient-disk-space');
+  const html = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
+  assert.match(html, /<video\b/iu);
+  assert.doesNotMatch(html, /images\/frame-cache\/pitch/u);
+  assert.equal(result.manifest.files.some((file) => file.relativePath.includes('frame-cache')), false);
+});
+
+test('does not downgrade a strict ready frame-cache export after ENOSPC', async () => {
+  const root = path.join(testRoot, 'enospc-strict');
+  await fs.mkdir(root, { recursive: true });
+  const ready = await createReadyCache(root, 'pitch', 'media/pitch.mp4', 2);
+  const report = reportFor({ type: 'singleVideo', mediaAssetId: 'pitch' });
+  const outputDirectory = path.join(root, 'output');
+  const originalWriteFile = fs.writeFile;
+  fs.writeFile = async (targetPath, ...args) => {
+    if (String(targetPath).includes(`${path.sep}images${path.sep}frame-cache${path.sep}`)) {
+      const error = new Error('simulated strict output disk full');
+      error.code = 'ENOSPC';
+      throw error;
+    }
+    return originalWriteFile(targetPath, ...args);
+  };
+
+  try {
+    await assert.rejects(
+      exportReport({
+        projectRoot: root,
+        outputDirectory,
+        reportDocument: report,
+        assets: [{ id: 'pitch', kind: 'video', sourcePath: 'media/pitch.mp4', displayName: 'pitch.mp4' }],
+        frameCaches: [{ assetId: 'pitch', response: ready.response }],
+        requireReadyFrameCache: true,
+      }),
+      (error) => error.code === 'ENOSPC' && error.exportPhase === 'stage-frame-cache',
+    );
+  } finally {
+    fs.writeFile = originalWriteFile;
+  }
+
+  assert.equal(await fs.stat(path.join(outputDirectory, 'Frame cache export')).catch(() => null), null);
+});
+
 test('downgrades a non-ready cache explicitly and can require ready cache', async () => {
   const root = path.join(testRoot, 'non-ready');
   await fs.mkdir(root, { recursive: true });
