@@ -33,6 +33,9 @@ test('single and dual cards use the same browser video surface and independent c
   assert.match(side, /renderFramePlayerControls\(title\)/u);
   const controls = functionSlice(renderer, 'function renderFramePlayerControls(', 'function renderInlineVideoSide(');
   assert.match(controls, /data-frame-rate/u);
+  assert.match(controls, /data-frame-rate-input/u);
+  assert.match(controls, /min="\$\{PLAYBACK_RATE_MIN\}" max="\$\{PLAYBACK_RATE_MAX\}"/u);
+  assert.match(controls, /data-frame-rate-row/u);
   assert.match(controls, /data-frame-action="reset-rate"/u);
   assert.match(controls, /重置播放速度為 1 倍/u);
   assert.match(controls, /data-frame-player-status/u);

@@ -46,8 +46,8 @@ test('renders escaped text, inline styles, and relative media paths into self-co
   assert.match(html, /src="videos\/pitch%20clip\.mp4"/u);
   assert.match(html, /poster="images\/release%20frame\.png"/u);
   assert.match(html, /src="images\/release%20frame\.png"/u);
-  assert.match(html, /<figcaption>Before<\/figcaption>/u);
-  assert.match(html, /<figcaption>After<\/figcaption>/u);
+  assert.match(html, /<h3>Before<\/h3>/u);
+  assert.match(html, /<h3>After<\/h3>/u);
   assert.doesNotMatch(html, /editor-left|editor-right|private\.tmp|editorState/iu);
   assert.doesNotMatch(html, /id="summary"|id="media"/u);
   assert.doesNotMatch(html, /<script\s+src=/iu);
@@ -79,8 +79,9 @@ test('renders independent video playback, loop, and comparison layout settings i
         type: 'singleVideo',
         mediaAssetId: 'pitch',
         label: '單一投球',
+        sourceLabel: '單一來源',
         segment: { in: 1, out: 3 },
-        playback: { rate: 1.5 },
+        playback: { rate: 64 },
         loop: { enabled: true },
         anchor: { observedTime: 1, precision: 'time-based' },
       }, {
@@ -131,13 +132,18 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.match(html, /data-portable-player/iu);
   assert.match(html, /data-player-layout="stacked"/u);
   assert.match(html, /data-segment-in="1"[\s\S]*data-segment-out="3"/u);
-  assert.match(html, /data-playback-rate="1\.5"/u);
+  assert.match(html, /data-playback-rate="64"/u);
   assert.match(html, /data-loop-enabled="true"/u);
+  assert.match(html, /data-player-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);
+  assert.match(html, /data-player-rate type="range" min="-6" max="6"/u);
+  assert.match(html, /data-player-rate-reset/iu);
+  assert.match(html, /<h3>單一投球<\/h3>/u);
+  assert.match(html, /<h3>單一來源<\/h3>/u);
+  assert.doesNotMatch(html, /portable-player-settings|portable-player-eyebrow|portable-player-layout/iu);
   assert.doesNotMatch(html, /data-anchor-time|data-sync-offset|data-loop-start|data-loop-end|同步|綁定|錨點/u);
-  assert.match(html, /雙影片播放器/u);
   assert.doesNotMatch(html, /同步播放/u);
   assert.match(html, /回到區段起點/u);
-  assert.match(html, /播放速率/u);
+  assert.match(html, /播放速度數值/u);
   assert.match(html, /循環/u);
   assert.doesNotMatch(html, /data-player-runtime-status/iu);
   assert.match(html, /<script>\s*\(\(\) =>/u);

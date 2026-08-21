@@ -58,7 +58,7 @@ ContentBlock 必須以 discriminated type 表示：
 
 - text：結構化 rich text／安全 markup，不接受任意 script。
 - image：一個 project-local MediaAsset reference 與可選 caption/alt。
-- singleVideo：一個 MediaAsset reference、label、playback options、segment loop。
+- singleVideo：一個 MediaAsset reference、獨立的區塊 label 與 sourceLabel、playback options、segment loop。
 - comparisonVideo（使用者介面稱雙影片）：兩個 side references；每側 filename、source title、segment、playback 與 loop。兩側是獨立的單影片播放器。
 
 空 title、空 optional fields 不應在 export renderer 產生空白 section 或裝飾性 placeholder。

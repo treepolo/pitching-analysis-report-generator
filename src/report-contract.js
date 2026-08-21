@@ -149,6 +149,8 @@
     if (type === 'singleVideo') {
       copyAssetReferences(block, output);
       copyString(block, output, 'label');
+      if (typeof block.sourceLabel === 'string') output.sourceLabel = block.sourceLabel;
+      else if (typeof block.label === 'string') output.sourceLabel = block.label;
       copyString(block, output, 'caption');
       const legacyLoop = block.loop ?? block.loopRange ?? block.playback?.loop ?? block.playback?.loopRange;
       const segment = cloneSegmentConfig(block.segment, legacyLoop);

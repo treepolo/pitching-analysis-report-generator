@@ -69,6 +69,38 @@ const elements = {
   exportStatus: document.querySelector('#export-status'),
 };
 
+const PLAYBACK_RATE_MIN = 1 / 64;
+const PLAYBACK_RATE_MAX = 64;
+const PLAYBACK_RATE_DEFAULT = 1;
+const PLAYBACK_RATE_SLIDER_MIN = -6;
+const PLAYBACK_RATE_SLIDER_MAX = 6;
+const PLAYBACK_RATE_SLIDER_STEP = 0.01;
+
+function clampPlaybackRate(value, fallback = PLAYBACK_RATE_DEFAULT) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(PLAYBACK_RATE_MAX, Math.max(PLAYBACK_RATE_MIN, parsed));
+}
+
+function playbackRateToSliderValue(rate) {
+  return Math.log2(clampPlaybackRate(rate));
+}
+
+function sliderValueToPlaybackRate(value) {
+  const exponent = Math.min(
+    PLAYBACK_RATE_SLIDER_MAX,
+    Math.max(PLAYBACK_RATE_SLIDER_MIN, Number(value) || 0),
+  );
+  return clampPlaybackRate(2 ** exponent);
+}
+
+function formatPlaybackRate(rate) {
+  const normalized = clampPlaybackRate(rate);
+  if (normalized < 0.1) return normalized.toFixed(4);
+  if (normalized < 1) return normalized.toFixed(3);
+  return normalized.toFixed(2);
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -292,7 +324,9 @@ function playerSideFallbackLabel(side) {
 
 function playerSideTitle(block, side) {
   const config = playerSideConfig(block, side);
-  const configuredLabel = typeof config.label === 'string' ? config.label : '';
+  const configuredLabel = typeof (side === 'single' ? config.sourceLabel : config.label) === 'string'
+    ? (side === 'single' ? config.sourceLabel : config.label)
+    : '';
   if (configuredLabel.trim() !== '') return configuredLabel;
   const asset = mediaAssetFor(playerAssetIdFor(block, side));
   const fileName = asset?.metadata?.fileName || asset?.displayName || asset?.id;
@@ -343,6 +377,7 @@ function addSingleVideoBlock({ allowEmpty = false } = {}) {
     type: 'singleVideo',
     mediaAssetId: asset?.id || null,
     label: asset?.displayName || '單一影片',
+    sourceLabel: asset?.displayName || '影片來源',
     playback: { rate: 1 },
     segment: { in: 0, out: null },
     loop: { enabled: false },
@@ -658,17 +693,19 @@ function renderVideoSideEditor(block, side) {
   const prefix = comparison ? `${side}.` : '';
   const label = comparison ? (side === 'left' ? '左側來源' : '右側來源') : '影片來源';
   const loop = config.loop || {};
+  const sourceTitle = playerSideTitle(block, side);
+  const sourceLabelPath = comparison ? `${prefix}label` : 'sourceLabel';
   return `
     <fieldset class="video-side-config">
       <legend>${label}</legend>
       <label>檔名
         <select data-block-path="${prefix}mediaAssetId" aria-label="${label}檔名">${editorVideoAssetOptions(config.mediaAssetId)}</select>
       </label>
-      <label>來源標題 <input type="text" data-block-path="${prefix}label" value="${editorValue(config.label)}" /></label>
+      <label>來源標題 <input type="text" data-block-path="${sourceLabelPath}" value="${editorValue(sourceTitle)}" /></label>
       <div class="block-inline-fields">
         <label>起點 <input type="number" min="0" step="0.001" data-block-path="${prefix}segment.in" value="${editorValue(config.segment?.in)}" /></label>
         <label>終點 <input type="number" min="0" step="0.001" data-block-path="${prefix}segment.out" value="${editorValue(config.segment?.out)}" /></label>
-        <label>播放速度 <input type="number" min="0.1" max="8" step="0.1" data-block-path="${prefix}playback.rate" value="${editorValue(config.playback?.rate || 1)}" /></label>
+        <label>播放速度 <input type="number" min="${PLAYBACK_RATE_MIN}" max="${PLAYBACK_RATE_MAX}" step="any" data-block-path="${prefix}playback.rate" value="${editorValue(clampPlaybackRate(config.playback?.rate))}" /></label>
         <label>循環播放 <input type="checkbox" data-block-path="${prefix}loop.enabled"${loop.enabled === true ? ' checked' : ''} /></label>
       </div>
     </fieldset>`;
@@ -701,16 +738,18 @@ function renderFramePlayerControls(label) {
   const escapedLabel = escapeHtml(label);
   return `
       <div class="inline-frame-controls" data-frame-controls aria-label="${escapedLabel}影格播放器控制">
-        <button class="button button-quiet" type="button" data-frame-action="previous" disabled>上一幀</button>
-        <input class="inline-frame-timeline" data-frame-timeline type="range" min="0" max="0" step="1" value="0" disabled aria-label="${escapedLabel}影格時間軸" />
-        <button class="button button-quiet" type="button" data-frame-action="next" disabled>下一幀</button>
-        <output class="inline-frame-position" data-frame-position>尚未準備</output>
-        <button class="button button-secondary" type="button" data-frame-action="toggle" disabled aria-pressed="false">播放</button>
-        <label class="inline-frame-rate">速度
-          <input class="inline-frame-rate-slider" data-frame-rate type="range" min="0.25" max="2" step="0.05" value="1" disabled aria-label="${escapedLabel}播放速度" />
-          <output data-frame-rate-value>1.00×</output>
+        <div class="inline-frame-navigation">
+          <button class="button button-quiet" type="button" data-frame-action="previous" disabled>上一幀</button>
+          <input class="inline-frame-timeline" data-frame-timeline type="range" min="0" max="0" step="1" value="0" disabled aria-label="${escapedLabel}影格時間軸" />
+          <button class="button button-quiet" type="button" data-frame-action="next" disabled>下一幀</button>
+          <output class="inline-frame-position" data-frame-position>尚未準備</output>
+          <button class="button button-secondary" type="button" data-frame-action="toggle" disabled aria-pressed="false">播放</button>
+        </div>
+        <div class="inline-frame-rate-row" data-frame-rate-row>
+          <input class="inline-frame-rate-input" data-frame-rate-input type="number" min="${PLAYBACK_RATE_MIN}" max="${PLAYBACK_RATE_MAX}" step="any" value="1" disabled aria-label="${escapedLabel}播放速度數值" />
+          <input class="inline-frame-rate-slider" data-frame-rate type="range" min="${PLAYBACK_RATE_SLIDER_MIN}" max="${PLAYBACK_RATE_SLIDER_MAX}" step="${PLAYBACK_RATE_SLIDER_STEP}" value="0" disabled aria-label="${escapedLabel}播放速度控制條" />
           <button class="button button-quiet inline-frame-rate-reset" type="button" data-frame-action="reset-rate" disabled aria-label="重置播放速度為 1 倍" title="重置為 1 倍">↻</button>
-        </label>
+        </div>
         <span class="inline-frame-player-status" data-frame-player-status role="status" data-state="pending">正在載入影片…</span>
       </div>`;
 }
@@ -863,7 +902,7 @@ function updateFramePlayerControls(card) {
   const toggle = card.querySelector('[data-frame-action="toggle"]');
   const resetRate = card.querySelector('[data-frame-action="reset-rate"]');
   const rateSlider = card.querySelector('[data-frame-rate]');
-  const rateValue = card.querySelector('[data-frame-rate-value]');
+  const rateInput = card.querySelector('[data-frame-rate-input]');
   const available = count > 0;
   if (timeline) {
     timeline.max = String(maxIndex);
@@ -879,12 +918,15 @@ function updateFramePlayerControls(card) {
     toggle.setAttribute('aria-pressed', runtime.playing ? 'true' : 'false');
   }
   if (resetRate) resetRate.disabled = !available;
-  const rate = Number(runtime.playbackRate) > 0 ? Number(runtime.playbackRate) : 1;
+  const rate = clampPlaybackRate(runtime.playbackRate);
   if (rateSlider) {
-    rateSlider.value = String(Math.min(2, Math.max(0.25, rate)));
+    rateSlider.value = String(playbackRateToSliderValue(rate));
     rateSlider.disabled = !available;
   }
-  if (rateValue) rateValue.textContent = `${rate.toFixed(2)}×`;
+  if (rateInput) {
+    rateInput.value = formatPlaybackRate(rate);
+    rateInput.disabled = !available;
+  }
 }
 
 function bindFramePlayerActionButtons(card) {
@@ -1211,10 +1253,11 @@ async function prepareFramePlayerCard(card, block, generation) {
         frameCount,
         frameTimes: Array.isArray(metadata.frameTimes) ? metadata.frameTimes : null,
       };
+      const configuredRate = clampPlaybackRate(playerSideConfig(block, side).playback?.rate);
       if (side === framePlayerPrimarySide(block, runtime, card)) {
-        runtime.playbackRate = Number(playerSideConfig(block, side).playback?.rate) || 1;
+        runtime.playbackRate = configuredRate;
       }
-      video.playbackRate = Number(playerSideConfig(block, side).playback?.rate) || 1;
+      video.playbackRate = configuredRate;
       setInlineVideoStatus(sideElement, `影片已就緒 · ${frameCount} 幀。`, 'loaded');
       return true;
     } catch (error) {
@@ -1310,15 +1353,36 @@ function resetFramePlayerRate(card) {
   const block = entry.block;
   const runtime = framePlayerRuntimeForCard(card);
   if (!block || framePlayerFrameCount(block, runtime, card) <= 0) return;
-  runtime.playbackRate = 1;
-  const side = framePlayerSides(block, card)[0];
-  const video = framePlayerVideoForSide(card, side);
-  if (video) video.playbackRate = 1;
-  const config = playerSideConfig(block, side);
-  config.playback = { ...(config.playback || {}), rate: 1 };
+  runtime.playbackRate = PLAYBACK_RATE_DEFAULT;
+  framePlayerSides(block, card).forEach((side) => {
+    const video = framePlayerVideoForSide(card, side);
+    if (video) video.playbackRate = PLAYBACK_RATE_DEFAULT;
+    const config = playerSideConfig(block, side);
+    config.playback = { ...(config.playback || {}), rate: PLAYBACK_RATE_DEFAULT };
+  });
   updateFramePlayerControls(card);
   setFramePlayerStatus(card, '播放速度已重置為 1.00 倍。', 'loaded');
   scheduleSave();
+}
+
+function applyFramePlayerRate(card, rate, { persist = false } = {}) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  if (!block) return false;
+  const normalizedRate = clampPlaybackRate(rate);
+  const runtime = framePlayerRuntimeForCard(card);
+  runtime.playbackRate = normalizedRate;
+  framePlayerSides(block, card).forEach((side) => {
+    const video = framePlayerVideoForSide(card, side);
+    if (video) video.playbackRate = normalizedRate;
+    if (persist) {
+      const config = playerSideConfig(block, side);
+      config.playback = { ...(config.playback || {}), rate: normalizedRate };
+    }
+  });
+  updateFramePlayerControls(card);
+  if (persist) scheduleSave();
+  return true;
 }
 
 function handleFramePlayerEvent(event) {
@@ -1333,25 +1397,15 @@ function handleFramePlayerEvent(event) {
     }
     return true;
   }
-  if (target.matches('[data-frame-rate]')) {
+  if (target.matches('[data-frame-rate], [data-frame-rate-input]')) {
     if (!['input', 'change'].includes(event.type)) return true;
-    const runtime = framePlayerRuntimeForCard(card);
-    const rate = Math.min(2, Math.max(0.25, Number(target.value) || 1));
-    runtime.playbackRate = rate;
-    framePlayerSides(blockForEditorCard(card).block, card).forEach((side) => {
-      const video = framePlayerVideoForSide(card, side);
-      if (video) video.playbackRate = rate;
-    });
-    if (event.type === 'change') {
-      const block = blockForEditorCard(card).block;
-      const side = block ? framePlayerSides(block, card)[0] : null;
-      if (block && side) {
-        const config = playerSideConfig(block, side);
-        config.playback = { ...(config.playback || {}), rate };
-      }
-      scheduleSave();
+    if (target.matches('[data-frame-rate-input]') && target.value.trim() === '') {
+      return true;
     }
-    updateFramePlayerControls(card);
+    const rate = target.matches('[data-frame-rate]')
+      ? sliderValueToPlaybackRate(target.value)
+      : clampPlaybackRate(Number(target.value), framePlayerRuntimeForCard(card).playbackRate);
+    applyFramePlayerRate(card, rate, { persist: event.type === 'change' });
     return true;
   }
   const surface = target.closest('[data-frame-surface]');
@@ -1430,7 +1484,9 @@ function applyInlineSideSettings(card, block, side) {
   const video = framePlayerVideoForSide(targetCard, side);
   if (!video) return;
   const config = playerSideConfig(block, side);
-  const rate = Number(config.playback?.rate) || 1;
+  const rate = clampPlaybackRate(config.playback?.rate);
+  const runtime = framePlayerRuntimeForCard(targetCard);
+  runtime.playbackRate = rate;
   // Native looping always wraps the complete media file.  The editor uses
   // the block's segment.in/segment.out as the only loop bounds instead.
   video.loop = false;
@@ -1527,9 +1583,12 @@ function bindInlineVideoRuntime(card, block, side, video) {
     const current = blockForEditorCard(card).block;
     if (!current || !['singleVideo', 'comparisonVideo'].includes(current.type)) return;
     const config = playerSideConfig(current, side);
-    const rate = Number(video.playbackRate);
-    if (!Number.isFinite(rate) || rate <= 0 || Math.abs(Number(config.playback?.rate) - rate) < 0.001) return;
+    const rate = clampPlaybackRate(video.playbackRate);
+    if (!Number.isFinite(rate) || Math.abs(Number(config.playback?.rate) - rate) < 0.001) return;
     config.playback = { ...(config.playback || {}), rate };
+    const frameRuntime = framePlayerRuntimeForCard(card);
+    frameRuntime.playbackRate = rate;
+    updateFramePlayerControls(card);
     scheduleSave();
   });
   video.addEventListener('ended', () => {
@@ -1594,12 +1653,14 @@ function patchInlineVideoCard(card, block) {
     const controls = sideElement?.querySelector('[data-frame-controls]');
     const timeline = sideElement?.querySelector('[data-frame-timeline]');
     const rate = sideElement?.querySelector('[data-frame-rate]');
+    const rateInput = sideElement?.querySelector('[data-frame-rate-input]');
     if (sideTitleElement) sideTitleElement.textContent = sideTitle;
     if (surface) surface.setAttribute('aria-label', `${sideTitle}影格畫面`);
     if (video) video.setAttribute('aria-label', `${sideTitle}影片`);
     if (controls) controls.setAttribute('aria-label', `${sideTitle}影格播放器控制`);
     if (timeline) timeline.setAttribute('aria-label', `${sideTitle}影格時間軸`);
     if (rate) rate.setAttribute('aria-label', `${sideTitle}播放速度`);
+    if (rateInput) rateInput.setAttribute('aria-label', `${sideTitle}播放速度數值`);
   }
 }
 
@@ -1761,7 +1822,7 @@ function convertVideoBlockMode(block, mode) {
     block.layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
     block.left = {
       mediaAssetId: singleAsset,
-      label: block.label || '左側影片',
+      label: playerSideTitle(block, 'single') || '左側影片',
       segment: block.segment || { in: 0, out: null },
       playback: block.playback || { rate: 1 },
       loop: block.loop || { enabled: false },
@@ -1774,6 +1835,7 @@ function convertVideoBlockMode(block, mode) {
       loop: { enabled: false },
     };
     delete block.mediaAssetId;
+    delete block.sourceLabel;
     delete block.segment;
     delete block.playback;
     delete block.loop;
@@ -1785,6 +1847,9 @@ function convertVideoBlockMode(block, mode) {
   if (mode === 'single' && block.type !== 'singleVideo') {
     block.type = 'singleVideo';
     block.mediaAssetId = referenceId(block.left?.mediaAssetId);
+    block.sourceLabel = typeof block.left?.label === 'string' && block.left.label.trim() !== ''
+      ? block.left.label
+      : (typeof block.sourceLabel === 'string' ? block.sourceLabel : undefined);
     block.segment = block.left?.segment || { in: 0, out: null };
     block.playback = block.left?.playback || { rate: 1 };
     block.loop = block.left?.loop || { enabled: false };
@@ -1821,6 +1886,7 @@ function handleBlockEditorEvent(event) {
   if (target.closest('[data-frame-player]')
     && (target.matches('[data-frame-timeline]')
       || target.matches('[data-frame-rate]')
+      || target.matches('[data-frame-rate-input]')
       || target.closest('[data-frame-action]')
       || target.closest('[data-frame-surface]'))) {
     handleFramePlayerEvent(event);

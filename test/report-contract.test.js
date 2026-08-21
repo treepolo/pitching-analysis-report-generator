@@ -51,6 +51,7 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
     type: 'singleVideo',
     mediaAssetId: 'asset-1',
     label: 'Front view',
+    sourceLabel: 'Front source',
     segment: { in: 1, out: 2 },
     playback: { rate: 0.5, controls: true, internalState: 'drop' },
     loop: { start: 1, end: 2, temporaryPath: 'drop.tmp' },
@@ -84,6 +85,7 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
     type: 'singleVideo',
     mediaAssetId: 'asset-1',
     label: 'Front view',
+    sourceLabel: 'Front source',
     segment: { in: 1, out: 2 },
     playback: { rate: 0.5, controls: true },
     loop: { enabled: true },
@@ -152,6 +154,7 @@ test('preserves block-local video settings in the shared report contract', () =>
     type: 'singleVideo',
     mediaAssetId: 'asset-front',
     label: 'Front view',
+    sourceLabel: 'Front view',
     segment: { in: 0.25, out: 2.5 },
     playback: { rate: 0.75 },
   }, {

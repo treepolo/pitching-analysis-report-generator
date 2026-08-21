@@ -88,7 +88,10 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /state\.export\.outputDirectory \|\| defaultExportDirectory\(\)/u);
   assert.match(renderer, /data-inline-video-block/u);
   assert.match(renderer, /function playerSideTitle\(block, side\)/u);
-  assert.match(renderer, /const configuredLabel = typeof config\.label === 'string' \? config\.label : ''/u);
+  assert.match(renderer, /side === 'single' \? config\.sourceLabel : config\.label/u);
+  assert.match(renderer, /const sourceLabelPath = comparison \? `\$\{prefix\}label` : 'sourceLabel'/u);
+  assert.match(renderer, /sourceLabel: asset\?\.displayName/u);
+  assert.match(renderer, /block\.sourceLabel = typeof block\.left\?\.label/u);
   assert.match(renderer, /data-inline-side-title/u);
   assert.match(renderer, /elements\.blockCanvas\?\.addEventListener\('click'/u);
   assert.match(renderer, /function safeInlineMediaSourceUrl\(source\)/u);
@@ -108,8 +111,8 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.doesNotMatch(renderer, /singleVideo[\s\S]{0,200}data-block-path="layout"/u);
   assert.match(renderer, /comparison && block\.layout === 'stacked'/u);
   assert.match(renderer, /: 'stacked';/u);
-  assert.match(styles, /\.inline-frame-controls \{[^}]*display: flex;[^}]*flex-wrap: wrap;/u);
-  assert.match(styles, /\.inline-frame-player-status \{[^}]*flex: 1 0 100%/u);
+  assert.match(styles, /\.inline-frame-controls \{[^}]*display: grid;/u);
+  assert.match(styles, /\.inline-frame-rate-row \{[^}]*width: 100%/u);
   assert.match(renderer, /data-frame-player/u);
   assert.match(renderer, /data-frame-timeline/u);
   assert.match(renderer, /data-frame-action="toggle"/u);
@@ -120,6 +123,9 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /video\.fastSeek/u);
   assert.match(renderer, /requestVideoFrameCallback/u);
   assert.match(renderer, /data-frame-rate/u);
+  assert.match(renderer, /data-frame-rate-input/u);
+  assert.match(renderer, /PLAYBACK_RATE_MIN = 1 \/ 64/u);
+  assert.match(renderer, /PLAYBACK_RATE_MAX = 64/u);
   assert.match(renderer, /handleFramePlayerKeydown/u);
   assert.match(renderer, /\['ArrowLeft', 'ArrowRight'\]\.includes\(event\.key\)/u);
   assert.match(renderer, /event\.key === 'ArrowRight'/u);

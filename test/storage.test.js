@@ -79,6 +79,7 @@ test('preserves media metadata and export settings as future vertical-slice seam
     type: 'singleVideo',
     mediaAssetId: 'asset-1',
     label: 'Future player seam',
+    sourceLabel: 'Future player seam',
     playback: { rate: 1 },
   });
   snapshot.exportSettings = {
@@ -123,6 +124,7 @@ test('persists independent video settings and clears retired sync state across r
     type: 'singleVideo',
     mediaAssetId: 'asset-front',
     label: 'Front view',
+    sourceLabel: 'Front source',
     playback: { rate: 0.75 },
     segment: { in: 0.25, out: 2.5 },
     relativeOffset: 1.5,
@@ -158,6 +160,8 @@ test('persists independent video settings and clears retired sync state across r
   assert.equal('sync' in reopened.sections[0].blocks.at(-2), false);
   assert.equal('anchor' in reopened.sections[0].blocks.at(-2), false);
   assert.equal('relativeOffset' in reopened.sections[0].blocks.at(-2), false);
+  assert.equal(reopened.sections[0].blocks.at(-2).label, 'Front view');
+  assert.equal(reopened.sections[0].blocks.at(-2).sourceLabel, 'Front source');
   assert.equal(reopened.sections[0].blocks.at(-1).left.segment.out, 3);
   assert.equal('anchor' in reopened.sections[0].blocks.at(-1).left, false);
   assert.equal('anchor' in reopened.sections[0].blocks.at(-1).right, false);

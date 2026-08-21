@@ -8,6 +8,13 @@ const {
 } = require('./asset-paths');
 const { toReportDocument } = require('../report-contract');
 
+const PLAYBACK_RATE_MIN = 1 / 64;
+const PLAYBACK_RATE_MAX = 64;
+const PLAYBACK_RATE_DEFAULT = 1;
+const PLAYBACK_RATE_SLIDER_MIN = -6;
+const PLAYBACK_RATE_SLIDER_MAX = 6;
+const PLAYBACK_RATE_SLIDER_STEP = 0.01;
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -131,6 +138,23 @@ function finiteSetting(value, fallback = null) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+function clampPlaybackRate(value, fallback = PLAYBACK_RATE_DEFAULT) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(PLAYBACK_RATE_MAX, Math.max(PLAYBACK_RATE_MIN, parsed));
+}
+
+function playbackRateToSliderValue(rate) {
+  return Math.log2(clampPlaybackRate(rate));
+}
+
+function formatPlaybackRate(rate) {
+  const normalized = clampPlaybackRate(rate);
+  if (normalized < 0.1) return normalized.toFixed(4);
+  if (normalized < 1) return normalized.toFixed(3);
+  return normalized.toFixed(2);
+}
+
 function normalizeSegment(value) {
   const segment = value && typeof value === 'object' ? value : {};
   const start = Math.max(0, finiteSetting(segment.in ?? segment.start, 0));
@@ -164,7 +188,7 @@ function playbackSettings(config) {
   const explicitRate = finiteSetting(playback.rate ?? playbackOptions.rate, null);
   return {
     segment,
-    rate: Math.max(0.1, Math.min(8, explicitRate ?? 1)),
+    rate: clampPlaybackRate(explicitRate),
     loop: normalizeLoop(loopSource, segment),
   };
 }
@@ -172,6 +196,16 @@ function playbackSettings(config) {
 function sideConfig(block, side) {
   if (side === 'single') return block;
   return block[side] || block.sides?.[side] || {};
+}
+
+function sideTitle(block, side, asset) {
+  const config = sideConfig(block, side);
+  const configuredLabel = side === 'single' ? config.sourceLabel : config.label;
+  if (typeof configuredLabel === 'string' && configuredLabel.trim() !== '') return configuredLabel;
+  const fileName = asset
+    ? (asset.fileName || asset.originalFileName || asset.label || asset.relativePath?.split('/').pop() || '')
+    : '';
+  return fileName || (side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : '影片來源');
 }
 
 function sideAssetId(block, side) {
@@ -202,23 +236,6 @@ function formatLoop(loop, segment = { in: 0, out: null }) {
     : `開啟（${formatSeconds(segment.in)}–${formatSeconds(segment.out)}）`;
 }
 
-function renderPlayerSettings(block, side, asset, settings, comparison) {
-  const config = sideConfig(block, side);
-  const fileName = asset
-    ? (asset.fileName || asset.originalFileName || asset.label || asset.relativePath?.split('/').pop() || '')
-    : '';
-  const assetBindingLabel = asset
-    ? `已載入${fileName ? `：${fileName}` : ''}`
-    : '未載入影片檔案';
-  const sideLabel = side === 'left' ? '左側' : side === 'right' ? '右側' : '影片';
-  return `<dl class="portable-player-settings" data-player-settings="${side}">
-    <div><dt>影片來源</dt><dd>${escapeHtml(`${sideLabel}；${assetBindingLabel}`)}</dd></div>
-    <div><dt>播放區段</dt><dd>${escapeHtml(`${formatSeconds(settings.segment.in)} 至 ${formatSeconds(settings.segment.out)}`)}</dd></div>
-    <div><dt>播放速率</dt><dd>${escapeHtml(`${settings.rate.toFixed(2)} 倍`)}</dd></div>
-    <div><dt>循環播放</dt><dd>${escapeHtml(formatLoop(settings.loop, settings.segment))}</dd></div>
-  </dl>`;
-}
-
 function renderImage(asset, label) {
   const alt = label || asset.label || 'Report image';
   return '<figure class="report-media report-image">'
@@ -231,9 +248,7 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
   if (!asset) return '';
   const config = sideConfig(block, side);
   const settings = playbackSettings(config);
-  const label = typeof config.label === 'string' && config.label
-    ? config.label
-    : (asset.label || (side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : '單一影片'));
+  const label = sideTitle(block, side, asset);
   const poster = posterAsset ? ` poster="${escapeHtml(encodeAssetPath(posterAsset.relativePath))}"` : '';
   const segmentOut = settings.segment.out === null ? '' : String(settings.segment.out);
   const sideLabel = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
@@ -243,23 +258,22 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     data-playback-rate="${escapeHtml(String(settings.rate))}"
     data-loop-enabled="${settings.loop.enabled ? 'true' : 'false'}"
     >
-    <div class="portable-player-side-heading">
-      <h3>${escapeHtml(sideLabel)}</h3>
-      <span>${escapeHtml(label)}</span>
-    </div>
+    <div class="portable-player-side-heading"><h3>${escapeHtml(label)}</h3></div>
     <video controls playsinline preload="metadata" data-player-video src="${escapeHtml(encodeAssetPath(asset.relativePath))}"${poster}>
       此瀏覽器不支援內嵌影片。
     </video>
-    ${renderCaption(label)}
     <div class="portable-player-side-controls">
-      <label>播放速率
-        <input data-player-rate type="number" min="0.1" max="8" step="0.05" value="${escapeHtml(String(settings.rate))}" aria-label="${escapeHtml(`${sideLabel}播放速率`)}">
-      </label>
+      <div class="portable-player-timeline-row">
+        <input data-player-seek type="range" min="${escapeHtml(String(settings.segment.in))}" max="${escapeHtml(String(settings.segment.out ?? settings.segment.in))}" step="0.001" value="${escapeHtml(String(settings.segment.in))}" disabled aria-label="${escapeHtml(`${sideLabel}時間軸`)}">
+        <output data-player-time>0.00 秒</output>
+      </div>
+      <div class="portable-player-rate-row" data-player-rate-row>
+        <input data-player-rate-input type="number" min="${PLAYBACK_RATE_MIN}" max="${PLAYBACK_RATE_MAX}" step="any" value="${escapeHtml(formatPlaybackRate(settings.rate))}" aria-label="${escapeHtml(`${sideLabel}播放速度數值`)}">
+        <input data-player-rate type="range" min="${PLAYBACK_RATE_SLIDER_MIN}" max="${PLAYBACK_RATE_SLIDER_MAX}" step="${PLAYBACK_RATE_SLIDER_STEP}" value="${escapeHtml(String(playbackRateToSliderValue(settings.rate)))}" aria-label="${escapeHtml(`${sideLabel}播放速度控制條`)}">
+        <button class="portable-player-rate-reset" type="button" data-player-rate-reset aria-label="${escapeHtml(`${sideLabel}重置播放速度為 1 倍`)}" title="重置為 1 倍">↻</button>
+      </div>
       <label class="portable-player-loop"><input data-player-loop type="checkbox"${settings.loop.enabled ? ' checked' : ''}>循環</label>
-      <input data-player-seek type="range" min="${escapeHtml(String(settings.segment.in))}" max="${escapeHtml(String(settings.segment.out ?? settings.segment.in))}" step="0.001" value="${escapeHtml(String(settings.segment.in))}" disabled aria-label="${escapeHtml(`${sideLabel}時間軸`)}">
-      <output data-player-time>0.00 秒</output>
     </div>
-    ${renderPlayerSettings(block, side, asset, settings, comparison)}
   </div>`;
 }
 
@@ -414,9 +428,7 @@ function renderFramePlayerSide(block, side, frameBinding, comparison) {
   const { asset, cache } = frameBinding;
   const config = sideConfig(block, side);
   const settings = playbackSettings(config);
-  const label = typeof config.label === 'string' && config.label
-    ? config.label
-    : (asset.label || (side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : '單一影片'));
+  const label = sideTitle(block, side, asset);
   const firstFrame = cache.frames[0];
   const sideLabel = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
   const segmentOut = settings.segment.out === null ? '' : String(settings.segment.out);
@@ -429,14 +441,12 @@ function renderFramePlayerSide(block, side, frameBinding, comparison) {
     data-frame-index-path="${escapeHtml(cache.cache.indexRelativePath)}"
     data-frame-count="${cache.frames.length}"
     data-frame-fps="${escapeHtml(String(cache.fps ?? cache.metadata?.fps ?? cache.metadata?.averageFps ?? 30))}">
-    <div class="portable-player-side-heading"><h3>${escapeHtml(sideLabel)}</h3><span>${escapeHtml(label)}</span></div>
+    <div class="portable-player-side-heading"><h3>${escapeHtml(label)}</h3></div>
     <div class="portable-frame-surface" data-frame-surface tabindex="0" aria-label="${escapeHtml(`${sideLabel}影格畫面`)}">
       <img data-player-frame data-inline-frame src="${escapeHtml(encodeAssetPath(firstFrame.relativePath))}" alt="${escapeHtml(`${label}目前影格`)}">
       <span data-frame-placeholder hidden>尚未準備影格</span>
     </div>
     <p class="portable-frame-side-status" data-frame-side-status role="status">影格快取已就緒 · ${cache.frames.length} 幀。</p>
-    ${renderCaption(label)}
-    ${renderPlayerSettings(block, side, asset, settings, comparison)}
   </div>`;
 }
 
@@ -445,29 +455,35 @@ function renderFramePlayer(block, byId, comparison, frameCaches) {
   const bindings = sides.map((side) => frameCacheForSide(block, side, byId, frameCaches));
   if (bindings.some((binding) => !binding)) return '';
   const layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
-  const blockLabel = typeof block.label === 'string' && block.label
-    ? block.label
-    : (comparison ? '雙影片' : '單一影片');
+  const blockLabel = typeof block.label === 'string' ? block.label.trim() : '';
+  const accessibleBlockLabel = blockLabel || (comparison ? '雙影片' : '單一影片');
   const renderedPlayers = bindings.map((binding, index) => {
     const side = sides[index];
     const count = binding.cache.frames.length;
-    const sideLabel = side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : blockLabel;
+    const sideLabel = side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : accessibleBlockLabel;
+    const settings = playbackSettings(sideConfig(block, side));
     return `<div class="portable-player portable-frame-player" data-portable-player data-frame-player data-frame-mode="cache" tabindex="0" aria-label="${escapeHtml(`${sideLabel}播放器`)}">
       ${renderFramePlayerSide(block, side, binding, comparison)}
       <div class="portable-frame-controls" data-frame-controls role="group" aria-label="${escapeHtml(`${sideLabel}影格播放器控制`)}">
-        <button type="button" data-frame-action="previous">上一幀</button>
-        <input data-frame-timeline type="range" min="0" max="${Math.max(0, count - 1)}" step="1" value="0" aria-label="${escapeHtml(`${sideLabel}影格時間軸`)}">
-        <button type="button" data-frame-action="next">下一幀</button>
-        <output data-frame-position>第 1 / ${count} 幀</output>
-        <button type="button" data-frame-action="toggle" aria-pressed="false">播放</button>
+        <div class="portable-frame-navigation">
+          <button type="button" data-frame-action="previous">上一幀</button>
+          <input data-frame-timeline type="range" min="0" max="${Math.max(0, count - 1)}" step="1" value="0" aria-label="${escapeHtml(`${sideLabel}影格時間軸`)}">
+          <button type="button" data-frame-action="next">下一幀</button>
+          <output data-frame-position>第 1 / ${count} 幀</output>
+          <button type="button" data-frame-action="toggle" aria-pressed="false">播放</button>
+        </div>
+        <div class="portable-frame-rate-row" data-frame-rate-row>
+          <input data-frame-rate-input type="number" min="${PLAYBACK_RATE_MIN}" max="${PLAYBACK_RATE_MAX}" step="any" value="${escapeHtml(formatPlaybackRate(settings.rate))}" aria-label="${escapeHtml(`${sideLabel}播放速度數值`)}">
+          <input data-frame-rate type="range" min="${PLAYBACK_RATE_SLIDER_MIN}" max="${PLAYBACK_RATE_SLIDER_MAX}" step="${PLAYBACK_RATE_SLIDER_STEP}" value="${escapeHtml(String(playbackRateToSliderValue(settings.rate)))}" aria-label="${escapeHtml(`${sideLabel}播放速度控制條`)}">
+          <button type="button" data-frame-action="reset-rate" aria-label="${escapeHtml(`${sideLabel}重置播放速度為 1 倍`)}" title="重置為 1 倍">↻</button>
+        </div>
         <span data-frame-player-status role="status" data-state="loaded">影格快取已就緒；可獨立逐幀播放。</span>
       </div>
     </div>`;
   }).join('');
-  return `<figure class="report-media report-video portable-player portable-dual-player" data-portable-player aria-label="${escapeHtml(`${blockLabel}播放器`)}" data-player-layout="${layout}">
-    <header class="portable-player-header"><div><p class="portable-player-eyebrow">${comparison ? '雙影片播放器' : '單一影片播放器'}</p><h3>${escapeHtml(blockLabel)}</h3></div>${comparison ? `<span class="portable-player-layout">${layout === 'stacked' ? '堆疊版面' : '並排版面'}</span>` : ''}</header>
+  return `<figure class="report-media report-video portable-player portable-dual-player" data-portable-player aria-label="${escapeHtml(`${accessibleBlockLabel}播放器`)}" data-player-layout="${layout}">
+    ${blockLabel ? `<header class="portable-player-header"><h3>${escapeHtml(blockLabel)}</h3></header>` : ''}
     <div class="portable-player-grid portable-player-grid-${layout}">${renderedPlayers}</div>
-    ${renderCaption(blockLabel)}
   </figure>`;
 }
 
@@ -485,27 +501,22 @@ function renderPlayer(block, byId, comparison, frameCaches) {
   if (!renderedSides) return renderText(block);
 
   const layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
-  const blockLabel = typeof block.label === 'string' && block.label
-    ? block.label
-    : (comparison ? '雙影片' : '單一影片');
+  const blockLabel = typeof block.label === 'string' ? block.label.trim() : '';
+  const accessibleBlockLabel = blockLabel || (comparison ? '雙影片' : '單一影片');
   const fallback = frameCacheFallbackStatus(block, frameCaches);
   const fallbackNotice = fallback
     ? `<p class="portable-frame-fallback" data-frame-cache-status="${escapeHtml(fallback.status || 'not-ready')}" role="status">影格快取未就緒，已降級為影片播放（${escapeHtml(fallback.status || 'unknown')}）。</p>`
     : '';
-  const actions = comparison ? '' : `<div class="portable-player-actions" role="group" aria-label="${escapeHtml(`${blockLabel}播放器控制`)}">
+  const actions = comparison ? '' : `<div class="portable-player-actions" role="group" aria-label="${escapeHtml(`${accessibleBlockLabel}播放器控制`)}">
       <button type="button" data-player-action="play">播放</button>
       <button type="button" data-player-action="pause">暫停</button>
       <button type="button" data-player-action="reset">回到區段起點</button>
     </div>`;
-  return `<figure class="report-media report-video portable-player" data-portable-player tabindex="0" aria-label="${escapeHtml(`${blockLabel}播放器`)}" data-player-layout="${layout}">
-    <header class="portable-player-header">
-      <div><p class="portable-player-eyebrow">${comparison ? '雙影片播放器' : '單一影片播放器'}</p><h3>${escapeHtml(blockLabel)}</h3></div>
-      ${comparison ? `<span class="portable-player-layout">${layout === 'stacked' ? '堆疊版面' : '並排版面'}</span>` : ''}
-    </header>
+  return `<figure class="report-media report-video portable-player" data-portable-player tabindex="0" aria-label="${escapeHtml(`${accessibleBlockLabel}播放器`)}" data-player-layout="${layout}">
+    ${blockLabel ? `<header class="portable-player-header"><h3>${escapeHtml(blockLabel)}</h3></header>` : ''}
     <div class="portable-player-grid portable-player-grid-${layout}">${renderedSides}</div>
     ${actions}
     ${fallbackNotice}
-    ${renderCaption(blockLabel)}
   </figure>`;
 }
 
@@ -564,10 +575,8 @@ function renderStyles() {
     .comparison-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
     .portable-player { padding: 1rem; border: 1px solid #ccd6e5; border-radius: .9rem; background: #fbfcff; }
     .portable-player-header, .portable-player-side-heading, .portable-player-actions { display: flex; align-items: center; gap: .75rem; }
-    .portable-player-header { justify-content: space-between; margin-bottom: .75rem; }
+    .portable-player-header { margin-bottom: .75rem; }
     .portable-player-header h3, .portable-player-side-heading h3 { margin: 0; }
-    .portable-player-eyebrow { margin: 0 0 .25rem; color: #596780; font-size: .75rem; font-weight: 700; }
-    .portable-player-layout { color: #596780; font-size: .85rem; }
     .portable-player-grid { display: grid; gap: 1rem; }
     .portable-player-grid-side-by-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .portable-player-grid-stacked { grid-template-columns: 1fr; }
@@ -580,24 +589,37 @@ function renderStyles() {
     .portable-frame-surface img { width: 100%; max-height: 460px; object-fit: contain; }
     .portable-frame-surface [hidden] { display: none; }
     .portable-frame-side-status, .portable-frame-fallback { margin: .55rem 0 0; color: #596780; font-size: .82rem; }
-    .portable-frame-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-top: .8rem; }
-    .portable-frame-controls input[type="range"] { flex: 1 1 12rem; min-width: 8rem; }
-    .portable-frame-controls button { padding: .45rem .7rem; border: 1px solid #b9c5d8; border-radius: .45rem; background: #fff; color: #172033; cursor: pointer; }
-    .portable-frame-controls button:hover { background: #eef3fa; }
-    .portable-frame-controls output { color: #596780; font-variant-numeric: tabular-nums; }
-    .portable-player-side-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-top: .65rem; }
+    .portable-frame-controls { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content max-content max-content; column-gap: .6rem; row-gap: .6rem; margin-top: .8rem; }
+    .portable-frame-navigation { display: contents; }
+    .portable-frame-navigation input[type="range"] { grid-column: 2; min-width: 0; width: 100%; }
+    .portable-frame-rate-row { grid-column: 2; display: flex; align-items: center; gap: .6rem; width: 100%; }
+    .portable-frame-rate-row input[type="range"] { flex: 1 1 auto; min-width: 0; }
+    .portable-frame-controls button, .portable-player-rate-row button, .portable-frame-rate-row button { padding: .45rem .7rem; border: 1px solid #b9c5d8; border-radius: .45rem; background: #fff; color: #172033; cursor: pointer; }
+    .portable-frame-controls button:hover, .portable-player-rate-row button:hover, .portable-frame-rate-row button:hover { background: #eef3fa; }
+    .portable-frame-controls output, .portable-player-side-controls output { color: #596780; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .portable-player-side-controls { display: grid; grid-template-columns: minmax(0, 1fr) max-content; column-gap: .6rem; row-gap: .6rem; margin-top: .65rem; }
+    .portable-player-timeline-row { display: contents; }
+    .portable-player-timeline-row input[type="range"] { grid-column: 1; min-width: 0; width: 100%; }
+    .portable-player-timeline-row output { grid-column: 2; }
+    .portable-player-rate-row { grid-column: 1; display: flex; align-items: center; gap: .6rem; width: 100%; }
+    .portable-player-loop { grid-column: 1 / -1; }
     .portable-player-side-controls label { display: inline-flex; align-items: center; gap: .35rem; color: #33415c; font-size: .85rem; }
-    .portable-player-side-controls input[type="number"] { width: 5rem; }
-    .portable-player-side-controls input[type="range"] { flex: 1 1 10rem; min-width: 8rem; }
-    .portable-player-side-controls output { color: #596780; font-variant-numeric: tabular-nums; }
+    .portable-player-rate-input { flex: 0 0 5.5rem; width: 5.5rem; }
+    .portable-player-rate-reset, .portable-frame-rate-row button { flex: 0 0 2.2rem; width: 2.2rem; height: 2.2rem; padding: 0 !important; border-radius: 50% !important; font-size: 1.1rem; line-height: 1; }
+    .portable-player-rate-row input[type="number"], .portable-frame-rate-row input[type="number"] { flex: 0 0 5.5rem; width: 5.5rem; }
     .portable-player-actions { margin-top: .8rem; }
     .portable-player-actions button { padding: .45rem .7rem; border: 1px solid #b9c5d8; border-radius: .45rem; background: #fff; color: #172033; cursor: pointer; }
     .portable-player-actions button:hover { background: #eef3fa; }
-    .portable-player-settings { display: grid; gap: .3rem; margin: .7rem 0 0; color: #596780; font-size: .8rem; }
-    .portable-player-settings div { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: .5rem; }
-    .portable-player-settings dt { font-weight: 700; }
-    .portable-player-settings dd { margin: 0; overflow-wrap: anywhere; }
-    @media (max-width: 700px) { main { width: min(100% - 1rem, 980px); padding-top: 1rem; } .report-section { padding: 1rem; } .comparison-media, .portable-player-grid-side-by-side { grid-template-columns: 1fr; } }
+    @media (max-width: 700px) {
+      main { width: min(100% - 1rem, 980px); padding-top: 1rem; }
+      .report-section { padding: 1rem; }
+      .comparison-media, .portable-player-grid-side-by-side { grid-template-columns: 1fr; }
+      .portable-frame-controls { grid-template-columns: 1fr; }
+      .portable-frame-navigation { display: flex; flex-wrap: wrap; }
+      .portable-frame-navigation input[type="range"] { flex: 1 1 10rem; }
+      .portable-frame-rate-row { grid-column: 1; }
+      .portable-player-side-controls { grid-template-columns: minmax(0, 1fr) max-content; }
+    }
   `;
 }
 
@@ -611,7 +633,10 @@ function renderFramePlayerScript() {
     const sideStatus = side.querySelector('[data-frame-side-status]');
     const start = numberValue(side.dataset.segmentIn, 0);
     const end = numberValue(side.dataset.segmentOut);
-    const rate = clamp(numberValue(side.dataset.playbackRate, 1), .1, 8);
+    const rateInput = player.querySelector('[data-frame-rate-input]');
+    const rateSlider = player.querySelector('[data-frame-rate]');
+    const resetRate = player.querySelector('[data-frame-action="reset-rate"]');
+    let rate = clamp(numberValue(side.dataset.playbackRate, 1), ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
     const loopEnabled = side.dataset.loopEnabled === 'true';
     const count = frames.length;
     const timeline = player.querySelector('[data-frame-timeline]');
@@ -622,6 +647,21 @@ function renderFramePlayerScript() {
     let playing = false;
     let timer = null;
     const setStatus = (message) => { if (status) status.textContent = message; };
+    const rateToSlider = (value) => Math.log2(clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}));
+    const sliderToRate = (value) => 2 ** clamp(numberValue(value, 0), ${PLAYBACK_RATE_SLIDER_MIN}, ${PLAYBACK_RATE_SLIDER_MAX});
+    const formatRate = (value) => {
+      const normalized = clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
+      if (normalized < 0.1) return normalized.toFixed(4);
+      if (normalized < 1) return normalized.toFixed(3);
+      return normalized.toFixed(2);
+    };
+    const updateRateControls = () => {
+      if (rateInput) rateInput.value = formatRate(rate);
+      if (rateSlider) rateSlider.value = String(rateToSlider(rate));
+      const videos = [...player.querySelectorAll('[data-player-video]')];
+      videos.forEach((video) => { video.playbackRate = rate; });
+    };
+    const setRate = (value) => { rate = clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}); updateRateControls(); };
     const frameTime = (value) => {
       const frame = frames[value];
       return Number.isFinite(frame?.time) ? frame.time : value / Math.max(1, numberValue(side.dataset.frameFps, 30));
@@ -664,11 +704,19 @@ function renderFramePlayerScript() {
     player.querySelector('[data-frame-action="next"]')?.addEventListener('click', () => { stop(); renderIndex(index + 1); setStatus('已顯示下一幀。'); });
     toggle?.addEventListener('click', () => { if (playing) stop('已暫停。'); else { playing = true; updateControls(); setStatus('已開始逐幀播放。'); tick(); } });
     timeline?.addEventListener('input', (event) => { stop(); renderIndex(numberValue(event.target.value, 0)); setStatus('已切換至指定影格。'); });
+    rateSlider?.addEventListener('input', (event) => { setRate(sliderToRate(event.target.value)); });
+    rateInput?.addEventListener('input', (event) => {
+      const value = numberValue(event.target.value, null);
+      if (value !== null) setRate(value);
+    });
+    rateInput?.addEventListener('change', (event) => { setRate(numberValue(event.target.value, rate)); });
+    resetRate?.addEventListener('click', () => { setRate(1); setStatus('播放速度已重置為 1.00 倍。'); });
     player.addEventListener('keydown', (event) => {
       if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
       event.preventDefault(); stop(); renderIndex(index + (event.key === 'ArrowLeft' ? -1 : 1)); setStatus('已用鍵盤逐幀切換。');
     });
     const segmentStartIndex = frames.findIndex((frame) => frame.time !== null && frame.time >= start);
+    updateRateControls();
     renderIndex(segmentStartIndex >= 0 ? segmentStartIndex : 0);
     updateControls();
   });`;
@@ -680,12 +728,15 @@ function renderLegacyPlayerScript() {
     const sides = [...player.querySelectorAll('[data-player-side]')];
     const settingsFor = (side) => {
       const video = side.querySelector('[data-player-video]');
-      const rateInput = side.querySelector('[data-player-rate]');
+      const rateInput = side.querySelector('[data-player-rate-input]');
+      const rateSlider = side.querySelector('[data-player-rate]');
+      const resetRate = side.querySelector('[data-player-rate-reset]');
       const loopInput = side.querySelector('[data-player-loop]');
-      return { side, video, rateInput, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: clamp(numberValue(side.dataset.playbackRate, 1), .1, 8), loopEnabled: side.dataset.loopEnabled === 'true' };
+      return { side, video, rateInput, rateSlider, resetRate, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: clamp(numberValue(side.dataset.playbackRate, 1), ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}), loopEnabled: side.dataset.loopEnabled === 'true' };
     };
-    const updateSide = (settings) => { const { video, side } = settings; if (!video) return; const seek = side.querySelector('[data-player-seek]'); const output = side.querySelector('[data-player-time]'); const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : settings.end; if (seek) { seek.min = String(settings.start); seek.max = String(Math.max(settings.start, settings.end ?? duration ?? settings.start)); seek.value = String(clamp(video.currentTime || settings.start, settings.start, Number(seek.max))); seek.disabled = false; } if (output) output.textContent = String((video.currentTime || 0).toFixed(2)) + ' 秒'; };
-    const applySettings = (settings, seekToStart = true) => { if (!settings.video) return; settings.video.playbackRate = settings.rate; if (settings.rateInput) settings.rateInput.value = String(settings.rate); if (settings.loopInput) settings.loopInput.checked = settings.loopEnabled; if (seekToStart && Number.isFinite(settings.start)) settings.video.currentTime = settings.start; updateSide(settings); };
+    const updateRateControls = (settings) => { if (settings.rateInput) settings.rateInput.value = settings.rate < .1 ? settings.rate.toFixed(4) : settings.rate < 1 ? settings.rate.toFixed(3) : settings.rate.toFixed(2); if (settings.rateSlider) settings.rateSlider.value = String(Math.log2(settings.rate)); };
+    const updateSide = (settings) => { const { video, side } = settings; if (!video) return; const seek = side.querySelector('[data-player-seek]'); const output = side.querySelector('[data-player-time]'); const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : settings.end; if (seek) { seek.min = String(settings.start); seek.max = String(Math.max(settings.start, settings.end ?? duration ?? settings.start)); seek.value = String(clamp(video.currentTime || settings.start, settings.start, Number(seek.max))); seek.disabled = false; } if (output) output.textContent = String((video.currentTime || 0).toFixed(2)) + ' 秒'; updateRateControls(settings); };
+    const applySettings = (settings, seekToStart = true) => { if (!settings.video) return; settings.video.playbackRate = settings.rate; if (settings.loopInput) settings.loopInput.checked = settings.loopEnabled; if (seekToStart && Number.isFinite(settings.start)) settings.video.currentTime = settings.start; updateSide(settings); };
     sides.forEach((side) => {
       const settings = settingsFor(side);
       applySettings(settings);
@@ -703,7 +754,10 @@ function renderLegacyPlayerScript() {
       });
       settings.video?.addEventListener('error', () => { const status = side.querySelector('[data-player-time]'); if (status) status.textContent = '媒體載入失敗'; });
       side.querySelector('[data-player-seek]')?.addEventListener('input', (event) => { settings.video.currentTime = numberValue(event.target.value, settings.start); updateSide(settings); });
-      settings.rateInput?.addEventListener('change', (event) => { settings.rate = clamp(numberValue(event.target.value, settings.rate), .1, 8); settings.video.playbackRate = settings.rate; event.target.value = String(settings.rate); });
+      settings.rateInput?.addEventListener('input', (event) => { const value = numberValue(event.target.value, null); if (value !== null) { settings.rate = clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}); settings.video.playbackRate = settings.rate; updateRateControls(settings); } });
+      settings.rateInput?.addEventListener('change', (event) => { settings.rate = clamp(numberValue(event.target.value, settings.rate), ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}); settings.video.playbackRate = settings.rate; updateRateControls(settings); });
+      settings.rateSlider?.addEventListener('input', (event) => { settings.rate = 2 ** clamp(numberValue(event.target.value, 0), -6, 6); settings.video.playbackRate = settings.rate; updateRateControls(settings); });
+      settings.resetRate?.addEventListener('click', () => { settings.rate = 1; settings.video.playbackRate = 1; updateRateControls(settings); });
       settings.loopInput?.addEventListener('change', () => { settings.loopEnabled = settings.loopInput.checked; });
     });
     const primary = sides.length === 1 ? settingsFor(sides[0]) : null;

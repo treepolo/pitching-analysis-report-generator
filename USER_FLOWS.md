@@ -38,7 +38,7 @@
 4. 使用者在 Media Library 匯入多個 MP4/圖片；系統顯示 metadata 與 compatibility/normalization 狀態，長工作建立 job。
 5. 使用者在 section/issue 選「插入媒體」；系統只提供該 project 可用的 asset，建立一個獨立 Player Block reference。
 6. 單影片區塊直接可播放；雙影片區塊引導選兩個檔名、來源標題與可選循環，沒有第三支影片 UI。
-7. 使用者在兩側各自播放、seek、逐幀移動或調整速度；任一側操作不會改變另一側。
+7. 使用者在兩側各自播放、seek、逐幀移動或調整速度；速度可由進度條下方的連續滑桿或數字輸入調整，也可一鍵重設為 1 倍；任一側操作不會改變另一側。
 8. 使用者開 Preview；系統使用同一 report model/renderer 顯示 desktop/narrow/mobile viewport。
 9. 使用者修改 issue 或 block；autosave 顯示已保存狀態，並保存 media references、播放設定與 export settings。
 10. 使用者關閉並重開 project；Projects list 顯示更新時間/未完成 job，重開後內容與引用仍在。

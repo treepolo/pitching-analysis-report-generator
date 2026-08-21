@@ -35,6 +35,7 @@ function fixtureReport() {
           mediaAssetId: 'pitch',
           posterAssetId: 'frame',
           label: 'Synthetic pitch',
+          sourceLabel: 'Synthetic source',
           segment: { in: 0.25, out: 1.5 },
           playback: { rate: 1.25 },
           segment: { in: 0.25, out: 1.5 },
@@ -144,7 +145,10 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
   assert.match(folderHtml, /data-playback-rate="1\.25"/u);
   assert.match(folderHtml, /data-loop-enabled="true"/u);
   assert.match(folderHtml, /data-player-action="play"/u);
-  assert.match(folderHtml, /單一影片播放器/u);
+  assert.match(folderHtml, /<h3>Synthetic pitch<\/h3>/u);
+  assert.match(folderHtml, /<h3>Synthetic source<\/h3>/u);
+  assert.match(folderHtml, /data-player-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);
+  assert.doesNotMatch(folderHtml, /portable-player-settings|portable-player-eyebrow/iu);
   assert.doesNotMatch(folderHtml, /同步|綁定|錨點/u);
   assert.doesNotMatch(folderHtml, /\bfetch\s*\(/iu);
 

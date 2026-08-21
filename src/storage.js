@@ -13,6 +13,8 @@ const {
 } = require('./media');
 
 const PROJECT_ID_PATTERN = /^[a-z0-9-]{1,80}$/u;
+const PLAYBACK_RATE_MIN = 1 / 64;
+const PLAYBACK_RATE_MAX = 64;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 const TEXT_CONTENT_CONTROL_PATTERN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
 const MAX_SECTIONS = 50;
@@ -151,7 +153,10 @@ function normalizePlayback(value, fieldName) {
   if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
   const playback = cloneJson(value);
   if (playback.rate === undefined) playback.rate = 1;
-  if (typeof playback.rate !== 'number' || !Number.isFinite(playback.rate) || playback.rate <= 0 || playback.rate > 8) {
+  if (typeof playback.rate !== 'number'
+    || !Number.isFinite(playback.rate)
+    || playback.rate < PLAYBACK_RATE_MIN
+    || playback.rate > PLAYBACK_RATE_MAX) {
     throw new Error(`${fieldName}.rate is invalid`);
   }
   const legacyLoop = playback.loop ?? playback.loopRange;
@@ -219,10 +224,16 @@ function normalizeVideoBlock(block) {
   delete normalized.binding;
   delete normalized.anchor;
   if (normalized.label !== undefined) normalized.label = safeOptionalText(normalized.label, 'Video block label', 160);
+  if (normalized.sourceLabel !== undefined) normalized.sourceLabel = safeOptionalText(normalized.sourceLabel, 'Video source label', 160);
   if (normalized.layout !== undefined) normalized.layout = normalized.layout === 'stacked' ? 'stacked' : 'side-by-side';
   if (normalized.playback !== undefined) normalized.playback = normalizePlayback(normalized.playback, 'Video block playback');
   if (normalized.type === 'singleVideo') {
     delete normalized.layout;
+    if (normalized.sourceLabel === undefined && normalized.label !== undefined) {
+      // Preserve the old single-video label as the initial source title while
+      // keeping the two fields independent for all subsequent edits.
+      normalized.sourceLabel = normalized.label;
+    }
     if (normalized.mediaAssetId !== undefined || normalized.videoAssetId !== undefined || normalized.assetId !== undefined) {
       normalized.mediaAssetId = normalizeOptionalAssetId(
         normalized.mediaAssetId ?? normalized.videoAssetId ?? normalized.assetId,
@@ -231,6 +242,7 @@ function normalizeVideoBlock(block) {
     }
     if (normalized.segment !== undefined) normalized.segment = normalizeSegment(normalized.segment, 'Video block segment');
   } else {
+    delete normalized.sourceLabel;
     // Dual-video settings live on the two sides.  Do not retain the former
     // shared media/segment/playback fields when an old payload is reopened.
     delete normalized.mediaAssetId;
