@@ -121,6 +121,7 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.doesNotMatch(renderer, /elements\.(mediaLibrary|playerPanel|preview|sectionList)\s*=|document\.querySelector\('#(?:media-library|player-panel|preview|section-list)'\)/u);
   assert.match(styles, /\.export-directory-status/u);
   assert.match(styles, /\.inline-frame-controls/u);
+  assert.match(styles, /\.inline-frame-rate-reset\s*\{[^}]*width: 28px[^}]*min-width: 28px[^}]*height: 28px[^}]*border-radius: 50%/u);
   assert.match(indexHtml, /img-src 'self' data: blob: file:/u);
 });
 

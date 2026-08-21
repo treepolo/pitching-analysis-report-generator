@@ -30,6 +30,9 @@ test('single and comparison cards share one browser video surface and one frame 
   assert.match(block, /data-frame-action="previous"/u);
   assert.match(block, /data-frame-action="next"/u);
   assert.match(block, /data-frame-rate/u);
+  assert.match(block, /data-frame-action="reset-rate"/u);
+  assert.match(block, /重置播放速度為 1 倍/u);
+  assert.match(block, /↻/u);
   assert.match(block, /data-frame-player-status/u);
   assert.match(block, /const sides = comparison \? `\$\{renderInlineVideoSide\(block, 'left'\)\}\$\{renderInlineVideoSide\(block, 'right'\)\}` : renderInlineVideoSide\(block, 'single'\)/u);
   assert.match(renderer, /function bindFramePlayerActionButtons\(card\)/u);
@@ -91,6 +94,8 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.match(renderer, /function syncFramePlayerProgress\(card, block, side, video\)/u);
   assert.match(renderer, /\['loadeddata', 'canplay', 'playing'\]/u);
   assert.match(renderer, /hideFramePlayerPlaceholder\(video\)/u);
+  assert.match(renderer, /function resetFramePlayerRate\(card\)/u);
+  assert.match(renderer, /播放速度已重置為 1\.00 倍/u);
   const step = functionSlice(renderer, 'async function stepFramePlayer(', 'function handleFramePlayerEvent(');
   assert.match(step, /影片尚未準備，無法定位影格/u);
 });

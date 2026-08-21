@@ -895,6 +895,7 @@ function renderInlineVideoBlock(section, block) {
         <label class="inline-frame-rate">速度
           <input class="inline-frame-rate-slider" data-frame-rate type="range" min="0.25" max="2" step="0.05" value="1" disabled aria-label="播放速度" />
           <output data-frame-rate-value>1.00×</output>
+          <button class="button button-quiet inline-frame-rate-reset" type="button" data-frame-action="reset-rate" disabled aria-label="重置播放速度為 1 倍" title="重置為 1 倍">↻</button>
         </label>
         <span class="inline-frame-player-status" data-frame-player-status role="status" data-state="pending">正在載入影片…</span>
       </div>
@@ -1025,6 +1026,7 @@ function updateFramePlayerControls(card) {
   const previous = card.querySelector('[data-frame-action="previous"]');
   const next = card.querySelector('[data-frame-action="next"]');
   const toggle = card.querySelector('[data-frame-action="toggle"]');
+  const resetRate = card.querySelector('[data-frame-action="reset-rate"]');
   const rateSlider = card.querySelector('[data-frame-rate]');
   const rateValue = card.querySelector('[data-frame-rate-value]');
   const available = count > 0;
@@ -1041,6 +1043,7 @@ function updateFramePlayerControls(card) {
     toggle.textContent = runtime.playing ? '暫停' : '播放';
     toggle.setAttribute('aria-pressed', runtime.playing ? 'true' : 'false');
   }
+  if (resetRate) resetRate.disabled = !available;
   const rate = Number(runtime.playbackRate) > 0 ? Number(runtime.playbackRate) : 1;
   if (rateSlider) {
     rateSlider.value = String(Math.min(2, Math.max(0.25, rate)));
@@ -1464,6 +1467,31 @@ async function stepFramePlayer(card, direction) {
   await seekFramePlayerIndex(card, target, { exact: true });
 }
 
+function resetFramePlayerRate(card) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const runtime = framePlayerRuntimeForCard(card);
+  if (!block || framePlayerFrameCount(block, runtime) <= 0) return;
+  runtime.playbackRate = 1;
+  framePlayerSides(block).forEach((side) => {
+    const video = framePlayerVideoForSide(card, side);
+    if (video) video.playbackRate = 1;
+  });
+  if (block.type === 'comparisonVideo') {
+    const binding = inlineBindingForBlock(block);
+    if (binding.enabled) persistInlineBinding(block, { playbackRate: 1 });
+    else framePlayerSides(block).forEach((side) => {
+      const config = playerSideConfig(block, side);
+      config.playback = { ...(config.playback || {}), rate: 1 };
+    });
+  } else {
+    block.playback = { ...(block.playback || {}), rate: 1 };
+  }
+  updateFramePlayerControls(card);
+  setFramePlayerStatus(card, '播放速度已重置為 1.00 倍。', 'loaded');
+  scheduleSave();
+}
+
 function handleFramePlayerEvent(event) {
   const target = event.target;
   const card = target.closest('[data-frame-player]');
@@ -1522,6 +1550,8 @@ function handleFramePlayerEvent(event) {
     void stepFramePlayer(card, -1);
   } else if (action === 'next') {
     void stepFramePlayer(card, 1);
+  } else if (action === 'reset-rate') {
+    resetFramePlayerRate(card);
   }
   return true;
 }
