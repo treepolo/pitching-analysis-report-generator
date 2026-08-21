@@ -88,6 +88,9 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.doesNotMatch(controls, /setTimeout|setInterval/u);
   assert.match(renderer, /function waitForPresentedVideoFrame\(video/u);
   assert.match(renderer, /requestVideoFrameCallback/u);
+  assert.match(renderer, /function syncFramePlayerProgress\(card, block, side, video\)/u);
+  assert.match(renderer, /\['loadeddata', 'canplay', 'playing'\]/u);
+  assert.match(renderer, /hideFramePlayerPlaceholder\(video\)/u);
   const step = functionSlice(renderer, 'async function stepFramePlayer(', 'function handleFramePlayerEvent(');
   assert.match(step, /影片尚未準備，無法定位影格/u);
 });
@@ -106,5 +109,5 @@ test('launcher leaves GPU enabled by default for browser video composition', () 
   assert.doesNotMatch(launcher, /set "PITCHING_DISABLE_GPU=1"/u);
   assert.doesNotMatch(launcher, /--disable-gpu/u);
   assert.match(renderer, /pendingSeeks: new Map\(\)/u);
-  assert.match(renderer, /playerRuntime\.exactSeek === null/u);
+  assert.match(renderer, /function syncFramePlayerProgress\(card, block, side, video\)/u);
 });

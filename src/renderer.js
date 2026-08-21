@@ -1770,46 +1770,94 @@ function syncFramePlayerSides(card, block, masterSide) {
   }
 }
 
+function hideFramePlayerPlaceholder(video) {
+  const placeholder = video?.closest('[data-inline-side]')?.querySelector('[data-frame-placeholder]');
+  if (!placeholder) return;
+  // A playing video is already presenting real frames even if the initial
+  // exact-seek bookkeeping completed a little later than the media pipeline.
+  if (video.readyState >= 2 || !video.paused) placeholder.hidden = true;
+}
+
+function syncFramePlayerProgress(card, block, side, video) {
+  const runtime = framePlayerRuntimeForCard(card);
+  const cache = runtime.caches[side];
+  if (!cache || side !== framePlayerPrimarySide(block, runtime)) return;
+  // Do not let an intermediate paused drag seek overwrite the thumb. Once
+  // playback or a seek has produced a real clock position, the video clock is
+  // authoritative and must keep the frame timeline in lockstep with it.
+  if ((runtime.scrubActive && video.paused) || (video.paused && video.seeking)) return;
+  const fps = Number(cache.fps) > 0 ? Number(cache.fps) : 30;
+  runtime.currentFrameIndex = Math.max(0, Math.min(
+    cache.frameCount - 1,
+    Math.round((Number(video.currentTime) || 0) * fps),
+  ));
+  updateFramePlayerControls(card);
+  if (runtime.playing && block.type === 'comparisonVideo') {
+    syncFramePlayerSides(card, block, side);
+  }
+}
+
 function bindInlineVideoRuntime(card, block, side, video) {
   if (!video || video.dataset.inlineRuntimeBound === 'true') return;
   video.dataset.inlineRuntimeBound = 'true';
   video.addEventListener('timeupdate', () => {
+    hideFramePlayerPlaceholder(video);
     const sideElement = video.closest('[data-inline-side]');
     updateInlineVideoTime(sideElement);
     const current = blockForEditorCard(card).block;
-    const frameRuntime = framePlayerRuntimeForCard(card);
     if (current?.type === 'singleVideo' || current?.type === 'comparisonVideo') {
-      const playerRuntime = framePlayerRuntimeForCard(card);
-      const cache = playerRuntime.caches[side];
-      if (cache && side === playerRuntime.primarySide
-        && !playerRuntime.scrubActive && playerRuntime.exactSeek === null) {
-        const fps = Number(cache.fps) > 0 ? Number(cache.fps) : 30;
-        playerRuntime.currentFrameIndex = Math.max(0, Math.min(
-          cache.frameCount - 1,
-          Math.round((Number(video.currentTime) || 0) * fps),
-        ));
-        updateFramePlayerControls(card);
-        if (playerRuntime.playing && current.type === 'comparisonVideo') {
-          syncFramePlayerSides(card, current, side);
-        }
-      }
+      syncFramePlayerProgress(card, current, side, video);
     }
   });
+  ['loadeddata', 'canplay', 'playing'].forEach((eventName) => {
+    video.addEventListener(eventName, () => {
+      hideFramePlayerPlaceholder(video);
+      const current = blockForEditorCard(card).block;
+      if (eventName === 'playing' && (current?.type === 'singleVideo' || current?.type === 'comparisonVideo')) {
+        const frameRuntime = framePlayerRuntimeForCard(card);
+        if (side === framePlayerPrimarySide(current, frameRuntime)) {
+          frameRuntime.playing = true;
+          frameRuntime.lifecycle = 'playing';
+          frameRuntime.scrubActive = false;
+        }
+        syncFramePlayerProgress(card, current, side, video);
+      }
+    });
+  });
   video.addEventListener('seeked', () => {
-    const frameRuntime = framePlayerRuntimeForCard(card);
-    const placeholder = video.closest('[data-inline-side]')?.querySelector('[data-frame-placeholder]');
-    if (placeholder && frameRuntime.lifecycle === 'ready') placeholder.hidden = true;
+    hideFramePlayerPlaceholder(video);
+    const current = blockForEditorCard(card).block;
+    if (current?.type === 'singleVideo' || current?.type === 'comparisonVideo') {
+      syncFramePlayerProgress(card, current, side, video);
+    }
   });
   video.addEventListener('play', () => {
     const current = blockForEditorCard(card).block;
     const runtime = inlineRuntimeForCard(card);
     const frameRuntime = framePlayerRuntimeForCard(card);
+    hideFramePlayerPlaceholder(video);
+    if (current?.type === 'singleVideo' || current?.type === 'comparisonVideo') {
+      if (side === framePlayerPrimarySide(current, frameRuntime)) {
+        frameRuntime.playing = true;
+        frameRuntime.lifecycle = 'playing';
+        frameRuntime.scrubActive = false;
+      }
+      syncFramePlayerProgress(card, current, side, video);
+    }
     if (current && !runtime.guard && !frameRuntime.frameEngineGuard) void propagateInlinePlayback(card, 'play', side);
   });
   video.addEventListener('pause', () => {
     const current = blockForEditorCard(card).block;
     const runtime = inlineRuntimeForCard(card);
     const frameRuntime = framePlayerRuntimeForCard(card);
+    if ((current?.type === 'singleVideo' || current?.type === 'comparisonVideo')
+      && side === framePlayerPrimarySide(current, frameRuntime)
+      && !frameRuntime.frameEngineGuard
+      && !video.ended) {
+      frameRuntime.playing = false;
+      frameRuntime.lifecycle = 'paused';
+      updateFramePlayerControls(card);
+    }
     if (current && !runtime.guard && !frameRuntime.frameEngineGuard) void propagateInlinePlayback(card, 'pause', side);
   });
   video.addEventListener('ratechange', () => {
