@@ -647,6 +647,9 @@ function renderFramePlayerScript() {
     let index = 0;
     let playing = false;
     let timer = null;
+    let playbackTime = null;
+    let lastTimestamp = null;
+    let scheduleTick = null;
     const setStatus = (message) => { if (status) status.textContent = message; };
     const rateToSlider = (value) => Math.log2(clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}));
     const sliderToRate = (value) => 2 ** clamp(numberValue(value, 0), ${PLAYBACK_RATE_SLIDER_MIN}, ${PLAYBACK_RATE_SLIDER_MAX});
@@ -662,10 +665,38 @@ function renderFramePlayerScript() {
       const videos = [...player.querySelectorAll('[data-player-video]')];
       videos.forEach((video) => { video.playbackRate = rate; });
     };
-    const setRate = (value) => { rate = clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}); updateRateControls(); };
+    const clockNow = () => (typeof performance !== 'undefined' && Number.isFinite(performance.now()) ? performance.now() : Date.now());
+    const setRate = (value) => {
+      rate = clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
+      updateRateControls();
+      if (playing) {
+        lastTimestamp = clockNow();
+        scheduleTick?.();
+      }
+    };
     const frameTime = (value) => {
       const frame = frames[value];
       return Number.isFinite(frame?.time) ? frame.time : value / Math.max(1, numberValue(side.dataset.frameFps, 30));
+    };
+    const frameDuration = (value) => {
+      const current = frameTime(value);
+      const duration = value < count - 1
+        ? frameTime(value + 1) - current
+        : current - frameTime(Math.max(0, value - 1));
+      return Number.isFinite(duration) && duration > 0
+        ? duration
+        : 1 / Math.max(1, numberValue(side.dataset.frameFps, 30));
+    };
+    const frameIndexAtTime = (value) => {
+      if (count <= 0) return 0;
+      let low = 0;
+      let high = count - 1;
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
+        if (frameTime(middle) <= value) low = middle;
+        else high = middle - 1;
+      }
+      return low;
     };
     const updateControls = () => {
       const maximum = Math.max(0, count - 1);
@@ -680,30 +711,66 @@ function renderFramePlayerScript() {
     const renderIndex = (nextIndex) => {
       if (count <= 0) return;
       index = Math.min(Math.max(0, Math.round(nextIndex)), count - 1);
+      if (!playing) playbackTime = frameTime(index);
       const frame = frames[index];
       if (frame && image) image.src = frame.relativePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
       if (sideStatus) sideStatus.textContent = '已顯示第 ' + (index + 1) + ' 幀。';
       updateControls();
     };
-    const stop = (message) => { playing = false; if (timer) clearTimeout(timer); timer = null; updateControls(); if (message) setStatus(message); };
+    const stop = (message) => { playing = false; lastTimestamp = null; if (timer) clearTimeout(timer); timer = null; updateControls(); if (message) setStatus(message); };
     const tick = () => {
       if (!playing || count <= 0) return;
-      const nextIndex = index + 1;
-      const loopStartIndex = frames.findIndex((frame) => frame.time !== null && frame.time >= start);
-      const loopEndIndex = end === null
-        ? -1
-        : frames.findIndex((frame) => frame.time !== null && frame.time >= end);
-      if (nextIndex >= count || (loopEnabled && loopEndIndex >= 0 && nextIndex >= loopEndIndex)) {
-        if (loopEnabled) renderIndex(loopStartIndex >= 0 ? loopStartIndex : 0);
-        else { renderIndex(count - 1); stop('已到達最後一幀。'); return; }
-      } else renderIndex(nextIndex);
-      const currentFrameTime = frameTime(index);
-      const nextFrameTime = frameTime(Math.min(count - 1, index + 1));
-      timer = setTimeout(tick, Math.max(16, Math.round(Math.max(.016, nextFrameTime - currentFrameTime) * 1000 / rate)));
+      const timestamp = clockNow();
+      if (!Number.isFinite(lastTimestamp)) lastTimestamp = timestamp;
+      const elapsed = Math.max(0, timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+      if (!Number.isFinite(playbackTime)) playbackTime = frameTime(index);
+      playbackTime += elapsed * rate;
+      const loopStartIndex = frames.findIndex((frame, frameIndex) => frameTime(frameIndex) >= start);
+      const loopStartTime = frameTime(loopStartIndex >= 0 ? loopStartIndex : 0);
+      const finalFrameTime = frameTime(count - 1);
+      const loopEndTime = end === null
+        ? finalFrameTime + frameDuration(count - 1)
+        : Math.max(loopStartTime + 0.000001, end);
+      if (loopEnabled) {
+        const loopDuration = loopEndTime - loopStartTime;
+        if (loopDuration > 0 && playbackTime >= loopEndTime) {
+          playbackTime = loopStartTime + ((playbackTime - loopStartTime) % loopDuration);
+        }
+        if (playbackTime < loopStartTime) playbackTime = loopStartTime;
+      } else if (playbackTime >= finalFrameTime) {
+        renderIndex(count - 1);
+        stop('已到達最後一幀。');
+        return;
+      }
+      const renderTime = loopEnabled
+        ? Math.min(playbackTime, Math.max(loopStartTime, loopEndTime - 0.000001))
+        : Math.min(playbackTime, finalFrameTime);
+      renderIndex(frameIndexAtTime(renderTime));
+      scheduleTick?.();
+    };
+    scheduleTick = () => {
+      if (!playing || count <= 0) return;
+      if (timer) clearTimeout(timer);
+      const nextIndex = Math.min(count - 1, index + 1);
+      const nextTime = nextIndex > index ? frameTime(nextIndex) : frameTime(index) + frameDuration(index);
+      const waitSeconds = Math.max(0.001, nextTime - (Number.isFinite(playbackTime) ? playbackTime : frameTime(index)));
+      timer = setTimeout(() => { timer = null; tick(); }, Math.max(4, Math.round(waitSeconds * 1000 / Math.max(rate, ${PLAYBACK_RATE_MIN}))));
     };
     player.querySelector('[data-frame-action="previous"]')?.addEventListener('click', () => { stop(); renderIndex(index - 1); setStatus('已顯示上一幀。'); });
     player.querySelector('[data-frame-action="next"]')?.addEventListener('click', () => { stop(); renderIndex(index + 1); setStatus('已顯示下一幀。'); });
-    toggle?.addEventListener('click', () => { if (playing) stop('已暫停。'); else { playing = true; updateControls(); setStatus('已開始逐幀播放。'); tick(); } });
+    toggle?.addEventListener('click', () => {
+      if (playing) stop('已暫停。');
+      else {
+        if (index >= count - 1 && !loopEnabled) renderIndex(segmentStartIndex >= 0 ? segmentStartIndex : 0);
+        if (!Number.isFinite(playbackTime)) playbackTime = frameTime(index);
+        lastTimestamp = clockNow();
+        playing = true;
+        updateControls();
+        setStatus('已開始逐幀播放。');
+        tick();
+      }
+    });
     timeline?.addEventListener('input', (event) => { stop(); renderIndex(numberValue(event.target.value, 0)); setStatus('已切換至指定影格。'); });
     rateSlider?.addEventListener('input', (event) => { setRate(sliderToRate(event.target.value)); });
     rateInput?.addEventListener('input', (event) => {
@@ -716,13 +783,12 @@ function renderFramePlayerScript() {
       if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
       event.preventDefault(); stop(); renderIndex(index + (event.key === 'ArrowLeft' ? -1 : 1)); setStatus('已用鍵盤逐幀切換。');
     });
-    const segmentStartIndex = frames.findIndex((frame) => frame.time !== null && frame.time >= start);
+    const segmentStartIndex = frames.findIndex((frame, frameIndex) => frameTime(frameIndex) >= start);
     updateRateControls();
     renderIndex(segmentStartIndex >= 0 ? segmentStartIndex : 0);
     updateControls();
   });`;
 }
-
 function renderLegacyPlayerScript() {
   return `
   document.querySelectorAll('[data-portable-player]:not([data-frame-player])').forEach((player) => {
@@ -736,12 +802,18 @@ function renderLegacyPlayerScript() {
       return { side, video, rateInput, rateSlider, resetRate, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: clamp(numberValue(side.dataset.playbackRate, 1), ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}), loopEnabled: side.dataset.loopEnabled === 'true' };
     };
     const updateRateControls = (settings) => { if (settings.rateInput) settings.rateInput.value = settings.rate < .1 ? settings.rate.toFixed(4) : settings.rate < 1 ? settings.rate.toFixed(3) : settings.rate.toFixed(2); if (settings.rateSlider) settings.rateSlider.value = String(Math.log2(settings.rate)); };
-    const setPlaybackRate = (settings, requested) => {
+    const rateCandidates = (requested) => {
       const desired = clamp(requested, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
-      const candidates = desired >= 1
+      return desired >= 1
         ? [desired, 16, 8, 4, 2, 1, .5, .25, .125, .0625]
         : [desired, .0625, .125, .25, .5, 1, 2, 4, 8, 16];
-      for (const candidate of candidates) {
+    };
+    const setPlaybackRate = (settings, requested, candidates = null) => {
+      const desired = clamp(requested, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
+      const values = Array.isArray(candidates) && candidates.length > 0
+        ? candidates
+        : rateCandidates(desired);
+      for (const candidate of values) {
         try {
           settings.video.playbackRate = candidate;
           const actual = Number(settings.video.playbackRate);
@@ -757,6 +829,30 @@ function renderLegacyPlayerScript() {
       updateRateControls(settings);
       return settings.rate;
     };
+    const unsupportedPlaybackRateError = (error) => {
+      const message = String(error?.message || error || '').toLowerCase();
+      return error?.name === 'NotSupportedError'
+        || message.includes('playbackrate')
+        || message.includes('playback rate')
+        || message.includes('supported playback range');
+    };
+    const playVideo = async (settings) => {
+      let lastError = null;
+      const attemptedRates = new Set();
+      for (const requested of rateCandidates(settings.rate)) {
+        const actual = setPlaybackRate(settings, requested, [requested]);
+        if (!Number.isFinite(actual) || attemptedRates.has(actual)) continue;
+        attemptedRates.add(actual);
+        try {
+          await settings.video.play();
+          return actual;
+        } catch (error) {
+          lastError = error;
+          if (!unsupportedPlaybackRateError(error)) throw error;
+        }
+      }
+      throw lastError || new Error('影片無法播放。');
+    };
     const updateSide = (settings) => { const { video, side } = settings; if (!video) return; const seek = side.querySelector('[data-player-seek]'); const output = side.querySelector('[data-player-time]'); const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : settings.end; if (seek) { seek.min = String(settings.start); seek.max = String(Math.max(settings.start, settings.end ?? duration ?? settings.start)); seek.value = String(clamp(video.currentTime || settings.start, settings.start, Number(seek.max))); seek.disabled = false; } if (output) output.textContent = String((video.currentTime || 0).toFixed(2)) + ' 秒'; updateRateControls(settings); };
     const applySettings = (settings, seekToStart = true) => { if (!settings.video) return; setPlaybackRate(settings, settings.rate); if (settings.loopInput) settings.loopInput.checked = settings.loopEnabled; if (seekToStart && Number.isFinite(settings.start)) settings.video.currentTime = settings.start; updateSide(settings); };
     sides.forEach((side) => {
@@ -766,13 +862,13 @@ function renderLegacyPlayerScript() {
       settings.video?.addEventListener('timeupdate', () => {
         const loopEnabled = settings.loopInput?.checked;
         if (settings.end !== null && settings.video.currentTime >= settings.end) {
-          if (loopEnabled) { settings.video.currentTime = settings.start; settings.video.play().catch(() => {}); }
+          if (loopEnabled) { settings.video.currentTime = settings.start; playVideo(settings).catch(() => {}); }
           else { settings.video.currentTime = settings.end; settings.video.pause(); }
         }
         updateSide(settings);
       });
       settings.video?.addEventListener('ended', () => {
-        if (settings.loopInput?.checked) { settings.video.currentTime = settings.start; settings.video.play().catch(() => {}); }
+        if (settings.loopInput?.checked) { settings.video.currentTime = settings.start; playVideo(settings).catch(() => {}); }
       });
       settings.video?.addEventListener('error', () => { const status = side.querySelector('[data-player-time]'); if (status) status.textContent = '媒體載入失敗'; });
       side.querySelector('[data-player-seek]')?.addEventListener('input', (event) => { settings.video.currentTime = numberValue(event.target.value, settings.start); updateSide(settings); });
@@ -785,7 +881,7 @@ function renderLegacyPlayerScript() {
     const primary = sides.length === 1 ? settingsFor(sides[0]) : null;
     if (primary?.video) {
       const reset = () => { primary.video.pause(); primary.video.currentTime = primary.start; updateSide(primary); };
-      player.querySelector('[data-player-action="play"]')?.addEventListener('click', () => primary.video.play().catch(() => {}));
+      player.querySelector('[data-player-action="play"]')?.addEventListener('click', () => playVideo(primary).catch(() => {}));
       player.querySelector('[data-player-action="pause"]')?.addEventListener('click', () => primary.video.pause());
       player.querySelector('[data-player-action="reset"]')?.addEventListener('click', reset);
       player.addEventListener('keydown', (event) => { if (event.target !== player || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return; event.preventDefault(); const duration = Number.isFinite(primary.video.duration) && primary.video.duration > 0 ? primary.video.duration : primary.end; const maximum = primary.end ?? duration ?? primary.start; primary.video.currentTime = clamp(primary.video.currentTime + (event.key === 'ArrowLeft' ? -1 : 1) * 0.1, primary.start, Math.max(primary.start, maximum)); updateSide(primary); });

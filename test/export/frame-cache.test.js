@@ -1,5 +1,7 @@
 'use strict';
 
+const vm = require('node:vm');
+
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
@@ -135,7 +137,14 @@ test('exports referenced ready frame cache index and PNGs into folder and ZIP', 
   assert.match(html, /data-frame-action="next"/u);
   assert.doesNotMatch(html, /<video\b/iu);
   assert.doesNotMatch(html, /currentTime/u);
+  assert.match(html, /let playbackTime = null;/u);
+  assert.match(html, /const frameIndexAtTime =/u);
+  assert.match(html, /performance\.now\(\)/u);
+  assert.doesNotMatch(html, /Math\.max\(16,/u);
   assert.doesNotMatch(html, /fetch\s*\(/iu);
+  const inlineScripts = [...html.matchAll(/<script>\s*([\s\S]*?)\s*<\/script>/g)].map((match) => match[1]);
+  assert.equal(inlineScripts.length, 1);
+  assert.doesNotThrow(() => new vm.Script(inlineScripts[0]));
   assert.match(html, /images\/frame-cache\/used\/frames\/frame-00000000\.png/u);
   assert.doesNotMatch(html, /unused/u);
 

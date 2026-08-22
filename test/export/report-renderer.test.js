@@ -1,5 +1,7 @@
 'use strict';
 
+const vm = require('node:vm');
+
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { extractHtmlAssetReferences } = require('../../src/export/layout-validator');
@@ -53,6 +55,9 @@ test('renders escaped text, inline styles, and relative media paths into self-co
   assert.doesNotMatch(html, /<script\s+src=/iu);
   assert.doesNotMatch(html, /\bfetch\s*\(/iu);
   assert.doesNotMatch(html, /https?:\/\//iu);
+  const inlineScripts = [...html.matchAll(/<script>\s*([\s\S]*?)\s*<\/script>/g)].map((match) => match[1]);
+  assert.equal(inlineScripts.length, 1);
+  assert.doesNotThrow(() => new vm.Script(inlineScripts[0]));
 
   const references = extractHtmlAssetReferences(html);
   assert.deepEqual(
@@ -141,7 +146,10 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.match(html, /<h3>單一來源<\/h3>/u);
   assert.match(html, /\.portable-frame-rate-row \{ grid-column: 1 \/ -1;/u);
   assert.match(html, /\.portable-player-rate-row \{ grid-column: 1 \/ -1;/u);
-  assert.match(html, /const setPlaybackRate = \(settings, requested\)/u);
+  assert.match(html, /const setPlaybackRate = \(settings, requested/u);
+  assert.match(html, /const rateCandidates = \(requested\)/u);
+  assert.match(html, /const unsupportedPlaybackRateError = \(error\)/u);
+  assert.match(html, /const playVideo = async \(settings\)/u);
   assert.doesNotMatch(html, /portable-player-settings|portable-player-eyebrow|portable-player-layout/iu);
   assert.doesNotMatch(html, /data-anchor-time|data-sync-offset|data-loop-start|data-loop-end|同步|綁定|錨點/u);
   assert.doesNotMatch(html, /同步播放/u);
