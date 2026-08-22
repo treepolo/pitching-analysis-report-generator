@@ -872,6 +872,7 @@ function framePlayerRuntimeForCard(card) {
       manualPlaybackFrame: null,
       manualPlaybackCancel: null,
       manualPlaybackTimestamp: null,
+      manualPlaybackTime: null,
       rateSyncGuard: false,
       frameEngineGuard: false,
       primarySide: card?.dataset.framePlayerSide || 'single',
@@ -1009,6 +1010,7 @@ function cancelManualFramePlayer(card) {
   runtime.manualPlaybackFrame = null;
   runtime.manualPlaybackCancel = null;
   runtime.manualPlaybackTimestamp = null;
+  runtime.manualPlaybackTime = null;
   runtime.manualPlayback = false;
 }
 
@@ -1040,6 +1042,10 @@ function startManualFramePlayer(card) {
   runtime.playing = true;
   runtime.lifecycle = 'playing';
   runtime.manualPlaybackTimestamp = null;
+  const initialBounds = inlinePlaybackBounds(block, side, video);
+  runtime.manualPlaybackTime = Number.isFinite(video.currentTime)
+    ? Math.max(initialBounds.start, video.currentTime)
+    : initialBounds.start;
   runtime.rateSyncGuard = true;
   try {
     video.pause();
@@ -1071,9 +1077,7 @@ function startManualFramePlayer(card) {
     const config = playerSideConfig(currentBlock, currentSide);
     const bounds = inlinePlaybackBounds(currentBlock, currentSide, currentVideo);
     const rate = clampPlaybackRate(runtime.playbackRate);
-    const currentTime = Number.isFinite(currentVideo.currentTime)
-      ? Math.max(bounds.start, currentVideo.currentTime)
-      : bounds.start;
+    const currentTime = Number.isFinite(runtime.manualPlaybackTime) ? runtime.manualPlaybackTime : (Number.isFinite(currentVideo.currentTime) ? Math.max(bounds.start, currentVideo.currentTime) : bounds.start);
     let nextTime = currentTime + elapsed * rate;
     if (bounds.end !== null && bounds.end > bounds.start && nextTime >= bounds.end) {
       if (config.loop?.enabled === true) {
@@ -1094,6 +1098,18 @@ function startManualFramePlayer(card) {
         setFramePlayerStatus(card, '已到達區段終點。', 'loaded');
         return;
       }
+    }
+    runtime.manualPlaybackTime = nextTime;
+    if (currentVideo.seeking) {
+      syncFramePlayerProgress(card, currentBlock, currentSide, currentVideo);
+      scheduleManualFramePlayerTick(card, tick);
+      return;
+    }
+    const displayedTime = Number(currentVideo.currentTime);
+    if (Number.isFinite(displayedTime) && Math.abs(displayedTime - nextTime) <= 0.0005) {
+      syncFramePlayerProgress(card, currentBlock, currentSide, currentVideo);
+      scheduleManualFramePlayerTick(card, tick);
+      return;
     }
     runtime.rateSyncGuard = true;
     try {

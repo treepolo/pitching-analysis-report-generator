@@ -95,6 +95,8 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.match(controls, /stopFramePlayer/u);
   assert.match(renderer, /function startManualFramePlayer\(card\)/u);
   assert.match(renderer, /setSafePlaybackRate\(card, video, rate\)/u);
+  assert.match(renderer, /manualPlaybackTime/u);
+  assert.match(renderer, /if \(currentVideo\.seeking\)/u);
   assert.match(renderer, /!frameRuntime\.manualPlayback/u);
   assert.match(renderer, /unsupportedPlaybackRateError/u);
   assert.match(renderer, /function waitForPresentedVideoFrame\(video/u);
