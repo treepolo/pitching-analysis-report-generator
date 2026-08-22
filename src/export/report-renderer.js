@@ -831,8 +831,7 @@ function renderLegacyPlayerScript() {
     };
     const unsupportedPlaybackRateError = (error) => {
       const message = String(error?.message || error || '').toLowerCase();
-      return error?.name === 'NotSupportedError'
-        || message.includes('playbackrate')
+      return message.includes('playbackrate')
         || message.includes('playback rate')
         || message.includes('supported playback range');
     };

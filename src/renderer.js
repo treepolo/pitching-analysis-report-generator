@@ -122,8 +122,9 @@ function setSafePlaybackRate(card, video, rate) {
 
 function unsupportedPlaybackRateError(error) {
   const message = String(error?.message || error || '').toLowerCase();
-  return error?.name === 'NotSupportedError'
-    || message.includes('playbackrate')
+  // A generic NotSupportedError can mean the source is not ready or decodable.
+  // Only an explicit playback-rate message should enter the manual clock.
+  return message.includes('playbackrate')
     || message.includes('playback rate')
     || message.includes('supported playback range');
 }
@@ -873,6 +874,8 @@ function framePlayerRuntimeForCard(card) {
       manualPlaybackCancel: null,
       manualPlaybackTimestamp: null,
       manualPlaybackTime: null,
+      manualPlaybackSerial: 0,
+      rateTransition: false,
       rateSyncGuard: false,
       frameEngineGuard: false,
       primarySide: card?.dataset.framePlayerSide || 'single',
@@ -943,7 +946,10 @@ function updateFramePlayerControls(card) {
   const resetRate = card.querySelector('[data-frame-action="reset-rate"]');
   const rateSlider = card.querySelector('[data-frame-rate]');
   const rateInput = card.querySelector('[data-frame-rate-input]');
-  const available = count > 0;
+  const pendingPreparation = runtime.lifecycle === 'loading'
+    || runtime.exactSeek !== null
+    || runtime.rateTransition;
+  const available = count > 0 && !pendingPreparation;
   if (timeline) {
     timeline.max = String(maxIndex);
     timeline.value = String(index);
@@ -1006,6 +1012,7 @@ function framePlayerVideoForSide(card, side) {
 
 function cancelManualFramePlayer(card) {
   const runtime = framePlayerRuntimeForCard(card);
+  runtime.manualPlaybackSerial += 1;
   if (runtime.manualPlaybackCancel) runtime.manualPlaybackCancel();
   runtime.manualPlaybackFrame = null;
   runtime.manualPlaybackCancel = null;
@@ -1038,14 +1045,25 @@ function startManualFramePlayer(card) {
   const video = framePlayerVideoForSide(card, side);
   if (!block || !video) return false;
   cancelManualFramePlayer(card);
+  const manualPlaybackSerial = runtime.manualPlaybackSerial;
+  runtime.seekSerial += 1;
+  runtime.exactSeek = null;
+  runtime.scrubActive = false;
+  framePlayerSides(block, card).forEach((sideName) => {
+    cancelPendingVideoSeek(runtime, framePlayerVideoForSide(card, sideName));
+  });
   runtime.manualPlayback = true;
   runtime.playing = true;
   runtime.lifecycle = 'playing';
   runtime.manualPlaybackTimestamp = null;
   const initialBounds = inlinePlaybackBounds(block, side, video);
-  runtime.manualPlaybackTime = Number.isFinite(video.currentTime)
-    ? Math.max(initialBounds.start, video.currentTime)
-    : initialBounds.start;
+  const indexedTime = framePlayerTimeForSide(runtime, side, runtime.currentFrameIndex);
+  const displayedTime = Number(video.currentTime);
+  const initialTime = Number.isFinite(displayedTime) && !video.seeking
+    && Math.abs(displayedTime - indexedTime) <= 0.25
+    ? displayedTime
+    : indexedTime;
+  runtime.manualPlaybackTime = Math.max(initialBounds.start, initialTime);
   runtime.rateSyncGuard = true;
   try {
     video.pause();
@@ -1054,7 +1072,8 @@ function startManualFramePlayer(card) {
     runtime.rateSyncGuard = false;
   }
   const tick = (timestamp) => {
-    if (!runtime.manualPlayback || !runtime.playing || !card.isConnected) {
+    if (manualPlaybackSerial !== runtime.manualPlaybackSerial
+      || !runtime.manualPlayback || !runtime.playing || !card.isConnected) {
       cancelManualFramePlayer(card);
       return;
     }
@@ -1079,6 +1098,10 @@ function startManualFramePlayer(card) {
     const rate = clampPlaybackRate(runtime.playbackRate);
     const currentTime = Number.isFinite(runtime.manualPlaybackTime) ? runtime.manualPlaybackTime : (Number.isFinite(currentVideo.currentTime) ? Math.max(bounds.start, currentVideo.currentTime) : bounds.start);
     let nextTime = currentTime + elapsed * rate;
+    const displayedTime = Number(currentVideo.currentTime);
+    if (!currentVideo.seeking && Number.isFinite(displayedTime)) {
+      nextTime = Math.max(nextTime, displayedTime);
+    }
     if (bounds.end !== null && bounds.end > bounds.start && nextTime >= bounds.end) {
       if (config.loop?.enabled === true) {
         const span = bounds.end - bounds.start;
@@ -1105,7 +1128,6 @@ function startManualFramePlayer(card) {
       scheduleManualFramePlayerTick(card, tick);
       return;
     }
-    const displayedTime = Number(currentVideo.currentTime);
     if (Number.isFinite(displayedTime) && Math.abs(displayedTime - nextTime) <= 0.0005) {
       syncFramePlayerProgress(card, currentBlock, currentSide, currentVideo);
       scheduleManualFramePlayerTick(card, tick);
@@ -1363,6 +1385,7 @@ async function prepareFramePlayerCard(card, block, generation) {
   runtime.scrubActive = false;
   runtime.caches = Object.create(null);
   runtime.lifecycle = 'loading';
+  runtime.rateTransition = false;
   if (runtime.dragFrame !== null) cancelAnimationFrame(runtime.dragFrame);
   runtime.dragFrame = null;
   framePlayerSides(block, card).forEach((side) => {
@@ -1441,9 +1464,8 @@ async function prepareFramePlayerCard(card, block, generation) {
     updateFramePlayerControls(card);
     return;
   }
-  runtime.lifecycle = 'ready';
-  updateFramePlayerControls(card);
   const ready = await seekFramePlayerIndex(card, framePlayerSegmentStartIndex(block, runtime, card), { exact: true, status: false });
+  runtime.lifecycle = ready ? 'ready' : 'error';
   framePlayerSides(block, card).forEach((side) => {
     const placeholder = inlineSideElementForCard(card, side)?.querySelector('[data-frame-placeholder]');
     if (placeholder) placeholder.hidden = !ready;
@@ -1455,6 +1477,7 @@ async function prepareFramePlayerCard(card, block, generation) {
 function stopFramePlayer(card) {
   const runtime = framePlayerRuntimeForCard(card);
   runtime.playing = false;
+  runtime.rateTransition = false;
   cancelManualFramePlayer(card);
   runtime.seekSerial += 1;
   runtime.exactSeek = null;
@@ -1473,10 +1496,14 @@ function scheduleFramePlayerTick(card) {
   // intentionally does not invent a renderer-side timer.
 }
 
-async function playFramePlayer(card) {
+async function playFramePlayer(card, { fromRateTransition = false } = {}) {
   const entry = blockForEditorCard(card);
   const block = entry.block;
   const runtime = framePlayerRuntimeForCard(card);
+  if (!fromRateTransition
+    && (runtime.lifecycle === 'loading' || runtime.exactSeek !== null || runtime.rateTransition)) {
+    throw new Error('影片正在準備，請稍候。');
+  }
   const videos = framePlayerSides(block, card)
     .map((side) => framePlayerVideoForSide(card, side))
     .filter(Boolean);
@@ -1501,6 +1528,10 @@ async function playFramePlayer(card) {
 async function toggleFramePlayer(card) {
   const runtime = framePlayerRuntimeForCard(card);
   const entry = blockForEditorCard(card);
+  if (runtime.lifecycle === 'loading' || runtime.exactSeek !== null || runtime.rateTransition) {
+    setFramePlayerStatus(card, '影片正在準備，請稍候。', 'pending');
+    return;
+  }
   const videos = framePlayerSides(entry.block, card).map((side) => framePlayerVideoForSide(card, side)).filter(Boolean);
   if (framePlayerFrameCount(entry.block, runtime, card) <= 0 || videos.length === 0) {
     setFramePlayerStatus(card, '影片尚未準備，無法播放。', 'error');
@@ -1566,26 +1597,40 @@ function applyFramePlayerRate(card, rate, { persist = false } = {}) {
     .map((side) => framePlayerVideoForSide(card, side))
     .filter(Boolean);
   const nativeRate = videos.length === 0 || videos.every((video) => setSafePlaybackRate(card, video, normalizedRate));
+  const shouldResumeNative = wasManual && wasPlaying && nativeRate;
   if (wasManual) {
     cancelManualFramePlayer(card);
     runtime.playing = false;
     videos.forEach((video) => video.pause());
+  }
+  if (shouldResumeNative) {
+    runtime.rateTransition = true;
+    runtime.lifecycle = 'loading';
+    setFramePlayerStatus(card, '正在切換播放速度…', 'pending');
   }
   if (!nativeRate) {
     videos.forEach((video) => setSafePlaybackRate(card, video, PLAYBACK_RATE_DEFAULT));
     if (wasPlaying) {
       void playFramePlayer(card).catch((error) => {
         runtime.playing = false;
+        runtime.lifecycle = 'error';
         setFramePlayerStatus(card, `播放失敗：${error?.message || '請重試。'}`, 'error');
         updateFramePlayerControls(card);
       });
     }
-  } else if (wasManual && wasPlaying) {
-    void playFramePlayer(card).catch((error) => {
-      runtime.playing = false;
-      setFramePlayerStatus(card, `播放失敗：${error?.message || '請重試。'}`, 'error');
-      updateFramePlayerControls(card);
-    });
+  } else if (shouldResumeNative) {
+    void playFramePlayer(card, { fromRateTransition: true })
+      .then(() => {
+        runtime.rateTransition = false;
+        updateFramePlayerControls(card);
+      })
+      .catch((error) => {
+        runtime.playing = false;
+        runtime.lifecycle = 'error';
+        runtime.rateTransition = false;
+        setFramePlayerStatus(card, `播放失敗：${error?.message || '請重試。'}`, 'error');
+        updateFramePlayerControls(card);
+      });
   }
   if (persist) {
     framePlayerSides(block, card).forEach((side) => {
@@ -1720,6 +1765,15 @@ function syncFramePlayerProgress(card, block, side, video) {
   const runtime = framePlayerRuntimeForCard(card);
   const cache = runtime.caches[side];
   if (!cache || side !== framePlayerPrimarySide(block, runtime, card)) return;
+  if (runtime.manualPlayback && Number.isFinite(runtime.manualPlaybackTime)) {
+    const fps = Number(cache.fps) > 0 ? Number(cache.fps) : 30;
+    runtime.currentFrameIndex = Math.max(0, Math.min(
+      cache.frameCount - 1,
+      Math.round(runtime.manualPlaybackTime * fps),
+    ));
+    updateFramePlayerControls(card);
+    return;
+  }
   // Do not let an intermediate paused drag seek overwrite the thumb. Once
   // playback or a seek has produced a real clock position, the video clock is
   // authoritative and must keep the frame timeline in lockstep with it.

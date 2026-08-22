@@ -149,6 +149,7 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.match(html, /const setPlaybackRate = \(settings, requested/u);
   assert.match(html, /const rateCandidates = \(requested\)/u);
   assert.match(html, /const unsupportedPlaybackRateError = \(error\)/u);
+  assert.doesNotMatch(html, /error\?\.name === 'NotSupportedError'/u);
   assert.match(html, /const playVideo = async \(settings\)/u);
   assert.doesNotMatch(html, /portable-player-settings|portable-player-eyebrow|portable-player-layout/iu);
   assert.doesNotMatch(html, /data-anchor-time|data-sync-offset|data-loop-start|data-loop-end|同步|綁定|錨點/u);

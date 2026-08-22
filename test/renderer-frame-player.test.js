@@ -49,6 +49,7 @@ test('loading uses the native browser video pipeline without frame-cache prepara
   assert.match(prepare, /loadedmetadata/u);
   assert.match(prepare, /video\.preload = 'auto'/u);
   assert.match(prepare, /seekFramePlayerIndex\(card, framePlayerSegmentStartIndex\(block, runtime, card\), \{ exact: true/u);
+  assert.match(prepare, /runtime\.lifecycle = ready \? 'ready' : 'error'/u);
   assert.doesNotMatch(prepare, /frameCache|prepareFrameCache|readFrameCache|base64|dataUrl/u);
   assert.doesNotMatch(renderer, /nativePlayer|native-frame-player|native-player-surface|Media Foundation/u);
 });
@@ -96,9 +97,20 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.match(renderer, /function startManualFramePlayer\(card\)/u);
   assert.match(renderer, /setSafePlaybackRate\(card, video, rate\)/u);
   assert.match(renderer, /manualPlaybackTime/u);
+  assert.match(renderer, /manualPlaybackSerial/u);
+  assert.match(renderer, /manualPlaybackSerial !== runtime\.manualPlaybackSerial/u);
+  assert.match(renderer, /rateTransition/u);
+  assert.match(renderer, /const shouldResumeNative = wasManual && wasPlaying && nativeRate/u);
+  assert.match(renderer, /fromRateTransition = false/u);
+  assert.match(renderer, /framePlayerSides\(block, card\)\.forEach\(\(sideName\)/u);
+  assert.match(renderer, /nextTime = Math\.max\(nextTime, displayedTime\)/u);
   assert.match(renderer, /if \(currentVideo\.seeking\)/u);
   assert.match(renderer, /!frameRuntime\.manualPlayback/u);
   assert.match(renderer, /unsupportedPlaybackRateError/u);
+  const unsupported = functionSlice(renderer, 'function unsupportedPlaybackRateError(', 'function formatPlaybackRate(');
+  assert.doesNotMatch(unsupported, /error\?\.name === 'NotSupportedError'/u);
+  assert.match(unsupported, /supported playback range/u);
+  assert.match(renderer, /正在切換播放速度/u);
   assert.match(renderer, /function waitForPresentedVideoFrame\(video/u);
   assert.match(renderer, /requestVideoFrameCallback/u);
   assert.match(renderer, /function syncFramePlayerProgress\(card, block, side, video\)/u);
