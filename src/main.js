@@ -517,13 +517,11 @@ function registerIpc() {
     assertTrustedSender(event);
     const projectId = payload?.projectId;
     const project = await projectStore.readProject(projectId);
-    const frameCaches = await readExportFrameCaches(project);
     return exportJobs.start({
       projectId: project.id,
       projectRoot: PROJECT_ROOT,
       reportDocument: project,
       assets: project.media,
-      frameCaches,
       outputDirectory: payload?.outputDirectory,
       reportName: payload?.reportName ?? project.reportTitle ?? project.displayName,
       outputKind: payload?.outputKind,

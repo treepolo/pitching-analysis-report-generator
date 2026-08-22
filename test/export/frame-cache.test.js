@@ -98,8 +98,8 @@ function reportFor(...blocks) {
   };
 }
 
-test('exports referenced ready frame cache index and PNGs into folder and ZIP', async () => {
-  const root = path.join(testRoot, 'ready');
+test('exports referenced videos through the native player and never stages frame-cache PNGs', async () => {
+  const root = path.join(testRoot, 'native-only');
   await fs.mkdir(root, { recursive: true });
   const used = await createReadyCache(root, 'used', 'media/used.mp4', 3);
   const unused = await createReadyCache(root, 'unused', 'media/unused.mp4', 2);
@@ -108,7 +108,7 @@ test('exports referenced ready frame cache index and PNGs into folder and ZIP', 
   const result = await exportReport({
     projectRoot: root,
     outputDirectory: path.join(root, 'output'),
-    reportName: 'Ready frame cache',
+    reportName: 'Native video export',
     createZip: true,
     reportDocument: reportFor({ type: 'singleVideo', mediaAssetId: 'used', label: 'Used clip' }),
     assets: [
@@ -119,6 +119,7 @@ test('exports referenced ready frame cache index and PNGs into folder and ZIP', 
       { assetId: 'used', response: used.response },
       { assetId: 'unused', response: unused.response },
     ],
+    requireReadyFrameCache: true,
   });
 
   assert.equal(result.warnings.length, 0);
@@ -131,116 +132,33 @@ test('exports referenced ready frame cache index and PNGs into folder and ZIP', 
   );
 
   const html = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
-  assert.match(html, /data-frame-player/u);
-  assert.match(html, /data-frame-action="toggle"/u);
-  assert.match(html, /data-frame-action="previous"/u);
-  assert.match(html, /data-frame-action="next"/u);
-  assert.doesNotMatch(html, /<video\b/iu);
-  assert.doesNotMatch(html, /currentTime/u);
-  assert.match(html, /let playbackTime = null;/u);
-  assert.match(html, /const frameIndexAtTime =/u);
-  assert.match(html, /performance\.now\(\)/u);
-  assert.doesNotMatch(html, /Math\.max\(16,/u);
-  assert.doesNotMatch(html, /fetch\s*\(/iu);
+  assert.match(html, /<video\b[^>]*data-player-video/iu);
+  assert.match(html, /data-native-frame-player\b/u);
+  assert.match(html, /currentTime/u);
+  assert.match(html, /requestVideoFrameCallback/u);
+  assert.doesNotMatch(html, /data-frame-player="/u);
+  assert.doesNotMatch(html, /images\/frame-cache|frame-cache-status|cache-miss/u);
+  assert.doesNotMatch(html, /unused/u);
   const inlineScripts = [...html.matchAll(/<script>\s*([\s\S]*?)\s*<\/script>/g)].map((match) => match[1]);
   assert.equal(inlineScripts.length, 1);
   assert.doesNotThrow(() => new vm.Script(inlineScripts[0]));
-  assert.match(html, /images\/frame-cache\/used\/frames\/frame-00000000\.png/u);
-  assert.doesNotMatch(html, /unused/u);
 
   const outputFiles = result.manifest.files.map((file) => file.relativePath);
-  assert.ok(outputFiles.includes('images/frame-cache/used/index.json'));
-  assert.ok(outputFiles.includes('images/frame-cache/used/frames/frame-00000002.png'));
-  assert.equal(outputFiles.some((file) => file.includes('/unused/')), false);
-  assert.equal(result.manifest.frameCaches[0].assetId, 'used');
+  assert.ok(outputFiles.includes('videos/used.mp4'));
+  assert.equal(outputFiles.some((file) => file.includes('frame-cache')), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(result.manifest, 'frameCaches'), false);
 
   const extractedPath = path.join(root, 'extracted');
   await extractZipArchive(result.zipPath, extractedPath);
   assert.equal(
-    await fs.stat(path.join(extractedPath, 'images/frame-cache/used/index.json')).then((stats) => stats.isFile()),
+    await fs.stat(path.join(extractedPath, 'videos/used.mp4')).then((stats) => stats.isFile()),
     true,
   );
-  assert.equal(await fs.stat(path.join(extractedPath, 'images/frame-cache/unused')).catch(() => null), null);
+  assert.equal(await fs.stat(path.join(extractedPath, 'images/frame-cache')).catch(() => null), null);
 });
 
-test('falls back to video output when ready frame-cache staging runs out of space', async () => {
-  const root = path.join(testRoot, 'enospc-fallback');
-  await fs.mkdir(root, { recursive: true });
-  const ready = await createReadyCache(root, 'pitch', 'media/pitch.mp4', 3);
-  const report = reportFor({ type: 'singleVideo', mediaAssetId: 'pitch' });
-  const outputDirectory = path.join(root, 'output');
-  const originalWriteFile = fs.writeFile;
-  let injected = false;
-  fs.writeFile = async (targetPath, ...args) => {
-    if (!injected && String(targetPath).includes(`${path.sep}images${path.sep}frame-cache${path.sep}`)) {
-      injected = true;
-      const error = new Error('simulated output disk full');
-      error.code = 'ENOSPC';
-      throw error;
-    }
-    return originalWriteFile(targetPath, ...args);
-  };
-
-  let result;
-  try {
-    result = await exportReport({
-      projectRoot: root,
-      outputDirectory,
-      reportDocument: report,
-      assets: [{ id: 'pitch', kind: 'video', sourcePath: 'media/pitch.mp4', displayName: 'pitch.mp4' }],
-      frameCaches: [{ assetId: 'pitch', response: ready.response }],
-    });
-  } finally {
-    fs.writeFile = originalWriteFile;
-  }
-
-  assert.equal(injected, true);
-  assert.equal(result.validation.valid, true);
-  assert.match(result.warnings.join(' '), /輸出磁碟空間不足/u);
-  assert.equal(result.manifest.frameCaches[0].status, 'skipped-insufficient-disk-space');
-  const html = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
-  assert.match(html, /<video\b/iu);
-  assert.doesNotMatch(html, /images\/frame-cache\/pitch/u);
-  assert.equal(result.manifest.files.some((file) => file.relativePath.includes('frame-cache')), false);
-});
-
-test('does not downgrade a strict ready frame-cache export after ENOSPC', async () => {
-  const root = path.join(testRoot, 'enospc-strict');
-  await fs.mkdir(root, { recursive: true });
-  const ready = await createReadyCache(root, 'pitch', 'media/pitch.mp4', 2);
-  const report = reportFor({ type: 'singleVideo', mediaAssetId: 'pitch' });
-  const outputDirectory = path.join(root, 'output');
-  const originalWriteFile = fs.writeFile;
-  fs.writeFile = async (targetPath, ...args) => {
-    if (String(targetPath).includes(`${path.sep}images${path.sep}frame-cache${path.sep}`)) {
-      const error = new Error('simulated strict output disk full');
-      error.code = 'ENOSPC';
-      throw error;
-    }
-    return originalWriteFile(targetPath, ...args);
-  };
-
-  try {
-    await assert.rejects(
-      exportReport({
-        projectRoot: root,
-        outputDirectory,
-        reportDocument: report,
-        assets: [{ id: 'pitch', kind: 'video', sourcePath: 'media/pitch.mp4', displayName: 'pitch.mp4' }],
-        frameCaches: [{ assetId: 'pitch', response: ready.response }],
-        requireReadyFrameCache: true,
-      }),
-      (error) => error.code === 'ENOSPC' && error.exportPhase === 'stage-frame-cache',
-    );
-  } finally {
-    fs.writeFile = originalWriteFile;
-  }
-
-  assert.equal(await fs.stat(path.join(outputDirectory, 'Frame cache export')).catch(() => null), null);
-});
-
-test('downgrades a non-ready cache explicitly and can require ready cache', async () => {
-  const root = path.join(testRoot, 'non-ready');
+test('ignores missing or invalid frame-cache responses instead of changing native export behavior', async () => {
+  const root = path.join(testRoot, 'native-cache-ignored');
   await fs.mkdir(root, { recursive: true });
   const source = path.join(root, 'media', 'pitch.mp4');
   await fs.mkdir(path.dirname(source), { recursive: true });
@@ -259,48 +177,18 @@ test('downgrades a non-ready cache explicitly and can require ready cache', asyn
     progress: null,
     error: null,
   };
-  const report = reportFor({ type: 'singleVideo', mediaAssetId: 'pitch' });
   const result = await exportReport({
     projectRoot: root,
     outputDirectory: path.join(root, 'output'),
-    reportDocument: report,
+    reportDocument: reportFor({ type: 'singleVideo', mediaAssetId: 'pitch' }),
     assets: [{ id: 'pitch', kind: 'video', sourcePath: 'media/pitch.mp4', displayName: 'pitch.mp4' }],
     frameCaches: [{ assetId: 'pitch', response }],
+    requireReadyFrameCache: true,
   });
-  assert.equal(result.warnings.length, 1);
-  assert.match(result.warnings[0], /cache-miss/u);
+  assert.equal(result.warnings.length, 0);
+  assert.equal(result.validation.valid, true);
   const html = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
-  assert.match(html, /data-frame-cache-status="cache-miss"/u);
-  assert.match(html, /<video\b/iu);
-
-  await assert.rejects(
-    exportReport({
-      projectRoot: root,
-      outputDirectory: path.join(root, 'strict-output'),
-      reportDocument: report,
-      assets: [{ id: 'pitch', kind: 'video', sourcePath: 'media/pitch.mp4', displayName: 'pitch.mp4' }],
-      frameCaches: [{ assetId: 'pitch', response }],
-      requireReadyFrameCache: true,
-    }),
-    (error) => error instanceof ExportValidationError && /not ready/u.test(error.message),
-  );
-  assert.equal(await fs.stat(path.join(root, 'strict-output', 'Frame cache export')).catch(() => null), null);
-});
-
-test('rejects a ready cache whose index or frame escapes its cache root', async () => {
-  const root = path.join(testRoot, 'invalid');
-  await fs.mkdir(root, { recursive: true });
-  const ready = await createReadyCache(root, 'pitch', 'media/pitch.mp4', 1);
-  ready.response.frames[0].relativePath = 'media/pitch.mp4';
-  await assert.rejects(
-    exportReport({
-      projectRoot: root,
-      outputDirectory: path.join(root, 'output'),
-      reportDocument: reportFor({ type: 'singleVideo', mediaAssetId: 'pitch' }),
-      assets: [{ id: 'pitch', kind: 'video', sourcePath: 'media/pitch.mp4', displayName: 'pitch.mp4' }],
-      frameCaches: [{ assetId: 'pitch', response: ready.response }],
-    }),
-    (error) => error instanceof ExportValidationError && /outside its frame directory|mapping is invalid/u.test(error.message),
-  );
-  assert.equal(await fs.stat(path.join(root, 'output', 'Frame cache export')).catch(() => null), null);
+  assert.match(html, /<video\b[^>]*data-player-video/iu);
+  assert.doesNotMatch(html, /data-frame-cache-status|images\/frame-cache|cache-miss/u);
+  assert.equal(result.manifest.files.some((file) => file.relativePath.includes('frame-cache')), false);
 });

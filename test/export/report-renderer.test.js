@@ -135,35 +135,28 @@ test('renders independent video playback, loop, and comparison layout settings i
   });
 
   assert.match(html, /data-portable-player/iu);
+  assert.match(html, /data-native-frame-player-block/iu);
   assert.match(html, /data-player-layout="stacked"/u);
   assert.match(html, /data-segment-in="1"[\s\S]*data-segment-out="3"/u);
   assert.match(html, /data-playback-rate="64"/u);
   assert.match(html, /data-loop-enabled="true"/u);
-  assert.match(html, /data-player-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);
-  assert.match(html, /data-player-rate type="range" min="-6" max="6"/u);
-  assert.match(html, /data-player-rate-reset/iu);
-  assert.match(html, /<h3>單一投球<\/h3>/u);
-  assert.match(html, /<h3>單一來源<\/h3>/u);
-  assert.match(html, /\.portable-frame-rate-row \{ grid-column: 1 \/ -1;/u);
-  assert.match(html, /\.portable-player-rate-row \{ grid-column: 1 \/ -1;/u);
-  assert.match(html, /const setPlaybackRate = \(settings, requested/u);
-  assert.match(html, /const rateCandidates = \(requested\)/u);
-  assert.match(html, /const unsupportedPlaybackRateError = \(error\)/u);
-  assert.doesNotMatch(html, /error\?\.name === 'NotSupportedError'/u);
-  assert.match(html, /const playVideo = async \(settings\)/u);
+  assert.match(html, /data-frame-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);
+  assert.match(html, /data-frame-rate type="range" min="-6" max="6"/u);
+  assert.match(html, /data-frame-action="reset-rate"/u);
+  assert.doesNotMatch(html, /data-anchor-time|data-sync-offset|data-loop-start|data-loop-end|陷ｷ譴ｧ・ｭ・･|驍ｯ竏晢ｽｮ蝌ｶ鬪ｭ・ｨ魄溘・/u);
   assert.doesNotMatch(html, /portable-player-settings|portable-player-eyebrow|portable-player-layout/iu);
-  assert.doesNotMatch(html, /data-anchor-time|data-sync-offset|data-loop-start|data-loop-end|同步|綁定|錨點/u);
-  assert.doesNotMatch(html, /同步播放/u);
-  assert.match(html, /回到區段起點/u);
-  assert.match(html, /播放速度數值/u);
-  assert.match(html, /循環/u);
-  assert.doesNotMatch(html, /data-player-runtime-status/iu);
-  assert.match(html, /<script>\s*\(\(\) =>/u);
+  assert.match(html, /data-frame-loop/iu);
+  assert.match(html, /requestVideoFrameCallback/u);
+  assert.match(html, /requestAnimationFrame/u);
+  assert.match(html, /currentTime/u);
   assert.match(html, /ArrowLeft/u);
   assert.match(html, /ArrowRight/u);
-  assert.doesNotMatch(html, /<script\s+src=/iu);
+  assert.doesNotMatch(html, /data-frame-player="/u);
+  assert.doesNotMatch(html, /images\/frame-cache|frame-cache-status/u);
   assert.doesNotMatch(html, /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b/iu);
-});
+  const inlineScripts = [...html.matchAll(/<script>\s*([\s\S]*?)\s*<\/script>/g)].map((match) => match[1]);
+  assert.equal(inlineScripts.length, 1);
+  assert.doesNotThrow(() => new vm.Script(inlineScripts[0]));});
 
 test('drops retired binding state without exposing editor-only fields', () => {
   const html = renderReportHtml({

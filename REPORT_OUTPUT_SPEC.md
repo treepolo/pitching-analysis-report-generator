@@ -96,3 +96,21 @@ Online static report 正式支援 desktop modern browsers、iPhone/iPad Safari�
 ## 7. Status
 
 Folder、ZIP、complete package、file://、responsive 與 player output 目前均為 NOT_STARTED；沒有 generated report、實際影片或真人 acceptance evidence，不得標 VERIFIED。
+
+## Wave 21 native-video export contract (2026-08-23)
+
+This section supersedes the earlier frame-cache export wording for portable
+video blocks:
+
+- Every exported single-video or dual-video side is rendered as a native
+  video element with an export-local relative source such as videos/filename.mp4.
+- The inline runtime controls exact frame seeking from currentTime, frame
+  stepping, keyboard arrows, independent segment loop bounds, playback rate
+  input/slider/reset, and the extended-rate requestAnimationFrame clock used
+  only when the browser rejects a native rate.
+- Export never reads, stages, copies, or references images/frame-cache. The
+  images directory is optional and is used only for real image/poster assets.
+  Folder and ZIP outputs contain the same referenced source media.
+- Electron IPC and frame-cache preparation remain available to the editor's
+  media pipeline, but are not an export prerequisite and cannot alter the
+  portable report player.

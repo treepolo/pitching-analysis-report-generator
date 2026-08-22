@@ -1,3 +1,18 @@
+## Current Wave 21 native-video portable export (2026-08-23)
+
+- Selected design: portable HTML uses the same native browser-video frame-player
+  behavior as the editor; only the source adapter changes from Electron project
+  identity to a relative videos/ path.
+- Export no longer calls the frame-cache reader, stages cache indexes, copies
+  frame PNGs, or writes frame-cache manifest/warning data. Ready-cache input is
+  ignored for compatibility, so repeated folder/ZIP export does not depend on
+  cache presence or free space.
+- Native runtime controls include exact seek confirmation, latest-target drag
+  scrubbing, previous/next/keyboard stepping, independent segment loop bounds,
+  1/64..64 playback rate input/slider/reset, and the extended clock fallback.
+- Automated native-only export tests and syntax checks are complete. Electron
+  file:// playback and real codec/frame-latency behavior remain a manual
+  acceptance boundary.
 # Current Project State
 
 ## Current dual-video simplification (2026-08-21)

@@ -144,10 +144,15 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
   assert.match(folderHtml, /data-segment-out="1\.5"/u);
   assert.match(folderHtml, /data-playback-rate="1\.25"/u);
   assert.match(folderHtml, /data-loop-enabled="true"/u);
-  assert.match(folderHtml, /data-player-action="play"/u);
+  assert.match(folderHtml, /<video\b[^>]*data-player-video/iu);
+  assert.match(folderHtml, /data-native-frame-player\b/u);
+  assert.match(folderHtml, /data-frame-action="toggle"/u);
   assert.match(folderHtml, /<h3>Synthetic pitch<\/h3>/u);
   assert.match(folderHtml, /<h3>Synthetic source<\/h3>/u);
-  assert.match(folderHtml, /data-player-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);
+  assert.match(folderHtml, /data-frame-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);
+  assert.match(folderHtml, /requestVideoFrameCallback/u);
+  assert.match(folderHtml, /currentTime/u);
+  assert.doesNotMatch(folderHtml, /data-frame-player="|images\/frame-cache|frame-cache-status/u);
   assert.doesNotMatch(folderHtml, /portable-player-settings|portable-player-eyebrow/iu);
   assert.doesNotMatch(folderHtml, /同步|綁定|錨點/u);
   assert.doesNotMatch(folderHtml, /\bfetch\s*\(/iu);

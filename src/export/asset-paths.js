@@ -208,6 +208,7 @@ function normalizeAssetManifest(assetManifest = []) {
       relativePath,
       label: typeof asset.label === 'string' ? asset.label : '',
       mediaType: typeof asset.mediaType === 'string' ? asset.mediaType : '',
+      metadata: asset.metadata && typeof asset.metadata === 'object' ? asset.metadata : null,
     };
   });
 }

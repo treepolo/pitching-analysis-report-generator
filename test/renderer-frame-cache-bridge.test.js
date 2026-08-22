@@ -28,8 +28,8 @@ test('main registers the v1 frame-cache channels and resolves sources from proje
   assert.match(main, /operation\.controller\.abort\(\)/u);
   assert.match(main, /data:image\/png;base64/u);
   assert.match(main, /collectReferencedVideoAssetIds/u);
-  assert.match(main, /readExportFrameCaches/u);
-  assert.match(main, /frameCaches,/u);
+  assert.doesNotMatch(main, /const frameCaches = await readExportFrameCaches/u);
+  assert.doesNotMatch(main, /frameCaches,\s*outputDirectory/u);
   assert.match(main, /frameDirectoryRelativePath/u);
   assert.match(main, /isPathInside\(frameDirectory, framePath\)/u);
   assert.match(main, /sandbox: true/u);

@@ -1,5 +1,4 @@
 'use strict';
-
 const {
   ExportValidationError,
   normalizeRelativeAssetPath,
@@ -7,14 +6,13 @@ const {
   validateReferencedVideoAssetReferences,
 } = require('./asset-paths');
 const { toReportDocument } = require('../report-contract');
-
+const { renderNativeFramePlayerScript } = require('./native-frame-player');
 const PLAYBACK_RATE_MIN = 1 / 64;
 const PLAYBACK_RATE_MAX = 64;
 const PLAYBACK_RATE_DEFAULT = 1;
 const PLAYBACK_RATE_SLIDER_MIN = -6;
 const PLAYBACK_RATE_SLIDER_MAX = 6;
 const PLAYBACK_RATE_SLIDER_STEP = 0.01;
-
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -23,11 +21,9 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 }
-
 function encodeAssetPath(relativePath) {
   return relativePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
 }
-
 function assertReportDocument(reportDocument) {
   if (reportDocument === null || typeof reportDocument !== 'object' || Array.isArray(reportDocument)) {
     throw new ExportValidationError('Report document is required');
@@ -36,17 +32,14 @@ function assertReportDocument(reportDocument) {
     throw new ExportValidationError('Report document sections must be an array');
   }
 }
-
 function toPortableReportDocument(reportDocument) {
   return toReportDocument(reportDocument);
 }
-
 function referenceId(value) {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object' && typeof value.id === 'string') return value.id;
   return null;
 }
-
 const NESTED_REFERENCE_KEYS = [
   'assetId',
   'assetIds',
@@ -68,7 +61,6 @@ const NESTED_REFERENCE_KEYS = [
   'secondMediaAssetId',
   'videoAssetIds',
 ];
-
 function appendReferenceIds(value, ids) {
   if (Array.isArray(value)) {
     value.forEach((entry) => appendReferenceIds(entry, ids));
@@ -80,7 +72,6 @@ function appendReferenceIds(value, ids) {
     NESTED_REFERENCE_KEYS.forEach((key) => appendReferenceIds(value[key], ids));
   }
 }
-
 function firstReferenceId(block, keys) {
   for (const key of keys) {
     const ids = [];
@@ -89,7 +80,6 @@ function firstReferenceId(block, keys) {
   }
   return null;
 }
-
 function blockReferenceIds(block) {
   const values = [
     block.leftMediaAssetId,
@@ -114,47 +104,38 @@ function blockReferenceIds(block) {
   values.forEach((value) => appendReferenceIds(value, ids));
   return [...new Set(ids)];
 }
-
 function blockText(block) {
   if (typeof block.content === 'string') return block.content;
   if (typeof block.text === 'string') return block.text;
   return '';
 }
-
 function renderEmptyContent() {
   return '<span class="muted">No content</span>';
 }
-
 function renderText(block) {
   const content = blockText(block);
   return `<p class="report-text">${content ? escapeHtml(content) : renderEmptyContent()}</p>`;
 }
-
 function renderCaption(label) {
   return label ? `<figcaption>${escapeHtml(label)}</figcaption>` : '';
 }
-
 function finiteSetting(value, fallback = null) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
-
 function clampPlaybackRate(value, fallback = PLAYBACK_RATE_DEFAULT) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return Math.min(PLAYBACK_RATE_MAX, Math.max(PLAYBACK_RATE_MIN, parsed));
 }
-
 function playbackRateToSliderValue(rate) {
   return Math.log2(clampPlaybackRate(rate));
 }
-
 function formatPlaybackRate(rate) {
   const normalized = clampPlaybackRate(rate);
   if (normalized < 0.1) return normalized.toFixed(4);
   if (normalized < 1) return normalized.toFixed(3);
   return normalized.toFixed(2);
 }
-
 function normalizeSegment(value) {
   const segment = value && typeof value === 'object' ? value : {};
   const start = Math.max(0, finiteSetting(segment.in ?? segment.start, 0));
@@ -164,7 +145,6 @@ function normalizeSegment(value) {
     out: endValue !== null && endValue > start ? endValue : null,
   };
 }
-
 function normalizeLoop(value, segment) {
   const loop = value && typeof value === 'object' ? value : null;
   if (!loop && value !== true) {
@@ -174,7 +154,6 @@ function normalizeLoop(value, segment) {
     enabled: loop ? loop.enabled !== false : true,
   };
 }
-
 function playbackSettings(config) {
   const source = config && typeof config === 'object' ? config : {};
   const playback = source.playback && typeof source.playback === 'object' ? source.playback : {};
@@ -192,12 +171,10 @@ function playbackSettings(config) {
     loop: normalizeLoop(loopSource, segment),
   };
 }
-
 function sideConfig(block, side) {
   if (side === 'single') return block;
   return block[side] || block.sides?.[side] || {};
 }
-
 function sideTitle(block, side, asset) {
   const config = sideConfig(block, side);
   const configuredLabel = side === 'single' ? config.sourceLabel : config.label;
@@ -207,7 +184,6 @@ function sideTitle(block, side, asset) {
     : '';
   return fileName || (side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : '影片來源');
 }
-
 function sideAssetId(block, side) {
   const config = sideConfig(block, side);
   const directId = firstReferenceId(config, ['mediaAssetId', 'videoAssetId', 'assetRef', 'assetId']);
@@ -217,25 +193,21 @@ function sideAssetId(block, side) {
     : ['rightMediaAssetId', 'rightAssetId', 'secondMediaAssetId', 'secondAssetId'];
   return firstReferenceId(block, keys);
 }
-
 function sidePosterAssetId(block, side) {
   const config = sideConfig(block, side);
   const directId = firstReferenceId(config, ['posterAssetId', 'posterImageAssetId']);
   if (directId) return directId;
   return side === 'single' ? firstReferenceId(block, ['posterAssetId', 'posterImageAssetId']) : null;
 }
-
 function formatSeconds(value) {
   return value === null || value === undefined ? '未設定' : `${Number(value).toFixed(2)} 秒`;
 }
-
 function formatLoop(loop, segment = { in: 0, out: null }) {
   if (!loop.enabled) return '關閉';
   return segment.out === null
     ? `開啟（${formatSeconds(segment.in)}起）`
     : `開啟（${formatSeconds(segment.in)}–${formatSeconds(segment.out)}）`;
 }
-
 function renderImage(asset, label) {
   const alt = label || asset.label || 'Report image';
   return '<figure class="report-media report-image">'
@@ -243,40 +215,66 @@ function renderImage(asset, label) {
     + renderCaption(label || asset.label)
     + '</figure>';
 }
-
+function frameMetadataAttributes(asset) {
+  const metadata = asset && asset.metadata && typeof asset.metadata === 'object'
+    ? asset.metadata
+    : {};
+  const fps = Number(metadata.fps);
+  const frameCount = Number(metadata.frameCount);
+  const frameTimes = Array.isArray(metadata.frameTimes)
+    ? metadata.frameTimes.map((value) => (Number.isFinite(Number(value)) ? Number(value) : null))
+    : [];
+  return {
+    fpsAttribute: ' data-frame-fps="' + escapeHtml(String(Number.isFinite(fps) && fps > 0 ? fps : 30)) + '"',
+    frameCountAttribute: ' data-frame-count="' + escapeHtml(String(Number.isInteger(frameCount) && frameCount > 0 ? frameCount : 0)) + '"',
+    frameTimesAttribute: frameTimes.length > 0
+      ? ' data-frame-times="' + escapeHtml(JSON.stringify(frameTimes)) + '"'
+      : '',
+  };
+}
 function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
   if (!asset) return '';
   const config = sideConfig(block, side);
   const settings = playbackSettings(config);
   const label = sideTitle(block, side, asset);
-  const poster = posterAsset ? ` poster="${escapeHtml(encodeAssetPath(posterAsset.relativePath))}"` : '';
+  const poster = posterAsset
+    ? ' poster="' + escapeHtml(encodeAssetPath(posterAsset.relativePath)) + '"'
+    : '';
   const segmentOut = settings.segment.out === null ? '' : String(settings.segment.out);
   const sideLabel = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
-  return `<div class="portable-player-side" data-player-side="${side}"
-    data-segment-in="${escapeHtml(String(settings.segment.in))}"
-    data-segment-out="${escapeHtml(segmentOut)}"
-    data-playback-rate="${escapeHtml(String(settings.rate))}"
-    data-loop-enabled="${settings.loop.enabled ? 'true' : 'false'}"
-    >
-    <div class="portable-player-side-heading"><h3>${escapeHtml(label)}</h3></div>
-    <video controls playsinline preload="metadata" data-player-video src="${escapeHtml(encodeAssetPath(asset.relativePath))}"${poster}>
-      此瀏覽器不支援內嵌影片。
-    </video>
-    <div class="portable-player-side-controls">
-      <div class="portable-player-timeline-row">
-        <input data-player-seek type="range" min="${escapeHtml(String(settings.segment.in))}" max="${escapeHtml(String(settings.segment.out ?? settings.segment.in))}" step="0.001" value="${escapeHtml(String(settings.segment.in))}" disabled aria-label="${escapeHtml(`${sideLabel}時間軸`)}">
-        <output data-player-time>0.00 秒</output>
-      </div>
-      <div class="portable-player-rate-row" data-player-rate-row>
-        <input data-player-rate-input type="number" min="${PLAYBACK_RATE_MIN}" max="${PLAYBACK_RATE_MAX}" step="any" value="${escapeHtml(formatPlaybackRate(settings.rate))}" aria-label="${escapeHtml(`${sideLabel}播放速度數值`)}">
-        <input data-player-rate type="range" min="${PLAYBACK_RATE_SLIDER_MIN}" max="${PLAYBACK_RATE_SLIDER_MAX}" step="${PLAYBACK_RATE_SLIDER_STEP}" value="${escapeHtml(String(playbackRateToSliderValue(settings.rate)))}" aria-label="${escapeHtml(`${sideLabel}播放速度控制條`)}">
-        <button class="portable-player-rate-reset" type="button" data-player-rate-reset aria-label="${escapeHtml(`${sideLabel}重置播放速度為 1 倍`)}" title="重置為 1 倍">↻</button>
-      </div>
-      <label class="portable-player-loop"><input data-player-loop type="checkbox"${settings.loop.enabled ? ' checked' : ''}>循環</label>
-    </div>
-  </div>`;
+  const metadata = frameMetadataAttributes(asset);
+  return '<div class="portable-player-side native-frame-player-side" data-native-frame-player data-player-side="' + escapeHtml(side) + '"'
+    + ' data-segment-in="' + escapeHtml(String(settings.segment.in)) + '"'
+    + ' data-segment-out="' + escapeHtml(segmentOut) + '"'
+    + ' data-playback-rate="' + escapeHtml(String(settings.rate)) + '"'
+    + ' data-loop-enabled="' + (settings.loop.enabled ? 'true' : 'false') + '"'
+    + metadata.fpsAttribute + metadata.frameCountAttribute + metadata.frameTimesAttribute + '>'
+    + '<div class="portable-player-side-heading"><h3>' + escapeHtml(label) + '</h3></div>'
+    + '<div class="portable-frame-surface" data-frame-surface tabindex="0" aria-label="' + escapeHtml(sideLabel + '影格畫面') + '">'
+    + '<video playsinline preload="metadata" data-player-video src="' + escapeHtml(encodeAssetPath(asset.relativePath)) + '"' + poster + '>'
+    + '此瀏覽器不支援內嵌影片。'
+    + '</video>'
+    + '<span data-frame-placeholder>正在載入第一幀…</span>'
+    + '</div>'
+    + '<p class="portable-frame-side-status" data-frame-side-status role="status">正在載入影片…</p>'
+    + '<div class="portable-frame-controls" data-frame-controls role="group" aria-label="' + escapeHtml(sideLabel + '影格播放器控制') + '">'
+    + '<div class="portable-frame-navigation">'
+    + '<button type="button" data-frame-action="previous" disabled>上一幀</button>'
+    + '<input data-frame-timeline type="range" min="0" max="0" step="1" value="0" disabled aria-label="' + escapeHtml(sideLabel + '影格時間軸') + '">'
+    + '<button type="button" data-frame-action="next" disabled>下一幀</button>'
+    + '<output data-frame-position>尚未準備</output>'
+    + '<button type="button" data-frame-action="toggle" disabled aria-pressed="false">播放</button>'
+    + '</div>'
+    + '<div class="portable-frame-rate-row" data-frame-rate-row>'
+    + '<input data-frame-rate-input type="number" min="' + PLAYBACK_RATE_MIN + '" max="' + PLAYBACK_RATE_MAX + '" step="any" value="' + formatPlaybackRate(settings.rate) + '" disabled aria-label="' + escapeHtml(sideLabel + '播放速度數值') + '">'
+    + '<input data-frame-rate type="range" min="' + PLAYBACK_RATE_SLIDER_MIN + '" max="' + PLAYBACK_RATE_SLIDER_MAX + '" step="' + PLAYBACK_RATE_SLIDER_STEP + '" value="' + playbackRateToSliderValue(settings.rate) + '" disabled aria-label="' + escapeHtml(sideLabel + '播放速度控制條') + '">'
+    + '<button type="button" data-frame-action="reset-rate" disabled aria-label="' + escapeHtml(sideLabel + '重置播放速度為 1 倍') + '" title="重置為 1 倍">↻</button>'
+    + '</div>'
+    + '<label class="portable-frame-loop"><input data-frame-loop type="checkbox"' + (settings.loop.enabled ? ' checked' : '') + '>循環</label>'
+    + '<span class="portable-frame-player-status" data-frame-player-status role="status" data-state="pending">正在載入影片…</span>'
+    + '</div>'
+    + '</div>';
 }
-
 function frameCacheFramePath(frame, assetId, frameIndex) {
   if (!frame || typeof frame !== 'object' || typeof frame.relativePath !== 'string') {
     throw new ExportValidationError(`Frame cache ${assetId} frame ${frameIndex} is invalid`);
@@ -287,12 +285,10 @@ function frameCacheFramePath(frame, assetId, frameIndex) {
     throw new ExportValidationError(`Frame cache ${assetId} frame ${frameIndex} path is invalid`, { cause: error });
   }
 }
-
 function frameCachePathInside(root, candidate) {
   const relative = root === candidate ? '' : candidate.slice(`${root}/`.length);
   return root === candidate || (candidate.startsWith(`${root}/`) && relative.length > 0 && !relative.startsWith('../'));
 }
-
 function normalizeRendererFrameCaches(frameCacheManifest) {
   if (frameCacheManifest === null || frameCacheManifest === undefined) return new Map();
   const entries = Array.isArray(frameCacheManifest)
@@ -304,7 +300,6 @@ function normalizeRendererFrameCaches(frameCacheManifest) {
       }))
       : null);
   if (!entries) throw new ExportValidationError('Frame cache manifest must be an array or object');
-
   const byAssetId = new Map();
   entries.forEach((entry, entryIndex) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
@@ -401,7 +396,6 @@ function normalizeRendererFrameCaches(frameCacheManifest) {
   });
   return byAssetId;
 }
-
 function frameCacheForSide(block, side, byId, frameCaches) {
   const assetId = sideAssetId(block, side);
   if (!assetId) return null;
@@ -410,7 +404,6 @@ function frameCacheForSide(block, side, byId, frameCaches) {
   if (!asset || !cache || cache.ready !== true || !cache.cache?.frames?.length) return null;
   return { asset, cache: cache.cache };
 }
-
 function frameCacheFallbackStatus(block, frameCaches) {
   const sides = block.type === 'comparisonVideo' ? ['left', 'right'] : ['single'];
   return sides
@@ -419,11 +412,9 @@ function frameCacheFallbackStatus(block, frameCaches) {
     .map((assetId) => frameCaches.get(assetId))
     .find((entry) => entry && entry.ready !== true) || null;
 }
-
 function frameCacheJson(cache) {
   return escapeHtml(JSON.stringify(cache.frames).replaceAll('<', '\\u003c'));
 }
-
 function renderFramePlayerSide(block, side, frameBinding, comparison) {
   const { asset, cache } = frameBinding;
   const config = sideConfig(block, side);
@@ -449,7 +440,6 @@ function renderFramePlayerSide(block, side, frameBinding, comparison) {
     <p class="portable-frame-side-status" data-frame-side-status role="status">影格快取已就緒 · ${cache.frames.length} 幀。</p>
   </div>`;
 }
-
 function renderFramePlayer(block, byId, comparison, frameCaches) {
   const sides = comparison ? ['left', 'right'] : ['single'];
   const bindings = sides.map((side) => frameCacheForSide(block, side, byId, frameCaches));
@@ -486,10 +476,7 @@ function renderFramePlayer(block, byId, comparison, frameCaches) {
     <div class="portable-player-grid portable-player-grid-${layout}">${renderedPlayers}</div>
   </figure>`;
 }
-
-function renderPlayer(block, byId, comparison, frameCaches) {
-  const framePlayer = renderFramePlayer(block, byId, comparison, frameCaches);
-  if (framePlayer) return framePlayer;
+function renderPlayer(block, byId, comparison) {
   const sides = comparison ? ['left', 'right'] : ['single'];
   const renderedSides = sides.map((side) => {
     const assetId = sideAssetId(block, side);
@@ -499,59 +486,39 @@ function renderPlayer(block, byId, comparison, frameCaches) {
     return renderPlayerVideo(block, side, asset, posterAsset, comparison);
   }).join('');
   if (!renderedSides) return renderText(block);
-
   const layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
   const blockLabel = typeof block.label === 'string' ? block.label.trim() : '';
   const accessibleBlockLabel = blockLabel || (comparison ? '雙影片' : '單一影片');
-  const fallback = frameCacheFallbackStatus(block, frameCaches);
-  const fallbackNotice = fallback
-    ? `<p class="portable-frame-fallback" data-frame-cache-status="${escapeHtml(fallback.status || 'not-ready')}" role="status">影格快取未就緒，已降級為影片播放（${escapeHtml(fallback.status || 'unknown')}）。</p>`
-    : '';
-  const actions = comparison ? '' : `<div class="portable-player-actions" role="group" aria-label="${escapeHtml(`${accessibleBlockLabel}播放器控制`)}">
-      <button type="button" data-player-action="play">播放</button>
-      <button type="button" data-player-action="pause">暫停</button>
-      <button type="button" data-player-action="reset">回到區段起點</button>
-    </div>`;
-  return `<figure class="report-media report-video portable-player" data-portable-player tabindex="0" aria-label="${escapeHtml(`${accessibleBlockLabel}播放器`)}" data-player-layout="${layout}">
+  return `<figure class="report-media report-video portable-player" data-portable-player data-native-frame-player-block aria-label="${escapeHtml(`${accessibleBlockLabel}播放器`)}" data-player-layout="${layout}">
     ${blockLabel ? `<header class="portable-player-header"><h3>${escapeHtml(blockLabel)}</h3></header>` : ''}
     <div class="portable-player-grid portable-player-grid-${layout}">${renderedSides}</div>
-    ${actions}
-    ${fallbackNotice}
   </figure>`;
 }
-
-function renderComparison(block, byId, frameCaches) {
-  return renderPlayer(block, byId, true, frameCaches);
+function renderComparison(block, byId) {
+  return renderPlayer(block, byId, true);
 }
-
 function renderBlock(block, byId, frameCaches) {
   const safeBlock = block && typeof block === 'object' ? block : {};
   const type = typeof safeBlock.type === 'string' ? safeBlock.type.toLowerCase() : 'unknown';
   const label = typeof safeBlock.label === 'string'
     ? safeBlock.label
     : (typeof safeBlock.title === 'string' ? safeBlock.title : '');
-
   if (type === 'image' || type === 'imageblock' || type === 'photo') {
     const imageId = firstReferenceId(safeBlock, ['mediaAssetId', 'imageAssetId', 'assetRef', 'assetId']);
     const image = imageId ? byId.get(imageId) : null;
     return image ? renderImage(image, label) : renderText(safeBlock);
   }
-
   if (type === 'singlevideo' || type === 'video' || type === 'video-block') {
     return renderPlayer(safeBlock, byId, false, frameCaches);
   }
-
   if (type === 'comparisonvideo' || type === 'comparison-video' || type === 'comparison') {
     return renderComparison(safeBlock, byId, frameCaches);
   }
-
   if (type === 'heading' || type === 'subheading') {
     return `<h4>${escapeHtml(label || blockText(safeBlock))}</h4>`;
   }
-
   return `${label ? `<h4>${escapeHtml(label)}</h4>` : ''}${renderText(safeBlock)}`;
 }
-
 function renderStyles() {
   return `
     :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -586,7 +553,7 @@ function renderStyles() {
     .portable-player-side-heading span { overflow-wrap: anywhere; color: #596780; font-size: .9rem; }
     .portable-player-side video { max-height: 460px; }
     .portable-frame-surface { display: grid; min-height: 220px; place-items: center; overflow: hidden; border-radius: .75rem; background: #111827; }
-    .portable-frame-surface img { width: 100%; max-height: 460px; object-fit: contain; }
+    .portable-frame-surface img, .portable-frame-surface video { width: 100%; max-height: 460px; object-fit: contain; }
     .portable-frame-surface [hidden] { display: none; }
     .portable-frame-side-status, .portable-frame-fallback { margin: .55rem 0 0; color: #596780; font-size: .82rem; }
     .portable-frame-controls { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content max-content max-content; column-gap: .6rem; row-gap: .6rem; margin-top: .8rem; }
@@ -603,7 +570,7 @@ function renderStyles() {
     .portable-player-timeline-row input[type="range"] { grid-column: 1; min-width: 0; width: 100%; }
     .portable-player-timeline-row output { grid-column: 2; }
     .portable-player-rate-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; width: 100%; }
-    .portable-player-loop { grid-column: 1 / -1; }
+    .portable-player-loop, .portable-frame-loop { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: .35rem; color: #33415c; font-size: .85rem; }
     .portable-player-side-controls label { display: inline-flex; align-items: center; gap: .35rem; color: #33415c; font-size: .85rem; }
     .portable-player-rate-input { flex: 0 0 5.5rem; width: 5.5rem; }
     .portable-player-rate-reset, .portable-frame-rate-row button { flex: 0 0 2.2rem; width: 2.2rem; height: 2.2rem; padding: 0 !important; border-radius: 50% !important; font-size: 1.1rem; line-height: 1; }
@@ -623,7 +590,6 @@ function renderStyles() {
     }
   `;
 }
-
 function renderFramePlayerScript() {
   return `
   document.querySelectorAll('[data-frame-player]').forEach((player) => {
@@ -887,19 +853,10 @@ function renderLegacyPlayerScript() {
     }
   });`;
 }
-
-function renderPlayerScript({ includeFrame = false, includeLegacy = true } = {}) {
-  const body = [
-    '(() => {',
-    '  const numberValue = (value, fallback = null) => { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; };',
-    '  const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));',
-    includeFrame ? renderFramePlayerScript() : '',
-    includeLegacy ? renderLegacyPlayerScript() : '',
-    '})();',
-  ].filter(Boolean).join('\n');
-  return `<script>\n${body}\n</script>`;
+function renderPlayerScript({ includeNative = true } = {}) {
+  const body = includeNative ? renderNativeFramePlayerScript() : '';
+  return '<script>' + String.fromCharCode(10) + body + String.fromCharCode(10) + '</script>';
 }
-
 function renderReportHtml(
   reportDocument,
   { assetManifest = [], frameCacheManifest = [], frameCacheWarnings = [] } = {},
@@ -908,12 +865,13 @@ function renderReportHtml(
   const safeReportDocument = toPortableReportDocument(reportDocument);
   const { manifest } = validateReferencedVideoAssetReferences(safeReportDocument, assetManifest);
   const byId = new Map(manifest.map((asset) => [asset.id, asset]));
-  const frameCaches = normalizeRendererFrameCaches(frameCacheManifest);
+  // Portable reports always use the native video player. The optional
+  // frame-cache arguments remain accepted for backwards-compatible callers,
+  // but are intentionally ignored so exports never depend on PNG caches.
   const title = typeof safeReportDocument.title === 'string' && safeReportDocument.title.length > 0
     ? safeReportDocument.title
     : 'Pitching analysis report';
-  let framePlayerCount = 0;
-  let legacyPlayerCount = 0;
+  let nativePlayerCount = 0;
   const sections = safeReportDocument.sections.map((section, sectionIndex) => {
     const safeSection = section && typeof section === 'object' ? section : {};
     const sectionId = typeof safeSection.id === 'string' && safeSection.id.length > 0
@@ -927,14 +885,11 @@ function renderReportHtml(
         const blockType = typeof block?.type === 'string' ? block.type.toLowerCase() : '';
         const isVideo = ['singlevideo', 'comparisonvideo'].includes(blockType);
         const sides = blockType === 'comparisonvideo' ? ['left', 'right'] : ['single'];
-        const hasFramePlayer = isVideo && sides.every((side) => Boolean(frameCacheForSide(block, side, byId, frameCaches)));
-        if (hasFramePlayer) framePlayerCount += 1;
-        else if (isVideo) legacyPlayerCount += 1;
-        return renderBlock(block, byId, frameCaches);
+        if (isVideo) nativePlayerCount += 1;
+        return renderBlock(block, byId);
       }).join('') : renderEmptyContent()}`
       + '</section>';
   }).join('');
-
   return `<!doctype html>
 <html lang="zh-Hant">
   <head>
@@ -952,13 +907,11 @@ function renderReportHtml(
       </header>
       ${sections || `<section class="report-section">${renderEmptyContent()}</section>`}
     </main>
-    ${frameCacheWarnings.length > 0 ? `<meta name="frame-cache-warnings" content="${escapeHtml(frameCacheWarnings.join(' | '))}">` : ''}
-    ${renderPlayerScript({ includeFrame: framePlayerCount > 0, includeLegacy: legacyPlayerCount > 0 })}
+    ${renderPlayerScript({ includeNative: nativePlayerCount > 0 })}
   </body>
 </html>
 `;
 }
-
 module.exports = {
   encodeAssetPath,
   escapeHtml,

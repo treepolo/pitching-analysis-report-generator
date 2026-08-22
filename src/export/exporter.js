@@ -17,12 +17,7 @@ const {
 const { validateExportLayout } = require('./layout-validator');
 const { renderReportHtml, toPortableReportDocument } = require('./report-renderer');
 const { createZipArchive, validateZipParity } = require('./zip-archive');
-const {
-  frameCacheWarning,
-  indexFrameCaches,
-  resolveFrameCacheForAsset,
-  stageFrameCache,
-} = require('./frame-cache');
+
 
 // Export target selection is collision-safe for completed outputs, but two
 // jobs can otherwise observe the same free target before either one commits it.
@@ -113,12 +108,6 @@ async function commitStagingDirectory(stagingPath, folderPath, { sameDestination
   }
 }
 
-function shouldFallbackFrameCache({ error, frameCaches, requireReadyFrameCache }) {
-  return requireReadyFrameCache !== true
-    && frameCaches !== null
-    && frameCaches !== undefined
-    && error?.code === 'ENOSPC';
-}
 
 function outputLockKey(outputRoot) {
   const resolved = path.resolve(outputRoot);
@@ -380,6 +369,21 @@ function uniqueGeneratedPath(kind, filename, usedPaths) {
   }
 }
 
+function portableAssetMetadata(asset) {
+  const metadata = asset && asset.metadata && typeof asset.metadata === 'object'
+    ? asset.metadata
+    : {};
+  const fps = Number(metadata.fps);
+  const frameCount = Number(metadata.frameCount);
+  const frameTimes = Array.isArray(metadata.frameTimes)
+    ? metadata.frameTimes.map((value) => (Number.isFinite(Number(value)) ? Number(value) : null))
+    : [];
+  return {
+    fps: Number.isFinite(fps) && fps > 0 ? fps : null,
+    frameCount: Number.isInteger(frameCount) && frameCount > 0 ? frameCount : null,
+    frameTimes,
+  };
+}
 function prepareAssetDescriptors(assets, { referencedAssetIds = null } = {}) {
   if (!Array.isArray(assets)) throw new ExportValidationError('Export assets must be an array');
   const selectedAssets = referencedAssetIds === null
@@ -436,11 +440,7 @@ function prepareAssetDescriptors(assets, { referencedAssetIds = null } = {}) {
       mediaType: typeof asset.mediaType === 'string' ? asset.mediaType : '',
       sourcePath,
       data,
-      frameCache: asset.frameCacheResponse
-        ?? asset.frameCache
-        ?? asset.frameIndex
-        ?? asset.readyFrameCache
-        ?? null,
+      metadata: portableAssetMetadata(asset),
     };
   });
 }
@@ -488,6 +488,7 @@ async function stageAsset(asset, outputRoot, { projectRootLexical, projectRootRe
     relativePath: asset.relativePath,
     label: asset.label,
     mediaType: asset.mediaType,
+    metadata: asset.metadata,
     byteLength: data.length,
     sha256: sha256(data),
   };
@@ -500,6 +501,7 @@ function rendererManifest(stagedAssets) {
     relativePath: asset.relativePath,
     label: asset.label,
     mediaType: asset.mediaType,
+    metadata: asset.metadata,
   }));
 }
 
@@ -509,8 +511,6 @@ function exportManifest({
   stagedAssets,
   html,
   reportFileName = 'report.html',
-  auxiliaryFiles = [],
-  frameCaches = [],
   warnings = [],
 }) {
   return {
@@ -541,21 +541,8 @@ function exportManifest({
         byteLength: asset.byteLength,
         sha256: asset.sha256,
       })),
-      ...auxiliaryFiles.map((file) => ({
-        relativePath: file.relativePath,
-        byteLength: file.byteLength,
-        sha256: file.sha256,
-      })),
+
     ],
-    ...(frameCaches.length > 0 ? {
-      frameCaches: frameCaches.map((entry) => ({
-        assetId: entry.assetId,
-        status: entry.status,
-        cache: entry.cache?.cache ?? null,
-        frameCount: entry.cache?.frameCount ?? 0,
-        indexRelativePath: entry.indexFile?.relativePath ?? null,
-      })),
-    } : {}),
     ...(warnings.length > 0 ? { warnings: [...warnings] } : {}),
   };
 }
@@ -590,7 +577,6 @@ async function exportReport({
   const { lexicalRoot: projectRootLexical, realRoot: projectRootReal } = await resolveProjectRoots(projectRoot);
   const safeReportDocument = toPortableReportDocument(reportDocument);
   const referencedAssetIds = new Set(collectReferencedVideoAssetIds(safeReportDocument));
-  const indexedFrameCaches = indexFrameCaches(frameCaches, { assetIds: referencedAssetIds });
   const outputRoot = path.resolve(outputDirectory);
   if (typeof outputDirectory !== 'string' || outputDirectory.trim() === '' || !path.isAbsolute(outputDirectory)) {
     throw new ExportValidationError('Export outputDirectory must be an absolute safe path');
@@ -653,11 +639,7 @@ async function exportReport({
     );
     const preparedAssets = prepareAssetDescriptors(assets, { referencedAssetIds });
     const stagedAssets = [];
-    const stagedFrameAssets = [];
-    const stagedFrameFiles = [];
-    const portableFrameCaches = [];
     const warnings = [];
-    const usedOutputPaths = new Set();
     for (const asset of preparedAssets) {
       throwIfAborted(signal);
       const stagedAsset = await stageAsset(asset, stagingPath, {
@@ -665,64 +647,13 @@ async function exportReport({
         projectRootReal,
       });
       stagedAssets.push(stagedAsset);
-      usedOutputPaths.add(portableAssetPathKey(stagedAsset.relativePath));
 
-      if (asset.kind !== 'video') continue;
-      const cacheEntry = resolveFrameCacheForAsset(asset, indexedFrameCaches);
-      if (!cacheEntry?.ready) {
-        if (requireReadyFrameCache) {
-          throw new ExportValidationError(
-            cacheEntry
-              ? `Frame cache for referenced video asset ${asset.id} is not ready: ${cacheEntry.status}`
-              : `Ready frame cache is required for referenced video asset: ${asset.id}`,
-            { assetId: asset.id, status: cacheEntry?.status ?? 'missing' },
-          );
-        }
-        if (frameCacheFallbackReason === 'insufficient-disk-space') {
-          warnings.push(
-            `影格快取因輸出磁碟空間不足而略過（資產：${asset.id}）；已改用影片播放。`,
-          );
-        } else {
-          warnings.push(frameCacheWarning(asset.id, cacheEntry));
-        }
-        portableFrameCaches.push({
-          assetId: asset.id,
-          status: frameCacheFallbackReason === 'insufficient-disk-space'
-            ? 'skipped-insufficient-disk-space'
-            : (cacheEntry?.status || 'missing'),
-          ready: false,
-          error: frameCacheFallbackReason === 'insufficient-disk-space'
-            ? { code: 'ENOSPC', message: 'The output disk has insufficient free space for the ready frame cache.' }
-            : (cacheEntry?.error || null),
-        });
-        continue;
-      }
-      let stagedFrameCache;
-      try {
-        stagedFrameCache = await stageFrameCache({
-          asset,
-          cacheEntry,
-          stagingPath,
-          projectRoot: projectRootLexical,
-          projectRootReal,
-          usedPaths: usedOutputPaths,
-        });
-      } catch (error) {
-        throw annotateExportFsError(error, 'stage-frame-cache');
-      }
-      stagedFrameAssets.push(...stagedFrameCache.frameAssets);
-      stagedFrameFiles.push(stagedFrameCache.indexFile);
-      portableFrameCaches.push(stagedFrameCache);
     }
 
     throwIfAborted(signal);
-    const stagedManifest = rendererManifest([...stagedAssets, ...stagedFrameAssets]);
+    const stagedManifest = rendererManifest(stagedAssets);
     validateReferencedVideoAssetReferences(safeReportDocument, stagedManifest);
-    const html = renderReportHtml(safeReportDocument, {
-      assetManifest: stagedManifest,
-      frameCacheManifest: portableFrameCaches.map((entry) => entry.ready ? entry.cache : entry),
-      frameCacheWarnings: warnings,
-    });
+    const html = renderReportHtml(safeReportDocument, { assetManifest: stagedManifest });
     await withExportFsRetry(
       () => fs.writeFile(path.join(stagingPath, reportFileName), html, 'utf8'),
       'write-report',
@@ -730,11 +661,9 @@ async function exportReport({
     const manifest = exportManifest({
       reportDocument: safeReportDocument,
       safeName,
-      stagedAssets: [...stagedAssets, ...stagedFrameAssets],
+      stagedAssets,
       html,
       reportFileName,
-      auxiliaryFiles: stagedFrameFiles,
-      frameCaches: portableFrameCaches,
       warnings,
     });
     await writeJson(path.join(stagingPath, 'export-manifest.json'), manifest, 'write-manifest');
@@ -801,27 +730,7 @@ async function exportReport({
       throw error;
     }
   });
-  try {
-    return await runExport();
-  } catch (error) {
-    if (shouldFallbackFrameCache({ error, frameCaches, requireReadyFrameCache })) {
-      return exportReport({
-        reportDocument,
-        assets,
-        projectRoot,
-        outputDirectory,
-        reportName,
-        createZip,
-        outputKind,
-        zipPath,
-        frameCaches: null,
-        requireReadyFrameCache,
-        frameCacheFallbackReason: 'insufficient-disk-space',
-        signal,
-      });
-    }
-    throw error;
-  }
+  return runExport();
 }
 
 module.exports = {
