@@ -955,7 +955,7 @@ function updateFramePlayerControls(card) {
     timeline.value = String(index);
     timeline.disabled = !available;
   }
-  if (position) position.textContent = available ? `第 ${index + 1} / ${count} 幀` : '尚未準備';
+  if (position) position.textContent = count > 0 ? `第 ${index + 1} / ${count} 幀` : '尚未準備';
   if (previous) previous.disabled = !available || index <= 0;
   if (next) next.disabled = !available || index >= maxIndex;
   if (toggle) {
@@ -1320,8 +1320,8 @@ async function seekFramePlayerIndex(card, frameIndex, { exact = true, status = t
     const fps = Number(runtime.caches[side]?.fps) > 0 ? Number(runtime.caches[side].fps) : 30;
     return seekVideoExact(video, targetTime, serial, runtime, Math.max(0.02, (0.5 / fps) + 0.01));
   }));
-  if (serial !== runtime.seekSerial || !card.isConnected) return false;
   if (runtime.exactSeek === serial) runtime.exactSeek = null;
+  if (serial !== runtime.seekSerial || !card.isConnected) return false;
   if (results.every(Boolean)) {
     updateFramePlayerControls(card);
     if (status) setFramePlayerStatus(card, `已顯示第 ${target + 1} 幀。`, 'loaded');
@@ -1661,6 +1661,7 @@ function handleFramePlayerEvent(event) {
       if (!runtime.scrubActive) return true;
       void requestFramePlayerScrub(card, Number(target.value), { exact: false });
     } else if (event.type === 'input') {
+      if (runtime.exactSeek !== null) return true;
       void requestFramePlayerScrub(card, Number(target.value), { exact: false });
     } else if (event.type === 'pointerup' || event.type === 'change') {
       try {

@@ -68,6 +68,7 @@ test('drag is latest-target-wins approximate seek, release is exact seek', () =>
   assert.match(seek, /video\.seeking/u);
   assert.match(seek, /seekVideoExact\(video, targetTime/u);
   assert.match(seek, /runtime\.seekSerial/u);
+  assert.match(seek, /if \(runtime\.exactSeek === serial\) runtime\.exactSeek = null/u);
   assert.match(seek, /cancelPendingVideoSeek/u);
   assert.match(seek, /scrubActive/u);
   assert.match(renderer, /readyAtTarget/u);
@@ -77,6 +78,7 @@ test('drag is latest-target-wins approximate seek, release is exact seek', () =>
   assert.match(events, /event\.type === 'pointerdown'/u);
   assert.match(events, /event\.type === 'pointermove'/u);
   assert.match(events, /event\.type === 'input'/u);
+  assert.match(events, /if \(runtime\.exactSeek !== null\) return true/u);
   assert.match(events, /if \(!runtime\.scrubActive\) return true/u);
   assert.match(events, /event\.type === 'pointercancel'/u);
   assert.match(events, /event\.type === 'pointerup'/u);
@@ -85,6 +87,7 @@ test('drag is latest-target-wins approximate seek, release is exact seek', () =>
   assert.match(events, /exact: true/u);
   assert.match(events, /exact: false/u);
   assert.match(events, /event\.type !== 'click'/u);
+  assert.match(renderer, /position\.textContent = count > 0/u);
   assert.match(renderer, /addEventListener\('pointercancel', handleBlockEditorEvent\)/u);
 });
 
