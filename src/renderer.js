@@ -1648,10 +1648,39 @@ function handleFramePlayerEvent(event) {
   const card = target.closest('[data-frame-player]');
   if (!card) return false;
   if (target.matches('[data-frame-timeline]')) {
-    if (event.type === 'change' || event.type === 'pointerup') {
-      void requestFramePlayerScrub(card, Number(target.value), { exact: true });
-    } else if (['input', 'pointerdown', 'pointermove'].includes(event.type)) {
+    const runtime = framePlayerRuntimeForCard(card);
+    if (event.type === 'pointerdown') {
+      runtime.scrubActive = true;
+      try {
+        target.setPointerCapture?.(event.pointerId);
+      } catch {
+        // Pointer capture is unavailable in some test and legacy WebViews.
+      }
       void requestFramePlayerScrub(card, Number(target.value), { exact: false });
+    } else if (event.type === 'pointermove') {
+      if (!runtime.scrubActive) return true;
+      void requestFramePlayerScrub(card, Number(target.value), { exact: false });
+    } else if (event.type === 'input') {
+      void requestFramePlayerScrub(card, Number(target.value), { exact: false });
+    } else if (event.type === 'pointerup' || event.type === 'change') {
+      try {
+        target.releasePointerCapture?.(event.pointerId);
+      } catch {
+        // The pointer may already have been released by the browser.
+      }
+      void requestFramePlayerScrub(card, Number(target.value), { exact: true });
+    } else if (event.type === 'pointercancel') {
+      runtime.scrubActive = false;
+      runtime.dragTarget = null;
+      if (runtime.dragFrame !== null) {
+        window.cancelAnimationFrame?.(runtime.dragFrame);
+        runtime.dragFrame = null;
+      }
+      try {
+        target.releasePointerCapture?.(event.pointerId);
+      } catch {
+        // The pointer may already have been released by the browser.
+      }
     }
     return true;
   }
@@ -2532,6 +2561,7 @@ elements.blockCanvas?.addEventListener('click', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('pointerdown', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('pointermove', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('pointerup', handleBlockEditorEvent);
+elements.blockCanvas?.addEventListener('pointercancel', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('keydown', handleFramePlayerKeydown);
 elements.blockCanvas?.addEventListener('focusout', () => {
   setTimeout(flushQueuedBlockCanvasRender, 0);

@@ -74,11 +74,18 @@ test('drag is latest-target-wins approximate seek, release is exact seek', () =>
   assert.match(renderer, /presented \|\| readyAtTarget\(\)/u);
 
   const events = functionSlice(renderer, 'function handleFramePlayerEvent(', 'function handleFramePlayerKeydown(');
+  assert.match(events, /event\.type === 'pointerdown'/u);
+  assert.match(events, /event\.type === 'pointermove'/u);
+  assert.match(events, /event\.type === 'input'/u);
+  assert.match(events, /if \(!runtime\.scrubActive\) return true/u);
+  assert.match(events, /event\.type === 'pointercancel'/u);
   assert.match(events, /event\.type === 'pointerup'/u);
   assert.match(events, /event\.type === 'change'/u);
+  assert.match(events, /setPointerCapture/u);
   assert.match(events, /exact: true/u);
   assert.match(events, /exact: false/u);
   assert.match(events, /event\.type !== 'click'/u);
+  assert.match(renderer, /addEventListener\('pointercancel', handleBlockEditorEvent\)/u);
 });
 
 test('keyboard stepping is one exact frame and playback uses video clock/rate', () => {
