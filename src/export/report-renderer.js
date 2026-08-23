@@ -241,13 +241,13 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
   const segmentOut = settings.segment.out > 0 ? String(settings.segment.out) : '';
   const sideLabel = side === 'left' ? '左側' : side === 'right' ? '右側' : '影片';
   const metadata = frameMetadataAttributes(asset);
-  return '<div class="portable-player-side native-frame-player-side" data-native-frame-player data-player-side="' + escapeHtml(side) + '" tabindex="0" aria-selected="false" data-frame-selected="false"'
+  return '<div class="portable-player-side native-frame-player-side" data-native-frame-player data-player-side="' + escapeHtml(side) + '" tabindex="-1" aria-selected="false" data-frame-selected="false"'
     + ' data-segment-in="' + escapeHtml(String(settings.segment.in)) + '"'
     + ' data-segment-out="' + escapeHtml(segmentOut) + '"'
     + ' data-loop-enabled="' + (settings.loop.enabled ? 'true' : 'false') + '"'
     + metadata.fpsAttribute + metadata.frameCountAttribute + metadata.frameTimesAttribute + '>'
     + '<div class="portable-player-side-heading"><h3>' + escapeHtml(label) + '</h3></div>'
-    + '<div class="portable-frame-surface" data-frame-surface tabindex="0" aria-label="' + escapeHtml(sideLabel + '影格畫面') + '">'
+    + '<div class="portable-frame-surface" data-frame-surface tabindex="-1" aria-label="' + escapeHtml(sideLabel + '影格畫面') + '">'
     + '<video playsinline preload="metadata" data-player-video src="' + escapeHtml(encodeAssetPath(asset.relativePath)) + '"' + poster + '>'
     + '此瀏覽器不支援內嵌影片。'
     + '</video>'
@@ -430,7 +430,7 @@ function renderFramePlayerSide(block, side, frameBinding, comparison) {
     data-frame-count="${cache.frames.length}"
     data-frame-fps="${escapeHtml(String(cache.fps ?? cache.metadata?.fps ?? cache.metadata?.averageFps ?? 30))}">
     <div class="portable-player-side-heading"><h3>${escapeHtml(label)}</h3></div>
-    <div class="portable-frame-surface" data-frame-surface tabindex="0" aria-label="${escapeHtml(`${sideLabel}影格畫面`)}">
+    <div class="portable-frame-surface" data-frame-surface tabindex="-1" aria-label="${escapeHtml(`${sideLabel}影格畫面`)}">
       <img data-player-frame data-inline-frame src="${escapeHtml(encodeAssetPath(firstFrame.relativePath))}" alt="${escapeHtml(`${label}目前影格`)}">
       <span data-frame-placeholder hidden>尚未準備影格</span>
     </div>
@@ -476,11 +476,7 @@ function renderFramePlayer(block, byId, comparison, frameCaches) {
 function renderNativeSharedControls(label, block) {
   const escaped = escapeHtml(label);
   const leftSettings = playbackSettings(sideConfig(block, 'left'));
-  const commonSegment = block?.commonSegment && typeof block.commonSegment === 'object' ? block.commonSegment : {};
-  const commonStart = Number.isInteger(Number(commonSegment.in)) && Number(commonSegment.in) > 0 ? Number(commonSegment.in) : 0;
-  const commonEnd = Number.isInteger(Number(commonSegment.out)) && Number(commonSegment.out) > 0 ? Number(commonSegment.out) : 0;
   const commonLoop = block?.loop?.enabled !== false;
-  const sync = block?.sync && Number.isInteger(Number(block.sync.leftFrame)) && Number.isInteger(Number(block.sync.rightFrame)) ? block.sync : null;
   return '<div class="portable-frame-controls portable-frame-shared-controls" data-frame-controls data-frame-shared-controls role="group" aria-label="' + escaped + '影格播放器控制">'
     + '<div class="portable-frame-navigation">'
     + '<button type="button" class="portable-frame-toggle" data-frame-action="toggle" disabled aria-pressed="false" aria-label="播放" title="播放">▶</button>'
@@ -496,8 +492,6 @@ function renderNativeSharedControls(label, block) {
     + '<button type="button" data-frame-action="reset-rate" disabled aria-label="重置播放速度為 1 倍" title="重置為 1 倍">↻</button>'
     + '</div>'
     + '<label class="portable-frame-loop"><input data-frame-loop type="checkbox"' + (commonLoop ? ' checked' : '') + '>循環播放</label>'
-    + '<div class="portable-frame-common-readonly" data-frame-common-info>共同區間：' + (commonStart > 0 ? ('第 ' + (commonStart + 1) + ' 幀起') : '起點未設定') + ' · ' + (commonEnd > 0 ? ('第 ' + (commonEnd + 1) + ' 幀止') : '終點未設定') + '</div>'
-    + '<div class="portable-frame-sync-row"><span class="portable-frame-sync-label">同步位置</span><output data-frame-sync-info>' + (sync ? ('左 Frame: ' + sync.leftFrame + ' · 右 Frame: ' + sync.rightFrame) : '尚未設定同步點') + '</output></div>'
     + '<span data-frame-player-status role="status" data-state="pending">正在載入影片…</span>'
     + '</div>';
 }
@@ -549,7 +543,7 @@ function renderStyles() {
   return `
     :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
     * { box-sizing: border-box; }
-    body, body button, body output, body label, body h1, body h2, body h3, body h4, body p, body span { user-select: text; }
+    body, body * { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
     body { margin: 0; background: #f5f7fb; color: #172033; }
     main { width: min(100% - 2rem, 980px); margin: 0 auto; padding: 2rem 0 4rem; }
     .report-header { margin-bottom: 2rem; }
@@ -567,15 +561,17 @@ function renderStyles() {
     .report-media img { background: #eef2f7; }
     figcaption { margin-top: .5rem; color: #596780; font-size: .9rem; }
     .comparison-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-    .portable-player { padding: 1rem; border: 1px solid #ccd6e5; border-radius: .9rem; background: #fbfcff; }
+    .portable-player { width: 100%; padding: 1rem; border: 1px solid #ccd6e5; border-radius: .9rem; background: #fbfcff; }
     .portable-player-header, .portable-player-side-heading, .portable-player-actions { display: flex; align-items: center; gap: .75rem; }
     .portable-player-header { margin-bottom: .75rem; }
     .portable-player-header h3, .portable-player-side-heading h3 { margin: 0; }
-    .portable-player-grid { display: grid; gap: 1rem; }
+    .portable-player-grid { display: grid; width: 100%; gap: 1rem; }
     .portable-player-grid-side-by-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .portable-player-grid-stacked { grid-template-columns: 1fr; }
-    .portable-player-side { min-width: 0; padding: .75rem; border: 1px solid #dfe5ef; border-radius: .75rem; background: #fff; }
+    .portable-player-side { width: 100%; min-width: 0; padding: .75rem; border: 1px solid #dfe5ef; border-radius: .75rem; background: #fff; }
     .portable-player[data-frame-selected="true"] { box-shadow: 0 0 0 3px rgba(42, 104, 214, .78), 0 0 18px rgba(42, 104, 214, .34); }
+    .portable-player, .portable-player:focus, .portable-player:focus-visible,
+    .portable-player-side, .portable-player-side:focus, .portable-frame-surface:focus { outline: none; }
     .portable-player-side-heading { justify-content: space-between; margin-bottom: .5rem; }
     .portable-player-side-heading h3 { font-size: 1rem; }
     .portable-player-side-heading span { overflow-wrap: anywhere; color: #596780; font-size: .9rem; }
@@ -584,18 +580,16 @@ function renderStyles() {
     .portable-frame-surface img, .portable-frame-surface video { width: 100%; max-height: 460px; object-fit: contain; }
     .portable-frame-surface [hidden] { display: none; }
     .portable-frame-side-status, .portable-frame-fallback { margin: .55rem 0 0; color: #596780; font-size: .82rem; }
-    .portable-frame-controls { display: grid; grid-template-columns: max-content max-content max-content minmax(0, 1fr) max-content max-content; column-gap: .6rem; row-gap: .6rem; margin-top: .8rem; }
+    .portable-frame-controls { display: grid; grid-template-columns: 28px 28px minmax(5.5rem, 5.5rem) minmax(0, 1fr) minmax(5.5rem, 5.5rem) 28px; column-gap: .6rem; row-gap: .6rem; margin-top: .8rem; }
     .portable-frame-navigation { display: contents; }
     .portable-frame-navigation > button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; font-family: inherit; font-size: 16px; line-height: 1; text-align: center; }
     .portable-frame-navigation [data-frame-current] { grid-column: 3; }
     .portable-frame-navigation input[type="range"] { grid-column: 4; min-width: 0; width: 100%; padding: 0; margin: 0; }
     .portable-frame-rate-row input[type="range"] { padding: 0; margin: 0; }
-    .portable-frame-navigation [data-frame-total] { grid-column: 5; }
+    .portable-frame-navigation [data-frame-total] { grid-column: 5; width: 5.5rem; min-width: 5.5rem; }
+    .portable-frame-navigation [data-frame-current] { width: 5.5rem; min-width: 5.5rem; }
     .portable-frame-rate-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; width: 100%; }
-    .portable-frame-sync-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; min-width: 0; }
-    .portable-frame-common-readonly { grid-column: 1 / -1; color: #596780; font-size: .85rem; font-variant-numeric: tabular-nums; }
     .portable-frame-loop { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: .35rem; color: #33415c; font-size: .85rem; }
-    .portable-frame-sync-row output { color: #596780; font-variant-numeric: tabular-nums; }
     .portable-frame-shared-controls { grid-column: 1 / -1; width: 100%; }
     .portable-frame-rate-row input[type="range"] { flex: 1 1 auto; min-width: 0; }
     .portable-frame-controls button, .portable-player-rate-row button, .portable-frame-rate-row button { padding: .45rem .7rem; border: 1px solid #b9c5d8; border-radius: .45rem; background: #fff; color: #172033; cursor: pointer; }
@@ -623,6 +617,7 @@ function renderStyles() {
       .portable-frame-controls { grid-template-columns: 1fr; }
       .portable-frame-navigation { display: flex; flex-wrap: wrap; }
       .portable-frame-navigation input[type="range"] { flex: 1 1 10rem; }
+      .portable-frame-navigation [data-frame-current], .portable-frame-navigation [data-frame-total] { flex: 0 0 5.5rem; width: 5.5rem; }
       .portable-frame-rate-row { grid-column: 1; }
       .portable-player-side-controls { grid-template-columns: minmax(0, 1fr) max-content; }
     }

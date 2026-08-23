@@ -957,8 +957,9 @@ function selectedFramePlayerCard() {
 }
 
 function framePlayerKeyTargetIsEditable(target) {
-  return Boolean(target?.matches?.('input, textarea, select, [contenteditable="true"]')
-    || target?.isContentEditable || target?.closest?.('button'));
+  return Boolean(target?.closest?.('[data-frame-side-controls]')
+    || target?.matches?.('input, textarea, select, [contenteditable="true"]')
+    || target?.isContentEditable);
 }
 
 function framePlayerReady(block, runtime, card) {
@@ -2119,8 +2120,11 @@ async function playFramePlayer(card, { fromRateTransition = false } = {}) {
 async function toggleFramePlayer(card) {
   const runtime = framePlayerRuntimeForCard(card);
   const entry = blockForEditorCard(card);
-  if (runtime.lifecycle === 'loading' || runtime.exactSeek !== null || runtime.rateTransition) {
+  if (!framePlayerReady(entry.block, runtime, card)
+    || runtime.lifecycle === 'idle' || runtime.lifecycle === 'loading'
+    || runtime.lifecycle === 'error' || runtime.exactSeek !== null || runtime.rateTransition) {
     setFramePlayerStatus(card, '影片正在準備，請稍候。', 'pending');
+    updateFramePlayerControls(card);
     return;
   }
   const videos = framePlayerSides(entry.block, card).map((side) => framePlayerVideoForSide(card, side)).filter(Boolean);
@@ -2154,6 +2158,13 @@ async function toggleFramePlayer(card) {
 
 async function stepFramePlayer(card, direction) {
   const runtime = framePlayerRuntimeForCard(card);
+  const entry = blockForEditorCard(card);
+  if (!entry.block || !framePlayerReady(entry.block, runtime, card)
+    || runtime.lifecycle === 'idle' || runtime.lifecycle === 'loading' || runtime.lifecycle === 'error') {
+    setFramePlayerStatus(card, '影片正在準備，請稍候。', 'pending');
+    updateFramePlayerControls(card);
+    return;
+  }
   stopFramePlayer(card);
   const count = framePlayerFrameCount(blockForEditorCard(card).block, runtime, card);
   if (count <= 0) {

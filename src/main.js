@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu } = require('electron');
 const gpuDisabled = process.env.PITCHING_DISABLE_GPU === '1' || process.argv.includes('--disable-gpu');
 if (gpuDisabled) {
   app.commandLine.appendSwitch('disable-gpu');
@@ -591,6 +591,20 @@ function createWindow({ show = true } = {}) {
   const window = new BrowserWindow({ ...browserWindowOptions(), show });
   closeGuards.set(window, { allowClose: false, requestPending: false });
   window.setMenuBarVisibility(false);
+  window.webContents.on('context-menu', (_event, params = {}) => {
+    const selectionText = typeof params.selectionText === 'string' ? params.selectionText.trim() : '';
+    const editable = Boolean(params.isEditable);
+    if (!selectionText && !editable) return;
+    const flags = params.editFlags || {};
+    const menu = Menu.buildFromTemplate([
+      { label: '剪下', role: 'cut', enabled: editable && Boolean(flags.canCut) },
+      { label: '複製', role: 'copy', enabled: Boolean(flags.canCopy || selectionText) },
+      { label: '貼上', role: 'paste', enabled: editable && Boolean(flags.canPaste) },
+      { type: 'separator' },
+      { label: '全選', role: 'selectAll', enabled: Boolean(flags.canSelectAll || editable || selectionText) },
+    ]);
+    menu.popup({ window });
+  });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', guardNavigation);
   window.webContents.on('will-redirect', guardNavigation);

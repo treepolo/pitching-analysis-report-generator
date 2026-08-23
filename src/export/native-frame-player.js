@@ -66,7 +66,6 @@ function renderNativeFramePlayerScript() {
     const nativeKeyboardTargetIsEditable = (target) => Boolean(
       target?.matches?.('input:not([type="range"]), textarea, select, [contenteditable="true"]')
       || target?.isContentEditable
-      || target?.closest?.('button')
     );
 
     document.querySelectorAll('[data-native-frame-player]').forEach((side) => {
@@ -111,6 +110,8 @@ function renderNativeFramePlayerScript() {
         dragFrame: null,
         rateTransition: false,
         loaded: false,
+        metadataInitialized: false,
+        firstFrameReady: false,
         lifecycle: 'idle',
       };
 
@@ -172,7 +173,11 @@ function renderNativeFramePlayerScript() {
       const updateControls = () => {
         const count = frameCount();
         const maximum = Math.max(0, count - 1);
-        const pending = runtime.lifecycle === 'loading'
+        const pending = !runtime.loaded
+          || runtime.lifecycle === 'idle'
+          || runtime.lifecycle === 'loading'
+          || runtime.lifecycle === 'error'
+          || !runtime.firstFrameReady
           || runtime.exactSeek !== null;
         const playbackPending = pending || runtime.rateTransition;
         runtime.index = clamp(runtime.index, 0, maximum);
@@ -211,7 +216,7 @@ function renderNativeFramePlayerScript() {
         updateControls();
       };
       const hidePlaceholder = () => {
-        if (placeholder && (video.readyState >= 2 || !video.paused)) placeholder.hidden = true;
+        if (placeholder && runtime.firstFrameReady && (video.readyState >= 2 || !video.paused)) placeholder.hidden = true;
       };
       const cancelManual = () => {
         if (runtime.manualFrame !== null) {
@@ -478,7 +483,10 @@ function renderNativeFramePlayerScript() {
       const play = async ({ fromRateTransition = false } = {}) => {
         const operation = runtime.operationSerial;
         const count = frameCount();
-        if (count <= 0 || (!fromRateTransition && runtime.lifecycle === 'loading') || runtime.exactSeek !== null || (runtime.rateTransition && !fromRateTransition)) { setStatus('影片正在準備，請稍候。', 'pending'); return; }
+        if (count <= 0 || !runtime.loaded || !runtime.firstFrameReady
+          || runtime.lifecycle === 'idle' || runtime.lifecycle === 'loading' || runtime.lifecycle === 'error'
+          || (!fromRateTransition && runtime.lifecycle === 'loading') || runtime.exactSeek !== null
+          || (runtime.rateTransition && !fromRateTransition)) { setStatus('影片正在準備，請稍候。', 'pending'); return; }
         if (runtime.index >= count - 1) { const ready = await seekExact(segmentStartIndex(), false); if (operation !== runtime.operationSerial || !ready || runtime.index >= count - 1) return; }
         const rate = clampRate(runtime.rate);
         if (!nativeRate(rate)) { if (operation === runtime.operationSerial) startManual(); return; }
@@ -498,6 +506,12 @@ function renderNativeFramePlayerScript() {
         if (resume && wasPlaying) { runtime.rateTransition = true; setStatus('正在切換播放速度…', 'pending'); updateControls(); void play({ fromRateTransition: true }).finally(() => { if (rateSerial !== runtime.rateSerial) return; runtime.rateTransition = false; if (runtime.lifecycle === 'loading') runtime.lifecycle = 'ready'; updateControls(); }); } else updateControls();
       };
       const step = (direction) => {
+        if (!runtime.loaded || !runtime.firstFrameReady
+          || runtime.lifecycle === 'idle' || runtime.lifecycle === 'loading' || runtime.lifecycle === 'error') {
+          setStatus('影片正在準備，請稍候。', 'pending');
+          updateControls();
+          return;
+        }
         stop();
         void seekExact(runtime.index + direction);
       };
@@ -542,22 +556,30 @@ function renderNativeFramePlayerScript() {
         if (event.target.value.trim() !== '') applyRate(event.target.value);
       });
       rateInput?.addEventListener('change', (event) => applyRate(event.target.value));
-      video.addEventListener('loadedmetadata', () => {
+      const initializeVideo = () => {
+        if (runtime.metadataInitialized || video.readyState < 1) return;
+        runtime.metadataInitialized = true;
         runtime.count = runtime.count || frameTimes.length || Math.max(1, Math.ceil(duration() * fps));
         runtime.loaded = true;
-        if (isSharedSide()) { runtime.lifecycle = 'ready'; updateControls(); return; }
         runtime.lifecycle = 'loading';
         updateControls();
+        if (isSharedSide()) {
+          setSideStatus('影片已載入，正在定位第一幀…', 'pending');
+          updateControls();
+          return;
+        }
         void seekExact(segmentStartIndex(), false).then((ready) => {
           runtime.lifecycle = ready ? 'ready' : 'error';
-          if (placeholder) placeholder.hidden = !ready;
+          runtime.firstFrameReady = ready;
+          if (ready) hidePlaceholder();
           setSideStatus(ready ? '影片已就緒 · ' + frameCount() + ' 幀。' : '影片載入失敗。', ready ? 'loaded' : 'error');
           setStatus(ready ? '已顯示第 ' + (runtime.index + 1) + ' 幀。' : '第一幀尚未呈現，請重試。', ready ? 'loaded' : 'error');
           updateControls();
         });
-      });
-      video.addEventListener('loadeddata', hidePlaceholder);
-      video.addEventListener('canplay', hidePlaceholder);
+      };
+      video.addEventListener('loadedmetadata', initializeVideo);
+      video.addEventListener('loadeddata', () => { initializeVideo(); hidePlaceholder(); });
+      video.addEventListener('canplay', () => { initializeVideo(); hidePlaceholder(); });
       video.addEventListener('playing', () => {
         hidePlaceholder();
         if (!runtime.manual && !isSharedSide()) {
@@ -631,13 +653,14 @@ function renderNativeFramePlayerScript() {
           try { video.currentTime = frameTime(bounded); } catch {}
           updateControls();
         },
+        markReady: () => { runtime.firstFrameReady = true; hidePlaceholder(); updateControls(); },
         runtime,
       };
       side.addEventListener('pointerdown', () => selectNativeFramePlayer(side));
       updateRateControls();
       updateControls();
       setStatus('正在載入影片…', 'pending');
-      if (video.readyState >= 1) video.dispatchEvent(new Event('loadedmetadata'));
+      initializeVideo();
     });
     document.querySelectorAll('[data-native-frame-player-block]').forEach((block) => {
       const sides = ['left', 'right'].map((name) => block.querySelector('[data-native-frame-player][data-player-side="' + name + '"]')).filter(Boolean);
@@ -660,9 +683,9 @@ function renderNativeFramePlayerScript() {
       const rateSlider = controls?.querySelector('[data-frame-rate]');
       const resetRate = controls?.querySelector('[data-frame-action="reset-rate"]');
       const loopInput = controls?.querySelector('[data-frame-loop], [data-frame-common-loop]');
-      const syncInfo = controls?.querySelector('[data-frame-sync-info]');
       const status = controls?.querySelector('[data-frame-player-status]');
-      const state = { index: 0, count: 0, playing: false, rate: RATE_DEFAULT, sync: null, initialized: false, loopTransition: false, rateTransition: false, manual: false, manualTime: null, manualTimestamp: null, manualCancel: null, manualSerial: 0, operationSerial: 0, rateSerial: 0 };
+      const state = { index: 0, count: 0, playing: false, rate: RATE_DEFAULT, sync: null, initialized: false, initializing: false, loopTransition: false, rateTransition: false, manual: false, manualTime: null, manualTimestamp: null, manualCancel: null, manualSerial: 0, operationSerial: 0, rateSerial: 0 };
+      const sideStatuses = sides.map((side) => side.querySelector('[data-frame-side-status]'));
       const setStatus = (message, stateName = '') => { if (status) { status.textContent = message; status.dataset.state = stateName; } };
       const loopEnabled = () => block.dataset.commonLoopEnabled !== 'false' && (!loopInput || loopInput.checked !== false);
       const configuredRange = (side, action) => {
@@ -705,8 +728,11 @@ function renderNativeFramePlayerScript() {
       const update = () => {
         const map = mapping();
         state.count = map.count; state.sync = map.validSync ? map.sync : null; state.index = clamp(state.index, 0, Math.max(0, state.count - 1));
-        const ready = state.count > 0 && actions.every((action) => action.runtime.loaded && action.runtime.lifecycle !== 'loading');
-        const pending = !ready;
+        const sideReady = actions.every((action) => action.runtime.loaded
+          && action.runtime.firstFrameReady
+          && ['ready', 'playing', 'paused', 'ended'].includes(action.runtime.lifecycle));
+        const ready = state.initialized && state.count > 0 && sideReady;
+        const pending = state.initializing || !ready;
         if (timeline) { timeline.min = '0'; timeline.max = String(Math.max(0, state.count - 1)); timeline.value = String(state.index); timeline.disabled = pending; }
         if (position) position.textContent = state.count > 0 ? ('第 ' + (state.index + 1) + ' 幀') : '尚未準備';
         if (total) total.textContent = state.count > 0 ? ('共 ' + state.count + ' 幀') : '共 -- 幀';
@@ -717,7 +743,6 @@ function renderNativeFramePlayerScript() {
         if (rateSlider) { rateSlider.value = String(rateToSlider(state.rate)); rateSlider.disabled = pending; }
         if (resetRate) resetRate.disabled = pending;
         if (loopInput) { loopInput.checked = loopEnabled(); loopInput.disabled = pending; }
-        if (syncInfo) syncInfo.textContent = state.sync ? ('左 Frame: ' + state.sync.leftFrame + ' · 右 Frame: ' + state.sync.rightFrame) : '尚未設定同步點';
       };
       const cancelSharedManual = () => {
         state.manualSerial += 1; state.manualCancel?.(); state.manualCancel = null; state.manual = false; state.manualTime = null; state.manualTimestamp = null;
@@ -749,7 +774,12 @@ function renderNativeFramePlayerScript() {
         setStatus('播放中（使用擴充速度時鐘）。', 'loaded'); update(); scheduleSharedManual(tick); return true;
       };
       const stop = (message = null) => { state.operationSerial += 1; cancelSharedManual(); state.playing = false; state.rateTransition = false; actions.forEach((action) => action.stop()); if (message) setStatus(message, 'loaded'); update(); };
-      const seekControl = async (target, announce = true) => {
+      const seekControl = async (target, announce = true, { bootstrap = false } = {}) => {
+        if (!state.initialized && !bootstrap) {
+          setStatus('影片正在準備，請稍候。', 'pending');
+          update();
+          return false;
+        }
         const map = mapping(); if (map.count <= 0) return false;
         const bounded = clamp(Math.round(target), 0, map.count - 1); const operation = ++state.operationSerial;
         state.index = bounded; state.playing = false; state.rateTransition = false; cancelSharedManual(); actions.forEach((action) => action.stop()); update();
@@ -773,6 +803,11 @@ function renderNativeFramePlayerScript() {
       };
       const togglePlayback = async () => {
         if (state.rateTransition) return;
+        if (!state.initialized || state.initializing) {
+          setStatus('影片正在準備，請稍候。', 'pending');
+          update();
+          return;
+        }
         if (state.playing) { stop('已暫停。'); return; }
         const map = mapping(); if (map.count <= 0) return;
         if (state.index >= map.count - 1) { const ready = await seekControl(0, false); if (!ready && map.count > 1) return; }
@@ -808,7 +843,31 @@ function renderNativeFramePlayerScript() {
         video?.addEventListener('timeupdate', syncProgress);
         video?.addEventListener('playing', () => { if (!state.rateTransition) { state.playing = true; update(); } });
         video?.addEventListener('pause', () => { if (!video.ended && !state.loopTransition && !state.rateTransition && !actions.some((action) => action.runtime.manual)) { state.playing = false; actions.forEach((action) => action.stop()); update(); } });
-        video?.addEventListener('loadedmetadata', () => { update(); if (!state.initialized && actions.every((action) => action.runtime.loaded)) { state.initialized = true; void seekControl(0, false); } });
+        video?.addEventListener('loadedmetadata', () => {
+          update();
+          const sideReady = actions.every((action) => action.runtime.loaded
+            && ['ready', 'playing', 'paused', 'ended'].includes(action.runtime.lifecycle));
+          if (!state.initialized && !state.initializing && actions.length === 2 && sideReady) {
+            state.initializing = true;
+            update();
+            void seekControl(0, false, { bootstrap: true }).then((ok) => {
+              state.initializing = false;
+              actions.forEach((action, index) => {
+                action.markReady?.();
+                const sideStatus = sideStatuses[index];
+                if (sideStatus) {
+                  sideStatus.textContent = ok
+                    ? '影片已就緒 · ' + action.runtime.count + ' 幀。'
+                    : '影片載入失敗。';
+                  sideStatus.dataset.state = ok ? 'loaded' : 'error';
+                }
+              });
+              state.initialized = ok;
+              if (!ok) setStatus('雙側影片第一幀定位失敗，請確認輸出資料夾內的影片檔案。', 'error');
+              update();
+            });
+          }
+        });
         video?.addEventListener('ended', () => {
           if (state.loopTransition) return;
           if (loopEnabled() && state.count > 0) { state.loopTransition = true; void seekControl(0, false).then((ok) => ok ? togglePlayback() : null).finally(() => { state.loopTransition = false; }); }

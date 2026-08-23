@@ -594,6 +594,9 @@ test('main/preload keep export lifecycle channels renderer-independent', async (
   }
   assert.match(mainSource, /dialog\.showOpenDialog\(senderWindow[\s\S]*openDirectory/iu);
   assert.match(mainSource, /validatePickedExportDirectory\(PROJECT_ROOT, result\.filePaths\[0\]\)/u);
+  assert.match(mainSource, /webContents\.on\(['"]context-menu['"]/u);
+  assert.match(mainSource, /Menu\.buildFromTemplate/u);
+  assert.match(mainSource, /role:\s*['"]copy['"]/u);
   assert.match(preloadSource, /pickExportDirectory:\s*\(\)\s*=>\s*ipcRenderer\.invoke\(['"]export:pick-directory['"]\)/u);
   assert.doesNotMatch(preloadSource, /document\.querySelector|window\.addEventListener/iu);
 });
