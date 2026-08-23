@@ -25,8 +25,10 @@ test('single and dual cards use the shared outer-player contract', () => {
   assert.match(side, /data-frame-placeholder/u);
   assert.doesNotMatch(side, /data-frame-player-side|data-frame-selected/u);
   assert.match(block, /data-frame-player data-frame-player-kind/u);
-  assert.match(block, /renderInlineVideoSide\(block, 'left'\)/u);
-  assert.match(block, /renderInlineVideoSide\(block, 'right'\)/u);
+  assert.match(block, /renderInlineVideoSide\(block, 'left', \{ sideControls: true \}\)/u);
+  assert.match(block, /renderInlineVideoSide\(block, 'right', \{ sideControls: true \}\)/u);
+  assert.match(side, /data-frame-side-controls/u);
+  assert.match(side, /data-frame-control-side/u);
   assert.match(block, /renderInlineVideoSide\(block, 'single', \{ playerCard: true \}\)/u);
   assert.match(block, /renderFramePlayerControls\(block\.label \|\| '雙影片', \{ shared: true \}\)/u);
   assert.match(controls, /data-frame-shared-controls/u);
@@ -46,6 +48,13 @@ test('single and dual cards use the shared outer-player contract', () => {
   assert.match(renderer, /function constrainDualSegmentToSync\(block, pathValue, value\)/u);
   assert.match(renderer, /syncFrame \+ \(kind === 'out' \? 1 : 0\)/u);
   assert.match(renderer, /function bindFramePlayerActionButtons\(card\)/u);
+  assert.match(renderer, /function framePlayerSideRuntime\(card, side\)/u);
+  assert.match(renderer, /function seekFramePlayerSideIndex\(card, side/u);
+  assert.match(renderer, /function toggleFramePlayerSide\(card, side\)/u);
+  assert.match(renderer, /function handleFramePlayerSideEvent\(event, card, side\)/u);
+  assert.match(renderer, /target\.closest\('\[data-frame-side-controls\]'\)/u);
+  assert.match(renderer, /target\?\.matches\?\.\('input, textarea, select/u);
+  assert.match(renderer, /sync: \{ leftFrame: 0, rightFrame: 0 \}/u);
 });
 
 test('loading uses the native browser video pipeline without frame-cache preparation', () => {

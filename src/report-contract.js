@@ -186,8 +186,10 @@
       copyString(block, output, 'caption');
       copyString(block, output, 'layout');
       copyStringArray(block, output, 'labels');
+      const hasSync = Object.prototype.hasOwnProperty.call(block, 'sync');
       const sync = cloneDualSync(block.sync);
       if (sync) output.sync = sync;
+      else if (!hasSync) output.sync = { leftFrame: 0, rightFrame: 0 };
     }
 
     return output;

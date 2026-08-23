@@ -494,7 +494,7 @@ function renderNativeSharedControls(label, block) {
     + '<input data-frame-rate type="range" min="' + PLAYBACK_RATE_SLIDER_MIN + '" max="' + PLAYBACK_RATE_SLIDER_MAX + '" step="' + PLAYBACK_RATE_SLIDER_STEP + '" value="0" disabled aria-label="' + escaped + '播放速度控制條">'
     + '<button type="button" data-frame-action="reset-rate" disabled aria-label="重置播放速度為 1 倍" title="重置為 1 倍">↻</button>'
     + '</div>'
-    + '<div class="portable-frame-sync-row"><button type="button" data-frame-action="sync" disabled>同步</button><output data-frame-sync-info>' + (sync ? ('左 Frame: ' + sync.leftFrame + ' · 右 Frame: ' + sync.rightFrame) : '尚未設定同步點') + '</output></div>'
+    + '<div class="portable-frame-sync-row"><span class="portable-frame-sync-label">同步位置</span><output data-frame-sync-info>' + (sync ? ('左 Frame: ' + sync.leftFrame + ' · 右 Frame: ' + sync.rightFrame) : '尚未設定同步點') + '</output></div>'
     + '<span data-frame-player-status role="status" data-state="pending">正在載入影片…</span>'
     + '</div>';
 }

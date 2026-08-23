@@ -150,7 +150,9 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.match(html, /data-frame-action="previous"[^>]*>←/u);
   assert.match(html, /data-frame-action="next"[^>]*>→/u);
   assert.match(html, /data-frame-shared-controls/u);
-  assert.ok([...html.matchAll(/data-frame-action="sync"/g)].length >= 1);
+  assert.match(html, /data-frame-sync-info/u);
+  assert.doesNotMatch(html, /data-frame-action="sync"/u);
+  assert.doesNotMatch(html, /syncPoint|syncButton/u);
   assert.match(html, /nativeFramePlayerKeyboardBound/u);
   assert.doesNotMatch(html, /data-anchor-time|data-sync-offset|data-loop-start|data-loop-end|陷ｷ譴ｧ・ｭ・･|驍ｯ竏晢ｽｮ蝌ｶ鬪ｭ・ｨ魄溘・/u);
   assert.doesNotMatch(html, /portable-player-settings|portable-player-eyebrow|portable-player-layout/iu);

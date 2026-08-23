@@ -231,6 +231,7 @@ function normalizeVideoBlock(block) {
   // The old comparison synchronisation fields are intentionally not migrated.
   // The current contract only accepts an explicit pair of non-negative frame
   // indexes on comparison-video blocks.
+  const hadSync = Object.prototype.hasOwnProperty.call(normalized, 'sync');
   const dualSync = normalizeDualSync(normalized.sync);
   delete normalized.sync;
   delete normalized.binding;
@@ -268,6 +269,7 @@ function normalizeVideoBlock(block) {
     if (left !== undefined) normalized.left = left;
     if (right !== undefined) normalized.right = right;
     if (dualSync !== undefined) normalized.sync = dualSync;
+    else if (!hadSync) normalized.sync = { leftFrame: 0, rightFrame: 0 };
   }
   return normalized;
 }

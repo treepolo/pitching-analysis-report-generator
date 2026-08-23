@@ -448,7 +448,7 @@ function addComparisonVideoBlock({ allowEmpty = false } = {}) {
       playback: { rate: 1 },
       loop: { enabled: false },
     },
-    sync: null,
+    sync: { leftFrame: 0, rightFrame: 0 },
   });
 }
 
@@ -792,7 +792,7 @@ function renderFramePlayerControls(label, { shared = false } = {}) {
         <span class="inline-frame-player-status" data-frame-player-status role="status" data-state="pending">正在載入影片…</span>
       </div>`;
 }
-function renderInlineVideoSide(block, side, { playerCard = false } = {}) {
+function renderInlineVideoSide(block, side, { playerCard = false, sideControls = false } = {}) {
   const title = playerSideTitle(block, side);
   const escapedTitle = escapeHtml(title);
   return `
@@ -804,6 +804,7 @@ function renderInlineVideoSide(block, side, { playerCard = false } = {}) {
       </div>
       <p class="inline-video-status" data-inline-status role="status">尚未準備播放影片。</p>
       ${playerCard ? renderFramePlayerControls(title) : ''}
+      ${sideControls ? renderFramePlayerControls(title).replace('data-frame-controls', 'data-frame-side-controls data-frame-control-side="' + side + '" data-frame-controls') : ''}
     </div>`;
 }
 function renderInlineVideoBlock(section, block) {
@@ -812,7 +813,7 @@ function renderInlineVideoBlock(section, block) {
   // blocks read the persisted layout choice.
   const layout = comparison && block.layout === 'stacked' ? 'stacked' : (comparison ? 'side-by-side' : 'stacked');
   const sides = comparison
-    ? `${renderInlineVideoSide(block, 'left')}${renderInlineVideoSide(block, 'right')}`
+    ? `${renderInlineVideoSide(block, 'left', { sideControls: true })}${renderInlineVideoSide(block, 'right', { sideControls: true })}`
     : renderInlineVideoSide(block, 'single', { playerCard: true });
   return `
     <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block data-frame-player data-frame-player-kind="${comparison ? 'comparison' : 'single'}" tabindex="0" aria-selected="false" data-frame-selected="false">
@@ -880,6 +881,7 @@ function framePlayerRuntimeForCard(card) {
       frameEngineGuard: false,
       primarySide: 'single',
       controlMap: null,
+      sideControls: Object.create(null),
       lifecycle: 'idle',
     };
     state.framePlayerByCard.set(card, runtime);
@@ -936,7 +938,7 @@ function selectedFramePlayerCard() {
 }
 
 function framePlayerKeyTargetIsEditable(target) {
-  return Boolean(target?.matches?.('input:not([type="range"]), textarea, select, [contenteditable="true"]')
+  return Boolean(target?.matches?.('input, textarea, select, [contenteditable="true"]')
     || target?.isContentEditable || target?.closest?.('button'));
 }
 
@@ -960,6 +962,91 @@ function framePlayerSideConfiguredRange(block, runtime, side) {
     : cache.frameCount - 1;
   return { start, end };
 }
+
+function framePlayerSideRuntime(card, side) {
+  const runtime = framePlayerRuntimeForCard(card);
+  if (!runtime.sideControls[side]) {
+    runtime.sideControls[side] = {
+      active: false,
+      playing: false,
+      frame: 0,
+      scrubActive: false,
+      dragTarget: null,
+      dragFrame: null,
+      exactTarget: null,
+      exactPromise: null,
+      seekRuntime: { seekSerial: 0, pendingSeeks: new Map() },
+    };
+  }
+  return runtime.sideControls[side];
+}
+
+function framePlayerSideControls(card, side) {
+  return inlineSideElementForCard(card, side)?.querySelector('[data-frame-side-controls]') || null;
+}
+function updateFramePlayerSideControls(card, side) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const runtime = framePlayerRuntimeForCard(card);
+  const controls = framePlayerSideControls(card, side);
+  if (!controls || !block) return;
+  const state = framePlayerSideRuntime(card, side);
+  const range = framePlayerSideConfiguredRange(block, runtime, side);
+  const cache = runtime.caches[side];
+  const count = cache?.frameCount || 0;
+  const video = framePlayerVideoForSide(card, side);
+  const fallbackFrame = video && cache
+    ? Math.max(0, Math.min(count - 1, Math.round((Number(video.currentTime) || 0) * (Number(cache.fps) || 30))))
+    : 0;
+  const frame = range
+    ? Math.max(range.start, Math.min(range.end, Number.isInteger(state.frame) ? state.frame : fallbackFrame))
+    : fallbackFrame;
+  state.frame = frame;
+  const timeline = controls.querySelector('[data-frame-timeline]');
+  const current = controls.querySelector('[data-frame-current], [data-frame-position]');
+  const total = controls.querySelector('[data-frame-total]');
+  const previous = controls.querySelector('[data-frame-action="previous"]');
+  const next = controls.querySelector('[data-frame-action="next"]');
+  const toggle = controls.querySelector('[data-frame-action="toggle"]');
+  const available = Boolean(range && count > 0 && runtime.lifecycle !== 'loading' && state.exactTarget === null);
+  if (timeline) {
+    timeline.min = String(range?.start ?? 0);
+    timeline.max = String(range?.end ?? Math.max(0, count - 1));
+    timeline.value = String(frame);
+    timeline.disabled = !available;
+  }
+  if (current) current.textContent = count > 0 ? ('第 ' + (frame + 1) + ' 幀') : '尚未準備';
+  if (total) total.textContent = count > 0 ? ('共 ' + count + ' 幀') : '共 -- 幀';
+  if (previous) previous.disabled = !available || !range || frame <= range.start;
+  if (next) next.disabled = !available || !range || frame >= range.end;
+  if (toggle) {
+    toggle.disabled = !available;
+    toggle.textContent = state.playing ? '⏸' : '▶';
+    toggle.setAttribute('aria-pressed', state.playing ? 'true' : 'false');
+    toggle.setAttribute('aria-label', state.playing ? '暫停' : '播放');
+    toggle.title = state.playing ? '暫停' : '播放';
+  }
+}
+
+function clearIndependentSideControls(card, except = null) {
+  const entry = blockForEditorCard(card);
+
+  for (const side of framePlayerSides(entry.block, card)) {
+    if (side === except) continue;
+    const state = framePlayerSideRuntime(card, side);
+    state.seekRuntime.seekSerial += 1;
+    cancelPendingVideoSeek(state.seekRuntime, framePlayerVideoForSide(card, side));
+    state.active = false;
+    state.playing = false;
+    state.scrubActive = false;
+    state.dragTarget = null;
+    const video = framePlayerVideoForSide(card, side);
+    if (video) video.pause();
+    updateFramePlayerSideControls(card, side);
+  }
+}
+
+
 function framePlayerControlMap(block, runtime, card) {
   const sides = framePlayerSides(block, card);
   if (sides.length !== 2) return null;
@@ -1007,7 +1094,8 @@ function framePlayerSegmentStartIndex(block, runtime, card) {
 }
 
 function setFramePlayerStatus(card, message, stateName = '') {
-  const status = card?.querySelector('[data-frame-player-status]');
+  const status = card?.querySelector('[data-frame-shared-controls] [data-frame-player-status]')
+    || card?.querySelector('[data-frame-player-status]');
   if (!status) return;
   status.textContent = message;
   status.dataset.state = stateName;
@@ -1021,17 +1109,19 @@ function updateFramePlayerControls(card) {
   const index = Math.min(Math.max(0, runtime.currentFrameIndex), maxIndex);
   runtime.currentFrameIndex = index;
   runtime.primarySide = framePlayerPrimarySide(entry.block, runtime, card);
-  const timeline = card.querySelector('[data-frame-timeline]');
-  const currentPosition = card.querySelector('[data-frame-current], [data-frame-position]');
-  const totalPosition = card.querySelector('[data-frame-total]');
-  const previous = card.querySelector('[data-frame-action="previous"]');
-  const next = card.querySelector('[data-frame-action="next"]');
-  const toggle = card.querySelector('[data-frame-action="toggle"]');
-  const resetRate = card.querySelector('[data-frame-action="reset-rate"]');
-  const rateSlider = card.querySelector('[data-frame-rate]');
-  const rateInput = card.querySelector('[data-frame-rate-input]');
-  const syncButton = card.querySelector('[data-frame-action="sync"]');
-  const syncInfo = card.querySelector('[data-frame-sync-info]');
+  const sharedControls = card.querySelector('[data-frame-shared-controls]');
+  const controlRoot = sharedControls || card;
+  const timeline = controlRoot.querySelector('[data-frame-timeline]');
+  const currentPosition = controlRoot.querySelector('[data-frame-current], [data-frame-position]');
+  const totalPosition = controlRoot.querySelector('[data-frame-total]');
+  const previous = controlRoot.querySelector('[data-frame-action="previous"]');
+  const next = controlRoot.querySelector('[data-frame-action="next"]');
+  const toggle = controlRoot.querySelector('[data-frame-action="toggle"]');
+  const resetRate = controlRoot.querySelector('[data-frame-action="reset-rate"]');
+  const rateSlider = controlRoot.querySelector('[data-frame-rate]');
+  const rateInput = controlRoot.querySelector('[data-frame-rate-input]');
+  const syncButton = controlRoot.querySelector('[data-frame-action="sync"]');
+  const syncInfo = controlRoot.querySelector('[data-frame-sync-info]');
   const pendingPreparation = runtime.lifecycle === 'loading'
     || runtime.exactSeek !== null
     || runtime.rateTransition;
@@ -1069,6 +1159,7 @@ function updateFramePlayerControls(card) {
     const sync = entry.block?.sync;
     syncInfo.textContent = map?.syncValid && sync ? `左 Frame: ${sync.leftFrame} · 右 Frame: ${sync.rightFrame}` : '尚未設定同步點';
   }
+  for (const side of framePlayerSides(entry.block, card)) updateFramePlayerSideControls(card, side);
 }
 function bindFramePlayerActionButtons(card) {
   card?.querySelectorAll('[data-frame-action="previous"], [data-frame-action="next"], [data-frame-action="toggle"], [data-frame-action="sync"]')
@@ -1082,6 +1173,14 @@ function bindFramePlayerActionButtons(card) {
         event.stopPropagation();
         if (button.disabled) return;
         const action = button.dataset.frameAction;
+        const sideControls = button.closest('[data-frame-side-controls]');
+        const side = sideControls?.dataset.frameControlSide;
+        if (side) {
+          if (action === 'previous') void stepFramePlayerSide(card, side, -1);
+          else if (action === 'next') void stepFramePlayerSide(card, side, 1);
+          else if (action === 'toggle') void toggleFramePlayerSide(card, side);
+          return;
+        }
         if (action === 'previous') void stepFramePlayer(card, -1);
         else if (action === 'next') void stepFramePlayer(card, 1);
         else if (action === 'toggle') void toggleFramePlayer(card);
@@ -1457,8 +1556,218 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
   });
 }
 
+function sideFrameIndexFromVideo(card, side) {
+  const runtime = framePlayerRuntimeForCard(card);
+  const cache = runtime.caches[side];
+  const video = framePlayerVideoForSide(card, side);
+  if (!cache || !video) return 0;
+  const fps = Number(cache.fps) > 0 ? Number(cache.fps) : 30;
+  return Math.max(0, Math.min(cache.frameCount - 1, Math.round((Number(video.currentTime) || 0) * fps)));
+}
+
+async function seekFramePlayerSideIndex(card, side, frameIndex, { exact = true, status = false } = {}) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const runtime = framePlayerRuntimeForCard(card);
+  if (runtime.playing || runtime.manualPlayback) stopFramePlayer(card);
+  clearIndependentSideControls(card, side);
+  const state = framePlayerSideRuntime(card, side);
+  const cache = runtime.caches[side];
+  const video = framePlayerVideoForSide(card, side);
+  const range = framePlayerSideConfiguredRange(block, runtime, side);
+  if (!block || !cache || !video || !range) return false;
+  const target = Math.max(range.start, Math.min(range.end, Math.round(Number(frameIndex) || 0)));
+  if (state.dragFrame !== null) {
+    window.cancelAnimationFrame?.(state.dragFrame);
+    state.dragFrame = null;
+  }
+  state.dragTarget = null;
+  state.seekRuntime.seekSerial += 1;
+  const serial = state.seekRuntime.seekSerial;
+  state.active = true;
+  state.playing = false;
+  state.frame = target;
+  state.exactTarget = exact ? target : null;
+  cancelPendingVideoSeek(state.seekRuntime, video);
+  try { video.pause(); } catch {}
+  updateFramePlayerSideControls(card, side);
+  if (status) setInlineVideoStatus(inlineSideElementForCard(card, side), '正在定位…', 'pending');
+  const targetTime = framePlayerTimeForSide(runtime, side, target);
+  let success = false;
+  if (!exact) {
+    try {
+      if (video.seeking || typeof video.fastSeek !== 'function') video.currentTime = targetTime;
+      else video.fastSeek(targetTime);
+      success = true;
+    } catch {
+      success = false;
+    }
+  } else {
+    const fps = Number(cache.fps) > 0 ? Number(cache.fps) : 30;
+    success = await seekVideoExact(video, targetTime, serial, state.seekRuntime, Math.max(0.02, (0.5 / fps) + 0.01));
+  }
+  if (serial !== state.seekRuntime.seekSerial || !card.isConnected) return false;
+  state.exactTarget = null;
+  if (!success) {
+    state.frame = sideFrameIndexFromVideo(card, side);
+    if (status) setInlineVideoStatus(inlineSideElementForCard(card, side), '影片定位未完成，請重試。', 'error');
+  } else if (status) {
+    setInlineVideoStatus(inlineSideElementForCard(card, side), '已完成定位。', 'loaded');
+  }
+  updateFramePlayerSideControls(card, side);
+  return success;
+}
+
+function requestFramePlayerSideScrub(card, side, frameIndex, { exact = false } = {}) {
+  const runtime = framePlayerRuntimeForCard(card);
+  const state = framePlayerSideRuntime(card, side);
+  const block = blockForEditorCard(card).block;
+  const range = framePlayerSideConfiguredRange(block, runtime, side);
+  if (!range) return Promise.resolve(false);
+  const target = Math.max(range.start, Math.min(range.end, Math.round(Number(frameIndex) || 0)));
+  const controls = framePlayerSideControls(card, side);
+  const timeline = controls?.querySelector('[data-frame-timeline]');
+  if (timeline) timeline.value = String(target);
+  state.dragTarget = target;
+  if (exact) {
+    state.scrubActive = false;
+    if (state.exactTarget === target && state.exactPromise) return state.exactPromise;
+    const promise = seekFramePlayerSideIndex(card, side, target, { exact: true, status: true });
+    state.exactTarget = target;
+    state.exactPromise = promise;
+    void promise.finally(() => {
+      if (state.exactPromise === promise) {
+        state.exactPromise = null;
+        state.exactTarget = null;
+        updateFramePlayerSideControls(card, side);
+      }
+    });
+    return promise;
+  }
+  if (state.dragFrame !== null) return Promise.resolve(true);
+  const schedule = typeof window.requestAnimationFrame === 'function'
+    ? window.requestAnimationFrame.bind(window)
+    : (callback) => setTimeout(callback, 0);
+  state.dragFrame = schedule(() => {
+    state.dragFrame = null;
+    const latest = state.dragTarget;
+    state.dragTarget = null;
+    if (latest === null || !card.isConnected) return;
+    void seekFramePlayerSideIndex(card, side, latest, { exact: false, status: false });
+  });
+  return Promise.resolve(true);
+}
+
+function stopFramePlayerSide(card, side) {
+  const state = framePlayerSideRuntime(card, side);
+  state.seekRuntime.seekSerial += 1;
+  cancelPendingVideoSeek(state.seekRuntime, framePlayerVideoForSide(card, side));
+  state.active = false;
+  state.playing = false;
+  state.scrubActive = false;
+  state.dragTarget = null;
+  state.exactTarget = null;
+  if (state.dragFrame !== null) {
+    window.cancelAnimationFrame?.(state.dragFrame);
+    state.dragFrame = null;
+  }
+  const video = framePlayerVideoForSide(card, side);
+  if (video) video.pause();
+  updateFramePlayerSideControls(card, side);
+}
+
+async function toggleFramePlayerSide(card, side) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const runtime = framePlayerRuntimeForCard(card);
+  const state = framePlayerSideRuntime(card, side);
+  const video = framePlayerVideoForSide(card, side);
+  const range = framePlayerSideConfiguredRange(block, runtime, side);
+  if (!block || !video || !range || runtime.lifecycle === 'loading') return false;
+  if (state.playing) {
+    stopFramePlayerSide(card, side);
+    setInlineVideoStatus(inlineSideElementForCard(card, side), '已暫停。', 'loaded');
+    return true;
+  }
+  stopFramePlayer(card);
+  state.active = true;
+  const atEnd = Number.isInteger(state.frame) && state.frame >= range.end;
+  const frame = atEnd ? range.start : Math.max(range.start, Math.min(range.end, Number.isInteger(state.frame) ? state.frame : sideFrameIndexFromVideo(card, side)));
+  state.frame = frame;
+  const targetTime = framePlayerTimeForSide(runtime, side, frame);
+  if (Math.abs((Number(video.currentTime) || 0) - targetTime) > 0.0001) {
+    const positioned = await seekFramePlayerSideIndex(card, side, frame, { exact: true, status: false });
+    if (!positioned) {
+      setInlineVideoStatus(inlineSideElementForCard(card, side), '影片定位未完成，請重試。', 'error');
+      return false;
+    }
+  }
+  state.active = true;
+  const nativeRate = setSafePlaybackRate(card, video, clampPlaybackRate(runtime.playbackRate));
+  if (!nativeRate) setSafePlaybackRate(card, video, PLAYBACK_RATE_DEFAULT);
+  enforceInlinePlaybackBounds(block, side, video, { starting: true });
+  try {
+    await video.play();
+    state.active = true;
+    state.playing = true;
+    setInlineVideoStatus(inlineSideElementForCard(card, side), '播放中。', 'loaded');
+    updateFramePlayerSideControls(card, side);
+    return true;
+  } catch (error) {
+    state.playing = false;
+    state.active = true;
+    setInlineVideoStatus(inlineSideElementForCard(card, side), '播放失敗：' + (error?.message || '請重試。'), 'error');
+    updateFramePlayerSideControls(card, side);
+    return false;
+  }
+}
+
+async function stepFramePlayerSide(card, side, direction) {
+  const runtime = framePlayerRuntimeForCard(card);
+  const block = blockForEditorCard(card).block;
+  const range = framePlayerSideConfiguredRange(block, runtime, side);
+  if (!range) return false;
+  stopFramePlayerSide(card, side);
+  const state = framePlayerSideRuntime(card, side);
+  const current = Number.isInteger(state.frame) ? state.frame : sideFrameIndexFromVideo(card, side);
+  const target = Math.max(range.start, Math.min(range.end, current + (direction < 0 ? -1 : 1)));
+  return seekFramePlayerSideIndex(card, side, target, { exact: true, status: true });
+}
+
+function handleFramePlayerSideEvent(event, card, side) {
+  const target = event.target;
+  if (!target.matches('[data-frame-timeline]')) return true;
+  const state = framePlayerSideRuntime(card, side);
+  if (event.type === 'pointerdown') {
+    state.scrubActive = true;
+    try { target.setPointerCapture?.(event.pointerId); } catch {}
+    void requestFramePlayerSideScrub(card, side, Number(target.value), { exact: false });
+  } else if (event.type === 'pointermove') {
+    if (!state.scrubActive) return true;
+    void requestFramePlayerSideScrub(card, side, Number(target.value), { exact: false });
+  } else if (event.type === 'input') {
+    if (state.exactTarget !== null) return true;
+    void requestFramePlayerSideScrub(card, side, Number(target.value), { exact: false });
+  } else if (event.type === 'pointerup' || event.type === 'change') {
+    state.scrubActive = false;
+    try { target.releasePointerCapture?.(event.pointerId); } catch {}
+    void requestFramePlayerSideScrub(card, side, Number(target.value), { exact: true });
+  } else if (event.type === 'pointercancel') {
+    state.scrubActive = false;
+    state.dragTarget = null;
+    if (state.dragFrame !== null) {
+      window.cancelAnimationFrame?.(state.dragFrame);
+      state.dragFrame = null;
+    }
+    try { target.releasePointerCapture?.(event.pointerId); } catch {}
+  }
+  return true;
+}
+
+
 async function seekFramePlayerIndex(card, frameIndex, { exact = true, status = true } = {}) {
   const entry = blockForEditorCard(card);
+  clearIndependentSideControls(card);
   const runtime = framePlayerRuntimeForCard(card);
   const count = framePlayerFrameCount(entry.block, runtime, card);
   if (count <= 0) return false;
@@ -1571,6 +1880,7 @@ async function prepareFramePlayerCard(card, block, generation) {
   runtime.exactSeek = null;
   runtime.scrubActive = false;
   runtime.caches = Object.create(null);
+  runtime.sideControls = Object.create(null);
   runtime.lifecycle = 'loading';
   runtime.rateTransition = false;
   if (runtime.dragFrame !== null) cancelAnimationFrame(runtime.dragFrame);
@@ -1662,6 +1972,7 @@ async function prepareFramePlayerCard(card, block, generation) {
 }
 
 function stopFramePlayer(card) {
+  clearIndependentSideControls(card);
   const runtime = framePlayerRuntimeForCard(card);
   runtime.playing = false;
   runtime.rateTransition = false;
@@ -1775,6 +2086,7 @@ function applyFramePlayerRate(card, rate, { persist = false } = {}) {
   const entry = blockForEditorCard(card);
   const block = entry.block;
   if (!block) return false;
+  clearIndependentSideControls(card);
   const normalizedRate = clampPlaybackRate(rate);
   const runtime = framePlayerRuntimeForCard(card);
   const wasPlaying = runtime.playing;
@@ -1834,6 +2146,10 @@ function handleFramePlayerEvent(event) {
   const target = event.target;
   const card = target.closest('[data-frame-player]');
   if (!card) return false;
+  const sideControls = target.closest('[data-frame-side-controls]');
+  if (sideControls) {
+    return handleFramePlayerSideEvent(event, card, sideControls.dataset.frameControlSide);
+  }
   if (target.matches('[data-frame-timeline]')) {
     const runtime = framePlayerRuntimeForCard(card);
     if (event.type === 'pointerdown') {
@@ -1982,6 +2298,12 @@ function syncFramePlayerProgress(card, block, side, video) {
   const runtime = framePlayerRuntimeForCard(card);
   const cache = runtime.caches[side];
   if (!cache) return;
+  const independentSide = framePlayerSideRuntime(card, side);
+  if (independentSide.active) {
+    independentSide.frame = sideFrameIndexFromVideo(card, side);
+    updateFramePlayerSideControls(card, side);
+    return;
+  }
   if (block?.type === 'comparisonVideo') {
     if (runtime.manualPlayback && Number.isFinite(runtime.manualPlaybackTime)) {
       runtime.currentFrameIndex = Math.max(0, Math.min(framePlayerFrameCount(block, runtime, card) - 1, Math.round(runtime.manualPlaybackTime * (Number(cache.fps) || 30))));
@@ -2044,7 +2366,8 @@ function bindInlineVideoRuntime(card, block, side, video) {
       const current = blockForEditorCard(card).block;
       if (eventName === 'playing' && (current?.type === 'singleVideo' || current?.type === 'comparisonVideo')) {
         const frameRuntime = framePlayerRuntimeForCard(card);
-        if (side === framePlayerPrimarySide(current, frameRuntime, card)) {
+        if (side === framePlayerPrimarySide(current, frameRuntime, card)
+          && !framePlayerSideRuntime(card, side).active) {
           frameRuntime.playing = true;
           frameRuntime.lifecycle = 'playing';
           frameRuntime.scrubActive = false;
@@ -2066,7 +2389,8 @@ function bindInlineVideoRuntime(card, block, side, video) {
     hideFramePlayerPlaceholder(video);
     if (current?.type === 'singleVideo' || current?.type === 'comparisonVideo') {
       enforceInlinePlaybackBounds(current, side, video, { starting: true });
-      if (side === framePlayerPrimarySide(current, frameRuntime, card)) {
+      if (side === framePlayerPrimarySide(current, frameRuntime, card)
+        && !framePlayerSideRuntime(card, side).active) {
         frameRuntime.playing = true;
         frameRuntime.lifecycle = 'playing';
         frameRuntime.scrubActive = false;
@@ -2079,6 +2403,7 @@ function bindInlineVideoRuntime(card, block, side, video) {
     const frameRuntime = framePlayerRuntimeForCard(card);
     if ((current?.type === 'singleVideo' || current?.type === 'comparisonVideo')
       && side === framePlayerPrimarySide(current, frameRuntime, card)
+      && !framePlayerSideRuntime(card, side).active
       && !frameRuntime.frameEngineGuard
       && !frameRuntime.manualPlayback
       && !video.ended) {
@@ -2107,6 +2432,20 @@ function bindInlineVideoRuntime(card, block, side, video) {
     const current = blockForEditorCard(card).block;
     const config = current ? playerSideConfig(current, side) : null;
     const frameRuntime = framePlayerRuntimeForCard(card);
+    const sideRuntime = framePlayerSideRuntime(card, side);
+    if (current && sideRuntime.active) {
+      if (config?.loop?.enabled === true) {
+        const { start } = inlinePlaybackBounds(current, side, video);
+        video.currentTime = start;
+        sideRuntime.playing = true;
+        void video.play().catch(() => { sideRuntime.playing = false; });
+      } else {
+        sideRuntime.playing = false;
+        sideRuntime.frame = framePlayerSideConfiguredRange(current, frameRuntime, side)?.end ?? sideRuntime.frame;
+      }
+      updateFramePlayerSideControls(card, side);
+      return;
+    }
     if (current && config?.loop?.enabled === true) {
       const { start } = inlinePlaybackBounds(current, side, video);
       video.currentTime = start;
@@ -2348,7 +2687,7 @@ function convertVideoBlockMode(block, mode) {
     delete block.playback;
     delete block.loop;
     delete block.anchor;
-    delete block.sync;
+    block.sync = { leftFrame: 0, rightFrame: 0 };
     delete block.binding;
     return;
   }

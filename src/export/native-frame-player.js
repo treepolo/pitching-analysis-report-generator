@@ -684,7 +684,6 @@ function renderNativeFramePlayerScript() {
       const rateInput = controls?.querySelector('[data-frame-rate-input]');
       const rateSlider = controls?.querySelector('[data-frame-rate]');
       const resetRate = controls?.querySelector('[data-frame-action="reset-rate"]');
-      const syncButton = controls?.querySelector('[data-frame-action="sync"]');
       const syncInfo = controls?.querySelector('[data-frame-sync-info]');
       const status = controls?.querySelector('[data-frame-player-status]');
       const state = { index: 0, count: 0, playing: false, rate: clampRate(sides[0].dataset.playbackRate, RATE_DEFAULT), sync: null, initialized: false, loopTransition: false, manual: false, manualTime: null, manualTimestamp: null, manualSerial: 0, manualCancel: null };
@@ -725,7 +724,6 @@ function renderNativeFramePlayerScript() {
         if (rateInput) { rateInput.value = formatRate(state.rate); rateInput.disabled = pending; }
         if (rateSlider) { rateSlider.value = String(rateToSlider(state.rate)); rateSlider.disabled = pending; }
         if (resetRate) resetRate.disabled = pending;
-        if (syncButton) syncButton.disabled = pending;
         if (syncInfo) syncInfo.textContent = state.sync ? ('左 Frame: ' + state.sync.leftFrame + ' · 右 Frame: ' + state.sync.rightFrame) : '尚未設定同步點';
       };
       const cancelSharedManual = () => {
@@ -812,11 +810,6 @@ function renderNativeFramePlayerScript() {
         await Promise.all(actions.map((action) => action.play()));
         if (!actions.every((action) => action.runtime.playing || action.runtime.manual)) { state.playing = false; update(); }
       };
-      const syncPoint = async () => {
-        const ranges = sides.map((side, i) => configuredRange(side, actions[i])); const frames = videos.map((video, i) => Math.max(0, Math.min(ranges[i]?.count - 1 || 0, Math.round((Number(video?.currentTime) || 0) * (ranges[i]?.fps || 30)))));
-        if (ranges.some((range, i) => !range || frames[i] < range.start || frames[i] > range.end)) { setStatus('同步點必須位於左右影片各自的起終點範圍內。', 'error'); return; }
-        block.dataset.syncLeftFrame = String(frames[0]); block.dataset.syncRightFrame = String(frames[1]); state.index = 0; update(); await seekControl(0, false); setStatus('同步點已設定。', 'loaded');
-      };
       const syncProgress = () => {
         const map = mapping(); if (!map.count) { update(); return; }
         const controlFrames = videos.map((video, i) => { const frame = Math.round((Number(video?.currentTime) || 0) * map.ranges[i].fps); if (state.playing && (frame < map.starts[i] || frame > map.ranges[i].end)) { const loopEnabled = sides.every((side) => side.dataset.loopEnabled === 'true'); if (loopEnabled && !state.loopTransition) { state.loopTransition = true; void seekControl(0, false).then(() => togglePlayback()).finally(() => { state.loopTransition = false; }); } else if (!loopEnabled) stop('雙側影片已離開允許播放區間。'); return null; } return Math.max(0, Math.min(map.count - 1, frame - map.starts[i])); });
@@ -826,7 +819,6 @@ function renderNativeFramePlayerScript() {
       next?.addEventListener('click', () => { void seekControl(state.index + 1); });
       toggle?.addEventListener('click', () => { void togglePlayback(); });
       resetRate?.addEventListener('click', () => setRate(RATE_DEFAULT));
-      syncButton?.addEventListener('click', () => { void syncPoint(); });
       timeline?.addEventListener('input', (event) => { void seekControl(numberValue(event.target.value, 0)); });
       rateSlider?.addEventListener('input', (event) => setRate(sliderToRate(event.target.value)));
       rateInput?.addEventListener('input', (event) => { if (event.target.value.trim() !== '') setRate(event.target.value); });

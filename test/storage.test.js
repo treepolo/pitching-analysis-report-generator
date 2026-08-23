@@ -190,7 +190,29 @@ test('clears legacy comparison sync and side anchors without creating replacemen
   assert.equal('anchor' in saved.sections[0].blocks.at(-1).right, false);
   const reopened = await store.openProject(created.id);
   assert.equal('binding' in reopened.sections[0].blocks.at(-1), false);
-  assert.equal('sync' in reopened.sections[0].blocks.at(-1), false);
+  assert.deepEqual(reopened.sections[0].blocks.at(-1).sync, { leftFrame: 0, rightFrame: 0 });
+});
+
+test('preserves a zero-based 0/0 dual sync point while clearing retired fields', async () => {
+  const created = await store.createProject('Zero dual sync');
+  const snapshot = await store.openProject(created.id);
+  snapshot.sections[0].blocks.push({
+    id: 'zero-dual-sync',
+    type: 'comparisonVideo',
+    sync: { leftFrame: 0, rightFrame: 0 },
+    binding: { enabled: true },
+    anchor: { frameIndex: 0 },
+    left: { anchor: { frameIndex: 0 } },
+    right: { anchor: { frameIndex: 0 } },
+  });
+
+  const saved = await store.saveProject(snapshot);
+  const block = saved.sections[0].blocks.at(-1);
+  assert.deepEqual(block.sync, { leftFrame: 0, rightFrame: 0 });
+  assert.equal('binding' in block, false);
+  assert.equal('anchor' in block, false);
+  assert.equal('anchor' in block.left, false);
+  assert.equal('anchor' in block.right, false);
 });
 
 test('drops malformed dual sync points while preserving valid frame pairs only', async () => {

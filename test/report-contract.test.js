@@ -91,6 +91,7 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
     loop: { enabled: true },
   }, {
     type: 'comparisonVideo',
+    sync: { leftFrame: 0, rightFrame: 0 },
     left: {
       mediaAssetId: 'asset-1',
       label: 'Front',
@@ -102,6 +103,26 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
       loop: { enabled: true },
     },
   }]);
+});
+
+test('exports a zero-based 0/0 dual sync point without retired fields', () => {
+  const document = toReportDocument({
+    displayName: 'Zero sync contract',
+    sections: [{
+      title: 'Video',
+      blocks: [{
+        type: 'comparisonVideo',
+        sync: { leftFrame: 0, rightFrame: 0 },
+        binding: { enabled: true },
+        anchor: { frameIndex: 0 },
+      }],
+    }],
+  });
+
+  assert.deepEqual(document.sections[0].blocks[0], {
+    type: 'comparisonVideo',
+    sync: { leftFrame: 0, rightFrame: 0 },
+  });
 });
 
 test('drops malformed dual sync points and retired binding fields from exported reports', () => {

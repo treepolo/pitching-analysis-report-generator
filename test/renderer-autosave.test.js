@@ -47,7 +47,9 @@ test('text input and video settings keep persistence without input-time redraw',
     "if (event.type !== 'click') return;",
   );
   assert.match(pathHandler, /if \(!\['input', 'change'\]\.includes\(event\.type\)\) return;/u);
-  assert.match(pathHandler, /setEditorPath\(block, target\.dataset\.blockPath, editorControlValue\(target\)\)/u);
+  assert.match(pathHandler, /const requestedValue = editorControlValue\(target\)/u);
+  assert.match(pathHandler, /setEditorPath\(block, target\.dataset\.blockPath, constrainedValue\)/u);
+  assert.match(pathHandler, /constrainDualSegmentToSync\(block, target\.dataset\.blockPath, requestedValue\)/u);
   assert.match(pathHandler, /refreshInlineVideoAfterEditorChange\(card, block, target\.dataset\.blockPath\)/u);
   assert.match(pathHandler, /target\.dataset\.blockPath\.endsWith\('mediaAssetId'\)/u);
   assert.match(pathHandler, /hydrateInlineVideoCards\(\)/u);
