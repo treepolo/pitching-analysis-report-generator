@@ -113,6 +113,8 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /: 'stacked';/u);
   assert.match(styles, /\.inline-frame-controls \{[^}]*display: grid;/u);
   assert.match(styles, /\.inline-frame-rate-row \{[^}]*grid-column: 1 \/ -1;[^}]*width: 100%/u);
+  assert.match(styles, /\.inline-frame-player-status \{[^}]*font-size: 10px[^}]*white-space: nowrap[^}]*text-overflow: ellipsis/u);
+  assert.match(styles, /\.inline-frame-controls \.inline-frame-player-status\[data-state="loaded"\][^}]*#8b95a5/u);
   assert.match(renderer, /data-frame-player/u);
   assert.match(renderer, /data-frame-timeline/u);
   assert.match(renderer, /data-frame-action="toggle"/u);

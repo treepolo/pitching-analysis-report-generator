@@ -150,6 +150,8 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.match(html, /data-frame-action="previous"[^>]*>←/u);
   assert.match(html, /data-frame-action="next"[^>]*>→/u);
   assert.match(html, /data-frame-shared-controls/u);
+  assert.match(html, /class="portable-frame-player-status" data-frame-player-status/u);
+  assert.match(html, /\.portable-frame-player-status \{[^}]*font-size: \.75rem[^}]*white-space: nowrap/u);
   assert.doesNotMatch(html, /data-frame-sync-info/u);
   assert.doesNotMatch(html, /portable-frame-common-readonly|portable-frame-sync-row|data-frame-common-info/u);
   assert.doesNotMatch(html, /data-frame-action="sync"/u);

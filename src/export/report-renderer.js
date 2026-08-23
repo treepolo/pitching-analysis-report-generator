@@ -492,7 +492,7 @@ function renderNativeSharedControls(label, block) {
     + '<button type="button" data-frame-action="reset-rate" disabled aria-label="重置播放速度為 1 倍" title="重置為 1 倍">↻</button>'
     + '</div>'
     + '<label class="portable-frame-loop"><input data-frame-loop type="checkbox"' + (commonLoop ? ' checked' : '') + '>循環播放</label>'
-    + '<span data-frame-player-status role="status" data-state="pending">正在載入影片…</span>'
+    + '<span class="portable-frame-player-status" data-frame-player-status role="status" data-state="pending">正在載入影片…</span>'
     + '</div>';
 }
 function renderPlayer(block, byId, comparison) {
@@ -595,7 +595,9 @@ function renderStyles() {
     .portable-frame-controls button, .portable-player-rate-row button, .portable-frame-rate-row button { padding: .45rem .7rem; border: 1px solid #b9c5d8; border-radius: .45rem; background: #fff; color: #172033; cursor: pointer; }
     .portable-frame-controls button:hover, .portable-player-rate-row button:hover, .portable-frame-rate-row button:hover { background: #eef3fa; }
     .portable-frame-controls output, .portable-player-side-controls output { color: #596780; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: center; }
-    .portable-frame-player-status { grid-column: 1 / -1; }
+    .portable-frame-player-status { grid-column: 1 / -1; min-height: 1rem; margin: 0; overflow: hidden; color: #7f8999; font-size: .75rem; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; }
+    .portable-frame-controls .portable-frame-player-status[data-state="loaded"], .portable-frame-controls .portable-frame-player-status[data-state="pending"] { color: #7f8999; }
+    .portable-frame-controls .portable-frame-player-status[data-state="error"] { color: #a87575; }
     .portable-player-side-controls { display: grid; grid-template-columns: minmax(0, 1fr) max-content; column-gap: .6rem; row-gap: .6rem; margin-top: .65rem; }
     .portable-player-timeline-row { display: contents; }
     .portable-player-timeline-row input[type="range"] { grid-column: 1; min-width: 0; width: 100%; }
