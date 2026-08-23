@@ -148,6 +148,17 @@ function normalizeSegment(value, fieldName) {
   return { in: start, out: end };
 }
 
+function normalizeCommonSegment(value, fieldName) {
+  if (value === null || value === undefined) return { in: 0, out: 0 };
+  if (!isPlainRecord(value)) throw new Error(fieldName + ' is invalid');
+  const rawIn = value.in ?? value.start ?? value.startFrame;
+  const rawOut = value.out ?? value.end ?? value.endFrame;
+  const start = rawIn === null || rawIn === undefined || rawIn === '' ? 0 : rawIn;
+  const end = rawOut === null || rawOut === undefined || rawOut === '' ? 0 : rawOut;
+  if (!Number.isInteger(start) || start < 0 || !Number.isInteger(end) || end < 0) throw new Error(fieldName + ' must use non-negative integer control frames');
+  if (start > 0 && end > 0 && end < start) throw new Error(fieldName + ' range is invalid');
+  return { in: start, out: end };
+}
 function normalizeDualSync(value) {
   if (!isPlainRecord(value)) return undefined;
   const { leftFrame, rightFrame } = value;
@@ -220,6 +231,9 @@ function normalizeVideoSide(value, fieldName) {
   if (side.label !== undefined) side.label = safeOptionalText(side.label, `${fieldName}.label`, 160);
   if (side.segment !== undefined) side.segment = normalizeSegment(side.segment, `${fieldName}.segment`);
   if (side.playback !== undefined) side.playback = normalizePlayback(side.playback, `${fieldName}.playback`);
+  // Dual-video looping is block-level; discard retired per-side loop state.
+  delete side.loop;
+  if (side.playback && isPlainRecord(side.playback)) delete side.playback.loop;
   // Anchors belong to the retired comparison synchronisation mechanism.
   delete side.anchor;
   return side;
@@ -233,7 +247,14 @@ function normalizeVideoBlock(block) {
   // indexes on comparison-video blocks.
   const hadSync = Object.prototype.hasOwnProperty.call(normalized, 'sync');
   const dualSync = normalizeDualSync(normalized.sync);
+  const dualCommonSegment = normalizeCommonSegment(normalized.commonSegment, 'Video block commonSegment');
+  const explicitCommonLoop = normalized.loop === undefined ? undefined : normalizeLoopConfig(normalized.loop, 'Video block loop');
+  const legacyLeftLoop = normalized.left?.loop ?? normalized.left?.playback?.loop;
+  const legacyRightLoop = normalized.right?.loop ?? normalized.right?.playback?.loop;
+  const legacyLeftLoopConfig = legacyLeftLoop === undefined ? undefined : normalizeLoopConfig(legacyLeftLoop, 'Video block left.loop');
+  const legacyRightLoopConfig = legacyRightLoop === undefined ? undefined : normalizeLoopConfig(legacyRightLoop, 'Video block right.loop');
   delete normalized.sync;
+  delete normalized.commonSegment;
   delete normalized.binding;
   delete normalized.anchor;
   if (normalized.label !== undefined) normalized.label = safeOptionalText(normalized.label, 'Video block label', 160);
@@ -242,6 +263,8 @@ function normalizeVideoBlock(block) {
   if (normalized.playback !== undefined) normalized.playback = normalizePlayback(normalized.playback, 'Video block playback');
   if (normalized.type === 'singleVideo') {
     delete normalized.layout;
+    delete normalized.commonSegment;
+    if (normalized.loop === undefined) normalized.loop = { enabled: true };
     if (normalized.sourceLabel === undefined && normalized.label !== undefined) {
       // Preserve the old single-video label as the initial source title while
       // keeping the two fields independent for all subsequent edits.
@@ -270,6 +293,10 @@ function normalizeVideoBlock(block) {
     if (right !== undefined) normalized.right = right;
     if (dualSync !== undefined) normalized.sync = dualSync;
     else if (!hadSync) normalized.sync = { leftFrame: 0, rightFrame: 0 };
+    normalized.commonSegment = dualCommonSegment;
+    if (explicitCommonLoop !== undefined) normalized.loop = explicitCommonLoop;
+    else if (legacyLeftLoopConfig && legacyRightLoopConfig && legacyLeftLoopConfig.enabled === legacyRightLoopConfig.enabled) normalized.loop = legacyLeftLoopConfig;
+    else normalized.loop = { enabled: true };
   }
   return normalized;
 }

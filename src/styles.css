@@ -102,15 +102,18 @@ select:focus, input:focus, textarea:focus { border-color: var(--blue); box-shado
 .inline-frame-navigation > button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; font-family: inherit; font-size: 16px; line-height: 1; text-align: center; }
 .inline-frame-navigation > .inline-frame-current { grid-column: 3; }
 .inline-frame-navigation > .inline-frame-total { grid-column: 5; }
-.inline-frame-navigation > .inline-frame-timeline { grid-column: 4; width: 100%; min-width: 0; max-width: 100%; accent-color: var(--blue); }
+.inline-frame-navigation > .inline-frame-timeline { grid-column: 4; width: 100%; min-width: 0; max-width: 100%; padding: 0; margin: 0; accent-color: var(--blue); }
 .inline-frame-rate-row { grid-column: 1 / -1; min-width: 0; display: flex; align-items: center; gap: 8px; width: 100%; }
 .inline-frame-sync-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.inline-frame-common-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; }
+.inline-frame-common-row label { display: inline-flex; align-items: center; gap: 6px; }
+.inline-frame-common-row input[type="number"] { width: 6rem; }
 .inline-frame-sync-row output { color: var(--muted); font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
 .inline-frame-shared-controls { grid-column: 1 / -1; width: 100%; }
 .inline-frame-controls[data-frame-side-controls] { grid-column: 1 / -1; width: 100%; margin-top: 8px; }
 .inline-frame-controls[data-frame-side-controls] .inline-frame-rate-row,
 .inline-frame-controls[data-frame-side-controls] .inline-frame-player-status { display: none; }
-.inline-frame-rate-row > .inline-frame-rate-slider { flex: 1 1 auto; width: auto; min-width: 0; max-width: 100%; accent-color: var(--blue); }
+.inline-frame-rate-row > .inline-frame-rate-slider { flex: 1 1 auto; width: auto; min-width: 0; max-width: 100%; padding: 0; margin: 0; accent-color: var(--blue); }
 .inline-frame-position { color: var(--muted); font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; white-space: nowrap; }
 .inline-frame-current, .inline-frame-total { text-align: center; }
 .inline-frame-rate-input { flex: 0 0 5.5rem; width: 5.5rem; }

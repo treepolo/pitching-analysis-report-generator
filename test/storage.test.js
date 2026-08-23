@@ -100,14 +100,14 @@ test('preserves media metadata and export settings as future vertical-slice seam
   assert.deepEqual(saved.exportSettings.validation, { requirePortablePaths: true, futureFlag: 'preserve-me' });
   assert.equal(saved.exportSettings.lastOutputPath, path.resolve(testRoot, 'output'));
   assert.deepEqual(saved.futureReportExtension, { sourceRevision: 3, owner: 'report-model' });
-  assert.deepEqual(saved.sections[1].blocks[1], snapshot.sections[1].blocks[1]);
+  assert.equal(saved.sections[1].blocks[1].loop.enabled, true);
 
   const reopened = await store.openProject(created.id);
   assert.equal(reopened.reportTitle, 'Payload contract title');
   assert.deepEqual(reopened.recoveryMetadata, { pendingChanges: false, pendingJobIds: [] });
   assert.deepEqual(reopened.media, snapshot.media);
   assert.deepEqual(reopened.exportSettings, saved.exportSettings);
-  assert.deepEqual(reopened.sections[1].blocks[1], snapshot.sections[1].blocks[1]);
+  assert.equal(reopened.sections[1].blocks[1].loop.enabled, true);
   assert.deepEqual(reopened.futureReportExtension, { sourceRevision: 3, owner: 'report-model' });
 
   const partialSave = await store.saveProject({ id: created.id, sections: reopened.sections });

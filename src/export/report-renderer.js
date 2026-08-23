@@ -148,7 +148,7 @@ function normalizeSegment(value) {
 function normalizeLoop(value, segment) {
   const loop = value && typeof value === 'object' ? value : null;
   if (!loop && value !== true) {
-    return { enabled: false };
+    return { enabled: true };
   }
   return {
     enabled: loop ? loop.enabled !== false : true,
@@ -479,6 +479,11 @@ function renderFramePlayer(block, byId, comparison, frameCaches) {
 }
 function renderNativeSharedControls(label, block) {
   const escaped = escapeHtml(label);
+  const leftSettings = playbackSettings(sideConfig(block, 'left'));
+  const commonSegment = block?.commonSegment && typeof block.commonSegment === 'object' ? block.commonSegment : {};
+  const commonStart = Number.isInteger(Number(commonSegment.in)) && Number(commonSegment.in) > 0 ? Number(commonSegment.in) : 0;
+  const commonEnd = Number.isInteger(Number(commonSegment.out)) && Number(commonSegment.out) > 0 ? Number(commonSegment.out) : 0;
+  const commonLoop = block?.loop?.enabled !== false;
   const sync = block?.sync && Number.isInteger(Number(block.sync.leftFrame)) && Number.isInteger(Number(block.sync.rightFrame)) ? block.sync : null;
   return '<div class="portable-frame-controls portable-frame-shared-controls" data-frame-controls data-frame-shared-controls role="group" aria-label="' + escaped + '影格播放器控制">'
     + '<div class="portable-frame-navigation">'
@@ -490,10 +495,12 @@ function renderNativeSharedControls(label, block) {
     + '<button type="button" class="portable-frame-step" data-frame-action="next" disabled aria-label="下一幀" title="下一幀">→</button>'
     + '</div>'
     + '<div class="portable-frame-rate-row" data-frame-rate-row>'
-    + '<input data-frame-rate-input type="number" min="' + PLAYBACK_RATE_MIN + '" max="' + PLAYBACK_RATE_MAX + '" step="any" value="1" disabled aria-label="' + escaped + '播放速度數值">'
+    + '<input data-frame-rate-input type="number" min="' + PLAYBACK_RATE_MIN + '" max="' + PLAYBACK_RATE_MAX + '" step="any" value="' + formatPlaybackRate(leftSettings.rate) + '" disabled aria-label="' + escaped + '播放速度數值">'
     + '<input data-frame-rate type="range" min="' + PLAYBACK_RATE_SLIDER_MIN + '" max="' + PLAYBACK_RATE_SLIDER_MAX + '" step="' + PLAYBACK_RATE_SLIDER_STEP + '" value="0" disabled aria-label="' + escaped + '播放速度控制條">'
     + '<button type="button" data-frame-action="reset-rate" disabled aria-label="重置播放速度為 1 倍" title="重置為 1 倍">↻</button>'
     + '</div>'
+    + '<label class="portable-frame-loop"><input data-frame-loop type="checkbox"' + (commonLoop ? ' checked' : '') + '>循環播放</label>'
+    + '<div class="portable-frame-common-readonly" data-frame-common-info>共同區間：' + (commonStart > 0 ? ('第 ' + (commonStart + 1) + ' 幀起') : '起點未設定') + ' · ' + (commonEnd > 0 ? ('第 ' + (commonEnd + 1) + ' 幀止') : '終點未設定') + '</div>'
     + '<div class="portable-frame-sync-row"><span class="portable-frame-sync-label">同步位置</span><output data-frame-sync-info>' + (sync ? ('左 Frame: ' + sync.leftFrame + ' · 右 Frame: ' + sync.rightFrame) : '尚未設定同步點') + '</output></div>'
     + '<span data-frame-player-status role="status" data-state="pending">正在載入影片…</span>'
     + '</div>';
@@ -511,7 +518,7 @@ function renderPlayer(block, byId, comparison) {
   const layout = comparison ? (block.layout === 'stacked' ? 'stacked' : 'side-by-side') : 'stacked';
   const blockLabel = typeof block.label === 'string' ? block.label.trim() : '';
   const accessibleBlockLabel = blockLabel || (comparison ? '雙影片' : '單一影片');
-  return `<figure class="report-media report-video portable-player" data-portable-player data-native-frame-player-block data-frame-selected="false" aria-selected="false" tabindex="0" aria-label="${escapeHtml(`${accessibleBlockLabel}播放器`)}" data-player-layout="${layout}" data-sync-left-frame="${block.sync?.leftFrame ?? ''}" data-sync-right-frame="${block.sync?.rightFrame ?? ''}">
+  return `<figure class="report-media report-video portable-player" data-portable-player data-native-frame-player-block data-frame-selected="false" aria-selected="false" tabindex="0" aria-label="${escapeHtml(`${accessibleBlockLabel}播放器`)}" data-player-layout="${layout}" data-sync-left-frame="${block.sync?.leftFrame ?? ''}" data-sync-right-frame="${block.sync?.rightFrame ?? ''}" data-common-segment-in="${block.commonSegment?.in ?? 0}" data-common-segment-out="${block.commonSegment?.out ?? 0}" data-common-loop-enabled="${block.loop?.enabled !== false ? 'true' : 'false'}">
     ${blockLabel ? `<header class="portable-player-header"><h3>${escapeHtml(blockLabel)}</h3></header>` : ''}
     <div class="portable-player-grid portable-player-grid-${layout}">${renderedSides}</div>
     ${comparison ? renderNativeSharedControls(accessibleBlockLabel, block) : ''}
@@ -585,10 +592,13 @@ function renderStyles() {
     .portable-frame-navigation { display: contents; }
     .portable-frame-navigation > button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; font-family: inherit; font-size: 16px; line-height: 1; text-align: center; }
     .portable-frame-navigation [data-frame-current] { grid-column: 3; }
-    .portable-frame-navigation input[type="range"] { grid-column: 4; min-width: 0; width: 100%; }
+    .portable-frame-navigation input[type="range"] { grid-column: 4; min-width: 0; width: 100%; padding: 0; margin: 0; }
+    .portable-frame-rate-row input[type="range"] { padding: 0; margin: 0; }
     .portable-frame-navigation [data-frame-total] { grid-column: 5; }
     .portable-frame-rate-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; width: 100%; }
     .portable-frame-sync-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; min-width: 0; }
+    .portable-frame-common-readonly { grid-column: 1 / -1; color: #596780; font-size: .85rem; font-variant-numeric: tabular-nums; }
+    .portable-frame-loop { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: .35rem; color: #33415c; font-size: .85rem; }
     .portable-frame-sync-row output { color: #596780; font-variant-numeric: tabular-nums; }
     .portable-frame-shared-controls { grid-column: 1 / -1; width: 100%; }
     .portable-frame-rate-row input[type="range"] { flex: 1 1 auto; min-width: 0; }

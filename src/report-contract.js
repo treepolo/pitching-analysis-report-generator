@@ -104,6 +104,14 @@
     return { leftFrame: value.leftFrame, rightFrame: value.rightFrame };
   }
 
+  function cloneCommonSegment(value) {
+    if (!isRecord(value)) return { in: 0, out: 0 };
+    const start = value.in ?? value.start ?? value.startFrame;
+    const end = value.out ?? value.end ?? value.endFrame;
+    const normalizedStart = Number.isInteger(start) && start > 0 ? start : 0;
+    const normalizedEnd = Number.isInteger(end) && end > 0 ? end : 0;
+    return { in: normalizedStart, out: normalizedEnd };
+  }
   function clonePlaybackConfig(value) {
     if (!isRecord(value)) return undefined;
     const playback = {};
@@ -125,20 +133,15 @@
     const side = {};
     copyAssetReferences(value, side);
     copyString(value, side, 'label');
-    const legacyLoop = value.loop ?? value.loopRange ?? value.playback?.loop ?? value.playback?.loopRange;
-    const loop = cloneLoopConfig(value.loop);
-    if (loop) side.loop = loop;
-    else {
-      const legacyLoopConfig = cloneLoopConfig(legacyLoop);
-      if (legacyLoopConfig) side.loop = legacyLoopConfig;
-    }
-    const segment = cloneSegmentConfig(value.segment, legacyLoop);
+    const segment = cloneSegmentConfig(value.segment);
     if (segment) side.segment = segment;
     const playback = clonePlaybackConfig(value.playback);
-    if (playback) side.playback = playback;
+    if (playback) {
+      delete playback.loop;
+      side.playback = playback;
+    }
     return Object.keys(side).length > 0 ? side : undefined;
   }
-
   function cloneBlock(block) {
     if (!isRecord(block)) return { type: 'unknown' };
     const type = typeof block.type === 'string' && BLOCK_TYPES.has(block.type)
@@ -172,7 +175,7 @@
       if (loop) output.loop = loop;
       else {
         const legacyLoopConfig = cloneLoopConfig(legacyLoop);
-        if (legacyLoopConfig) output.loop = legacyLoopConfig;
+        output.loop = legacyLoopConfig || { enabled: true };
       }
     }
 
@@ -190,6 +193,8 @@
       const sync = cloneDualSync(block.sync);
       if (sync) output.sync = sync;
       else if (!hasSync) output.sync = { leftFrame: 0, rightFrame: 0 };
+      output.commonSegment = cloneCommonSegment(block.commonSegment);
+      output.loop = cloneLoopConfig(block.loop) || { enabled: true };
     }
 
     return output;

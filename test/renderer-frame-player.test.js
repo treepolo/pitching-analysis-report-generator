@@ -30,7 +30,7 @@ test('single and dual cards use the shared outer-player contract', () => {
   assert.match(side, /data-frame-side-controls/u);
   assert.match(side, /data-frame-control-side/u);
   assert.match(block, /renderInlineVideoSide\(block, 'single', \{ playerCard: true \}\)/u);
-  assert.match(block, /renderFramePlayerControls\(block\.label \|\| '雙影片', \{ shared: true \}\)/u);
+  assert.match(block, /renderFramePlayerControls\(block\.label \|\| '雙影片', \{ shared: true, block \}\)/u);
   assert.match(controls, /data-frame-shared-controls/u);
   assert.match(controls, /data-frame-action="sync"/u);
   assert.match(controls, /data-frame-rate/u);
@@ -128,7 +128,7 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.match(renderer, /manualPlaybackSerial/u);
   assert.match(renderer, /manualPlaybackSerial !== runtime\.manualPlaybackSerial/u);
   assert.match(renderer, /rateTransition/u);
-  assert.match(renderer, /const shouldResumeNative = wasManual && wasPlaying && nativeRate/u);
+  assert.match(renderer, /wasPlaying && nativeRate/u);
   assert.match(renderer, /fromRateTransition = false/u);
   assert.match(renderer, /framePlayerSides\(block, card\)\.forEach\(\(sideName\)/u);
   assert.match(renderer, /nextTime = Math\.max\(nextTime, displayedTime\)/u);

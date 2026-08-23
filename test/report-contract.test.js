@@ -92,6 +92,8 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
   }, {
     type: 'comparisonVideo',
     sync: { leftFrame: 0, rightFrame: 0 },
+    commonSegment: { in: 0, out: 0 },
+    loop: { enabled: true },
     left: {
       mediaAssetId: 'asset-1',
       label: 'Front',
@@ -99,9 +101,7 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
     right: {
       mediaAssetId: 'asset-2',
       label: 'Side',
-      segment: { in: 0, out: 3 },
-      loop: { enabled: true },
-    },
+    }
   }]);
 });
 
@@ -122,6 +122,8 @@ test('exports a zero-based 0/0 dual sync point without retired fields', () => {
   assert.deepEqual(document.sections[0].blocks[0], {
     type: 'comparisonVideo',
     sync: { leftFrame: 0, rightFrame: 0 },
+    commonSegment: { in: 0, out: 0 },
+    loop: { enabled: true },
   });
 });
 
@@ -138,7 +140,11 @@ test('drops malformed dual sync points and retired binding fields from exported 
     }],
   });
 
-  assert.deepEqual(document.sections[0].blocks[0], { type: 'comparisonVideo' });
+  assert.deepEqual(document.sections[0].blocks[0], {
+    type: 'comparisonVideo',
+    commonSegment: { in: 0, out: 0 },
+    loop: { enabled: true },
+  });
 });
 
 test('preserves block-local video settings in the shared report contract', () => {
@@ -194,10 +200,13 @@ test('preserves block-local video settings in the shared report contract', () =>
     sourceLabel: 'Front view',
     segment: { in: 0.25, out: 2.5 },
     playback: { rate: 0.75 },
+    loop: { enabled: true },
   }, {
     type: 'comparisonVideo',
     layout: 'side-by-side',
     sync: { leftFrame: 100, rightFrame: 400 },
+    commonSegment: { in: 0, out: 0 },
+    loop: { enabled: true },
     left: {
       mediaAssetId: 'asset-front',
       segment: { in: 0, out: 3 },
