@@ -154,6 +154,7 @@ function renderNativeFramePlayerScript() {
         if (count <= 0) return 0;
         return clamp(Math.round(Math.max(0, numberValue(time, 0)) * fps), 0, count - 1);
       };
+      const segmentStartIndex = () => clamp(configuredStartFrame, 0, Math.max(0, frameCount() - 1));
       const nativeRate = (rate) => {
         try {
           video.playbackRate = rate;
@@ -653,7 +654,13 @@ function renderNativeFramePlayerScript() {
           try { video.currentTime = frameTime(bounded); } catch {}
           updateControls();
         },
-        markReady: () => { runtime.firstFrameReady = true; hidePlaceholder(); updateControls(); },
+        markReady: (ready = true) => {
+          runtime.firstFrameReady = Boolean(ready);
+          if (ready && runtime.lifecycle === 'loading') runtime.lifecycle = 'ready';
+          if (!ready) runtime.lifecycle = 'error';
+          if (ready) hidePlaceholder();
+          updateControls();
+        },
         runtime,
       };
       side.addEventListener('pointerdown', () => selectNativeFramePlayer(side));
@@ -845,15 +852,14 @@ function renderNativeFramePlayerScript() {
         video?.addEventListener('pause', () => { if (!video.ended && !state.loopTransition && !state.rateTransition && !actions.some((action) => action.runtime.manual)) { state.playing = false; actions.forEach((action) => action.stop()); update(); } });
         video?.addEventListener('loadedmetadata', () => {
           update();
-          const sideReady = actions.every((action) => action.runtime.loaded
-            && ['ready', 'playing', 'paused', 'ended'].includes(action.runtime.lifecycle));
-          if (!state.initialized && !state.initializing && actions.length === 2 && sideReady) {
+          const sideMetadataReady = actions.every((action) => action.runtime.loaded && action.runtime.metadataInitialized);
+          if (!state.initialized && !state.initializing && actions.length === 2 && sideMetadataReady) {
             state.initializing = true;
             update();
             void seekControl(0, false, { bootstrap: true }).then((ok) => {
               state.initializing = false;
               actions.forEach((action, index) => {
-                action.markReady?.();
+                action.markReady?.(ok);
                 const sideStatus = sideStatuses[index];
                 if (sideStatus) {
                   sideStatus.textContent = ok

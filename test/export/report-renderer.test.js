@@ -159,6 +159,9 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.doesNotMatch(html, /portable-player-settings|portable-player-eyebrow|portable-player-layout/iu);
   assert.match(html, /data-frame-loop/iu);
   assert.match(html, /requestVideoFrameCallback/u);
+  assert.match(html, /const segmentStartIndex = \(\) =>/u);
+  assert.match(html, /action\.runtime\.metadataInitialized/u);
+  assert.match(html, /action\.markReady\?\.\(ok\)/u);
   assert.match(html, /requestAnimationFrame/u);
   assert.match(html, /currentTime/u);
   assert.match(html, /ArrowLeft/u);
