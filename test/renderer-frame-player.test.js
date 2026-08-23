@@ -55,6 +55,8 @@ test('single and dual cards use the shared outer-player contract', () => {
   assert.match(renderer, /target\.closest\('\[data-frame-side-controls\]'\)/u);
   assert.match(renderer, /target\?\.matches\?\.\('input, textarea, select/u);
   assert.match(renderer, /sync: \{ leftFrame: 0, rightFrame: 0 \}/u);
+  assert.match(renderer, /data-frame-common-range/u);
+  assert.match(renderer, /data-frame-common-loop/u);
 });
 
 test('loading uses the native browser video pipeline without frame-cache preparation', () => {
@@ -104,6 +106,7 @@ test('drag is latest-target-wins approximate seek, release is exact seek', () =>
   assert.match(renderer, /currentPosition\.textContent = count > 0/u);
   assert.match(renderer, /totalPosition\.textContent = count > 0/u);
   assert.match(renderer, /settledAtTarget/u);
+  assert.match(renderer, /video.readyState >= 1/u);
   assert.match(renderer, /addEventListener\('pointercancel', handleBlockEditorEvent\)/u);
 });
 

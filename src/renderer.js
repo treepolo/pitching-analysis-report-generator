@@ -1586,10 +1586,10 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
     let waitingForFrame = false;
     const operation = { cancel: () => finish(false) };
     const readyAtTarget = () => !video.seeking
-      && video.readyState >= 2
+      && video.readyState >= 1
       && Math.abs((Number(video.currentTime) || 0) - targetTime) <= tolerance;
     const settledAtTarget = () => !video.seeking
-      && video.readyState >= 2
+      && video.readyState >= 1
       && Number.isFinite(Number(video.currentTime))
       && Math.abs((Number(video.currentTime) || 0) - targetTime) <= Math.max(tolerance * 4, 0.25);
     const finish = async (success) => {
@@ -1604,6 +1604,10 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
     const waitForFrame = () => {
       if (serial !== runtime.seekSerial) {
         void finish(false);
+        return;
+      }
+      if (readyAtTarget() || settledAtTarget()) {
+        void finish(true);
         return;
       }
       if (typeof video.requestVideoFrameCallback !== 'function') {
@@ -1633,7 +1637,7 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
     const timer = setTimeout(() => { void finish(readyAtTarget() || settledAtTarget()); }, 2_500);
     runtime.pendingSeeks?.set(video, operation);
     video.addEventListener('seeked', onSeeked);
-    if (Math.abs((Number(video.currentTime) || 0) - targetTime) < 0.0001 && video.readyState >= 2) {
+    if (Math.abs((Number(video.currentTime) || 0) - targetTime) < 0.0001 && video.readyState >= 1) {
       waitForFrame();
       return;
     }
@@ -2860,6 +2864,8 @@ function handleBlockEditorEvent(event) {
     && (target.matches('[data-frame-timeline]')
       || target.matches('[data-frame-rate]')
       || target.matches('[data-frame-rate-input]')
+      || target.matches('[data-frame-common-range]')
+      || target.matches('[data-frame-common-loop]')
       || target.closest('[data-frame-action]')
       || target.closest('[data-frame-surface]'))) {
     handleFramePlayerEvent(event);

@@ -274,10 +274,10 @@ function renderNativeFramePlayerScript() {
           let waitingForFrame = false;
           const operation = { cancel: () => finish(false) };
           const readyAtTarget = () => !video.seeking
-            && video.readyState >= 2
+            && video.readyState >= 1
             && Math.abs((Number(video.currentTime) || 0) - targetTime) <= tolerance;
           const settledAtTarget = () => !video.seeking
-            && video.readyState >= 2
+            && video.readyState >= 1
             && Number.isFinite(Number(video.currentTime))
             && Math.abs((Number(video.currentTime) || 0) - targetTime) <= Math.max(tolerance * 4, 0.25);
           const finish = async (success) => {
@@ -292,6 +292,10 @@ function renderNativeFramePlayerScript() {
           const waitForFrame = () => {
             if (serial !== runtime.seekSerial) {
               void finish(false);
+              return;
+            }
+            if (readyAtTarget() || settledAtTarget()) {
+              void finish(true);
               return;
             }
             if (typeof video.requestVideoFrameCallback !== 'function') {
@@ -317,7 +321,7 @@ function renderNativeFramePlayerScript() {
           const timer = setTimeout(() => finish(readyAtTarget() || settledAtTarget()), 2500);
           runtime.pendingSeek = operation;
           video.addEventListener('seeked', onSeeked);
-          if (Math.abs((Number(video.currentTime) || 0) - targetTime) < 0.0001 && video.readyState >= 2) {
+          if (Math.abs((Number(video.currentTime) || 0) - targetTime) < 0.0001 && video.readyState >= 1) {
             waitForFrame();
             return;
           }
