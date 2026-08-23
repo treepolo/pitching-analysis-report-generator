@@ -87,7 +87,7 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
     label: 'Front view',
     sourceLabel: 'Front source',
     segment: { in: 1, out: 2 },
-    playback: { rate: 0.5, controls: true },
+    playback: { controls: true },
     loop: { enabled: true },
   }, {
     type: 'comparisonVideo',
@@ -198,8 +198,7 @@ test('preserves block-local video settings in the shared report contract', () =>
     mediaAssetId: 'asset-front',
     label: 'Front view',
     sourceLabel: 'Front view',
-    segment: { in: 0.25, out: 2.5 },
-    playback: { rate: 0.75 },
+    segment: { in: 0, out: 3 },
     loop: { enabled: true },
   }, {
     type: 'comparisonVideo',
@@ -210,12 +209,10 @@ test('preserves block-local video settings in the shared report contract', () =>
     left: {
       mediaAssetId: 'asset-front',
       segment: { in: 0, out: 3 },
-      playback: { rate: 0.5 },
     },
     right: {
       mediaAssetId: 'asset-side',
-      segment: { in: 0.1, out: 2.9 },
-      playback: { rate: 0.5 },
+      segment: { in: 0, out: 3 },
     },
   }]);
 });

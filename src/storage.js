@@ -13,8 +13,6 @@ const {
 } = require('./media');
 
 const PROJECT_ID_PATTERN = /^[a-z0-9-]{1,80}$/u;
-const PLAYBACK_RATE_MIN = 1 / 64;
-const PLAYBACK_RATE_MAX = 64;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 const TEXT_CONTENT_CONTROL_PATTERN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
 const MAX_SECTIONS = 50;
@@ -148,6 +146,52 @@ function normalizeSegment(value, fieldName) {
   return { in: start, out: end };
 }
 
+
+function normalizeFrameValue(value, fieldName) {
+  const normalized = normalizeOptionalNonNegative(value, fieldName);
+  if (normalized === null) return 0;
+  if (!Number.isInteger(normalized)) throw new Error(fieldName + ' must be a non-negative integer frame');
+  return normalized;
+}
+
+function normalizeFrameSegment(value, fieldName) {
+  if (value === null || value === undefined) return { in: 0, out: 0 };
+  if (!isPlainRecord(value)) throw new Error(fieldName + ' is invalid');
+  const start = normalizeFrameValue(value.in ?? value.start ?? value.startFrame, fieldName + '.in');
+  const end = normalizeFrameValue(value.out ?? value.end ?? value.endFrame, fieldName + '.out');
+  if (end > 0 && end < start) throw new Error(fieldName + ' range is invalid');
+  return { in: start, out: end };
+}
+
+function frameRateForAsset(mediaById, assetId) {
+  const asset = mediaById?.get(assetId);
+  const candidates = [
+    asset?.metadata?.fps,
+    asset?.metadata?.averageFps,
+    asset?.timing?.fps,
+    asset?.timing?.frameRate,
+  ];
+  for (const candidate of candidates) {
+    const rate = Number(candidate);
+    if (Number.isFinite(rate) && rate > 0) return rate;
+  }
+  return 30;
+}
+
+function migrateLegacySegmentToFrames(value, fieldName, fps) {
+  const seconds = normalizeSegment(value, fieldName);
+  const start = Math.max(0, Math.round(seconds.in * fps));
+  const end = seconds.out === null ? 0 : Math.max(0, Math.ceil(seconds.out * fps) - 1);
+  if (end > 0 && end < start) throw new Error(fieldName + ' range is invalid');
+  return { in: start, out: end };
+}
+
+function normalizeVideoSegment(value, fieldName, segmentUnit, fps) {
+  return segmentUnit === 'frames'
+    ? normalizeFrameSegment(value, fieldName)
+    : migrateLegacySegmentToFrames(value, fieldName, fps);
+}
+
 function normalizeCommonSegment(value, fieldName) {
   if (value === null || value === undefined) return { in: 0, out: 0 };
   if (!isPlainRecord(value)) throw new Error(fieldName + ' is invalid');
@@ -170,18 +214,13 @@ function normalizeDualSync(value) {
 }
 
 function normalizePlayback(value, fieldName) {
-  if (value === null || value === undefined) return { rate: 1 };
-  if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
+  if (value === null || value === undefined) return {};
+  if (!isPlainRecord(value)) throw new Error(fieldName + ' is invalid');
   const playback = cloneJson(value);
-  if (playback.rate === undefined) playback.rate = 1;
-  if (typeof playback.rate !== 'number'
-    || !Number.isFinite(playback.rate)
-    || playback.rate < PLAYBACK_RATE_MIN
-    || playback.rate > PLAYBACK_RATE_MAX) {
-    throw new Error(`${fieldName}.rate is invalid`);
-  }
+  // Playback speed is runtime-only. Accept and discard the retired persisted field.
+  delete playback.rate;
   const legacyLoop = playback.loop ?? playback.loopRange;
-  if (legacyLoop !== undefined) playback.loop = normalizeLoopConfig(legacyLoop, `${fieldName}.loop`);
+  if (legacyLoop !== undefined) playback.loop = normalizeLoopConfig(legacyLoop, fieldName + '.loop');
   delete playback.loopRange;
   return playback;
 }
@@ -220,7 +259,7 @@ function normalizeLoopAndSegment(value, fieldName) {
   delete value.syncOffset;
 }
 
-function normalizeVideoSide(value, fieldName) {
+function normalizeVideoSide(value, fieldName, options = {}) {
   if (value === undefined || value === null) return undefined;
   if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
   const side = cloneJson(value);
@@ -229,8 +268,13 @@ function normalizeVideoSide(value, fieldName) {
     side.mediaAssetId = normalizeOptionalAssetId(side.mediaAssetId ?? side.videoAssetId ?? side.assetId, `${fieldName}.mediaAssetId`);
   }
   if (side.label !== undefined) side.label = safeOptionalText(side.label, `${fieldName}.label`, 160);
-  if (side.segment !== undefined) side.segment = normalizeSegment(side.segment, `${fieldName}.segment`);
-  if (side.playback !== undefined) side.playback = normalizePlayback(side.playback, `${fieldName}.playback`);
+  const sideUnit = side.segmentUnit === 'frames' ? 'frames' : 'seconds';
+  side.segment = normalizeVideoSegment(side.segment, fieldName + '.segment', sideUnit, frameRateForAsset(options.mediaById, side.mediaAssetId ?? null));
+  side.segmentUnit = 'frames';
+  if (side.playback !== undefined) {
+    side.playback = normalizePlayback(side.playback, fieldName + '.playback');
+    if (Object.keys(side.playback).length === 0) delete side.playback;
+  }
   // Dual-video looping is block-level; discard retired per-side loop state.
   delete side.loop;
   if (side.playback && isPlainRecord(side.playback)) delete side.playback.loop;
@@ -239,7 +283,7 @@ function normalizeVideoSide(value, fieldName) {
   return side;
 }
 
-function normalizeVideoBlock(block) {
+function normalizeVideoBlock(block, options = {}) {
   const normalized = { ...cloneJson(block) };
   normalizeLoopAndSegment(normalized, 'Video block');
   // The old comparison synchronisation fields are intentionally not migrated.
@@ -260,7 +304,10 @@ function normalizeVideoBlock(block) {
   if (normalized.label !== undefined) normalized.label = safeOptionalText(normalized.label, 'Video block label', 160);
   if (normalized.sourceLabel !== undefined) normalized.sourceLabel = safeOptionalText(normalized.sourceLabel, 'Video source label', 160);
   if (normalized.layout !== undefined) normalized.layout = normalized.layout === 'stacked' ? 'stacked' : 'side-by-side';
-  if (normalized.playback !== undefined) normalized.playback = normalizePlayback(normalized.playback, 'Video block playback');
+  if (normalized.playback !== undefined) {
+    normalized.playback = normalizePlayback(normalized.playback, 'Video block playback');
+    if (Object.keys(normalized.playback).length === 0) delete normalized.playback;
+  }
   if (normalized.type === 'singleVideo') {
     delete normalized.layout;
     delete normalized.commonSegment;
@@ -276,7 +323,9 @@ function normalizeVideoBlock(block) {
         'Video block mediaAssetId',
       );
     }
-    if (normalized.segment !== undefined) normalized.segment = normalizeSegment(normalized.segment, 'Video block segment');
+    const blockUnit = normalized.segmentUnit === 'frames' ? 'frames' : 'seconds';
+    normalized.segment = normalizeVideoSegment(normalized.segment, 'Video block segment', blockUnit, frameRateForAsset(options.mediaById, normalized.mediaAssetId ?? null));
+    normalized.segmentUnit = 'frames';
   } else {
     delete normalized.sourceLabel;
     // Dual-video settings live on the two sides.  Do not retain the former
@@ -285,10 +334,11 @@ function normalizeVideoBlock(block) {
     delete normalized.videoAssetId;
     delete normalized.assetId;
     delete normalized.segment;
+    delete normalized.segmentUnit;
     delete normalized.playback;
     delete normalized.loop;
-    const left = normalizeVideoSide(normalized.left, 'Video block left');
-    const right = normalizeVideoSide(normalized.right, 'Video block right');
+    const left = normalizeVideoSide(normalized.left, 'Video block left', options);
+    const right = normalizeVideoSide(normalized.right, 'Video block right', options);
     if (left !== undefined) normalized.left = left;
     if (right !== undefined) normalized.right = right;
     if (dualSync !== undefined) normalized.sync = dualSync;
@@ -390,7 +440,7 @@ function cloneProjectExtensions(value) {
   return extensions;
 }
 
-function normalizeSections(value) {
+function normalizeSections(value, options = {}) {
   if (!Array.isArray(value) || value.length > MAX_SECTIONS) {
     throw new Error(`Sections must be an array of at most ${MAX_SECTIONS} items`);
   }
@@ -422,7 +472,7 @@ function normalizeSections(value) {
         normalizedBlock.content = safeContent(block.content);
       }
       if (block.type === 'singleVideo' || block.type === 'comparisonVideo') {
-        const normalizedVideo = normalizeVideoBlock(normalizedBlock);
+        const normalizedVideo = normalizeVideoBlock(normalizedBlock, options);
         Object.keys(normalizedBlock).forEach((key) => {
           if (key !== 'id' && key !== 'type') delete normalizedBlock[key];
         });
@@ -576,6 +626,13 @@ function normalizeProjectRecord(value, projectRoot, expectedId = null) {
   const filesystemName = safeProjectId(value.filesystemName || value.safeName || id);
   if (filesystemName !== id) throw new Error('Filesystem project name does not match project id');
 
+  const media = normalizeMedia(value.media);
+  const mediaById = new Map();
+  for (const item of media) {
+    const assetId = item.id ?? item.assetId ?? item.mediaAssetId;
+    if (typeof assetId === 'string') mediaById.set(assetId, item);
+  }
+
   return {
     ...cloneProjectExtensions(value),
     schemaVersion: 1,
@@ -587,8 +644,8 @@ function normalizeProjectRecord(value, projectRoot, expectedId = null) {
     createdAt: safeTimestamp(value.createdAt, 'createdAt'),
     updatedAt: safeTimestamp(value.updatedAt, 'updatedAt'),
     lastOpenedAt: safeOptionalTimestamp(value.lastOpenedAt, 'lastOpenedAt'),
-    sections: normalizeSections(value.sections),
-    media: normalizeMedia(value.media),
+    sections: normalizeSections(value.sections, { mediaById }),
+    media,
     exportSettings: normalizeExportSettings(value.exportSettings, projectRoot),
     recoveryMetadata: normalizeOptionalRecord(value.recoveryMetadata, 'Recovery metadata'),
   };

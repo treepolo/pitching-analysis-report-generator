@@ -138,7 +138,7 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.match(html, /data-native-frame-player-block/iu);
   assert.match(html, /data-player-layout="stacked"/u);
   assert.match(html, /data-segment-in="1"[\s\S]*data-segment-out="3"/u);
-  assert.match(html, /data-playback-rate="64"/u);
+  assert.doesNotMatch(html, /data-playback-rate/iu);
   assert.match(html, /data-loop-enabled="true"/u);
   assert.match(html, /data-frame-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);
   assert.match(html, /data-frame-rate type="range" min="-6" max="6"/u);

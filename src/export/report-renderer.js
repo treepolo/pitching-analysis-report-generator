@@ -138,12 +138,11 @@ function formatPlaybackRate(rate) {
 }
 function normalizeSegment(value) {
   const segment = value && typeof value === 'object' ? value : {};
-  const start = Math.max(0, finiteSetting(segment.in ?? segment.start, 0));
-  const endValue = finiteSetting(segment.out ?? segment.end, null);
-  return {
-    in: start,
-    out: endValue !== null && endValue > start ? endValue : null,
-  };
+  const startValue = Number(segment.in ?? segment.start ?? segment.startFrame);
+  const endValue = Number(segment.out ?? segment.end ?? segment.endFrame);
+  const start = Number.isFinite(startValue) ? Math.max(0, Math.round(startValue)) : 0;
+  const end = Number.isFinite(endValue) && endValue > 0 ? Math.max(start, Math.round(endValue)) : 0;
+  return { in: start, out: end };
 }
 function normalizeLoop(value, segment) {
   const loop = value && typeof value === 'object' ? value : null;
@@ -164,10 +163,9 @@ function playbackSettings(config) {
   const loopSource = source.loop
     ?? playback.loop
     ?? playbackOptions.loop;
-  const explicitRate = finiteSetting(playback.rate ?? playbackOptions.rate, null);
   return {
     segment,
-    rate: clampPlaybackRate(explicitRate),
+    rate: PLAYBACK_RATE_DEFAULT,
     loop: normalizeLoop(loopSource, segment),
   };
 }
@@ -202,9 +200,9 @@ function sidePosterAssetId(block, side) {
 function formatSeconds(value) {
   return value === null || value === undefined ? '未設定' : `${Number(value).toFixed(2)} 秒`;
 }
-function formatLoop(loop, segment = { in: 0, out: null }) {
+function formatLoop(loop, segment = { in: 0, out: 0 }) {
   if (!loop.enabled) return '關閉';
-  return segment.out === null
+  return !(segment.out > 0)
     ? `開啟（${formatSeconds(segment.in)}起）`
     : `開啟（${formatSeconds(segment.in)}–${formatSeconds(segment.out)}）`;
 }
@@ -240,13 +238,12 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
   const poster = posterAsset
     ? ' poster="' + escapeHtml(encodeAssetPath(posterAsset.relativePath)) + '"'
     : '';
-  const segmentOut = settings.segment.out === null ? '' : String(settings.segment.out);
+  const segmentOut = settings.segment.out > 0 ? String(settings.segment.out) : '';
   const sideLabel = side === 'left' ? '左側' : side === 'right' ? '右側' : '影片';
   const metadata = frameMetadataAttributes(asset);
   return '<div class="portable-player-side native-frame-player-side" data-native-frame-player data-player-side="' + escapeHtml(side) + '" tabindex="0" aria-selected="false" data-frame-selected="false"'
     + ' data-segment-in="' + escapeHtml(String(settings.segment.in)) + '"'
     + ' data-segment-out="' + escapeHtml(segmentOut) + '"'
-    + ' data-playback-rate="' + escapeHtml(String(settings.rate)) + '"'
     + ' data-loop-enabled="' + (settings.loop.enabled ? 'true' : 'false') + '"'
     + metadata.fpsAttribute + metadata.frameCountAttribute + metadata.frameTimesAttribute + '>'
     + '<div class="portable-player-side-heading"><h3>' + escapeHtml(label) + '</h3></div>'
@@ -423,11 +420,10 @@ function renderFramePlayerSide(block, side, frameBinding, comparison) {
   const label = sideTitle(block, side, asset);
   const firstFrame = cache.frames[0];
   const sideLabel = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
-  const segmentOut = settings.segment.out === null ? '' : String(settings.segment.out);
+  const segmentOut = settings.segment.out > 0 ? String(settings.segment.out) : '';
   return `<div class="portable-player-side portable-frame-side" data-player-side="${side}"
     data-segment-in="${escapeHtml(String(settings.segment.in))}"
     data-segment-out="${escapeHtml(segmentOut)}"
-    data-playback-rate="${escapeHtml(String(settings.rate))}"
     data-loop-enabled="${settings.loop.enabled ? 'true' : 'false'}"
     data-frame-index="${frameCacheJson(cache)}"
     data-frame-index-path="${escapeHtml(cache.cache.indexRelativePath)}"
@@ -645,7 +641,7 @@ function renderFramePlayerScript() {
     const rateInput = player.querySelector('[data-frame-rate-input]');
     const rateSlider = player.querySelector('[data-frame-rate]');
     const resetRate = player.querySelector('[data-frame-action="reset-rate"]');
-    let rate = clamp(numberValue(side.dataset.playbackRate, 1), ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
+    let rate = 1;
     const loopEnabled = side.dataset.loopEnabled === 'true';
     const count = frames.length;
     const timeline = player.querySelector('[data-frame-timeline]');
@@ -807,7 +803,7 @@ function renderLegacyPlayerScript() {
       const rateSlider = side.querySelector('[data-player-rate]');
       const resetRate = side.querySelector('[data-player-rate-reset]');
       const loopInput = side.querySelector('[data-player-loop]');
-      return { side, video, rateInput, rateSlider, resetRate, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: clamp(numberValue(side.dataset.playbackRate, 1), ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}), loopEnabled: side.dataset.loopEnabled === 'true' };
+      return { side, video, rateInput, rateSlider, resetRate, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: 1, loopEnabled: side.dataset.loopEnabled === 'true' };
     };
     const updateRateControls = (settings) => { if (settings.rateInput) settings.rateInput.value = settings.rate < .1 ? settings.rate.toFixed(4) : settings.rate < 1 ? settings.rate.toFixed(3) : settings.rate.toFixed(2); if (settings.rateSlider) settings.rateSlider.value = String(Math.log2(settings.rate)); };
     const rateCandidates = (requested) => {

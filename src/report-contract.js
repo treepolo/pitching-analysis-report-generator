@@ -87,12 +87,15 @@
   function cloneSegmentConfig(value, legacyLoop) {
     const source = isRecord(value) ? value : isRecord(legacyLoop) ? legacyLoop : undefined;
     if (!source) return undefined;
-    const segment = {};
-    const start = source.in ?? source.start ?? source.startTime;
-    const end = source.out ?? source.end ?? source.endTime;
-    if (typeof start === 'number' && Number.isFinite(start)) segment.in = start;
-    if (typeof end === 'number' && Number.isFinite(end)) segment.out = end;
-    return Object.keys(segment).length > 0 ? segment : undefined;
+    const start = source.in ?? source.start ?? source.startFrame;
+    const end = source.out ?? source.end ?? source.endFrame;
+    const normalizedStart = Number.isFinite(Number(start)) ? Math.max(0, Math.round(Number(start))) : 0;
+    const normalizedEnd = Number.isFinite(Number(end)) && Number(end) > 0
+      ? Math.max(0, Math.round(Number(end)))
+      : 0;
+    return normalizedEnd > 0 && normalizedEnd < normalizedStart
+      ? { in: normalizedStart, out: normalizedStart }
+      : { in: normalizedStart, out: normalizedEnd };
   }
 
   function cloneDualSync(value) {
@@ -115,7 +118,6 @@
   function clonePlaybackConfig(value) {
     if (!isRecord(value)) return undefined;
     const playback = {};
-    copyFiniteNumber(value, playback, 'rate');
     copyBoolean(value, playback, 'autoplay');
     copyBoolean(value, playback, 'controls');
     copyBoolean(value, playback, 'muted');

@@ -68,7 +68,7 @@ test('text input and video settings keep persistence without input-time redraw',
 
   const sideSettings = functionSlice(renderer, 'function applyInlineSideSettings(', 'function hideFramePlayerPlaceholder(');
   assert.match(sideSettings, /video\.loop = false;/u);
-  assert.match(sideSettings, /enforceInlinePlaybackBounds\(block, side, video\)/u);
+  assert.match(sideSettings, /enforceInlinePlaybackBounds\(block, side, video/um);
   assert.match(sideSettings, /setSafePlaybackRate\(targetCard, video, rate\)/u);
   assert.doesNotMatch(renderer, /inlineBinding|queueInlineBinding|propagateInlinePlayback|sync\.binding/u);
 });

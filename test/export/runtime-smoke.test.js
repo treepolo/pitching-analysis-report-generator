@@ -36,9 +36,7 @@ function fixtureReport() {
           posterAssetId: 'frame',
           label: 'Synthetic pitch',
           sourceLabel: 'Synthetic source',
-          segment: { in: 0.25, out: 1.5 },
-          playback: { rate: 1.25 },
-          segment: { in: 0.25, out: 1.5 },
+          segment: { in: 8, out: 45 },
           loop: { enabled: true },
           sync: { mode: 'time', startAnchor: { observedTime: 0.25, precision: 'time-based' } },
           anchor: { observedTime: 0.25, precision: 'time-based' },
@@ -140,9 +138,9 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
   });
 
   const folderHtml = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
-  assert.match(folderHtml, /data-segment-in="0\.25"/u);
-  assert.match(folderHtml, /data-segment-out="1\.5"/u);
-  assert.match(folderHtml, /data-playback-rate="1\.25"/u);
+  assert.match(folderHtml, /data-segment-in="8"/u);
+  assert.match(folderHtml, /data-segment-out="45"/u);
+  assert.doesNotMatch(folderHtml, /data-playback-rate=/u);
   assert.match(folderHtml, /data-loop-enabled="true"/u);
   assert.match(folderHtml, /<video\b[^>]*data-player-video/iu);
   assert.match(folderHtml, /data-native-frame-player\b/u);

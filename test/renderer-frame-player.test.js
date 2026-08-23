@@ -46,7 +46,7 @@ test('single and dual cards use the shared outer-player contract', () => {
   assert.match(renderer, /function framePlayerControlMap\(block, runtime, card\)/u);
   assert.match(renderer, /function syncDualFramePlayer\(card\)/u);
   assert.match(renderer, /function constrainDualSegmentToSync\(block, pathValue, value\)/u);
-  assert.match(renderer, /syncFrame \+ \(kind === 'out' \? 1 : 0\)/u);
+  assert.match(renderer, /if \(kind === 'in' && value > syncFrame\)/u);
   assert.match(renderer, /function bindFramePlayerActionButtons\(card\)/u);
   assert.match(renderer, /function framePlayerSideRuntime\(card, side\)/u);
   assert.match(renderer, /function seekFramePlayerSideIndex\(card, side/u);

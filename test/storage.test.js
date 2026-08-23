@@ -163,7 +163,10 @@ test('persists independent video settings and the new dual sync point across reo
   assert.equal('relativeOffset' in reopened.sections[0].blocks.at(-2), false);
   assert.equal(reopened.sections[0].blocks.at(-2).label, 'Front view');
   assert.equal(reopened.sections[0].blocks.at(-2).sourceLabel, 'Front source');
-  assert.equal(reopened.sections[0].blocks.at(-1).left.segment.out, 3);
+  assert.equal(reopened.sections[0].blocks.at(-1).left.segment.out, 89);
+  assert.deepEqual(reopened.sections[0].blocks.at(-1).right.segment, { in: 3, out: 86 });
+  assert.deepEqual(reopened.sections[0].blocks.at(-2).segment, { in: 8, out: 74 });
+  assert.equal('playback' in reopened.sections[0].blocks.at(-2), false);
   assert.deepEqual(reopened.sections[0].blocks.at(-1).sync, { leftFrame: 100, rightFrame: 400 });
   assert.equal('anchor' in reopened.sections[0].blocks.at(-1).left, false);
   assert.equal('anchor' in reopened.sections[0].blocks.at(-1).right, false);

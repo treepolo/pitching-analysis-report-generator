@@ -90,12 +90,12 @@ function renderNativeFramePlayerScript() {
       const frameTimes = frameTimesFor(side);
       const declaredFrameCount = Math.max(0, Math.floor(numberValue(side.dataset.frameCount, 0)));
       const fps = Math.max(0.001, numberValue(side.dataset.frameFps, 30));
-      const configuredStart = Math.max(0, numberValue(side.dataset.segmentIn, 0));
-      const configuredEnd = numberValue(side.dataset.segmentOut, null);
+      const configuredStartFrame = Math.max(0, Math.round(numberValue(side.dataset.segmentIn, 0)));
+      const configuredEndFrame = Math.max(0, Math.round(numberValue(side.dataset.segmentOut, 0)));
       const runtime = {
         count: declaredFrameCount || frameTimes.length,
         index: 0,
-        rate: clampRate(side.dataset.playbackRate, RATE_DEFAULT),
+        rate: RATE_DEFAULT,
         playing: false,
         manual: false,
         manualTime: null,
@@ -132,24 +132,21 @@ function renderNativeFramePlayerScript() {
       };
       const frameTime = (index) => {
         const count = frameCount();
-        if (count <= 0) return configuredStart;
+        if (count <= 0) return configuredStartFrame / fps;
         const bounded = clamp(Math.round(index), 0, count - 1);
         const indexed = Number(frameTimes[bounded]);
         const candidate = Number.isFinite(indexed) ? indexed : (bounded / fps);
         return clamp(candidate, 0, Math.max(0, duration() - 0.0001));
       };
       const segmentBounds = () => {
-        const start = configuredStart;
         const mediaDuration = duration();
-        const end = Number.isFinite(configuredEnd) && configuredEnd > start
-          ? (mediaDuration > 0 ? Math.min(configuredEnd, mediaDuration) : configuredEnd)
+        const start = frameTime(configuredStartFrame);
+        const end = configuredEndFrame > 0
+          ? (frameCount() > 0 && configuredEndFrame + 1 >= frameCount()
+            ? mediaDuration
+            : frameTime(configuredEndFrame + 1))
           : (mediaDuration > 0 ? mediaDuration : null);
         return { start, end };
-      };
-      const segmentStartIndex = () => {
-        const count = frameCount();
-        if (count <= 0) return 0;
-        return clamp(Math.round(configuredStart * fps), 0, count - 1);
       };
       const frameIndexForTime = (time) => {
         const count = frameCount();
@@ -276,8 +273,7 @@ function renderNativeFramePlayerScript() {
           const readyAtTarget = () => !video.seeking
             && video.readyState >= 1
             && Math.abs((Number(video.currentTime) || 0) - targetTime) <= tolerance;
-          const settledAtTarget = () => !video.seeking
-            && video.readyState >= 1
+          const settledAtTarget = () => video.readyState >= 2
             && Number.isFinite(Number(video.currentTime))
             && Math.abs((Number(video.currentTime) || 0) - targetTime) <= Math.max(tolerance * 4, 0.25);
           const finish = async (success) => {
@@ -329,6 +325,12 @@ function renderNativeFramePlayerScript() {
         });
       };
       const seekExact = async (targetIndex, announce = true) => {
+        if (runtime.manualFrame !== null) {
+          if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(runtime.manualFrame);
+          else clearTimeout(runtime.manualFrame);
+          runtime.manualFrame = null;
+        }
+        runtime.dragTarget = null;
         const count = frameCount();
         if (count <= 0) return false;
         const target = clamp(Math.round(targetIndex), 0, count - 1);
@@ -660,18 +662,19 @@ function renderNativeFramePlayerScript() {
       const loopInput = controls?.querySelector('[data-frame-loop], [data-frame-common-loop]');
       const syncInfo = controls?.querySelector('[data-frame-sync-info]');
       const status = controls?.querySelector('[data-frame-player-status]');
-      const state = { index: 0, count: 0, playing: false, rate: clampRate(sides[0].dataset.playbackRate, RATE_DEFAULT), sync: null, initialized: false, loopTransition: false, rateTransition: false, manual: false, manualTime: null, manualTimestamp: null, manualCancel: null, manualSerial: 0, operationSerial: 0, rateSerial: 0 };
+      const state = { index: 0, count: 0, playing: false, rate: RATE_DEFAULT, sync: null, initialized: false, loopTransition: false, rateTransition: false, manual: false, manualTime: null, manualTimestamp: null, manualCancel: null, manualSerial: 0, operationSerial: 0, rateSerial: 0 };
       const setStatus = (message, stateName = '') => { if (status) { status.textContent = message; status.dataset.state = stateName; } };
       const loopEnabled = () => block.dataset.commonLoopEnabled !== 'false' && (!loopInput || loopInput.checked !== false);
       const configuredRange = (side, action) => {
         const count = Math.max(0, Math.floor(numberValue(action.runtime.count, numberValue(side.dataset.frameCount, 0))));
         if (count <= 0) return null;
-        const fps = Math.max(0.001, numberValue(side.dataset.frameFps, 30));
         const startValue = numberValue(side.dataset.segmentIn, 0);
-        const endValue = numberValue(side.dataset.segmentOut, null);
-        const start = clamp(Math.round(Math.max(0, startValue) * fps), 0, count - 1);
-        const end = Number.isFinite(endValue) && endValue > startValue ? Math.max(start, Math.min(count - 1, Math.ceil(endValue * fps) - 1)) : count - 1;
-        return { start, end, count, fps };
+        const endValue = numberValue(side.dataset.segmentOut, 0);
+        const start = clamp(Math.round(Math.max(0, startValue)), 0, count - 1);
+        const end = Number.isFinite(endValue) && endValue > 0
+          ? Math.max(start, Math.min(count - 1, Math.round(endValue)))
+          : count - 1;
+        return { start, end, count, fps: Math.max(0.001, numberValue(side.dataset.frameFps, 30)) };
       };
       const currentSync = () => {
         const left = numberValue(block.dataset.syncLeftFrame, 0);
