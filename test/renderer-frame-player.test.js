@@ -29,7 +29,7 @@ test('single and dual cards use the same browser video surface and independent c
   assert.match(block, /renderInlineVideoSide\(block, 'right', \{ playerCard: true \}\)/u);
   assert.match(block, /renderInlineVideoSide\(block, 'single', \{ playerCard: true \}\)/u);
   assert.doesNotMatch(block, /renderFramePlayerControls\(playerSideTitle\(block, 'single'\)\)/u);
-  assert.match(block, /const layout = comparison && block\.layout === 'stacked'/u);
+  assert.match(block, /const layout = comparison && block\.layout === 'stacked' \? 'stacked' : \(comparison \? 'side-by-side' : 'stacked'\)/u);
   assert.match(side, /renderFramePlayerControls\(title\)/u);
   const controls = functionSlice(renderer, 'function renderFramePlayerControls(', 'function renderInlineVideoSide(');
   assert.match(controls, /data-frame-rate/u);
@@ -40,6 +40,11 @@ test('single and dual cards use the same browser video surface and independent c
   assert.match(controls, /重置播放速度為 1 倍/u);
   assert.match(controls, /data-frame-player-status/u);
   assert.match(side, /data-frame-player-side="\$\{side\}"/u);
+  assert.match(side, /data-frame-selected="false"/u);
+  assert.match(controls, /data-frame-current/u);
+  assert.match(controls, /data-frame-total/u);
+  assert.match(controls, />←</u);
+  assert.match(controls, />→</u);
   assert.match(renderer, /function bindFramePlayerActionButtons\(card\)/u);
 });
 
@@ -87,16 +92,20 @@ test('drag is latest-target-wins approximate seek, release is exact seek', () =>
   assert.match(events, /exact: true/u);
   assert.match(events, /exact: false/u);
   assert.match(events, /event\.type !== 'click'/u);
-  assert.match(renderer, /position\.textContent = count > 0/u);
+  assert.match(renderer, /currentPosition\.textContent = count > 0/u);
+  assert.match(renderer, /totalPosition\.textContent = count > 0/u);
+  assert.match(renderer, /settledAtTarget/u);
   assert.match(renderer, /addEventListener\('pointercancel', handleBlockEditorEvent\)/u);
 });
 
 test('keyboard stepping is one exact frame and playback uses video clock/rate', () => {
   const keyHandler = functionSlice(renderer, 'function handleFramePlayerKeydown(', 'function inlinePlaybackBounds(');
-  assert.match(keyHandler, /\['ArrowLeft', 'ArrowRight'\]\.includes\(event\.key\)/u);
+  assert.match(keyHandler, /const isArrow = event\.key === 'ArrowLeft'/u);
   assert.match(keyHandler, /stepFramePlayer\(card, event\.key === 'ArrowRight' \? 1 : -1\)/u);
   assert.match(keyHandler, /event\.preventDefault\(\)/u);
-  assert.match(keyHandler, /data-frame-controls/u);
+  assert.match(keyHandler, /selectedFramePlayerCard\(\)/u);
+  assert.match(keyHandler, /isSpace/u);
+  assert.match(renderer, /document\.addEventListener\("keydown", handleFramePlayerKeydown\)/u);
   assert.doesNotMatch(renderer, /function handleInlineVideoKeydown\(/u);
 
   const controls = functionSlice(renderer, 'async function toggleFramePlayer(', 'function handleFramePlayerEvent(');

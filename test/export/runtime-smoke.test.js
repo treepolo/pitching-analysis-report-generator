@@ -147,6 +147,10 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
   assert.match(folderHtml, /<video\b[^>]*data-player-video/iu);
   assert.match(folderHtml, /data-native-frame-player\b/u);
   assert.match(folderHtml, /data-frame-action="toggle"/u);
+  assert.match(folderHtml, /data-frame-selected="false"/u);
+  assert.match(folderHtml, /data-frame-current/u);
+  assert.match(folderHtml, /data-frame-total/u);
+  assert.match(folderHtml, /nativeFramePlayerKeyboardBound/u);
   assert.match(folderHtml, /<h3>Synthetic pitch<\/h3>/u);
   assert.match(folderHtml, /<h3>Synthetic source<\/h3>/u);
   assert.match(folderHtml, /data-frame-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);

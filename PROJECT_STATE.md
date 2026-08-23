@@ -209,3 +209,11 @@
 - Product/spec facts：`PRODUCT_REQUIREMENTS.md`、`USER_FLOWS.md`、`UI_UX_SPEC.md`、`DATA_MODEL.md`、`DATA_AND_SYNC.md`、`MEDIA_PIPELINE.md`、`REPORT_OUTPUT_SPEC.md`。
 - Acceptance/evidence：`ACCEPTANCE_TESTS.md`、`TRACEABILITY_MATRIX.md`、`VERTICAL_SLICE_SCOPE.md`。
 - Current implementation status：本文件與實際 Git/source/test evidence；過期敘述不得覆蓋實際 repository。
+
+## Wave 22 選定播放器與鍵盤控制 checkpoint（2026-08-23）
+
+- 產生器與輸出 HTML 使用同一套選定語意：點擊播放器卡片、影片表面或其控制項即選定該播放器；選定外框以亮色提示，並同步 aria-selected 與 data-frame-selected。
+- 未選定播放器時，左右鍵與空白鍵不執行任何影格或播放動作；有選定時只作用於該播放器。雙影片左右側是兩個獨立選定單位，不會把快捷鍵轉送到另一側。
+- 左右鍵執行精確上一幀／下一幀，空白鍵切換播放／暫停；文字輸入、選單、可編輯內容不攔截快捷鍵。輸出 HTML 也保留原生影片速度失敗時的擴充影格時鐘與定位完成回退判定。
+- 單影片輸出固定堆疊；雙影片才讀取並排／堆疊設定。控制列使用播放／暫停、左右箭頭圖示，當前幀與總幀數分置進度條兩側。
+- 驗證邊界：完整 npm test、變更 JavaScript node --check、輸出 HTML renderer/runtime smoke；Electron file:// 實機執行若不可用仍明確標為 skip，不視為通過。

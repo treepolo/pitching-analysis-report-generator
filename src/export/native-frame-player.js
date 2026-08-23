@@ -47,11 +47,26 @@ function renderNativeFramePlayerScript() {
       }
     };
 
+    const selectNativeFramePlayer = (selectedSide) => {
+      document.querySelectorAll('[data-native-frame-player]').forEach((item) => {
+        const selected = item === selectedSide;
+        item.dataset.frameSelected = selected ? 'true' : 'false';
+        item.setAttribute('aria-selected', selected ? 'true' : 'false');
+      });
+    };
+    const selectedNativeFramePlayer = () => document.querySelector('[data-native-frame-player][data-frame-selected="true"]');
+    const nativeKeyboardTargetIsEditable = (target) => Boolean(
+      target?.matches?.('input:not([type="range"]), textarea, select, [contenteditable="true"]')
+      || target?.isContentEditable
+      || target?.closest?.('button')
+    );
+
     document.querySelectorAll('[data-native-frame-player]').forEach((side) => {
       const video = side.querySelector('[data-player-video]');
       if (!video) return;
       const timeline = side.querySelector('[data-frame-timeline]');
-      const position = side.querySelector('[data-frame-position]');
+      const currentPosition = side.querySelector('[data-frame-current], [data-frame-position]');
+      const totalPosition = side.querySelector('[data-frame-total]');
       const previous = side.querySelector('[data-frame-action="previous"]');
       const next = side.querySelector('[data-frame-action="next"]');
       const toggle = side.querySelector('[data-frame-action="toggle"]');
@@ -157,15 +172,20 @@ function renderNativeFramePlayerScript() {
           timeline.value = String(runtime.index);
           timeline.disabled = count <= 0 || pending;
         }
-        if (position) position.textContent = count > 0
-          ? ('第 ' + (runtime.index + 1) + ' / ' + count + ' 幀')
+        if (currentPosition) currentPosition.textContent = count > 0
+          ? ('第 ' + (runtime.index + 1) + ' 幀')
           : '尚未準備';
+        if (totalPosition) totalPosition.textContent = count > 0
+          ? ('共 ' + count + ' 幀')
+          : '共 -- 幀';
         if (previous) previous.disabled = count <= 0 || pending || runtime.index <= 0;
         if (next) next.disabled = count <= 0 || pending || runtime.index >= maximum;
         if (toggle) {
           toggle.disabled = count <= 0 || pending;
-          toggle.textContent = runtime.playing ? '暫停' : '播放';
+          toggle.textContent = runtime.playing ? '⏸' : '▶';
           toggle.setAttribute('aria-pressed', runtime.playing ? 'true' : 'false');
+          toggle.setAttribute('aria-label', runtime.playing ? '暫停' : '播放');
+          toggle.title = runtime.playing ? '暫停' : '播放';
         }
         if (rateInput) rateInput.disabled = count <= 0 || pending;
         if (rateSlider) rateSlider.disabled = count <= 0 || pending;
@@ -244,6 +264,10 @@ function renderNativeFramePlayerScript() {
           const readyAtTarget = () => !video.seeking
             && video.readyState >= 2
             && Math.abs((Number(video.currentTime) || 0) - targetTime) <= tolerance;
+          const settledAtTarget = () => !video.seeking
+            && video.readyState >= 2
+            && Number.isFinite(Number(video.currentTime))
+            && Math.abs((Number(video.currentTime) || 0) - targetTime) <= Math.max(tolerance * 4, 0.25);
           const finish = async (success) => {
             if (finished) return;
             finished = true;
@@ -259,26 +283,26 @@ function renderNativeFramePlayerScript() {
               return;
             }
             if (typeof video.requestVideoFrameCallback !== 'function') {
-              void finish(readyAtTarget());
+              void finish(readyAtTarget() || settledAtTarget());
               return;
             }
             if (waitingForFrame) return;
             waitingForFrame = true;
             frameWait = waitPresentedFrame(targetTime, tolerance);
-            void frameWait.then((presented) => finish(presented || readyAtTarget()));
+            void frameWait.then((presented) => finish(presented || readyAtTarget() || settledAtTarget()));
           };
           const onSeeked = () => {
             if (serial !== runtime.seekSerial) {
               void finish(false);
               return;
             }
-            if (readyAtTarget()) {
+            if (readyAtTarget() || settledAtTarget()) {
               waitForFrame();
               return;
             }
             try { video.currentTime = targetTime; } catch { void finish(false); }
           };
-          const timer = setTimeout(() => finish(readyAtTarget()), 1500);
+          const timer = setTimeout(() => finish(readyAtTarget() || settledAtTarget()), 1500);
           runtime.pendingSeek = operation;
           video.addEventListener('seeked', onSeeked);
           if (Math.abs((Number(video.currentTime) || 0) - targetTime) < 0.0001 && video.readyState >= 2) {
@@ -433,7 +457,7 @@ function renderNativeFramePlayerScript() {
       };
       const play = async ({ fromRateTransition = false } = {}) => {
         const count = frameCount();
-        if (count <= 0 || runtime.lifecycle === 'loading' || runtime.exactSeek !== null || (runtime.rateTransition && !fromRateTransition)) {
+        if (count <= 0 || (!fromRateTransition && runtime.lifecycle === 'loading') || runtime.exactSeek !== null || (runtime.rateTransition && !fromRateTransition)) {
           setStatus('影片正在準備，請稍候。', 'pending');
           return;
         }
@@ -609,17 +633,31 @@ function renderNativeFramePlayerScript() {
         setStatus('影片載入失敗；請確認輸出資料夾內的影片檔案。', 'error');
         updateControls();
       });
-      side.addEventListener('keydown', (event) => {
-        if (!['ArrowLeft', 'ArrowRight'].includes(event.key)
-          || ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
-        event.preventDefault();
-        step(event.key === 'ArrowLeft' ? -1 : 1);
-      });
+      side.__nativeFramePlayerActions = {
+        step: (direction) => step(direction),
+        toggle: () => togglePlayback(),
+      };
+      side.addEventListener('pointerdown', () => selectNativeFramePlayer(side));
       updateRateControls();
       updateControls();
       setStatus('正在載入影片…', 'pending');
       if (video.readyState >= 1) video.dispatchEvent(new Event('loadedmetadata'));
     });
+    if (!document.__nativeFramePlayerKeyboardBound) {
+      document.__nativeFramePlayerKeyboardBound = true;
+      document.addEventListener('keydown', (event) => {
+        const isArrow = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
+        const isSpace = event.key === ' ' || event.key === 'Spacebar';
+        if ((!isArrow && !isSpace) || (event.repeat && isSpace)
+          || nativeKeyboardTargetIsEditable(event.target)) return;
+        const selected = selectedNativeFramePlayer();
+        const actions = selected?.__nativeFramePlayerActions;
+        if (!actions) return;
+        event.preventDefault();
+        if (isSpace) actions.toggle();
+        else actions.step(event.key === 'ArrowRight' ? 1 : -1);
+      });
+    }
   })();`;
 }
 

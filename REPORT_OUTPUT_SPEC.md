@@ -114,3 +114,9 @@ video blocks:
 - Electron IPC and frame-cache preparation remain available to the editor's
   media pipeline, but are not an export prerequisite and cannot alter the
   portable report player.
+## Wave 22 播放器選定與快捷鍵輸出契約（2026-08-23）
+
+- 產生器與 portable report.html 都必須有明確的播放器選定狀態。點擊某個播放器卡片、影片表面或控制項即選定該卡片；選定的是外層播放器區塊，不是影片邊框，外層以亮色外框提示。
+- 左右鍵與空白鍵只作用於目前選定的播放器；沒有選定時不執行動作。雙影片左右兩側各自選定、各自逐幀與播放，快捷鍵不跨側傳遞。可編輯輸入與選單不攔截這些快捷鍵。
+- 單影片輸出固定使用堆疊版面；並排／堆疊選項只影響雙影片。影格控制列以播放／暫停圖示、上一幀／下一幀箭頭呈現，當前幀顯示在進度條左側，總幀數顯示在右側。
+- 播放速度輸入、連續速度滑桿與重設按鈕維持同步；輸出播放器在瀏覽器不接受要求速度時使用擴充影格時鐘，切換速度不得因載入狀態競態而無聲暫停。精確定位在影格已穩定但未觸發 frame callback 時仍可完成。

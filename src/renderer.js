@@ -24,6 +24,7 @@ const state = {
   blockCanvasRenderQueued: false,
   player: {
     selectedBlockId: null,
+    selectedPlayerKey: null,
     runtime: null,
     generation: 0,
     notice: '',
@@ -774,11 +775,12 @@ function renderFramePlayerControls(label) {
   return `
       <div class="inline-frame-controls" data-frame-controls aria-label="${escapedLabel}影格播放器控制">
         <div class="inline-frame-navigation">
-          <button class="button button-quiet" type="button" data-frame-action="previous" disabled>上一幀</button>
+          <button class="button button-secondary inline-frame-toggle" type="button" data-frame-action="toggle" disabled aria-pressed="false" aria-label="播放" title="播放">▶</button>
+          <button class="button button-quiet inline-frame-step" type="button" data-frame-action="previous" disabled aria-label="上一幀" title="上一幀">←</button>
+          <output class="inline-frame-position inline-frame-current" data-frame-position data-frame-current>尚未準備</output>
           <input class="inline-frame-timeline" data-frame-timeline type="range" min="0" max="0" step="1" value="0" disabled aria-label="${escapedLabel}影格時間軸" />
-          <button class="button button-quiet" type="button" data-frame-action="next" disabled>下一幀</button>
-          <output class="inline-frame-position" data-frame-position>尚未準備</output>
-          <button class="button button-secondary" type="button" data-frame-action="toggle" disabled aria-pressed="false">播放</button>
+          <output class="inline-frame-position inline-frame-total" data-frame-total>共 -- 幀</output>
+          <button class="button button-quiet inline-frame-step" type="button" data-frame-action="next" disabled aria-label="下一幀" title="下一幀">→</button>
         </div>
         <div class="inline-frame-rate-row" data-frame-rate-row>
           <input class="inline-frame-rate-input" data-frame-rate-input type="number" min="${PLAYBACK_RATE_MIN}" max="${PLAYBACK_RATE_MAX}" step="any" value="1" disabled aria-label="${escapedLabel}播放速度數值" />
@@ -788,12 +790,11 @@ function renderFramePlayerControls(label) {
         <span class="inline-frame-player-status" data-frame-player-status role="status" data-state="pending">正在載入影片…</span>
       </div>`;
 }
-
 function renderInlineVideoSide(block, side, { playerCard = false } = {}) {
   const title = playerSideTitle(block, side);
   const escapedTitle = escapeHtml(title);
   const playerAttributes = playerCard
-    ? ` data-frame-player data-frame-player-side="${side}"`
+    ? ` data-frame-player data-frame-player-side="${side}" tabindex="0" aria-selected="false" data-frame-selected="false"`
     : '';
   return `
     <div class="inline-video-side" data-inline-side="${side}"${playerAttributes}>
@@ -802,11 +803,10 @@ function renderInlineVideoSide(block, side, { playerCard = false } = {}) {
         <video data-inline-video preload="auto" playsinline aria-label="${escapedTitle}影片"></video>
         <span class="inline-frame-placeholder" data-frame-placeholder>正在載入第一幀…</span>
       </div>
-      <p class="inline-video-status" data-inline-status role="status">尚未準備；等待影片來源。</p>
+      <p class="inline-video-status" data-inline-status role="status">尚未準備播放影片。</p>
       ${playerCard ? renderFramePlayerControls(title) : ''}
     </div>`;
 }
-
 function renderInlineVideoBlock(section, block) {
   const comparison = block.type === 'comparisonVideo';
   // A single-video block is always one vertical player card.  Only dual
@@ -898,6 +898,48 @@ function framePlayerSides(block, card) {
 function framePlayerPrimarySide(block, runtime, card) {
   return framePlayerSides(block, card)[0];
 }
+function framePlayerSelectionKey(card) {
+  const owner = card?.closest?.('[data-block-id]');
+  const blockId = owner?.dataset.blockId;
+  const side = card?.dataset.framePlayerSide || card?.dataset.inlineSide || 'single';
+  return blockId ? `${blockId}:${side}` : null;
+}
+
+function syncFramePlayerSelectionDom() {
+  const players = elements.blockCanvas
+    ? [...elements.blockCanvas.querySelectorAll('[data-frame-player]')]
+    : [];
+  const selectedKey = state.player.selectedPlayerKey;
+  if (selectedKey && !players.some((card) => framePlayerSelectionKey(card) === selectedKey)) {
+    state.player.selectedPlayerKey = null;
+  }
+  players.forEach((card) => {
+    const selected = Boolean(state.player.selectedPlayerKey)
+      && framePlayerSelectionKey(card) === state.player.selectedPlayerKey;
+    card.dataset.frameSelected = selected ? 'true' : 'false';
+    card.setAttribute('aria-selected', selected ? 'true' : 'false');
+  });
+}
+
+function selectFramePlayer(card) {
+  const key = framePlayerSelectionKey(card);
+  if (!key) return false;
+  state.player.selectedPlayerKey = key;
+  state.player.selectedBlockId = card.closest('[data-block-id]')?.dataset.blockId || state.player.selectedBlockId;
+  syncFramePlayerSelectionDom();
+  return true;
+}
+
+function selectedFramePlayerCard() {
+  const key = state.player.selectedPlayerKey;
+  if (!key || !elements.blockCanvas) return null;
+  return [...elements.blockCanvas.querySelectorAll('[data-frame-player]')].find((card) => framePlayerSelectionKey(card) === key) || null;
+}
+
+function framePlayerKeyTargetIsEditable(target) {
+  return Boolean(target?.matches?.('input:not([type="range"]), textarea, select, [contenteditable="true"]')
+    || target?.isContentEditable || target?.closest?.('button'));
+}
 
 function framePlayerReady(block, runtime, card) {
   return framePlayerSides(block, card).every((side) => {
@@ -939,7 +981,8 @@ function updateFramePlayerControls(card) {
   runtime.currentFrameIndex = index;
   runtime.primarySide = framePlayerPrimarySide(entry.block, runtime, card);
   const timeline = card.querySelector('[data-frame-timeline]');
-  const position = card.querySelector('[data-frame-position]');
+  const currentPosition = card.querySelector('[data-frame-current], [data-frame-position]');
+  const totalPosition = card.querySelector('[data-frame-total]');
   const previous = card.querySelector('[data-frame-action="previous"]');
   const next = card.querySelector('[data-frame-action="next"]');
   const toggle = card.querySelector('[data-frame-action="toggle"]');
@@ -955,13 +998,17 @@ function updateFramePlayerControls(card) {
     timeline.value = String(index);
     timeline.disabled = !available;
   }
-  if (position) position.textContent = count > 0 ? `第 ${index + 1} / ${count} 幀` : '尚未準備';
+  if (currentPosition) currentPosition.textContent = count > 0 ? `第 ${index + 1} 幀` : '尚未準備';
+  if (totalPosition) totalPosition.textContent = count > 0 ? `共 ${count} 幀` : '共 -- 幀';
   if (previous) previous.disabled = !available || index <= 0;
   if (next) next.disabled = !available || index >= maxIndex;
   if (toggle) {
+    const playing = runtime.playing;
     toggle.disabled = !available;
-    toggle.textContent = runtime.playing ? '暫停' : '播放';
-    toggle.setAttribute('aria-pressed', runtime.playing ? 'true' : 'false');
+    toggle.textContent = playing ? '⏸' : '▶';
+    toggle.setAttribute('aria-pressed', playing ? 'true' : 'false');
+    toggle.setAttribute('aria-label', playing ? '暫停' : '播放');
+    toggle.title = playing ? '暫停' : '播放';
   }
   if (resetRate) resetRate.disabled = !available;
   const rate = clampPlaybackRate(runtime.playbackRate);
@@ -974,7 +1021,6 @@ function updateFramePlayerControls(card) {
     rateInput.disabled = !available;
   }
 }
-
 function bindFramePlayerActionButtons(card) {
   card?.querySelectorAll('[data-frame-action="previous"], [data-frame-action="next"], [data-frame-action="toggle"]')
     .forEach((button) => {
@@ -1217,6 +1263,10 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
     const readyAtTarget = () => !video.seeking
       && video.readyState >= 2
       && Math.abs((Number(video.currentTime) || 0) - targetTime) <= tolerance;
+    const settledAtTarget = () => !video.seeking
+      && video.readyState >= 2
+      && Number.isFinite(Number(video.currentTime))
+      && Math.abs((Number(video.currentTime) || 0) - targetTime) <= Math.max(tolerance * 4, 0.25);
     const finish = async (success) => {
       if (finished) return;
       finished = true;
@@ -1232,20 +1282,20 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
         return;
       }
       if (typeof video.requestVideoFrameCallback !== 'function') {
-        void finish(readyAtTarget());
+        void finish(readyAtTarget() || settledAtTarget());
         return;
       }
       if (waitingForFrame) return;
       waitingForFrame = true;
       frameWait = waitForPresentedVideoFrame(video, targetTime, tolerance, 500);
-      void frameWait.then((presented) => finish(presented || readyAtTarget()));
+      void frameWait.then((presented) => finish(presented || readyAtTarget() || settledAtTarget()));
     };
     const onSeeked = () => {
       if (serial !== runtime.seekSerial) {
         void finish(false);
         return;
       }
-      if (Math.abs((Number(video.currentTime) || 0) - targetTime) > tolerance) {
+      if (!readyAtTarget() && !settledAtTarget()) {
         try {
           video.currentTime = targetTime;
         } catch {
@@ -1255,7 +1305,7 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
       }
       waitForFrame();
     };
-    const timer = setTimeout(() => { void finish(readyAtTarget()); }, 1_500);
+    const timer = setTimeout(() => { void finish(readyAtTarget() || settledAtTarget()); }, 1_500);
     runtime.pendingSeeks?.set(video, operation);
     video.addEventListener('seeked', onSeeked);
     if (Math.abs((Number(video.currentTime) || 0) - targetTime) < 0.0001 && video.readyState >= 2) {
@@ -1723,14 +1773,17 @@ function handleFramePlayerEvent(event) {
 }
 
 function handleFramePlayerKeydown(event) {
-  if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-  const card = event.target.closest?.('[data-frame-player]');
-  if (!card || event.target.matches('[data-frame-timeline]')) return;
-  if (!event.target.closest?.('[data-frame-surface], [data-frame-controls]')) return;
+  const isArrow = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
+  const isSpace = event.key === ' ' || event.key === 'Spacebar';
+  if (!isArrow && !isSpace) return;
+  if (event.repeat && isSpace) return;
+  if (framePlayerKeyTargetIsEditable(event.target)) return;
+  const card = selectedFramePlayerCard();
+  if (!card) return;
   event.preventDefault();
-  stepFramePlayer(card, event.key === 'ArrowRight' ? 1 : -1);
+  if (isSpace) void toggleFramePlayer(card);
+  else void stepFramePlayer(card, event.key === 'ArrowRight' ? 1 : -1);
 }
-
 function inlinePlaybackBounds(block, side, video) {
   const config = playerSideConfig(block, side);
   const duration = Number.isFinite(video?.duration) && video.duration > 0 ? video.duration : null;
@@ -2090,6 +2143,7 @@ function renderBlockCanvas({ preserveFocus = false, allowFocusedSelect = false }
     </section>`).join('');
   hydrateInlineVideoCards();
   restoreBlockEditorFocus(focusSnapshot);
+  syncFramePlayerSelectionDom();
 }
 
 function setEditorPath(target, pathValue, value) {
@@ -2179,6 +2233,8 @@ function refreshInlineVideoAfterEditorChange(card, block, pathValue) {
 
 function handleBlockEditorEvent(event) {
   const target = event.target;
+  const player = target.closest?.("[data-frame-player]");
+  if (player && (event.type === "pointerdown" || event.type === "click")) selectFramePlayer(player);
   if (target.closest('[data-inline-video-block]') && target.closest('[data-frame-action="open"]')) {
     if (event.type !== 'click') return;
     const details = target.closest('[data-inline-video-block]')?.querySelector('details');
@@ -2563,7 +2619,7 @@ elements.blockCanvas?.addEventListener('pointerdown', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('pointermove', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('pointerup', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('pointercancel', handleBlockEditorEvent);
-elements.blockCanvas?.addEventListener('keydown', handleFramePlayerKeydown);
+document.addEventListener("keydown", handleFramePlayerKeydown);
 elements.blockCanvas?.addEventListener('focusout', () => {
   setTimeout(flushQueuedBlockCanvasRender, 0);
 });

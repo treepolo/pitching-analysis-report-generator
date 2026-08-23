@@ -143,6 +143,13 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.match(html, /data-frame-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);
   assert.match(html, /data-frame-rate type="range" min="-6" max="6"/u);
   assert.match(html, /data-frame-action="reset-rate"/u);
+  assert.match(html, /data-frame-selected="false"/u);
+  assert.match(html, /data-frame-current/u);
+  assert.match(html, /data-frame-total/u);
+  assert.match(html, /data-frame-action="toggle"[^>]*>▶/u);
+  assert.match(html, /data-frame-action="previous"[^>]*>←/u);
+  assert.match(html, /data-frame-action="next"[^>]*>→/u);
+  assert.match(html, /nativeFramePlayerKeyboardBound/u);
   assert.doesNotMatch(html, /data-anchor-time|data-sync-offset|data-loop-start|data-loop-end|陷ｷ譴ｧ・ｭ・･|驍ｯ竏晢ｽｮ蝌ｶ鬪ｭ・ｨ魄溘・/u);
   assert.doesNotMatch(html, /portable-player-settings|portable-player-eyebrow|portable-player-layout/iu);
   assert.match(html, /data-frame-loop/iu);
@@ -158,6 +165,34 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.equal(inlineScripts.length, 1);
   assert.doesNotThrow(() => new vm.Script(inlineScripts[0]));});
 
+test('forces single-video output to stacked while dual output honors layout', () => {
+  const html = renderReportHtml({
+    schemaVersion: 1,
+    title: 'Layout contract',
+    sections: [{
+      blocks: [{
+        type: 'singleVideo',
+        layout: 'side-by-side',
+        mediaAssetId: 'single',
+      }, {
+        type: 'comparisonVideo',
+        layout: 'side-by-side',
+        left: { mediaAssetId: 'left' },
+        right: { mediaAssetId: 'right' },
+      }],
+    }],
+  }, {
+    assetManifest: [
+      { id: 'single', kind: 'video', relativePath: 'videos/single.mp4' },
+      { id: 'left', kind: 'video', relativePath: 'videos/left.mp4' },
+      { id: 'right', kind: 'video', relativePath: 'videos/right.mp4' },
+    ],
+  });
+  assert.deepEqual(
+    [...html.matchAll(/data-player-layout="([^"]+)"/g)].map((match) => match[1]),
+    ['stacked', 'side-by-side'],
+  );
+});
 test('drops retired binding state without exposing editor-only fields', () => {
   const html = renderReportHtml({
     schemaVersion: 1,

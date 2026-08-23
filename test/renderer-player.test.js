@@ -109,7 +109,7 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /來源標題/u);
   assert.match(renderer, /comparison \? `<label>版面/u);
   assert.doesNotMatch(renderer, /singleVideo[\s\S]{0,200}data-block-path="layout"/u);
-  assert.match(renderer, /comparison && block\.layout === 'stacked'/u);
+  assert.match(renderer, /const layout = comparison && block\.layout === 'stacked' \? 'stacked' : \(comparison \? 'side-by-side' : 'stacked'\)/u);
   assert.match(renderer, /: 'stacked';/u);
   assert.match(styles, /\.inline-frame-controls \{[^}]*display: grid;/u);
   assert.match(styles, /\.inline-frame-rate-row \{[^}]*grid-column: 1 \/ -1;[^}]*width: 100%/u);
@@ -127,7 +127,9 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /PLAYBACK_RATE_MIN = 1 \/ 64/u);
   assert.match(renderer, /PLAYBACK_RATE_MAX = 64/u);
   assert.match(renderer, /handleFramePlayerKeydown/u);
-  assert.match(renderer, /\['ArrowLeft', 'ArrowRight'\]\.includes\(event\.key\)/u);
+  assert.match(renderer, /const isArrow = event\.key === 'ArrowLeft'/u);
+  assert.match(renderer, /const isSpace = event\.key === ' '/u);
+  assert.match(renderer, /selectedFramePlayerCard\(\)/u);
   assert.match(renderer, /event\.key === 'ArrowRight'/u);
   assert.match(renderer, /framePlayerByCard: new WeakMap\(\)/u);
   assert.match(renderer, /sideTitleElement\.textContent = sideTitle/u);
@@ -138,6 +140,9 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.doesNotMatch(renderer, /elements\.(mediaLibrary|playerPanel|preview|sectionList)\s*=|document\.querySelector\('#(?:media-library|player-panel|preview|section-list)'\)/u);
   assert.match(styles, /\.export-directory-status/u);
   assert.match(styles, /\.inline-frame-controls/u);
+  assert.match(styles, /\[data-frame-selected="true"\]/u);
+  assert.match(styles, /\.inline-frame-current/u);
+  assert.match(styles, /\.inline-frame-total/u);
   assert.match(styles, /\.inline-frame-rate-reset\s*\{[^}]*width: 28px[^}]*min-width: 28px[^}]*height: 28px[^}]*border-radius: 50%/u);
   assert.match(indexHtml, /img-src 'self' data: blob: file:/u);
 });
