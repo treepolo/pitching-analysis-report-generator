@@ -149,6 +149,8 @@ test('renders independent video playback, loop, and comparison layout settings i
   assert.match(html, /data-frame-action="toggle"[^>]*>▶/u);
   assert.match(html, /data-frame-action="previous"[^>]*>←/u);
   assert.match(html, /data-frame-action="next"[^>]*>→/u);
+  assert.match(html, /data-frame-shared-controls/u);
+  assert.ok([...html.matchAll(/data-frame-action="sync"/g)].length >= 1);
   assert.match(html, /nativeFramePlayerKeyboardBound/u);
   assert.doesNotMatch(html, /data-anchor-time|data-sync-offset|data-loop-start|data-loop-end|陷ｷ譴ｧ・ｭ・･|驍ｯ竏晢ｽｮ蝌ｶ鬪ｭ・ｨ魄溘・/u);
   assert.doesNotMatch(html, /portable-player-settings|portable-player-eyebrow|portable-player-layout/iu);
@@ -239,7 +241,7 @@ test('drops retired binding state without exposing editor-only fields', () => {
     ],
   });
 
-  assert.doesNotMatch(html, /data-sync-offset|data-loop-start|data-loop-end|同步|綁定|錨點/u);
+  assert.doesNotMatch(html, /data-sync-offset|data-loop-start|data-loop-end|綁定|錨點/u);
   assert.doesNotMatch(html, /data-asset-id/iu);
   assert.doesNotMatch(html, /comparison-internal-id|asset-left-internal|asset-right-internal|private\/temporary\.mp4|private\/left\.mp4|private\/right\.mp4/u);
 });

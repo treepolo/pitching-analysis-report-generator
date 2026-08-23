@@ -16,35 +16,35 @@ function functionSlice(source, start, end) {
   return source.slice(startIndex, endIndex);
 }
 
-test('single and dual cards use the same browser video surface and independent controls', () => {
+test('single and dual cards use the shared outer-player contract', () => {
   const side = functionSlice(renderer, 'function renderInlineVideoSide(', 'function renderInlineVideoBlock(');
   const block = functionSlice(renderer, 'function renderInlineVideoBlock(', 'function setInlineVideoStatus(');
-
+  const controls = functionSlice(renderer, 'function renderFramePlayerControls(', 'function renderInlineVideoSide(');
   assert.match(side, /<video data-inline-video preload="auto" playsinline/u);
   assert.match(side, /data-frame-surface/u);
   assert.match(side, /data-frame-placeholder/u);
-  assert.doesNotMatch(side, /native-player|HWND|EVR/u);
-  assert.match(renderer, /data-frame-player/u);
-  assert.match(block, /renderInlineVideoSide\(block, 'left', \{ playerCard: true \}\)/u);
-  assert.match(block, /renderInlineVideoSide\(block, 'right', \{ playerCard: true \}\)/u);
+  assert.doesNotMatch(side, /data-frame-player-side|data-frame-selected/u);
+  assert.match(block, /data-frame-player data-frame-player-kind/u);
+  assert.match(block, /renderInlineVideoSide\(block, 'left'\)/u);
+  assert.match(block, /renderInlineVideoSide\(block, 'right'\)/u);
   assert.match(block, /renderInlineVideoSide\(block, 'single', \{ playerCard: true \}\)/u);
-  assert.doesNotMatch(block, /renderFramePlayerControls\(playerSideTitle\(block, 'single'\)\)/u);
-  assert.match(block, /const layout = comparison && block\.layout === 'stacked' \? 'stacked' : \(comparison \? 'side-by-side' : 'stacked'\)/u);
-  assert.match(side, /renderFramePlayerControls\(title\)/u);
-  const controls = functionSlice(renderer, 'function renderFramePlayerControls(', 'function renderInlineVideoSide(');
+  assert.match(block, /renderFramePlayerControls\(block\.label \|\| '雙影片', \{ shared: true \}\)/u);
+  assert.match(controls, /data-frame-shared-controls/u);
+  assert.match(controls, /data-frame-action="sync"/u);
   assert.match(controls, /data-frame-rate/u);
   assert.match(controls, /data-frame-rate-input/u);
   assert.match(controls, /min="\$\{PLAYBACK_RATE_MIN\}" max="\$\{PLAYBACK_RATE_MAX\}"/u);
-  assert.match(controls, /data-frame-rate-row/u);
   assert.match(controls, /data-frame-action="reset-rate"/u);
-  assert.match(controls, /重置播放速度為 1 倍/u);
+  assert.match(renderer, /else if \(action === 'sync'\) void syncDualFramePlayer\(card\)/u);
   assert.match(controls, /data-frame-player-status/u);
-  assert.match(side, /data-frame-player-side="\$\{side\}"/u);
-  assert.match(side, /data-frame-selected="false"/u);
   assert.match(controls, /data-frame-current/u);
   assert.match(controls, /data-frame-total/u);
   assert.match(controls, />←</u);
   assert.match(controls, />→</u);
+  assert.match(renderer, /function framePlayerControlMap\(block, runtime, card\)/u);
+  assert.match(renderer, /function syncDualFramePlayer\(card\)/u);
+  assert.match(renderer, /function constrainDualSegmentToSync\(block, pathValue, value\)/u);
+  assert.match(renderer, /syncFrame \+ \(kind === 'out' \? 1 : 0\)/u);
   assert.match(renderer, /function bindFramePlayerActionButtons\(card\)/u);
 });
 
@@ -141,7 +141,7 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.match(step, /影片尚未準備，無法定位影格/u);
 });
 
-test('dual players initialize and run independently without a follower clock', () => {
+test('dual players share a mapped control timeline and sync point', () => {
   assert.match(renderer, /function framePlayerReady\(block, runtime, card\)/u);
   assert.match(renderer, /function videoBlockSides\(block\)/u);
   assert.match(renderer, /results\.every\(Boolean\)/u);

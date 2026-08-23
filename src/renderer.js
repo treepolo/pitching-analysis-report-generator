@@ -448,6 +448,7 @@ function addComparisonVideoBlock({ allowEmpty = false } = {}) {
       playback: { rate: 1 },
       loop: { enabled: false },
     },
+    sync: null,
   });
 }
 
@@ -770,10 +771,10 @@ function renderVideoBlockEditor(block) {
     </div>`;
 }
 
-function renderFramePlayerControls(label) {
+function renderFramePlayerControls(label, { shared = false } = {}) {
   const escapedLabel = escapeHtml(label);
   return `
-      <div class="inline-frame-controls" data-frame-controls aria-label="${escapedLabel}影格播放器控制">
+      <div class="inline-frame-controls${shared ? ' inline-frame-shared-controls' : ''}" data-frame-controls${shared ? ' data-frame-shared-controls' : ''} aria-label="${escapedLabel}影格播放器控制">
         <div class="inline-frame-navigation">
           <button class="button button-secondary inline-frame-toggle" type="button" data-frame-action="toggle" disabled aria-pressed="false" aria-label="播放" title="播放">▶</button>
           <button class="button button-quiet inline-frame-step" type="button" data-frame-action="previous" disabled aria-label="上一幀" title="上一幀">←</button>
@@ -787,17 +788,15 @@ function renderFramePlayerControls(label) {
           <input class="inline-frame-rate-slider" data-frame-rate type="range" min="${PLAYBACK_RATE_SLIDER_MIN}" max="${PLAYBACK_RATE_SLIDER_MAX}" step="${PLAYBACK_RATE_SLIDER_STEP}" value="0" disabled aria-label="${escapedLabel}播放速度控制條" />
           <button class="button button-quiet inline-frame-rate-reset" type="button" data-frame-action="reset-rate" disabled aria-label="重置播放速度為 1 倍" title="重置為 1 倍">↻</button>
         </div>
+        ${shared ? `<div class="inline-frame-sync-row"><button class="button button-quiet" type="button" data-frame-action="sync" disabled>同步</button><output data-frame-sync-info>尚未設定同步點</output></div>` : ''}
         <span class="inline-frame-player-status" data-frame-player-status role="status" data-state="pending">正在載入影片…</span>
       </div>`;
 }
 function renderInlineVideoSide(block, side, { playerCard = false } = {}) {
   const title = playerSideTitle(block, side);
   const escapedTitle = escapeHtml(title);
-  const playerAttributes = playerCard
-    ? ` data-frame-player data-frame-player-side="${side}" tabindex="0" aria-selected="false" data-frame-selected="false"`
-    : '';
   return `
-    <div class="inline-video-side" data-inline-side="${side}"${playerAttributes}>
+    <div class="inline-video-side" data-inline-side="${side}">
       <h3 data-inline-side-title>${escapedTitle}</h3>
       <div class="inline-video-frame inline-frame-surface" data-frame-surface tabindex="0" aria-label="${escapedTitle}影格畫面">
         <video data-inline-video preload="auto" playsinline aria-label="${escapedTitle}影片"></video>
@@ -813,10 +812,10 @@ function renderInlineVideoBlock(section, block) {
   // blocks read the persisted layout choice.
   const layout = comparison && block.layout === 'stacked' ? 'stacked' : (comparison ? 'side-by-side' : 'stacked');
   const sides = comparison
-    ? `${renderInlineVideoSide(block, 'left', { playerCard: true })}${renderInlineVideoSide(block, 'right', { playerCard: true })}`
+    ? `${renderInlineVideoSide(block, 'left')}${renderInlineVideoSide(block, 'right')}`
     : renderInlineVideoSide(block, 'single', { playerCard: true });
   return `
-    <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block>
+    <article class="inline-video-block" data-section-id="${escapeHtml(section.id)}" data-block-id="${escapeHtml(block.id)}" data-inline-video-block data-frame-player data-frame-player-kind="${comparison ? 'comparison' : 'single'}" tabindex="0" aria-selected="false" data-frame-selected="false">
       <header class="inline-video-header">
         <div class="inline-video-title"><strong>${escapeHtml(block.label || (comparison ? '雙影片' : '影片區塊'))}</strong><span>${comparison ? `雙影片 · ${layout === 'stacked' ? '堆疊' : '並排'}` : '單一來源 · 專案內媒體'}</span></div>
         <div class="inline-video-actions">
@@ -824,6 +823,7 @@ function renderInlineVideoBlock(section, block) {
         </div>
       </header>
       <div class="inline-video-grid" data-layout="${layout}">${sides}</div>
+      ${comparison ? renderFramePlayerControls(block.label || '雙影片', { shared: true }) : ''}
       <details class="inline-video-details"><summary>區塊設定</summary>${renderVideoBlockEditor(block)}</details>
     </article>`;
 }
@@ -878,7 +878,8 @@ function framePlayerRuntimeForCard(card) {
       rateTransition: false,
       rateSyncGuard: false,
       frameEngineGuard: false,
-      primarySide: card?.dataset.framePlayerSide || 'single',
+      primarySide: 'single',
+      controlMap: null,
       lifecycle: 'idle',
     };
     state.framePlayerByCard.set(card, runtime);
@@ -891,8 +892,7 @@ function videoBlockSides(block) {
 }
 
 function framePlayerSides(block, card) {
-  const sourceSide = card?.dataset.framePlayerSide;
-  return sourceSide === 'left' || sourceSide === 'right' ? [sourceSide] : ['single'];
+  return block?.type === 'comparisonVideo' ? ['left', 'right'] : ['single'];
 }
 
 function framePlayerPrimarySide(block, runtime, card) {
@@ -901,8 +901,7 @@ function framePlayerPrimarySide(block, runtime, card) {
 function framePlayerSelectionKey(card) {
   const owner = card?.closest?.('[data-block-id]');
   const blockId = owner?.dataset.blockId;
-  const side = card?.dataset.framePlayerSide || card?.dataset.inlineSide || 'single';
-  return blockId ? `${blockId}:${side}` : null;
+  return blockId || null;
 }
 
 function syncFramePlayerSelectionDom() {
@@ -948,15 +947,57 @@ function framePlayerReady(block, runtime, card) {
   });
 }
 
+function framePlayerSideConfiguredRange(block, runtime, side) {
+  const cache = runtime.caches[side];
+  if (!cache || !Number.isInteger(cache.frameCount) || cache.frameCount <= 0) return null;
+  const config = playerSideConfig(block, side) || {};
+  const fps = Number(cache.fps) > 0 ? Number(cache.fps) : 30;
+  const inValue = Number(config.segment?.in);
+  const outValue = Number(config.segment?.out);
+  const start = Math.max(0, Math.min(cache.frameCount - 1, Number.isFinite(inValue) && inValue > 0 ? Math.round(inValue * fps) : 0));
+  const end = Number.isFinite(outValue) && outValue > 0 && outValue > (Number.isFinite(inValue) ? inValue : 0)
+    ? Math.max(start, Math.min(cache.frameCount - 1, Math.ceil(outValue * fps) - 1))
+    : cache.frameCount - 1;
+  return { start, end };
+}
+function framePlayerControlMap(block, runtime, card) {
+  const sides = framePlayerSides(block, card);
+  if (sides.length !== 2) return null;
+  const ranges = Object.fromEntries(sides.map((side) => [side, framePlayerSideConfiguredRange(block, runtime, side)]));
+  if (!ranges.left || !ranges.right) return { ranges, count: 0, synced: false, syncValid: false };
+  const configuredSync = block.sync && Number.isInteger(Number(block.sync.leftFrame)) && Number.isInteger(Number(block.sync.rightFrame))
+    ? { leftFrame: Number(block.sync.leftFrame), rightFrame: Number(block.sync.rightFrame) }
+    : null;
+  const syncValid = Boolean(configuredSync
+    && configuredSync.leftFrame >= ranges.left.start && configuredSync.leftFrame <= ranges.left.end
+    && configuredSync.rightFrame >= ranges.right.start && configuredSync.rightFrame <= ranges.right.end);
+  const starts = syncValid
+    ? { left: configuredSync.leftFrame, right: configuredSync.rightFrame }
+    : { left: ranges.left.start, right: ranges.right.start };
+  const count = Math.max(0, Math.min(ranges.left.end - starts.left + 1, ranges.right.end - starts.right + 1));
+  return { ranges, starts, count, synced: syncValid, syncValid, sync: configuredSync };
+}
+function framePlayerSideFrameForControl(block, runtime, card, side, index) {
+  const map = framePlayerControlMap(block, runtime, card);
+  if (!map || !Number.isFinite(map.starts?.[side])) return Math.max(0, Math.round(Number(index) || 0));
+  const range = map.ranges?.[side];
+  return Math.min(range?.end ?? Number.MAX_SAFE_INTEGER, Math.max(map.starts[side], map.starts[side] + Math.round(Number(index) || 0)));
+}
+function framePlayerControlForSideFrame(block, runtime, card, side, frame) {
+  const map = framePlayerControlMap(block, runtime, card);
+  if (!map || !Number.isFinite(map.starts?.[side])) return Math.max(0, Math.round(Number(frame) || 0));
+  return Math.max(0, Math.min(Math.max(0, map.count - 1), Math.round(Number(frame) - map.starts[side])));
+}
+
 function framePlayerFrameCount(block, runtime, card) {
-  const primary = framePlayerPrimarySide(block, runtime, card);
-  const primaryCount = runtime.caches[primary]?.frameCount || 0;
   if (!framePlayerReady(block, runtime, card)) return 0;
-  if (primaryCount > 0) return primaryCount;
-  return framePlayerSides(block, card).reduce((highest, side) => Math.max(highest, runtime.caches[side]?.frameCount || 0), 0);
+  if (block?.type === 'comparisonVideo') return framePlayerControlMap(block, runtime, card)?.count || 0;
+  const primary = framePlayerPrimarySide(block, runtime, card);
+  return runtime.caches[primary]?.frameCount || 0;
 }
 
 function framePlayerSegmentStartIndex(block, runtime, card) {
+  if (block?.type === 'comparisonVideo') return 0;
   const primarySide = framePlayerPrimarySide(block, runtime, card);
   const cache = runtime.caches[primarySide];
   if (!cache || !Number.isFinite(cache.fps) || cache.fps <= 0) return 0;
@@ -989,6 +1030,8 @@ function updateFramePlayerControls(card) {
   const resetRate = card.querySelector('[data-frame-action="reset-rate"]');
   const rateSlider = card.querySelector('[data-frame-rate]');
   const rateInput = card.querySelector('[data-frame-rate-input]');
+  const syncButton = card.querySelector('[data-frame-action="sync"]');
+  const syncInfo = card.querySelector('[data-frame-sync-info]');
   const pendingPreparation = runtime.lifecycle === 'loading'
     || runtime.exactSeek !== null
     || runtime.rateTransition;
@@ -1020,9 +1063,15 @@ function updateFramePlayerControls(card) {
     rateInput.value = formatPlaybackRate(rate);
     rateInput.disabled = !available;
   }
+  const map = entry.block?.type === 'comparisonVideo' ? framePlayerControlMap(entry.block, runtime, card) : null;
+  if (syncButton) syncButton.disabled = !available || !map || !map.ranges?.left || !map.ranges?.right;
+  if (syncInfo) {
+    const sync = entry.block?.sync;
+    syncInfo.textContent = map?.syncValid && sync ? `左 Frame: ${sync.leftFrame} · 右 Frame: ${sync.rightFrame}` : '尚未設定同步點';
+  }
 }
 function bindFramePlayerActionButtons(card) {
-  card?.querySelectorAll('[data-frame-action="previous"], [data-frame-action="next"], [data-frame-action="toggle"]')
+  card?.querySelectorAll('[data-frame-action="previous"], [data-frame-action="next"], [data-frame-action="toggle"], [data-frame-action="sync"]')
     .forEach((button) => {
       if (button.dataset.frameActionBound === 'true') return;
       button.dataset.frameActionBound = 'true';
@@ -1036,13 +1085,43 @@ function bindFramePlayerActionButtons(card) {
         if (action === 'previous') void stepFramePlayer(card, -1);
         else if (action === 'next') void stepFramePlayer(card, 1);
         else if (action === 'toggle') void toggleFramePlayer(card);
+        else if (action === 'sync') void syncDualFramePlayer(card);
       });
     });
+}
+
+async function syncDualFramePlayer(card) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const runtime = framePlayerRuntimeForCard(card);
+  if (!block || block.type !== 'comparisonVideo' || !framePlayerReady(block, runtime, card)) return false;
+  const frames = {};
+  for (const side of ['left', 'right']) {
+    const video = framePlayerVideoForSide(card, side);
+    const cache = runtime.caches[side];
+    if (!video || !cache) return false;
+    const value = Math.max(0, Math.min(cache.frameCount - 1, Math.round((Number(video.currentTime) || 0) * (Number(cache.fps) || 30))));
+    const range = framePlayerSideConfiguredRange(block, runtime, side);
+    if (!range || value < range.start || value > range.end) {
+      setFramePlayerStatus(card, '同步點必須位於左右影片各自的起終點範圍內。', 'error');
+      return false;
+    }
+    frames[side] = value;
+  }
+  block.sync = { leftFrame: frames.left, rightFrame: frames.right };
+  runtime.currentFrameIndex = 0;
+  scheduleSave();
+  updateFramePlayerControls(card);
+  const ready = await seekFramePlayerIndex(card, 0, { exact: true, status: false });
+  setFramePlayerStatus(card, ready ? '同步點已設定。' : '同步點已設定，但定位尚未完成。', ready ? 'loaded' : 'error');
+  updateFramePlayerControls(card);
+  return ready;
 }
 
 function framePlayerIndexForSide(block, runtime, side, primaryIndex) {
   const cache = runtime.caches[side];
   if (!cache || cache.frameCount <= 1) return 0;
+  if (block?.type === 'comparisonVideo') return framePlayerSideFrameForControl(block, runtime, null, side, primaryIndex);
   return Math.min(cache.frameCount - 1, Math.max(0, Math.round(primaryIndex)));
 }
 
@@ -1083,7 +1162,65 @@ function scheduleManualFramePlayerTick(card, callback) {
   runtime.manualPlaybackCancel = () => clearTimeout(timer);
 }
 
+function startManualDualFramePlayer(card) {
+  const entry = blockForEditorCard(card);
+  const block = entry.block;
+  const runtime = framePlayerRuntimeForCard(card);
+  const count = framePlayerFrameCount(block, runtime, card);
+  if (!block || block.type !== 'comparisonVideo' || count <= 0) return false;
+  cancelManualFramePlayer(card);
+  runtime.seekSerial += 1;
+  runtime.exactSeek = null;
+  runtime.scrubActive = false;
+  runtime.manualPlayback = true;
+  runtime.playing = true;
+  runtime.lifecycle = 'playing';
+  runtime.manualPlaybackTimestamp = null;
+  runtime.manualPlaybackTime = runtime.currentFrameIndex;
+  runtime.rateSyncGuard = true;
+  framePlayerSides(block, card).forEach((side) => {
+    const video = framePlayerVideoForSide(card, side);
+    cancelPendingVideoSeek(runtime, video);
+    video?.pause();
+    setNativePlaybackRate(video, PLAYBACK_RATE_DEFAULT);
+  });
+  runtime.rateSyncGuard = false;
+  const serial = runtime.manualPlaybackSerial;
+  const tick = (timestamp) => {
+    if (serial !== runtime.manualPlaybackSerial || !runtime.manualPlayback || !runtime.playing || !card.isConnected) { cancelManualFramePlayer(card); return; }
+    const now = Number(timestamp);
+    const previous = runtime.manualPlaybackTimestamp;
+    runtime.manualPlaybackTimestamp = Number.isFinite(now) ? now : (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const elapsed = Number.isFinite(previous) ? Math.min(0.1, Math.max(0, (runtime.manualPlaybackTimestamp - previous) / 1000)) : 0;
+    const fps = Number(runtime.caches.left?.fps) > 0 ? Number(runtime.caches.left.fps) : 30;
+    let next = (Number.isFinite(runtime.manualPlaybackTime) ? runtime.manualPlaybackTime : runtime.currentFrameIndex) + elapsed * clampPlaybackRate(runtime.playbackRate) * fps;
+    const loopEnabled = framePlayerSides(block, card).every((side) => playerSideConfig(block, side).loop?.enabled === true);
+    if (next >= count - 1) {
+      if (loopEnabled && count > 1) next = next % count;
+      else { runtime.currentFrameIndex = count - 1; void seekFramePlayerIndex(card, count - 1, { exact: false, status: false }); cancelManualFramePlayer(card); runtime.playing = false; runtime.lifecycle = 'paused'; setFramePlayerStatus(card, '已到達最後一幀。', 'loaded'); updateFramePlayerControls(card); return; }
+    }
+    runtime.manualPlaybackTime = next;
+    runtime.currentFrameIndex = Math.max(0, Math.min(count - 1, Math.floor(next)));
+    runtime.rateSyncGuard = true;
+    framePlayerSides(block, card).forEach((side) => {
+      const video = framePlayerVideoForSide(card, side);
+      const sideIndex = framePlayerIndexForSide(block, runtime, side, runtime.currentFrameIndex);
+      const targetTime = framePlayerTimeForSide(runtime, side, sideIndex);
+      if (video && !video.seeking) { try { video.currentTime = targetTime; } catch {} }
+    });
+    runtime.rateSyncGuard = false;
+    updateFramePlayerControls(card);
+    scheduleManualFramePlayerTick(card, tick);
+  };
+  setFramePlayerStatus(card, '播放中（使用擴充速度時鐘）。', 'loaded');
+  scheduleManualFramePlayerTick(card, tick);
+  updateFramePlayerControls(card);
+  return true;
+}
+
 function startManualFramePlayer(card) {
+  const initialBlock = blockForEditorCard(card).block;
+  if (initialBlock?.type === 'comparisonVideo') return startManualDualFramePlayer(card);
   const entry = blockForEditorCard(card);
   const block = entry.block;
   const runtime = framePlayerRuntimeForCard(card);
@@ -1818,10 +1955,7 @@ function enforceInlinePlaybackBounds(block, side, video, { starting = false } = 
 }
 
 function applyInlineSideSettings(card, block, side) {
-  const playerCard = card?.matches?.('[data-frame-player]')
-    ? card
-    : card?.querySelector?.(`[data-frame-player][data-frame-player-side="${side}"]`);
-  const targetCard = playerCard || card;
+  const targetCard = card?.closest?.('[data-frame-player]') || card;
   const video = framePlayerVideoForSide(targetCard, side);
   if (!video) return;
   const config = playerSideConfig(block, side);
@@ -1847,25 +1981,48 @@ function hideFramePlayerPlaceholder(video) {
 function syncFramePlayerProgress(card, block, side, video) {
   const runtime = framePlayerRuntimeForCard(card);
   const cache = runtime.caches[side];
-  if (!cache || side !== framePlayerPrimarySide(block, runtime, card)) return;
-  if (runtime.manualPlayback && Number.isFinite(runtime.manualPlaybackTime)) {
-    const fps = Number(cache.fps) > 0 ? Number(cache.fps) : 30;
-    runtime.currentFrameIndex = Math.max(0, Math.min(
-      cache.frameCount - 1,
-      Math.round(runtime.manualPlaybackTime * fps),
-    ));
+  if (!cache) return;
+  if (block?.type === 'comparisonVideo') {
+    if (runtime.manualPlayback && Number.isFinite(runtime.manualPlaybackTime)) {
+      runtime.currentFrameIndex = Math.max(0, Math.min(framePlayerFrameCount(block, runtime, card) - 1, Math.round(runtime.manualPlaybackTime * (Number(cache.fps) || 30))));
+      updateFramePlayerControls(card);
+      return;
+    }
+    if ((runtime.scrubActive && video.paused) || (video.paused && video.seeking)) return;
+    const controlIndexes = [];
+    for (const sideName of ['left', 'right']) {
+      const sideVideo = framePlayerVideoForSide(card, sideName);
+      const sideCache = runtime.caches[sideName];
+      if (!sideVideo || !sideCache) return;
+      const sideFrame = Math.max(0, Math.min(sideCache.frameCount - 1, Math.round((Number(sideVideo.currentTime) || 0) * (Number(sideCache.fps) || 30))));
+      const range = framePlayerSideConfiguredRange(block, runtime, sideName);
+      if (runtime.playing && range && (sideFrame < range.start || sideFrame > range.end)) {
+        const loopEnabled = framePlayerSides(block, card).every((sideName) => playerSideConfig(block, sideName).loop?.enabled === true);
+        if (loopEnabled && !runtime.loopTransition) {
+          runtime.loopTransition = true;
+          void seekFramePlayerIndex(card, 0, { exact: true, status: false }).then(() => playFramePlayer(card)).finally(() => { runtime.loopTransition = false; });
+        } else if (!loopEnabled) {
+          stopFramePlayer(card);
+          setFramePlayerStatus(card, '雙側影片已離開允許播放區間。', 'loaded');
+        }
+        return;
+      }
+      controlIndexes.push(framePlayerControlForSideFrame(block, runtime, card, sideName, sideFrame));
+    }
+    if (controlIndexes.length) runtime.currentFrameIndex = Math.max(0, Math.min(...controlIndexes));
     updateFramePlayerControls(card);
     return;
   }
-  // Do not let an intermediate paused drag seek overwrite the thumb. Once
-  // playback or a seek has produced a real clock position, the video clock is
-  // authoritative and must keep the frame timeline in lockstep with it.
+  if (side !== framePlayerPrimarySide(block, runtime, card)) return;
+  if (runtime.manualPlayback && Number.isFinite(runtime.manualPlaybackTime)) {
+    const fps = Number(cache.fps) > 0 ? Number(cache.fps) : 30;
+    runtime.currentFrameIndex = Math.max(0, Math.min(cache.frameCount - 1, Math.round(runtime.manualPlaybackTime * fps)));
+    updateFramePlayerControls(card);
+    return;
+  }
   if ((runtime.scrubActive && video.paused) || (video.paused && video.seeking)) return;
   const fps = Number(cache.fps) > 0 ? Number(cache.fps) : 30;
-  runtime.currentFrameIndex = Math.max(0, Math.min(
-    cache.frameCount - 1,
-    Math.round((Number(video.currentTime) || 0) * fps),
-  ));
+  runtime.currentFrameIndex = Math.max(0, Math.min(cache.frameCount - 1, Math.round((Number(video.currentTime) || 0) * fps)));
   updateFramePlayerControls(card);
 }
 
@@ -1978,12 +2135,7 @@ function hydrateInlineVideoCards() {
   elements.blockCanvas.querySelectorAll('[data-inline-video-block]').forEach((card) => {
     const entry = blockForEditorCard(card);
     if (!entry.block) return;
-    const playerCards = card.matches('[data-frame-player]')
-      ? [card]
-      : [...card.querySelectorAll('[data-frame-player]')];
-    playerCards.forEach((playerCard) => {
-      void prepareFramePlayerCard(playerCard, entry.block, generation);
-    });
+    if (card.matches('[data-frame-player]')) void prepareFramePlayerCard(card, entry.block, generation);
   });
 }
 
@@ -2224,6 +2376,22 @@ function inlineSideFromPath(pathValue) {
   return null;
 }
 
+function constrainDualSegmentToSync(block, pathValue, value) {
+  if (block?.type !== 'comparisonVideo' || !block.sync || !['left', 'right'].includes(pathValue.split('.')[0])) return value;
+  const match = /^(left|right)\.segment\.(in|out)$/u.exec(pathValue);
+  if (!match || typeof value !== 'number' || !Number.isFinite(value)) return value;
+  const side = match[1];
+  const kind = match[2];
+  const syncFrame = Number(block.sync[side === 'left' ? 'leftFrame' : 'rightFrame']);
+  if (!Number.isInteger(syncFrame) || syncFrame < 0) return value;
+  const asset = mediaAssetFor(playerAssetIdFor(block, side));
+  const fps = Number(asset?.metadata?.fps) > 0 ? Number(asset.metadata.fps) : 30;
+  const boundary = (syncFrame + (kind === 'out' ? 1 : 0)) / fps;
+  if (kind === 'in' && value > boundary) return Number(boundary.toFixed(6));
+  if (kind === 'out' && value > 0 && value < boundary) return Number(boundary.toFixed(6));
+  return value;
+}
+
 function refreshInlineVideoAfterEditorChange(card, block, pathValue) {
   if (!block) return;
   const side = block.type === 'comparisonVideo' ? inlineSideFromPath(pathValue) : 'single';
@@ -2278,7 +2446,12 @@ function handleBlockEditorEvent(event) {
   }
   if (target.matches('[data-block-path]')) {
     if (!['input', 'change'].includes(event.type)) return;
-    setEditorPath(block, target.dataset.blockPath, editorControlValue(target));
+    const requestedValue = editorControlValue(target);
+    const constrainedValue = constrainDualSegmentToSync(block, target.dataset.blockPath, requestedValue);
+    setEditorPath(block, target.dataset.blockPath, constrainedValue);
+    if (constrainedValue !== requestedValue && constrainedValue !== null && target.type === 'number') {
+      target.value = String(constrainedValue);
+    }
     refreshInlineVideoAfterEditorChange(card, block, target.dataset.blockPath);
     if (event.type === 'change' && target.dataset.blockPath.endsWith('mediaAssetId')) {
       hydrateInlineVideoCards();

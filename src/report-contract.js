@@ -95,6 +95,15 @@
     return Object.keys(segment).length > 0 ? segment : undefined;
   }
 
+  function cloneDualSync(value) {
+    if (!isRecord(value)
+      || !Number.isInteger(value.leftFrame) || value.leftFrame < 0
+      || !Number.isInteger(value.rightFrame) || value.rightFrame < 0) {
+      return undefined;
+    }
+    return { leftFrame: value.leftFrame, rightFrame: value.rightFrame };
+  }
+
   function clonePlaybackConfig(value) {
     if (!isRecord(value)) return undefined;
     const playback = {};
@@ -177,6 +186,8 @@
       copyString(block, output, 'caption');
       copyString(block, output, 'layout');
       copyStringArray(block, output, 'labels');
+      const sync = cloneDualSync(block.sync);
+      if (sync) output.sync = sync;
     }
 
     return output;

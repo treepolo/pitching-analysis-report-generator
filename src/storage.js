@@ -148,6 +148,16 @@ function normalizeSegment(value, fieldName) {
   return { in: start, out: end };
 }
 
+function normalizeDualSync(value) {
+  if (!isPlainRecord(value)) return undefined;
+  const { leftFrame, rightFrame } = value;
+  if (!Number.isInteger(leftFrame) || leftFrame < 0
+    || !Number.isInteger(rightFrame) || rightFrame < 0) {
+    return undefined;
+  }
+  return { leftFrame, rightFrame };
+}
+
 function normalizePlayback(value, fieldName) {
   if (value === null || value === undefined) return { rate: 1 };
   if (!isPlainRecord(value)) throw new Error(`${fieldName} is invalid`);
@@ -218,8 +228,10 @@ function normalizeVideoSide(value, fieldName) {
 function normalizeVideoBlock(block) {
   const normalized = { ...cloneJson(block) };
   normalizeLoopAndSegment(normalized, 'Video block');
-  // The previous comparison synchronisation contract is intentionally not
-  // migrated.  Keep only media/playback configuration for the next design.
+  // The old comparison synchronisation fields are intentionally not migrated.
+  // The current contract only accepts an explicit pair of non-negative frame
+  // indexes on comparison-video blocks.
+  const dualSync = normalizeDualSync(normalized.sync);
   delete normalized.sync;
   delete normalized.binding;
   delete normalized.anchor;
@@ -255,6 +267,7 @@ function normalizeVideoBlock(block) {
     const right = normalizeVideoSide(normalized.right, 'Video block right');
     if (left !== undefined) normalized.left = left;
     if (right !== undefined) normalized.right = right;
+    if (dualSync !== undefined) normalized.sync = dualSync;
   }
   return normalized;
 }

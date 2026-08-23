@@ -257,7 +257,7 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     + '<span data-frame-placeholder>正在載入第一幀…</span>'
     + '</div>'
     + '<p class="portable-frame-side-status" data-frame-side-status role="status">正在載入影片…</p>'
-    + '<div class="portable-frame-controls" data-frame-controls role="group" aria-label="' + escapeHtml(sideLabel + '影格播放器控制') + '">'
+    + (comparison ? '' : '<div class="portable-frame-controls" data-frame-controls role="group" aria-label="' + escapeHtml(sideLabel + '影格播放器控制') + '">'
     + '<div class="portable-frame-navigation">'
     + '<button type="button" class="portable-frame-toggle" data-frame-action="toggle" disabled aria-pressed="false" aria-label="播放" title="播放">▶</button>'
     + '<button type="button" class="portable-frame-step" data-frame-action="previous" disabled aria-label="上一幀" title="上一幀">←</button>'
@@ -273,7 +273,7 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     + '</div>'
     + '<label class="portable-frame-loop"><input data-frame-loop type="checkbox"' + (settings.loop.enabled ? ' checked' : '') + '>循環</label>'
     + '<span class="portable-frame-player-status" data-frame-player-status role="status" data-state="pending">正在載入影片…</span>'
-    + '</div>'
+    + '</div>')
     + '</div>';
 }
 function frameCacheFramePath(frame, assetId, frameIndex) {
@@ -477,6 +477,27 @@ function renderFramePlayer(block, byId, comparison, frameCaches) {
     <div class="portable-player-grid portable-player-grid-${layout}">${renderedPlayers}</div>
   </figure>`;
 }
+function renderNativeSharedControls(label, block) {
+  const escaped = escapeHtml(label);
+  const sync = block?.sync && Number.isInteger(Number(block.sync.leftFrame)) && Number.isInteger(Number(block.sync.rightFrame)) ? block.sync : null;
+  return '<div class="portable-frame-controls portable-frame-shared-controls" data-frame-controls data-frame-shared-controls role="group" aria-label="' + escaped + '影格播放器控制">'
+    + '<div class="portable-frame-navigation">'
+    + '<button type="button" class="portable-frame-toggle" data-frame-action="toggle" disabled aria-pressed="false" aria-label="播放" title="播放">▶</button>'
+    + '<button type="button" class="portable-frame-step" data-frame-action="previous" disabled aria-label="上一幀" title="上一幀">←</button>'
+    + '<output data-frame-position data-frame-current>尚未準備</output>'
+    + '<input data-frame-timeline type="range" min="0" max="0" step="1" value="0" disabled aria-label="' + escaped + '影格時間軸">'
+    + '<output data-frame-total>共 -- 幀</output>'
+    + '<button type="button" class="portable-frame-step" data-frame-action="next" disabled aria-label="下一幀" title="下一幀">→</button>'
+    + '</div>'
+    + '<div class="portable-frame-rate-row" data-frame-rate-row>'
+    + '<input data-frame-rate-input type="number" min="' + PLAYBACK_RATE_MIN + '" max="' + PLAYBACK_RATE_MAX + '" step="any" value="1" disabled aria-label="' + escaped + '播放速度數值">'
+    + '<input data-frame-rate type="range" min="' + PLAYBACK_RATE_SLIDER_MIN + '" max="' + PLAYBACK_RATE_SLIDER_MAX + '" step="' + PLAYBACK_RATE_SLIDER_STEP + '" value="0" disabled aria-label="' + escaped + '播放速度控制條">'
+    + '<button type="button" data-frame-action="reset-rate" disabled aria-label="重置播放速度為 1 倍" title="重置為 1 倍">↻</button>'
+    + '</div>'
+    + '<div class="portable-frame-sync-row"><button type="button" data-frame-action="sync" disabled>同步</button><output data-frame-sync-info>' + (sync ? ('左 Frame: ' + sync.leftFrame + ' · 右 Frame: ' + sync.rightFrame) : '尚未設定同步點') + '</output></div>'
+    + '<span data-frame-player-status role="status" data-state="pending">正在載入影片…</span>'
+    + '</div>';
+}
 function renderPlayer(block, byId, comparison) {
   const sides = comparison ? ['left', 'right'] : ['single'];
   const renderedSides = sides.map((side) => {
@@ -490,9 +511,10 @@ function renderPlayer(block, byId, comparison) {
   const layout = comparison ? (block.layout === 'stacked' ? 'stacked' : 'side-by-side') : 'stacked';
   const blockLabel = typeof block.label === 'string' ? block.label.trim() : '';
   const accessibleBlockLabel = blockLabel || (comparison ? '雙影片' : '單一影片');
-  return `<figure class="report-media report-video portable-player" data-portable-player data-native-frame-player-block aria-label="${escapeHtml(`${accessibleBlockLabel}播放器`)}" data-player-layout="${layout}">
+  return `<figure class="report-media report-video portable-player" data-portable-player data-native-frame-player-block data-frame-selected="false" aria-selected="false" tabindex="0" aria-label="${escapeHtml(`${accessibleBlockLabel}播放器`)}" data-player-layout="${layout}" data-sync-left-frame="${block.sync?.leftFrame ?? ''}" data-sync-right-frame="${block.sync?.rightFrame ?? ''}">
     ${blockLabel ? `<header class="portable-player-header"><h3>${escapeHtml(blockLabel)}</h3></header>` : ''}
     <div class="portable-player-grid portable-player-grid-${layout}">${renderedSides}</div>
+    ${comparison ? renderNativeSharedControls(accessibleBlockLabel, block) : ''}
   </figure>`;
 }
 function renderComparison(block, byId) {
@@ -524,6 +546,7 @@ function renderStyles() {
   return `
     :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
     * { box-sizing: border-box; }
+    body, body button, body output, body label, body h1, body h2, body h3, body h4, body p, body span { user-select: text; }
     body { margin: 0; background: #f5f7fb; color: #172033; }
     main { width: min(100% - 2rem, 980px); margin: 0 auto; padding: 2rem 0 4rem; }
     .report-header { margin-bottom: 2rem; }
@@ -549,7 +572,7 @@ function renderStyles() {
     .portable-player-grid-side-by-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .portable-player-grid-stacked { grid-template-columns: 1fr; }
     .portable-player-side { min-width: 0; padding: .75rem; border: 1px solid #dfe5ef; border-radius: .75rem; background: #fff; }
-    .portable-player-side[data-frame-selected="true"] { box-shadow: 0 0 0 3px rgba(42, 104, 214, .78), 0 0 18px rgba(42, 104, 214, .34); }
+    .portable-player[data-frame-selected="true"] { box-shadow: 0 0 0 3px rgba(42, 104, 214, .78), 0 0 18px rgba(42, 104, 214, .34); }
     .portable-player-side-heading { justify-content: space-between; margin-bottom: .5rem; }
     .portable-player-side-heading h3 { font-size: 1rem; }
     .portable-player-side-heading span { overflow-wrap: anywhere; color: #596780; font-size: .9rem; }
@@ -560,11 +583,14 @@ function renderStyles() {
     .portable-frame-side-status, .portable-frame-fallback { margin: .55rem 0 0; color: #596780; font-size: .82rem; }
     .portable-frame-controls { display: grid; grid-template-columns: max-content max-content max-content minmax(0, 1fr) max-content max-content; column-gap: .6rem; row-gap: .6rem; margin-top: .8rem; }
     .portable-frame-navigation { display: contents; }
-    .portable-frame-navigation > button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; display: inline-grid; place-items: center; font-size: 16px; line-height: 1; }
+    .portable-frame-navigation > button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; font-family: inherit; font-size: 16px; line-height: 1; text-align: center; }
     .portable-frame-navigation [data-frame-current] { grid-column: 3; }
     .portable-frame-navigation input[type="range"] { grid-column: 4; min-width: 0; width: 100%; }
     .portable-frame-navigation [data-frame-total] { grid-column: 5; }
     .portable-frame-rate-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; width: 100%; }
+    .portable-frame-sync-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; min-width: 0; }
+    .portable-frame-sync-row output { color: #596780; font-variant-numeric: tabular-nums; }
+    .portable-frame-shared-controls { grid-column: 1 / -1; width: 100%; }
     .portable-frame-rate-row input[type="range"] { flex: 1 1 auto; min-width: 0; }
     .portable-frame-controls button, .portable-player-rate-row button, .portable-frame-rate-row button { padding: .45rem .7rem; border: 1px solid #b9c5d8; border-radius: .45rem; background: #fff; color: #172033; cursor: pointer; }
     .portable-frame-controls button:hover, .portable-player-rate-row button:hover, .portable-frame-rate-row button:hover { background: #eef3fa; }

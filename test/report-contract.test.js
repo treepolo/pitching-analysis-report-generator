@@ -104,6 +104,22 @@ test('keeps allowlisted media-facing fields while dropping editor-only block sta
   }]);
 });
 
+test('drops malformed dual sync points and retired binding fields from exported reports', () => {
+  const document = toReportDocument({
+    displayName: 'Invalid sync contract',
+    sections: [{
+      title: 'Video',
+      blocks: [{
+        type: 'comparisonVideo',
+        sync: { leftFrame: 10.5, rightFrame: -1 },
+        binding: { enabled: true, masterSide: 'left' },
+      }],
+    }],
+  });
+
+  assert.deepEqual(document.sections[0].blocks[0], { type: 'comparisonVideo' });
+});
+
 test('preserves block-local video settings in the shared report contract', () => {
   const document = toReportDocument({
     displayName: 'Block settings',
@@ -120,7 +136,7 @@ test('preserves block-local video settings in the shared report contract', () =>
       }, {
         type: 'comparisonVideo',
         layout: 'side-by-side',
-        sync: { mode: 'time', startAnchor: { observedTime: 0.75 } },
+        sync: { leftFrame: 100, rightFrame: 400, mode: 'time', startAnchor: { observedTime: 0.75 } },
         binding: {
           enabled: true,
           masterSide: 'right',
@@ -160,6 +176,7 @@ test('preserves block-local video settings in the shared report contract', () =>
   }, {
     type: 'comparisonVideo',
     layout: 'side-by-side',
+    sync: { leftFrame: 100, rightFrame: 400 },
     left: {
       mediaAssetId: 'asset-front',
       segment: { in: 0, out: 3 },

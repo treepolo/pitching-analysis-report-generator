@@ -116,7 +116,7 @@ test('preserves media metadata and export settings as future vertical-slice seam
   assert.deepEqual(partialSave.futureReportExtension, { sourceRevision: 3, owner: 'report-model' });
 });
 
-test('persists independent video settings and clears retired sync state across reopen', async () => {
+test('persists independent video settings and the new dual sync point across reopen', async () => {
   const created = await store.createProject('Block editor video config');
   const snapshot = await store.openProject(created.id);
   snapshot.sections[0].blocks.push({
@@ -136,6 +136,7 @@ test('persists independent video settings and clears retired sync state across r
     type: 'comparisonVideo',
     label: 'Front and side',
     layout: 'side-by-side',
+    sync: { leftFrame: 100, rightFrame: 400, editorOnly: 'drop' },
     playback: { rate: 1 },
     left: {
       mediaAssetId: 'asset-front',
@@ -163,9 +164,9 @@ test('persists independent video settings and clears retired sync state across r
   assert.equal(reopened.sections[0].blocks.at(-2).label, 'Front view');
   assert.equal(reopened.sections[0].blocks.at(-2).sourceLabel, 'Front source');
   assert.equal(reopened.sections[0].blocks.at(-1).left.segment.out, 3);
+  assert.deepEqual(reopened.sections[0].blocks.at(-1).sync, { leftFrame: 100, rightFrame: 400 });
   assert.equal('anchor' in reopened.sections[0].blocks.at(-1).left, false);
   assert.equal('anchor' in reopened.sections[0].blocks.at(-1).right, false);
-  assert.equal('sync' in reopened.sections[0].blocks.at(-1), false);
   assert.equal('binding' in reopened.sections[0].blocks.at(-1), false);
   assert.equal('playback' in reopened.sections[0].blocks.at(-1), false);
   assert.equal('segment' in reopened.sections[0].blocks.at(-1), false);
@@ -190,6 +191,24 @@ test('clears legacy comparison sync and side anchors without creating replacemen
   const reopened = await store.openProject(created.id);
   assert.equal('binding' in reopened.sections[0].blocks.at(-1), false);
   assert.equal('sync' in reopened.sections[0].blocks.at(-1), false);
+});
+
+test('drops malformed dual sync points while preserving valid frame pairs only', async () => {
+  const created = await store.createProject('Dual sync validation');
+  const snapshot = await store.openProject(created.id);
+  snapshot.sections[0].blocks.push({
+    id: 'invalid-dual-sync',
+    type: 'comparisonVideo',
+    sync: { leftFrame: 10.5, rightFrame: -1 },
+    left: { mediaAssetId: 'asset-front' },
+    right: { mediaAssetId: 'asset-side' },
+  });
+
+  const saved = await store.saveProject(snapshot);
+  const block = saved.sections[0].blocks.at(-1);
+  assert.equal('sync' in block, false);
+  assert.equal('binding' in block, false);
+  assert.equal('anchor' in block, false);
 });
 
 test('previews strict UTF-8 txt/md imports and persists imported content across reopen', async () => {

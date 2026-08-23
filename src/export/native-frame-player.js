@@ -47,14 +47,22 @@ function renderNativeFramePlayerScript() {
       }
     };
 
-    const selectNativeFramePlayer = (selectedSide) => {
-      document.querySelectorAll('[data-native-frame-player]').forEach((item) => {
-        const selected = item === selectedSide;
-        item.dataset.frameSelected = selected ? 'true' : 'false';
-        item.setAttribute('aria-selected', selected ? 'true' : 'false');
+    const nativePlayerBlockFor = (item) => item?.matches?.('[data-native-frame-player-block]')
+      ? item
+      : item?.closest?.('[data-native-frame-player-block]');
+    const selectNativeFramePlayer = (item) => {
+      const selectedBlock = nativePlayerBlockFor(item);
+      document.querySelectorAll('[data-native-frame-player-block]').forEach((block) => {
+        const selected = block === selectedBlock;
+        block.dataset.frameSelected = selected ? 'true' : 'false';
+        block.setAttribute('aria-selected', selected ? 'true' : 'false');
+      });
+      document.querySelectorAll('[data-native-frame-player]').forEach((side) => {
+        side.dataset.frameSelected = 'false';
+        side.setAttribute('aria-selected', 'false');
       });
     };
-    const selectedNativeFramePlayer = () => document.querySelector('[data-native-frame-player][data-frame-selected="true"]');
+    const selectedNativeFramePlayer = () => document.querySelector('[data-native-frame-player-block][data-frame-selected="true"]');
     const nativeKeyboardTargetIsEditable = (target) => Boolean(
       target?.matches?.('input:not([type="range"]), textarea, select, [contenteditable="true"]')
       || target?.isContentEditable
@@ -636,12 +644,197 @@ function renderNativeFramePlayerScript() {
       side.__nativeFramePlayerActions = {
         step: (direction) => step(direction),
         toggle: () => togglePlayback(),
+        seek: (index) => seekExact(index, false),
+        play: () => play(),
+        stop: (message) => stop(message),
+        applyRate: (value) => applyRate(value),
+        supportsNativeRate: (value) => nativeRate(value),
+        setSharedManual: (enabled) => { runtime.manual = Boolean(enabled); },
+        setFrame: (index) => {
+          const bounded = clamp(Math.round(index), 0, Math.max(0, frameCount() - 1));
+          runtime.index = bounded;
+          try { video.currentTime = frameTime(bounded); } catch {}
+          updateControls();
+        },
+        runtime,
       };
       side.addEventListener('pointerdown', () => selectNativeFramePlayer(side));
       updateRateControls();
       updateControls();
       setStatus('正在載入影片…', 'pending');
       if (video.readyState >= 1) video.dispatchEvent(new Event('loadedmetadata'));
+    });
+    document.querySelectorAll('[data-native-frame-player-block]').forEach((block) => {
+      const sides = ['left', 'right'].map((sideName) => block.querySelector('[data-native-frame-player][data-player-side="' + sideName + '"]')).filter(Boolean);
+      if (sides.length !== 2 || !sides.every((side) => side.__nativeFramePlayerActions)) {
+        const single = sides[0] || block.querySelector('[data-native-frame-player]');
+        if (single?.__nativeFramePlayerActions) block.__nativeFramePlayerActions = single.__nativeFramePlayerActions;
+        block.addEventListener('pointerdown', () => selectNativeFramePlayer(block));
+        return;
+      }
+      const actions = sides.map((side) => side.__nativeFramePlayerActions);
+      const videos = sides.map((side) => side.querySelector('[data-player-video]'));
+      const controls = block.querySelector('[data-frame-shared-controls]') || block.querySelector('[data-frame-controls]');
+      const timeline = controls?.querySelector('[data-frame-timeline]');
+      const position = controls?.querySelector('[data-frame-current], [data-frame-position]');
+      const total = controls?.querySelector('[data-frame-total]');
+      const previous = controls?.querySelector('[data-frame-action="previous"]');
+      const next = controls?.querySelector('[data-frame-action="next"]');
+      const toggle = controls?.querySelector('[data-frame-action="toggle"]');
+      const rateInput = controls?.querySelector('[data-frame-rate-input]');
+      const rateSlider = controls?.querySelector('[data-frame-rate]');
+      const resetRate = controls?.querySelector('[data-frame-action="reset-rate"]');
+      const syncButton = controls?.querySelector('[data-frame-action="sync"]');
+      const syncInfo = controls?.querySelector('[data-frame-sync-info]');
+      const status = controls?.querySelector('[data-frame-player-status]');
+      const state = { index: 0, count: 0, playing: false, rate: clampRate(sides[0].dataset.playbackRate, RATE_DEFAULT), sync: null, initialized: false, loopTransition: false, manual: false, manualTime: null, manualTimestamp: null, manualSerial: 0, manualCancel: null };
+      const setStatus = (message, stateName = '') => { if (status) { status.textContent = message; status.dataset.state = stateName; } };
+      const configuredRange = (side, action) => {
+        const count = Math.max(0, Math.floor(numberValue(action.runtime.count, numberValue(side.dataset.frameCount, 0))));
+        if (count <= 0) return null;
+        const fps = Math.max(0.001, numberValue(side.dataset.frameFps, 30));
+        const startValue = numberValue(side.dataset.segmentIn, 0);
+        const endValue = numberValue(side.dataset.segmentOut, null);
+        const start = clamp(Math.round(Math.max(0, startValue) * fps), 0, count - 1);
+        const end = Number.isFinite(endValue) && endValue > startValue ? Math.max(start, Math.min(count - 1, Math.ceil(endValue * fps) - 1)) : count - 1;
+        return { start, end, count, fps };
+      };
+      const currentSync = () => {
+        const left = numberValue(block.dataset.syncLeftFrame, null);
+        const right = numberValue(block.dataset.syncRightFrame, null);
+        return Number.isInteger(left) && Number.isInteger(right) ? { leftFrame: left, rightFrame: right } : null;
+      };
+      const mapping = () => {
+        const ranges = sides.map((side, i) => configuredRange(side, actions[i]));
+        if (ranges.some((range) => !range)) return { ranges, starts: [0, 0], count: 0, validSync: false, sync: null };
+        const sync = currentSync();
+        const validSync = Boolean(sync && sync.leftFrame >= ranges[0].start && sync.leftFrame <= ranges[0].end && sync.rightFrame >= ranges[1].start && sync.rightFrame <= ranges[1].end);
+        const starts = validSync ? [sync.leftFrame, sync.rightFrame] : [ranges[0].start, ranges[1].start];
+        return { ranges, starts, count: Math.max(0, Math.min(ranges[0].end - starts[0] + 1, ranges[1].end - starts[1] + 1)), validSync, sync };
+      };
+      const update = () => {
+        const map = mapping(); state.count = map.count; state.sync = map.validSync ? map.sync : null; state.index = clamp(state.index, 0, Math.max(0, state.count - 1));
+        const ready = state.count > 0 && actions.every((action) => action.runtime.loaded && action.runtime.lifecycle !== 'loading');
+        const pending = !ready;
+        if (timeline) { timeline.max = String(Math.max(0, state.count - 1)); timeline.value = String(state.index); timeline.disabled = pending; }
+        if (position) position.textContent = state.count > 0 ? ('第 ' + (state.index + 1) + ' 幀') : '尚未準備';
+        if (total) total.textContent = state.count > 0 ? ('共 ' + state.count + ' 幀') : '共 -- 幀';
+        if (previous) previous.disabled = pending || state.index <= 0;
+        if (next) next.disabled = pending || state.index >= state.count - 1;
+        if (toggle) { toggle.disabled = pending; toggle.textContent = state.playing ? '⏸' : '▶'; toggle.setAttribute('aria-pressed', state.playing ? 'true' : 'false'); toggle.setAttribute('aria-label', state.playing ? '暫停' : '播放'); toggle.title = state.playing ? '暫停' : '播放'; }
+        if (rateInput) { rateInput.value = formatRate(state.rate); rateInput.disabled = pending; }
+        if (rateSlider) { rateSlider.value = String(rateToSlider(state.rate)); rateSlider.disabled = pending; }
+        if (resetRate) resetRate.disabled = pending;
+        if (syncButton) syncButton.disabled = pending;
+        if (syncInfo) syncInfo.textContent = state.sync ? ('左 Frame: ' + state.sync.leftFrame + ' · 右 Frame: ' + state.sync.rightFrame) : '尚未設定同步點';
+      };
+      const cancelSharedManual = () => {
+        state.manualSerial += 1;
+        state.manualCancel?.();
+        state.manualCancel = null;
+        state.manual = false;
+        state.manualTime = null;
+        state.manualTimestamp = null;
+        actions.forEach((action) => action.setSharedManual?.(false));
+      };
+      const scheduleSharedManual = (callback) => {
+        if (typeof window.requestAnimationFrame === 'function') {
+          const frame = window.requestAnimationFrame(callback);
+          state.manualCancel = () => window.cancelAnimationFrame?.(frame);
+        } else {
+          const timer = setTimeout(() => callback(clockNow()), 16);
+          state.manualCancel = () => clearTimeout(timer);
+        }
+      };
+      const startSharedManual = () => {
+        const map = mapping();
+        if (map.count <= 0) return false;
+        cancelSharedManual();
+        state.manual = true;
+        state.playing = true;
+        state.manualTime = state.index;
+        state.manualTimestamp = null;
+        actions.forEach((action, i) => {
+          action.stop();
+          action.setSharedManual?.(true);
+          action.setFrame?.(map.starts[i] + state.index);
+        });
+        const serial = state.manualSerial;
+        const tick = (timestamp) => {
+          if (serial !== state.manualSerial || !state.manual || !state.playing) {
+            cancelSharedManual();
+            return;
+          }
+          const now = Number(timestamp);
+          const current = Number.isFinite(now) ? now : clockNow();
+          const previous = state.manualTimestamp;
+          state.manualTimestamp = current;
+          const elapsed = Number.isFinite(previous) ? Math.min(0.1, Math.max(0, (current - previous) / 1000)) : 0;
+          let next = (Number.isFinite(state.manualTime) ? state.manualTime : state.index)
+            + elapsed * clampRate(state.rate) * (map.ranges.left?.fps || 30);
+          if (next >= map.count - 1) {
+            const loopEnabled = sides.every((side) => side.dataset.loopEnabled === 'true');
+            if (loopEnabled && map.count > 1) next %= map.count;
+            else {
+              state.index = Math.max(0, map.count - 1);
+              actions.forEach((action, i) => action.setFrame?.(map.starts[i] + state.index));
+              cancelSharedManual();
+              state.playing = false;
+              actions.forEach((action) => action.stop());
+              setStatus('已到達最後一幀。', 'loaded');
+              update();
+              return;
+            }
+          }
+          state.manualTime = next;
+          state.index = Math.max(0, Math.min(map.count - 1, Math.floor(next)));
+          actions.forEach((action, i) => action.setFrame?.(map.starts[i] + state.index));
+          update();
+          scheduleSharedManual(tick);
+        };
+        setStatus('播放中（使用擴充速度時鐘）。', 'loaded');
+        update();
+        scheduleSharedManual(tick);
+        return true;
+      };
+      const stop = (message = null) => { cancelSharedManual(); state.playing = false; actions.forEach((action) => action.stop()); if (message) setStatus(message, 'loaded'); update(); };
+      const seekControl = async (target, announce = true) => {
+        const map = mapping(); if (map.count <= 0) return false; const bounded = clamp(Math.round(target), 0, map.count - 1); state.index = bounded; state.playing = false; cancelSharedManual(); actions.forEach((action) => action.stop()); update(); if (announce) setStatus('正在定位第 ' + (bounded + 1) + ' 幀…', 'pending');
+        const results = await Promise.all(actions.map((action, i) => action.seek(map.starts[i] + bounded)));
+        const ok = results.every(Boolean); update(); setStatus(ok ? ('已顯示第 ' + (bounded + 1) + ' 幀。') : '影片定位未完成，請重試。', ok ? 'loaded' : 'error'); return ok;
+      };
+      const setRate = (value) => { state.rate = clampRate(value, state.rate); const wasPlaying = state.playing; stop(); actions.forEach((action) => action.applyRate(state.rate)); update(); if (wasPlaying) void toggle(); };
+      const togglePlayback = async () => {
+        if (state.playing) { stop('已暫停。'); return; }
+        const map = mapping(); if (map.count <= 0) return;
+        if (state.index >= map.count - 1) await seekControl(0, false);
+        if (!actions.every((action) => action.supportsNativeRate?.(state.rate) !== false)) { startSharedManual(); return; } state.playing = true; update(); setStatus('播放中。', 'loaded');
+        await Promise.all(actions.map((action) => action.play()));
+        if (!actions.every((action) => action.runtime.playing || action.runtime.manual)) { state.playing = false; update(); }
+      };
+      const syncPoint = async () => {
+        const ranges = sides.map((side, i) => configuredRange(side, actions[i])); const frames = videos.map((video, i) => Math.max(0, Math.min(ranges[i]?.count - 1 || 0, Math.round((Number(video?.currentTime) || 0) * (ranges[i]?.fps || 30)))));
+        if (ranges.some((range, i) => !range || frames[i] < range.start || frames[i] > range.end)) { setStatus('同步點必須位於左右影片各自的起終點範圍內。', 'error'); return; }
+        block.dataset.syncLeftFrame = String(frames[0]); block.dataset.syncRightFrame = String(frames[1]); state.index = 0; update(); await seekControl(0, false); setStatus('同步點已設定。', 'loaded');
+      };
+      const syncProgress = () => {
+        const map = mapping(); if (!map.count) { update(); return; }
+        const controlFrames = videos.map((video, i) => { const frame = Math.round((Number(video?.currentTime) || 0) * map.ranges[i].fps); if (state.playing && (frame < map.starts[i] || frame > map.ranges[i].end)) { const loopEnabled = sides.every((side) => side.dataset.loopEnabled === 'true'); if (loopEnabled && !state.loopTransition) { state.loopTransition = true; void seekControl(0, false).then(() => togglePlayback()).finally(() => { state.loopTransition = false; }); } else if (!loopEnabled) stop('雙側影片已離開允許播放區間。'); return null; } return Math.max(0, Math.min(map.count - 1, frame - map.starts[i])); });
+        if (controlFrames.every((value) => value !== null)) state.index = Math.min(...controlFrames); update();
+      };
+      previous?.addEventListener('click', () => { void seekControl(state.index - 1); });
+      next?.addEventListener('click', () => { void seekControl(state.index + 1); });
+      toggle?.addEventListener('click', () => { void togglePlayback(); });
+      resetRate?.addEventListener('click', () => setRate(RATE_DEFAULT));
+      syncButton?.addEventListener('click', () => { void syncPoint(); });
+      timeline?.addEventListener('input', (event) => { void seekControl(numberValue(event.target.value, 0)); });
+      rateSlider?.addEventListener('input', (event) => setRate(sliderToRate(event.target.value)));
+      rateInput?.addEventListener('input', (event) => { if (event.target.value.trim() !== '') setRate(event.target.value); });
+      rateInput?.addEventListener('change', (event) => setRate(event.target.value));
+      videos.forEach((video) => { video?.addEventListener('timeupdate', syncProgress); video?.addEventListener('playing', () => { state.playing = true; update(); }); video?.addEventListener('pause', () => { if (!video.ended && !actions.some((action) => action.runtime.manual)) { state.playing = false; update(); } }); video?.addEventListener('loadedmetadata', () => { update(); if (!state.initialized && actions.every((action) => action.runtime.loaded)) { state.initialized = true; void seekControl(0, false); } }); });
+      block.__nativeFramePlayerActions = { step: (direction) => { void seekControl(state.index + direction); }, toggle: () => { void togglePlayback(); } };
+      block.addEventListener('pointerdown', () => selectNativeFramePlayer(block));
+      update();
     });
     if (!document.__nativeFramePlayerKeyboardBound) {
       document.__nativeFramePlayerKeyboardBound = true;

@@ -151,6 +151,10 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
   assert.match(folderHtml, /data-frame-current/u);
   assert.match(folderHtml, /data-frame-total/u);
   assert.match(folderHtml, /nativeFramePlayerKeyboardBound/u);
+  assert.match(folderHtml, /nativePlayerBlockFor/u);
+  assert.match(folderHtml, /data-native-frame-player-block\]\[data-frame-selected="true"\]/u);
+  assert.match(folderHtml, /supportsNativeRate/u);
+  assert.match(folderHtml, /setSharedManual/u);
   assert.match(folderHtml, /<h3>Synthetic pitch<\/h3>/u);
   assert.match(folderHtml, /<h3>Synthetic source<\/h3>/u);
   assert.match(folderHtml, /data-frame-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);
@@ -158,7 +162,7 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
   assert.match(folderHtml, /currentTime/u);
   assert.doesNotMatch(folderHtml, /data-frame-player="|images\/frame-cache|frame-cache-status/u);
   assert.doesNotMatch(folderHtml, /portable-player-settings|portable-player-eyebrow/iu);
-  assert.doesNotMatch(folderHtml, /同步|綁定|錨點/u);
+  assert.doesNotMatch(folderHtml, /綁定|錨點/u);
   assert.doesNotMatch(folderHtml, /\bfetch\s*\(/iu);
 
   const folderRuntime = await runLocalFileRuntimeSmoke({
