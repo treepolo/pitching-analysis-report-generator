@@ -34,11 +34,12 @@ test('editor redraws preserve the active control focus and text selection', () =
 test('text input and video settings keep persistence without input-time redraw', () => {
   const textHandler = functionSlice(
     renderer,
-    "if (target.matches('[data-block-field=\"content\"]'))",
+    "if (target.matches('[data-rich-text-editor]'))",
     "if (target.matches('[data-block-path]'))",
   );
-  assert.match(textHandler, /block\.content = target\.value;/u);
-  assert.match(textHandler, /scheduleSave\(\)/u);
+  assert.match(textHandler, /commitRichTextEditor\(target\)/u);
+  assert.match(renderer, /block\.content = sanitized;/u);
+  assert.match(renderer, /commitRichTextEditor\(editor\)[\s\S]*scheduleSave\(\)/u);
   assert.doesNotMatch(textHandler, /renderBlockCanvas\s*\(/u);
 
   const pathHandler = functionSlice(
@@ -86,7 +87,7 @@ test('native select interaction never replaces the active block canvas', () => {
   const modeHandler = functionSlice(
     renderer,
     "if (target.matches('[data-block-mode]'))",
-    "if (target.matches('[data-block-field=\"content\"]'))",
+    "if (target.matches('[data-rich-text-editor]'))",
   );
   assert.match(modeHandler, /if \(event\.type !== 'change'\) return;/u);
   assert.match(modeHandler, /allowFocusedSelect: true/u);
@@ -96,7 +97,8 @@ test('text block markup has one clear editable content label', () => {
   const blockEditor = functionSlice(renderer, 'function renderBlockEditor(', 'function captureBlockEditorFocus()');
   assert.match(blockEditor, /const headerLabel = typeLabel \? `<strong>\$\{typeLabel\}<\/strong>` : '';/u);
   assert.match(blockEditor, /block\.type === 'singleVideo' \? '單一影片' : '';/u);
-  assert.match(blockEditor, /文字內容 <textarea[^>]*data-block-field="content"/u);
+  assert.match(blockEditor, /renderRichTextEditor\(block\)/u);
+  assert.match(renderer, /data-rich-text-editor contenteditable="true"/u);
   assert.match(blockEditor, /<header class="content-block-header">[\s\S]*\$\{headerLabel\}/u);
   assert.doesNotMatch(blockEditor, /const typeLabel = displayBlockType/u);
 });

@@ -115,7 +115,22 @@
       </div>
     </dialog>
 
+    <div id="rich-text-toolbar" class="rich-text-toolbar" role="toolbar" aria-label="文字格式" hidden>
+      <div class="rich-text-toolbar-main" data-rich-text-toolbar-main>
+        <button type="button" data-rich-text-action="bold" aria-label="粗體" title="粗體"><strong>B</strong></button>
+        <button type="button" data-rich-text-action="italic" aria-label="斜體" title="斜體"><em>I</em></button>
+        <button type="button" data-rich-text-action="link" aria-label="超連結" title="超連結">鏈結</button>
+      </div>
+      <form class="rich-text-link-form" data-rich-text-link-form hidden>
+        <label for="rich-text-link-input">網址</label>
+        <input id="rich-text-link-input" data-rich-text-link-input type="text" inputmode="url" autocomplete="url" placeholder="輸入網址" />
+        <button type="submit" data-rich-text-action="link-confirm">套用</button>
+        <button type="button" data-rich-text-action="link-cancel">取消</button>
+        <span class="rich-text-link-error" data-rich-text-link-error role="alert" hidden></span>
+      </form>
+    </div>
     <script src="./report-contract.js"></script>
+    <script src="./rich-text.js"></script>
     <script src="./renderer.js"></script>
   </body>
 </html>

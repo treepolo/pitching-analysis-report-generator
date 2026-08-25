@@ -29,6 +29,12 @@ const state = {
     generation: 0,
     notice: '',
   },
+  richText: {
+    editor: null,
+    range: null,
+    offsets: null,
+    linkMode: false,
+  },
 };
 
 const elements = {
@@ -68,6 +74,11 @@ const elements = {
   exportCancel: document.querySelector('#export-cancel'),
   exportRetry: document.querySelector('#export-retry'),
   exportStatus: document.querySelector('#export-status'),
+  richTextToolbar: document.querySelector('#rich-text-toolbar'),
+  richTextToolbarMain: document.querySelector('[data-rich-text-toolbar-main]'),
+  richTextLinkForm: document.querySelector('[data-rich-text-link-form]'),
+  richTextLinkInput: document.querySelector('[data-rich-text-link-input]'),
+  richTextLinkError: document.querySelector('[data-rich-text-link-error]'),
 };
 
 const PLAYBACK_RATE_MIN = 1 / 64;
@@ -144,6 +155,318 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
+}
+
+
+const richTextApi = globalThis.pitchingRichText || {};
+const RICH_TEXT_HTML_FORMAT = 'html';
+
+function richTextPlainHtml(value) {
+  if (typeof richTextApi.escapeRichTextPlain === 'function') return richTextApi.escapeRichTextPlain(value);
+  return escapeHtml(value).replace(/\r\n?/gu, '\n').replaceAll('\n', '<br>');
+}
+
+function richTextStoredHtml(block) {
+  const content = typeof block?.content === 'string' ? block.content : '';
+  if (block?.contentFormat === RICH_TEXT_HTML_FORMAT
+    && typeof richTextApi.sanitizeRichTextEditorHtml === 'function') {
+    return richTextApi.sanitizeRichTextEditorHtml(content);
+  }
+  return richTextPlainHtml(content);
+}
+
+function renderRichTextEditor(block) {
+  return '<div class="block-text-editor">'
+    + '<span class="block-text-label">文字內容</span>'
+    + '<div class="rich-text-editor" data-block-field="content" data-rich-text-editor contenteditable="true" role="textbox" aria-label="文字內容" aria-multiline="true" spellcheck="true">'
+    + richTextStoredHtml(block)
+    + '</div>'
+    + '</div>';
+}
+
+function richTextEditorFromNode(node) {
+  const element = node?.nodeType === 1 ? node : node?.parentElement;
+  return element?.closest?.('[data-rich-text-editor]') || null;
+}
+
+function richTextRangeTextOffset(root, node, offset) {
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  try {
+    range.setEnd(node, offset);
+    return range.toString().length;
+  } catch {
+    return 0;
+  }
+}
+
+function richTextCaptureOffsets(root, range) {
+  return {
+    start: richTextRangeTextOffset(root, range.startContainer, range.startOffset),
+    end: richTextRangeTextOffset(root, range.endContainer, range.endOffset),
+  };
+}
+
+function richTextPointAtOffset(root, requestedOffset) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let remaining = Math.max(0, Number(requestedOffset) || 0);
+  let last = null;
+  while (walker.nextNode()) {
+    last = walker.currentNode;
+    const length = last.nodeValue?.length || 0;
+    if (remaining <= length) return { node: last, offset: remaining };
+    remaining -= length;
+  }
+  return last
+    ? { node: last, offset: last.nodeValue?.length || 0 }
+    : { node: root, offset: root.childNodes.length };
+}
+
+function richTextRestoreOffsets(root, offsets) {
+  if (!offsets) return null;
+  const selection = window.getSelection();
+  if (!selection) return null;
+  const range = document.createRange();
+  const start = richTextPointAtOffset(root, offsets.start);
+  const end = richTextPointAtOffset(root, offsets.end);
+  try {
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+  } catch {
+    range.selectNodeContents(root);
+    range.collapse(false);
+  }
+  selection.removeAllRanges();
+  selection.addRange(range);
+  return range;
+}
+
+function richTextSelectionForEditor(editor) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  const owner = richTextEditorFromNode(range.commonAncestorContainer);
+  if (owner !== editor || !editor.contains(range.startContainer) || !editor.contains(range.endContainer)) return null;
+  return { range: range.cloneRange(), offsets: richTextCaptureOffsets(editor, range) };
+}
+
+function richTextSaveSelection(editor, range, offsets) {
+  state.richText.editor = editor;
+  state.richText.range = range?.cloneRange?.() || null;
+  state.richText.offsets = offsets || (range ? richTextCaptureOffsets(editor, range) : null);
+}
+
+function richTextCurrentSelection() {
+  const editor = state.richText.editor;
+  if (!editor || !elements.blockCanvas?.contains(editor)) return null;
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) return null;
+  return range;
+}
+
+function richTextRestoreSavedSelection() {
+  const editor = state.richText.editor;
+  if (!editor || !elements.blockCanvas?.contains(editor)) return null;
+  editor.focus({ preventScroll: true });
+  const selection = window.getSelection();
+  if (!selection) return null;
+  if (state.richText.offsets) return richTextRestoreOffsets(editor, state.richText.offsets);
+  if (state.richText.range) {
+    selection.removeAllRanges();
+    selection.addRange(state.richText.range.cloneRange());
+    return selection.getRangeAt(0);
+  }
+  return null;
+}
+
+function richTextToolbarRect(range) {
+  const rects = [...range.getClientRects()].filter((rect) => rect.width > 0 || rect.height > 0);
+  return rects[0] || range.getBoundingClientRect();
+}
+
+function positionRichTextToolbar() {
+  const toolbar = elements.richTextToolbar;
+  const range = state.richText.range;
+  if (!toolbar || toolbar.hidden || !range) return;
+  const rect = richTextToolbarRect(range);
+  const width = toolbar.offsetWidth || 260;
+  const height = toolbar.offsetHeight || 40;
+  const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + (rect.width / 2) - (width / 2)));
+  const above = rect.top - height - 8;
+  const top = above >= 8 ? above : Math.min(window.innerHeight - height - 8, rect.bottom + 8);
+  toolbar.style.left = Math.max(8, left) + 'px';
+  toolbar.style.top = Math.max(8, top) + 'px';
+}
+
+function updateRichTextToolbarState() {
+  const toolbar = elements.richTextToolbar;
+  if (!toolbar) return;
+  for (const action of ['bold', 'italic']) {
+    const button = toolbar.querySelector('[data-rich-text-action="' + action + '"]');
+    if (!button) continue;
+    let active = false;
+    try { active = document.queryCommandState(action); } catch { active = false; }
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+}
+
+function showRichTextToolbar() {
+  const toolbar = elements.richTextToolbar;
+  if (!toolbar) return;
+  toolbar.hidden = false;
+  if (elements.richTextToolbarMain) elements.richTextToolbarMain.hidden = state.richText.linkMode;
+  if (elements.richTextLinkForm) elements.richTextLinkForm.hidden = !state.richText.linkMode;
+  updateRichTextToolbarState();
+  requestAnimationFrame(positionRichTextToolbar);
+}
+
+function hideRichTextToolbar() {
+  if (elements.richTextToolbar) elements.richTextToolbar.hidden = true;
+  if (elements.richTextToolbarMain) elements.richTextToolbarMain.hidden = false;
+  if (elements.richTextLinkForm) elements.richTextLinkForm.hidden = true;
+  if (elements.richTextLinkError) {
+    elements.richTextLinkError.hidden = true;
+    elements.richTextLinkError.textContent = '';
+  }
+  state.richText.editor = null;
+  state.richText.range = null;
+  state.richText.offsets = null;
+  state.richText.linkMode = false;
+}
+
+function commitRichTextEditor(editor) {
+  state.richText.editor = editor;
+  const selected = richTextSelectionForEditor(editor);
+  const offsets = selected?.offsets || state.richText.offsets;
+  const sanitized = typeof richTextApi.sanitizeRichTextEditorHtml === 'function'
+    ? richTextApi.sanitizeRichTextEditorHtml(editor.innerHTML)
+    : editor.innerHTML;
+  if (editor.innerHTML !== sanitized) {
+    editor.innerHTML = sanitized;
+    richTextRestoreOffsets(editor, offsets);
+  }
+  const card = editor.closest('[data-block-id]');
+  const block = blockForEditorCard(card).block;
+  if (!block) return;
+  block.content = sanitized;
+  block.contentFormat = RICH_TEXT_HTML_FORMAT;
+  const range = richTextCurrentSelection();
+  richTextSaveSelection(editor, range, offsets);
+  scheduleSave();
+}
+
+function richTextSelectionAnchor() {
+  const range = state.richText.range;
+  const editor = state.richText.editor;
+  if (!range || !editor) return null;
+  const element = range.startContainer.nodeType === 1
+    ? range.startContainer
+    : range.startContainer.parentElement;
+  const anchor = element?.closest?.('a');
+  return anchor && editor.contains(anchor) ? anchor : null;
+}
+
+function openRichTextLinkEditor() {
+  if (!state.richText.range || !state.richText.editor) return;
+  state.richText.linkMode = true;
+  if (elements.richTextLinkInput) elements.richTextLinkInput.value = richTextSelectionAnchor()?.getAttribute('href') || '';
+  if (elements.richTextLinkError) {
+    elements.richTextLinkError.hidden = true;
+    elements.richTextLinkError.textContent = '';
+  }
+  showRichTextToolbar();
+  elements.richTextLinkInput?.focus({ preventScroll: true });
+  positionRichTextToolbar();
+}
+
+function closeRichTextLinkEditor() {
+  state.richText.linkMode = false;
+  if (elements.richTextToolbarMain) elements.richTextToolbarMain.hidden = false;
+  if (elements.richTextLinkForm) elements.richTextLinkForm.hidden = true;
+  positionRichTextToolbar();
+  richTextRestoreSavedSelection();
+}
+
+function applyRichTextLink() {
+  const value = elements.richTextLinkInput?.value || '';
+  const href = typeof richTextApi.sanitizeHref === 'function' ? richTextApi.sanitizeHref(value) : value.trim();
+  if (!href) {
+    if (elements.richTextLinkError) {
+      elements.richTextLinkError.hidden = false;
+      elements.richTextLinkError.textContent = '請輸入安全的網址';
+    }
+    return;
+  }
+  const range = richTextRestoreSavedSelection();
+  const editor = state.richText.editor;
+  if (!range || !editor) return;
+  const anchor = richTextSelectionAnchor();
+  if (anchor && anchor.contains(range.startContainer) && anchor.contains(range.endContainer)) {
+    anchor.setAttribute('href', href);
+  } else {
+    try { document.execCommand('createLink', false, href); } catch { return; }
+  }
+  commitRichTextEditor(editor);
+  closeRichTextLinkEditor();
+  showRichTextToolbar();
+}
+
+function handleRichTextToolbarClick(event) {
+  const action = event.target.closest?.('[data-rich-text-action]')?.dataset.richTextAction;
+  if (!action) return;
+  if (action === 'link') {
+    openRichTextLinkEditor();
+    return;
+  }
+  if (action === 'link-confirm') {
+    event.preventDefault();
+    applyRichTextLink();
+    return;
+  }
+  if (action === 'link-cancel') {
+    closeRichTextLinkEditor();
+    return;
+  }
+  if (action !== 'bold' && action !== 'italic') return;
+  const editor = state.richText.editor;
+  if (!richTextRestoreSavedSelection() || !editor) return;
+  try { document.execCommand(action, false, null); } catch { return; }
+  commitRichTextEditor(editor);
+  showRichTextToolbar();
+}
+
+function updateRichTextToolbarFromSelection() {
+  if (state.richText.linkMode) return;
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+    hideRichTextToolbar();
+    return;
+  }
+  const range = selection.getRangeAt(0);
+  const editor = richTextEditorFromNode(range.commonAncestorContainer);
+  if (!editor || !editor.contains(range.startContainer) || !editor.contains(range.endContainer)
+    || selection.toString().length === 0) {
+    hideRichTextToolbar();
+    return;
+  }
+  richTextSaveSelection(editor, range, richTextCaptureOffsets(editor, range));
+  showRichTextToolbar();
+}
+
+function handleRichTextOutsidePointerDown(event) {
+  if (elements.richTextToolbar?.contains(event.target)) return;
+  if (richTextEditorFromNode(event.target)) return;
+  hideRichTextToolbar();
+}
+
+function handleRichTextEditorFocusOut() {
+  setTimeout(() => {
+    if (state.richText.linkMode) return;
+    const active = document.activeElement;
+    if (!elements.richTextToolbar?.contains(active) && !richTextEditorFromNode(active)) hideRichTextToolbar();
+  }, 0);
 }
 
 function formatDate(value) {
@@ -302,7 +625,7 @@ function textBlockFor(section) {
 function editableTextBlockFor(section) {
   const existing = textBlockFor(section);
   if (existing) return existing;
-  const block = { id: `${section.id}-text`, type: 'rich-text', content: '' };
+  const block = { id: `${section.id}-text`, type: 'rich-text', content: '', contentFormat: 'html' };
   section.blocks.push(block);
   return block;
 }
@@ -393,6 +716,7 @@ function addTextBlock() {
     id: makePlayerBlockId('text'),
     type: 'rich-text',
     content: '',
+    contentFormat: 'html',
   });
   state.player.notice = '已建立文字區塊。';
   renderBlockCanvas();
@@ -2645,7 +2969,7 @@ function renderBlockEditor(section, block, index) {
     : block.type === 'singleVideo' ? '單一影片' : '';
   const headerLabel = typeLabel ? `<strong>${typeLabel}</strong>` : '';
   const body = block.type === 'rich-text' || block.type === 'text'
-    ? `<label class="block-text-editor">文字內容 <textarea rows="5" data-block-field="content">${escapeHtml(block.content || '')}</textarea></label>`
+    ? renderRichTextEditor(block)
     : (block.type === 'singleVideo' || block.type === 'comparisonVideo')
       ? renderInlineVideoBlock(section, block)
       : `<p class="hint">不支援的區塊類型：${displayBlockType(block.type)}</p>`;
@@ -2665,6 +2989,11 @@ function renderBlockEditor(section, block, index) {
 
 function captureBlockEditorFocus() {
   const active = document.activeElement;
+  const richEditor = richTextEditorFromNode(active);
+  if (richEditor) {
+    const selection = richTextSelectionForEditor(richEditor);
+    if (selection) richTextSaveSelection(richEditor, selection.range, selection.offsets);
+  }
   if (!active || !elements.blockCanvas?.contains(active)) return null;
   const card = active.closest('[data-block-id]');
   const section = active.closest('[data-section-id]');
@@ -2674,6 +3003,7 @@ function captureBlockEditorFocus() {
     blockId: card?.dataset.blockId || '',
     blockPath: active.dataset.blockPath || '',
     blockMode: active.matches('[data-block-mode]'),
+    richText: active.matches('[data-rich-text-editor]'),
     sectionTitle: active.matches('[data-section-title]'),
     value: typeof active.value === 'string' ? active.value : null,
     selectionStart: Number.isInteger(active.selectionStart) ? active.selectionStart : null,
@@ -2694,8 +3024,10 @@ function restoreBlockEditorFocus(snapshot) {
     if (card) {
       target = snapshot.blockMode
         ? card.querySelector('[data-block-mode]')
-        : [...card.querySelectorAll('[data-block-path]')]
-          .find((item) => item.dataset.blockPath === snapshot.blockPath);
+        : snapshot.richText
+          ? card.querySelector('[data-rich-text-editor]')
+          : [...card.querySelectorAll('[data-block-path]')]
+            .find((item) => item.dataset.blockPath === snapshot.blockPath);
     }
   }
   if (!target) return;
@@ -2704,6 +3036,11 @@ function restoreBlockEditorFocus(snapshot) {
     target.value = snapshot.value;
   }
   target.focus({ preventScroll: true });
+  if (snapshot.richText && target.matches('[data-rich-text-editor]')) {
+    state.richText.editor = target;
+    if (state.richText.offsets) richTextRestoreOffsets(target, state.richText.offsets);
+    return;
+  }
   if (snapshot.selectionStart !== null && snapshot.selectionEnd !== null
     && typeof target.setSelectionRange === 'function') {
     try {
@@ -2907,10 +3244,9 @@ function handleBlockEditorEvent(event) {
     scheduleSave();
     return;
   }
-  if (target.matches('[data-block-field="content"]')) {
-    if (!['input', 'change'].includes(event.type)) return;
-    block.content = target.value;
-    scheduleSave();
+  if (target.matches('[data-rich-text-editor]')) {
+    if (!['input', 'keyup', 'blur'].includes(event.type)) return;
+    commitRichTextEditor(target);
     return;
   }
   if (target.matches('[data-block-path]')) {
@@ -2968,7 +3304,12 @@ function previewMediaReference(value, role = '媒體') {
 function renderPreviewBlock(block) {
   const type = typeof block?.type === 'string' ? block.type.toLowerCase() : 'unknown';
   if (type === 'rich-text' || type === 'text') {
-    return `<p>${escapeHtml(block.content || '') || '<span class="muted">尚未填寫</span>'}</p>`;
+    const content = block?.contentFormat === RICH_TEXT_HTML_FORMAT
+      ? (typeof richTextApi.sanitizeRichTextHtml === 'function'
+        ? richTextApi.sanitizeRichTextHtml(block.content || '')
+        : richTextPlainHtml(block.content || ''))
+      : richTextPlainHtml(block.content || '');
+    return content ? '<p>' + content + '</p>' : '<p><span class="muted">尚未填寫</span></p>';
   }
   if (type === 'heading' || type === 'subheading') {
     return `<h4>${escapeHtml(block.label || block.title || block.content || '')}</h4>`;
@@ -3261,6 +3602,12 @@ elements.blockCanvas?.addEventListener('pointerdown', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('pointermove', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('pointerup', handleBlockEditorEvent);
 elements.blockCanvas?.addEventListener('pointercancel', handleBlockEditorEvent);
+elements.richTextToolbar?.addEventListener('pointerdown', (event) => event.preventDefault());
+elements.richTextToolbar?.addEventListener('click', handleRichTextToolbarClick);
+elements.richTextLinkForm?.addEventListener('submit', (event) => { event.preventDefault(); applyRichTextLink(); });
+document.addEventListener('selectionchange', updateRichTextToolbarFromSelection);
+document.addEventListener('pointerdown', handleRichTextOutsidePointerDown);
+elements.blockCanvas?.addEventListener('focusout', handleRichTextEditorFocusOut);
 document.addEventListener("keydown", handleFramePlayerKeydown);
 elements.blockCanvas?.addEventListener('focusout', () => {
   setTimeout(flushQueuedBlockCanvasRender, 0);

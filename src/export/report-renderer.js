@@ -6,6 +6,7 @@ const {
   validateReferencedVideoAssetReferences,
 } = require('./asset-paths');
 const { toReportDocument } = require('../report-contract');
+const { sanitizeRichTextHtml } = require('../rich-text');
 const { renderNativeFramePlayerScript } = require('./native-frame-player');
 const PLAYBACK_RATE_MIN = 1 / 64;
 const PLAYBACK_RATE_MAX = 64;
@@ -113,8 +114,11 @@ function renderEmptyContent() {
   return '<span class="muted">No content</span>';
 }
 function renderText(block) {
-  const content = blockText(block);
-  return `<p class="report-text">${content ? escapeHtml(content) : renderEmptyContent()}</p>`;
+  const rawContent = typeof block?.content === 'string' ? block.content : '';
+  const content = block?.contentFormat === 'html'
+    ? sanitizeRichTextHtml(rawContent)
+    : escapeHtml(rawContent);
+  return '<p class="report-text">' + (content || renderEmptyContent()) + '</p>';
 }
 function renderCaption(label) {
   return label ? `<figcaption>${escapeHtml(label)}</figcaption>` : '';

@@ -153,6 +153,7 @@
 
     // Content is the only common text field exposed by the current editor.
     copyString(block, output, 'content');
+    if (block.contentFormat === 'html') output.contentFormat = 'html';
 
     if (type === 'image') {
       copyAssetReferences(block, output);
