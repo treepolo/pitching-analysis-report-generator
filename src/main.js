@@ -36,6 +36,7 @@ const {
   readFrameCache,
 } = require('./media');
 const { resolveProjectRelativePath } = require('./media/path-policy');
+const { nextZoomLevel, zoomDirectionForInput } = require('./zoom');
 
 const APP_ROOT = path.resolve(app.getAppPath());
 const configuredProjectRoot = process.env.PITCHING_PROJECT_ROOT;
@@ -591,6 +592,14 @@ function createWindow({ show = true } = {}) {
   const window = new BrowserWindow({ ...browserWindowOptions(), show });
   closeGuards.set(window, { allowClose: false, requestPending: false });
   window.setMenuBarVisibility(false);
+  // The application menu is hidden, so provide browser-style page zoom shortcuts at the native input layer.
+  // The physical '+' key arrives as Ctrl+Shift+= on Windows and is otherwise easy to miss.
+  window.webContents.on('before-input-event', (event, input = {}) => {
+    const direction = zoomDirectionForInput(input);
+    if (!direction || window.webContents.isDestroyed()) return;
+    event.preventDefault();
+    window.webContents.setZoomLevel(nextZoomLevel(window.webContents.getZoomLevel(), direction));
+  });
   window.webContents.on('context-menu', (_event, params = {}) => {
     const selectionText = typeof params.selectionText === 'string' ? params.selectionText.trim() : '';
     const editable = Boolean(params.isEditable);
