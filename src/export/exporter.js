@@ -49,10 +49,10 @@ async function withExportFsRetry(operation, phase, { attempts = 4 } = {}) {
   throw lastError;
 }
 
-async function createTemporaryRoot(outputRoot, projectRoot) {
+async function createTemporaryRoot(projectRoot) {
+  // Keep all internal staging inside the project. The selected output root is
+  // reserved for the final folder/ZIP delivery artifacts only.
   const candidates = [
-    { parent: outputRoot, prefix: '.report-export-', sameDestination: true },
-    { parent: outputRoot, prefix: 'report-export-', sameDestination: true },
     { parent: path.join(projectRoot, '.tmp'), prefix: '.report-export-', sameDestination: false },
   ];
   let lastError = null;
@@ -620,7 +620,7 @@ async function exportReport({
       });
     }
     throwIfAborted(signal);
-    const temporary = await createTemporaryRoot(outputRoot, projectRootLexical);
+    const temporary = await createTemporaryRoot(projectRootLexical);
     const temporaryRoot = temporary.root;
     const stagingPath = path.join(temporaryRoot, safeName);
     const reportFileName = 'report.html';

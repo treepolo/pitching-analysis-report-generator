@@ -2,9 +2,9 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
-const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { createTestTemp } = require('../project-temp');
 const {
   ASSET_LIFECYCLE_STATUS,
   COMPATIBILITY,
@@ -313,7 +313,7 @@ test('registers inspected evidence while preserving source and pending normaliza
 });
 
 test('ingest request and real-path containment reject external and symlink escapes', async (t) => {
-  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pitching-media-domain-'));
+  const fixtureRoot = await createTestTemp('pitching-media-domain-');
   const projectRoot = path.join(fixtureRoot, 'project');
   const mediaDirectory = path.join(projectRoot, 'media', 'original');
   const outsideRoot = path.join(fixtureRoot, 'outside');

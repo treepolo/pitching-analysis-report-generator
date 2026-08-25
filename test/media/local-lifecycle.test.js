@@ -3,9 +3,9 @@
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const fs = require('node:fs/promises');
-const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { createTestTemp } = require('../project-temp');
 const {
   COMPATIBILITY,
   INSPECTION_STATUS,
@@ -103,7 +103,7 @@ test('local adapter reports an unavailable executable without pretending probe s
 });
 
 test('local runner waits for a cancelled child to close before releasing its output file', async () => {
-  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'media-cancel-cleanup-'));
+  const fixtureRoot = await createTestTemp('media-cancel-cleanup-');
   const outputPath = path.join(fixtureRoot, 'partial-normalized.mp4');
   const controller = new AbortController();
   try {
@@ -152,7 +152,7 @@ test('local normalization orchestration keeps missing real tools recoverable', a
 });
 
 test('copies external source into project-local originals with checksum provenance and preserves source bytes', async () => {
-  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'media-copy-lifecycle-'));
+  const fixtureRoot = await createTestTemp('media-copy-lifecycle-');
   const projectRoot = path.join(fixtureRoot, 'project');
   const sourceRoot = path.join(fixtureRoot, 'incoming');
   const sourcePath = path.join(sourceRoot, 'pitch.mp4');
@@ -203,7 +203,7 @@ test('copies external source into project-local originals with checksum provenan
 });
 
 test('copies unsupported sources but keeps their unplayable state visible', async () => {
-  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'media-copy-unsupported-'));
+  const fixtureRoot = await createTestTemp('media-copy-unsupported-');
   const projectRoot = path.join(fixtureRoot, 'project');
   const sourcePath = path.join(fixtureRoot, 'clip.mov');
   try {
@@ -224,7 +224,7 @@ test('copies unsupported sources but keeps their unplayable state visible', asyn
 });
 
 test('verification helper requires a real project-local target and injected ffprobe evidence', async () => {
-  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'media-verify-lifecycle-'));
+  const fixtureRoot = await createTestTemp('media-verify-lifecycle-');
   const projectRoot = path.join(fixtureRoot, 'project');
   const targetPath = path.join(projectRoot, 'media', 'normalized', 'asset-verify-1.mp4');
   try {
@@ -258,7 +258,7 @@ test('verification helper requires a real project-local target and injected ffpr
 });
 
 test('normalization may prepare a project-local target directory but never treats process exit as output success', async () => {
-  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'media-normalize-target-'));
+  const fixtureRoot = await createTestTemp('media-normalize-target-');
   const projectRoot = path.join(fixtureRoot, 'project');
   const sourcePath = path.join(projectRoot, 'media', 'original', 'pitch.mp4');
   const targetPath = path.join(projectRoot, 'media', 'normalized', 'asset-target-1.mp4');

@@ -5,9 +5,9 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
-const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { createTestTemp } = require('../project-temp');
 const { ExportValidationError } = require('../../src/export/asset-paths');
 const { exportReport } = require('../../src/export/exporter');
 const { extractZipArchive } = require('../../src/export/zip-archive');
@@ -15,7 +15,7 @@ const { extractZipArchive } = require('../../src/export/zip-archive');
 let testRoot;
 
 test.before(async () => {
-  testRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pitch-report-frame-export-'));
+  testRoot = await createTestTemp('pitch-report-frame-export-');
 });
 
 test.after(async () => {

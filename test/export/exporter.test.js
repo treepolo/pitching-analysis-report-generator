@@ -5,6 +5,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const test = require('node:test');
+const { createTestTemp } = require('../project-temp');
 const { ExportValidationError } = require('../../src/export/asset-paths');
 const { exportReport } = require('../../src/export/exporter');
 
@@ -322,7 +323,7 @@ test('keeps the completed output when staging cleanup remains locked', async () 
   }
 });
 
-test('falls back to a visible staging directory when hidden staging is denied', async () => {
+test('keeps internal staging inside the project when output staging is unavailable', async () => {
   const outputRoot = path.join(testRoot, 'visible-staging-fallback-output');
   const originalMkdtemp = fs.mkdtemp;
   let deniedAttempts = 0;
@@ -353,7 +354,7 @@ test('falls back to a visible staging directory when hidden staging is denied', 
   }
 
   assert.equal(result.validation.valid, true);
-  assert.equal(deniedAttempts, 4);
+  assert.equal(deniedAttempts, 0);
   assert.equal(await fs.stat(result.folderPath).then((stats) => stats.isDirectory()), true);
   assert.deepEqual(
     (await fs.readdir(outputRoot)).filter((name) => name.includes('report-export-')),
@@ -361,12 +362,14 @@ test('falls back to a visible staging directory when hidden staging is denied', 
   );
 });
 
-test('commits a project-local staging fallback to an external output root', async () => {
-  const outputRoot = await fs.mkdtemp(path.join(require('node:os').tmpdir(), 'pitch-report-cross-volume-output-'));
+test('uses project-local staging for an external output root', async () => {
+  const outputRoot = await createTestTemp('pitch-report-cross-volume-output-');
   const originalMkdtemp = fs.mkdtemp;
   let deniedAttempts = 0;
+  const stagingPrefixes = [];
   fs.mkdtemp = async (prefix) => {
     const normalizedPrefix = String(prefix);
+    stagingPrefixes.push(normalizedPrefix);
     if (normalizedPrefix.startsWith(`${outputRoot}${path.sep}.report-export-`)
       || normalizedPrefix.startsWith(`${outputRoot}${path.sep}report-export-`)) {
       deniedAttempts += 1;
@@ -395,7 +398,9 @@ test('commits a project-local staging fallback to an external output root', asyn
   }
 
   assert.equal(result.validation.valid, true);
-  assert.equal(deniedAttempts, 8);
+  assert.equal(deniedAttempts, 0);
+  assert.ok(stagingPrefixes.length > 0);
+  assert.ok(stagingPrefixes.every((prefix) => prefix.startsWith(path.join(testRoot, '.tmp') + path.sep)));
   assert.match(result.folderPath, /cross-volume-output/u);
 });
 

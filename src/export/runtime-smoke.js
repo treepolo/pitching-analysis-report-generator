@@ -2,7 +2,6 @@
 
 const { spawn } = require('node:child_process');
 const fs = require('node:fs/promises');
-const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { ExportValidationError } = require('./asset-paths');
@@ -256,7 +255,12 @@ async function runLocalFileRuntimeSmoke({
     };
   }
 
-  const runtimeRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pitch-report-export-runtime-'));
+  // Keep harness, logs, and the isolated Electron profile inside the project.
+  // The exported folder itself may be an intentional user-selected destination;
+  // only runtime-smoke's internal files are constrained here.
+  const runtimeTempRoot = path.resolve(__dirname, '..', '..', '.tmp', 'export-runtime');
+  await fs.mkdir(runtimeTempRoot, { recursive: true });
+  const runtimeRoot = await fs.mkdtemp(path.join(runtimeTempRoot, 'pitch-report-export-runtime-'));
   try {
     const harnessPath = path.join(runtimeRoot, 'harness.cjs');
     const resultPath = path.join(runtimeRoot, 'result.json');

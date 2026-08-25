@@ -2,9 +2,9 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
-const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { createTestTemp } = require('../project-temp');
 const {
   COMPATIBILITY,
   FRAME_TIMING,
@@ -273,7 +273,7 @@ test('parses FFmpeg progress records without inventing a percentage or duration'
 });
 
 test('execution rejects existing source or normalized-target symlink escapes', async (t) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pitch-report-tool-path-'));
+  const root = await createTestTemp('pitch-report-tool-path-');
   const originalDirectory = path.join(root, 'media', 'original');
   const normalizedDirectory = path.join(root, 'media', 'normalized');
   const outsidePath = path.join(path.dirname(root), `${path.basename(root)}-outside.mp4`);

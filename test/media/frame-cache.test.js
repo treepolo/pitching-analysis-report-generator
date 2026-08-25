@@ -3,9 +3,9 @@
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const fs = require('node:fs/promises');
-const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { createTestTemp } = require('../project-temp');
 const {
   buildFrameCache,
   cleanupFrameCache,
@@ -19,7 +19,7 @@ const { createMediaToolAdapter } = require('../../src/media/tool-adapter');
 let projectRoot;
 
 test.beforeEach(async () => {
-  projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pitch-frame-cache-project-'));
+  projectRoot = await createTestTemp('pitch-frame-cache-project-');
   await fs.mkdir(path.join(projectRoot, 'media', 'original'), { recursive: true });
   await fs.writeFile(path.join(projectRoot, 'media', 'original', 'pitch.mp4'), Buffer.from('synthetic-private-source'));
 });
@@ -219,7 +219,7 @@ test('rejects unsafe source/cache paths and cleans a ready cache by identity', a
     /relativePath|outside|traversal/u,
   );
   await assert.rejects(
-    buildFrameCache(input(fixtureAdapter(), { cacheDirectory: path.join(os.tmpdir(), 'outside-frame-cache') })),
+    buildFrameCache(input(fixtureAdapter(), { cacheDirectory: path.join(path.dirname(projectRoot), 'outside-frame-cache') })),
     /inside the project root/u,
   );
   const built = await buildFrameCache(input(fixtureAdapter()));

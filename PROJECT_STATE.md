@@ -1,3 +1,7 @@
+## Current Wave 22 project-local generated artifacts (2026-08-25)
+
+- Internal runtime, test, browser/Electron profiles, logs, harnesses, and temporary staging must remain under the project .tmp/ or .runtime/ directories. The selected export destination may still be external when it is the intentional final folder/ZIP delivery location; no internal staging is created there.
+
 ## Current Wave 21 native-video portable export (2026-08-23)
 
 - Selected design: portable HTML uses the same native browser-video frame-player

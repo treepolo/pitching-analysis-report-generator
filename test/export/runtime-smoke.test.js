@@ -2,9 +2,9 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
-const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { createTestTemp } = require('../project-temp');
 const { ExportValidationError } = require('../../src/export/asset-paths');
 const { exportReport } = require('../../src/export/exporter');
 const { validateExportLayout } = require('../../src/export/layout-validator');
@@ -14,7 +14,7 @@ const { extractZipArchive, validateZipParity } = require('../../src/export/zip-a
 let testRoot;
 
 test.before(async () => {
-  testRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pitch-report-export-smoke-test-'));
+  testRoot = await createTestTemp('pitch-report-export-smoke-test-');
 });
 
 test.after(async () => {

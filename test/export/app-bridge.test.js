@@ -2,9 +2,9 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
-const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { createTestTemp } = require('../project-temp');
 const {
   ExportJobController,
   assertSafeOutputRoot,
@@ -16,7 +16,7 @@ const { exportReport } = require('../../src/export/exporter');
 let testRoot;
 
 test.before(async () => {
-  testRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'pitch-report-export-bridge-test-'));
+  testRoot = await createTestTemp('pitch-report-export-bridge-test-');
 });
 
 test.after(async () => {
@@ -154,7 +154,7 @@ test('exports renderer-shaped text-only, video-only, and mixed snapshots through
 test('validates export output roots and permits safe external destinations', async () => {
   const nested = path.join(testRoot, 'nested', 'output');
   assert.equal(await assertSafeOutputRoot(testRoot, nested), path.resolve(nested));
-  const external = await fs.mkdtemp(path.join(require('node:os').tmpdir(), 'pitch-report-external-root-'));
+  const external = await createTestTemp('pitch-report-external-root-');
   try {
     assert.equal(await assertSafeOutputRoot(testRoot, external), path.resolve(external));
   } finally {
@@ -168,7 +168,7 @@ test('validates export output roots and permits safe external destinations', asy
 
 test('validates native picker results as existing directories inside the project root', async () => {
   const selected = path.join(testRoot, 'selected-output');
-  const external = await fs.mkdtemp(path.join(require('node:os').tmpdir(), 'pitch-report-external-output-'));
+  const external = await createTestTemp('pitch-report-external-output-');
   await fs.mkdir(selected, { recursive: true });
   try {
     assert.equal(await validatePickedExportDirectory(testRoot, selected), path.resolve(selected));
