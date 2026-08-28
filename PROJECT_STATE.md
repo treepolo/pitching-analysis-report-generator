@@ -230,3 +230,12 @@
 - 左右鍵執行精確上一幀／下一幀，空白鍵切換播放／暫停；文字輸入、選單、可編輯內容不攔截快捷鍵。輸出 HTML 也保留原生影片速度失敗時的擴充影格時鐘與定位完成回退判定。
 - 單影片輸出固定堆疊；雙影片才讀取並排／堆疊設定。控制列使用播放／暫停、左右箭頭圖示，當前幀與總幀數分置進度條兩側。
 - 驗證邊界：完整 npm test、變更 JavaScript node --check、輸出 HTML renderer/runtime smoke；Electron file:// 實機執行若不可用仍明確標為 skip，不視為通過。
+
+## Wave 26 輸出 HTML XP→Windows 7 閱讀器外觀 checkpoint（2026-08-29）
+
+- 使用者選定「輸出器配套閱讀器」方向：輸出 HTML 與產生器屬同一年代、配色與字體家族，但不加入假的編輯指令或可編輯欄位。
+- `src/export/xp7-reader-theme.js` 是輸出專用 CSS 邊界，由 `report-renderer.js` 內嵌至既有 `<style>`；沒有外部 CSS、字型、圖片、腳本、網路 API 或 `generator-xp7.css` 依賴。
+- 文字固定為章節框＋正文兩個可見層級；影片固定為章節框＋播放器框＋黑色畫面框三個可見層級。雙影片兩側取消各自卡片框，只保留一條分隔線；選取狀態直接改現有播放器邊框與底色，不新增 outline、光暈或判定層。
+- 既有輸出 DOM/data attributes、原生影片、播放／逐幀／速度／重設／循環、點選與鍵盤機制未修改；完整回歸為 166 tests / 165 pass / 0 fail / 1 個既有 automated Electron `file://` harness 明確 skip。
+- 另以真實專案內 MP4 產生 QA 報告，經 Electron Chromium 直接從 `file://` 載入；1260×900 為左右雙欄，390×844 自動上下堆疊，兩者皆無水平溢出或外部資源請求，點選播放器仍使外層 `data-frame-selected` 變為 `true`。
+- Wave 26 計畫、檢核與證據位於 `WAVE_26_EXPORT_XP7_READER_PLAN.md`；專案內 `.tmp` QA 產物不進 Git，使用者既有 `AGENTS.md` 與 `測試輸出/` 變更不納入本 checkpoint。

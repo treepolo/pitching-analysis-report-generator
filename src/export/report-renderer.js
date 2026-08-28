@@ -8,6 +8,7 @@ const {
 const { toReportDocument } = require('../report-contract');
 const { sanitizeRichTextHtml } = require('../rich-text');
 const { renderNativeFramePlayerScript } = require('./native-frame-player');
+const { renderXp7ReaderTheme } = require('./xp7-reader-theme');
 const PLAYBACK_RATE_MIN = 1 / 64;
 const PLAYBACK_RATE_MAX = 64;
 const PLAYBACK_RATE_DEFAULT = 1;
@@ -544,90 +545,7 @@ function renderBlock(block, byId, frameCaches) {
   return `${label ? `<h4>${escapeHtml(label)}</h4>` : ''}${renderText(safeBlock)}`;
 }
 function renderStyles() {
-  return `
-    :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-    * { box-sizing: border-box; }
-    body, body * { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
-    body { margin: 0; background: #f5f7fb; color: #172033; }
-    main { width: min(100% - 2rem, 980px); margin: 0 auto; padding: 2rem 0 4rem; }
-    .report-header { margin-bottom: 2rem; }
-    .eyebrow { margin: 0 0 .5rem; color: #596780; font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-    h1, h2, h3, h4 { line-height: 1.2; }
-    h1 { margin: 0; font-size: clamp(1.75rem, 4vw, 2.8rem); }
-    h2 { margin: 0 0 1rem; font-size: 1.45rem; }
-    h3 { margin: 0 0 .75rem; font-size: 1.1rem; }
-    h4 { margin: 1rem 0 .5rem; font-size: 1rem; }
-    .report-section { margin: 0 0 1.25rem; padding: 1.25rem; border: 1px solid #dfe5ef; border-radius: 1rem; background: #fff; box-shadow: 0 8px 24px rgb(23 32 51 / 6%); }
-    .report-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
-    .muted { color: #71809a; }
-    .report-media { margin: 1rem 0 0; }
-    .report-media video, .report-media img { display: block; width: 100%; max-height: 620px; border-radius: .75rem; background: #111827; object-fit: contain; }
-    .report-media img { background: #eef2f7; }
-    figcaption { margin-top: .5rem; color: #596780; font-size: .9rem; }
-    .comparison-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-    .portable-player { width: 100%; padding: 1rem; border: 1px solid #ccd6e5; border-radius: .9rem; background: #fbfcff; }
-    .portable-player-header, .portable-player-side-heading, .portable-player-actions { display: flex; align-items: center; gap: .75rem; }
-    .portable-player-header { margin-bottom: .75rem; }
-    .portable-player-header h3, .portable-player-side-heading h3 { margin: 0; }
-    .portable-player-grid { display: grid; width: 100%; gap: 1rem; }
-    .portable-player-grid-side-by-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .portable-player-grid-stacked { grid-template-columns: 1fr; }
-    .portable-player-side { width: 100%; min-width: 0; padding: .75rem; border: 1px solid #dfe5ef; border-radius: .75rem; background: #fff; }
-    .portable-player[data-frame-selected="true"] { box-shadow: 0 0 0 3px rgba(42, 104, 214, .78), 0 0 18px rgba(42, 104, 214, .34); }
-    .portable-player, .portable-player:focus, .portable-player:focus-visible,
-    .portable-player-side, .portable-player-side:focus, .portable-frame-surface:focus { outline: none; }
-    .portable-player-side-heading { justify-content: space-between; margin-bottom: .5rem; }
-    .portable-player-side-heading h3 { font-size: 1rem; }
-    .portable-player-side-heading span { overflow-wrap: anywhere; color: #596780; font-size: .9rem; }
-    .portable-player-side video { max-height: 460px; }
-    .portable-frame-surface { display: grid; min-height: 220px; place-items: center; overflow: hidden; border-radius: .75rem; background: #111827; }
-    .portable-frame-surface img, .portable-frame-surface video { width: 100%; max-height: 460px; object-fit: contain; }
-    .portable-frame-surface [hidden] { display: none; }
-    .portable-frame-side-status, .portable-frame-fallback { margin: .55rem 0 0; color: #596780; font-size: .82rem; }
-    .portable-frame-controls { display: grid; grid-template-columns: 28px 28px minmax(5.5rem, 5.5rem) minmax(0, 1fr) minmax(5.5rem, 5.5rem) 28px; column-gap: .6rem; row-gap: .6rem; margin-top: .8rem; }
-    .portable-frame-navigation { display: contents; }
-    .portable-frame-navigation > button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; font-family: inherit; font-size: 16px; line-height: 1; text-align: center; }
-    .portable-frame-navigation [data-frame-current] { grid-column: 3; }
-    .portable-frame-navigation input[type="range"] { grid-column: 4; min-width: 0; width: 100%; padding: 0; margin: 0; }
-    .portable-frame-rate-row input[type="range"] { padding: 0; margin: 0; }
-    .portable-frame-navigation [data-frame-total] { grid-column: 5; width: 5.5rem; min-width: 5.5rem; }
-    .portable-frame-navigation [data-frame-current] { width: 5.5rem; min-width: 5.5rem; }
-    .portable-frame-rate-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; width: 100%; }
-    .portable-frame-loop { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: .35rem; color: #33415c; font-size: .85rem; }
-    .portable-frame-shared-controls { grid-column: 1 / -1; width: 100%; }
-    .portable-frame-rate-row input[type="range"] { flex: 1 1 auto; min-width: 0; }
-    .portable-frame-controls button, .portable-player-rate-row button, .portable-frame-rate-row button { padding: .45rem .7rem; border: 1px solid #b9c5d8; border-radius: .45rem; background: #fff; color: #172033; cursor: pointer; }
-    .portable-frame-controls button:hover, .portable-player-rate-row button:hover, .portable-frame-rate-row button:hover { background: #eef3fa; }
-    .portable-frame-controls output, .portable-player-side-controls output { color: #596780; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: center; }
-    .portable-frame-player-status { grid-column: 1 / -1; min-height: 1rem; margin: 0; overflow: hidden; color: #7f8999; font-size: .75rem; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; }
-    .portable-frame-controls .portable-frame-player-status[data-state="loaded"], .portable-frame-controls .portable-frame-player-status[data-state="pending"] { color: #7f8999; }
-    .portable-frame-controls .portable-frame-player-status[data-state="error"] { color: #a87575; }
-    .portable-player-side-controls { display: grid; grid-template-columns: minmax(0, 1fr) max-content; column-gap: .6rem; row-gap: .6rem; margin-top: .65rem; }
-    .portable-player-timeline-row { display: contents; }
-    .portable-player-timeline-row input[type="range"] { grid-column: 1; min-width: 0; width: 100%; }
-    .portable-player-timeline-row output { grid-column: 2; }
-    .portable-player-rate-row { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; width: 100%; }
-    .portable-player-loop, .portable-frame-loop { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: .35rem; color: #33415c; font-size: .85rem; }
-    .portable-player-side-controls label { display: inline-flex; align-items: center; gap: .35rem; color: #33415c; font-size: .85rem; }
-    .portable-player-rate-input { flex: 0 0 5.5rem; width: 5.5rem; }
-    .portable-player-rate-reset, .portable-frame-rate-row button { flex: 0 0 2.2rem; width: 2.2rem; height: 2.2rem; padding: 0 !important; border-radius: 50% !important; font-size: 1.1rem; line-height: 1; }
-    .portable-player-rate-row input[type="number"] { flex: 0 0 5.5rem; width: 5.5rem; }
-    .portable-frame-rate-row input[type="number"] { flex: 0 0 4.5rem; width: 4.5rem; }
-    .portable-player-actions { margin-top: .8rem; }
-    .portable-player-actions button { padding: .45rem .7rem; border: 1px solid #b9c5d8; border-radius: .45rem; background: #fff; color: #172033; cursor: pointer; }
-    .portable-player-actions button:hover { background: #eef3fa; }
-    @media (max-width: 700px) {
-      main { width: min(100% - 1rem, 980px); padding-top: 1rem; }
-      .report-section { padding: 1rem; }
-      .comparison-media, .portable-player-grid-side-by-side { grid-template-columns: 1fr; }
-      .portable-frame-controls { grid-template-columns: 1fr; }
-      .portable-frame-navigation { display: flex; flex-wrap: wrap; }
-      .portable-frame-navigation input[type="range"] { flex: 1 1 10rem; }
-      .portable-frame-navigation [data-frame-current], .portable-frame-navigation [data-frame-total] { flex: 0 0 5.5rem; width: 5.5rem; }
-      .portable-frame-rate-row { grid-column: 1; }
-      .portable-player-side-controls { grid-template-columns: minmax(0, 1fr) max-content; }
-    }
-  `;
+  return renderXp7ReaderTheme();
 }
 function renderFramePlayerScript() {
   return `
