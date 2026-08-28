@@ -1,4 +1,4 @@
-:root { color-scheme: light; --ink: #000; --muted: #404040; --line: #808080; --paper: #fff; --wash: #d4d0c8; --blue: #0a246a; --blue-soft: #c6d3ef; --green: #006400; --accent: #808080; --focus: #316ac5; --danger: #800000; --shadow: none; }
+:root { color-scheme: light; --ink: #18324d; --muted: #5c7186; --line: #9bb1c7; --paper: #fff; --wash: #dcebf7; --blue: #1769ad; --blue-soft: #d9eafa; --green: #176b42; --accent: #7fa9cf; --focus: #2b78c5; --danger: #9b2d2d; --shadow: 0 2px 8px rgba(35,74,112,.18); }
 * { box-sizing: border-box; }
 body, body * { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 body { margin: 0; min-width: 0; overflow-x: hidden; background: var(--wash); color: var(--ink); font: 11px/1.35 Tahoma, "MS Sans Serif", Arial, sans-serif; }
@@ -204,106 +204,109 @@ dialog::backdrop { background: rgba(17, 24, 39, .32); }
 }
 
 
-/* Windows XP Classic theme: dense gray workspace, blue title bars, beveled controls. */
-html { background: #d4d0c8; }
-body.document-app { background: #d4d0c8; color: #000; font-family: Tahoma, "MS Sans Serif", Arial, sans-serif; font-size: 11px; line-height: 1.35; }
-body.document-app button, body.document-app input, body.document-app textarea, body.document-app select { font-family: Tahoma, "MS Sans Serif", Arial, sans-serif; font-size: 11px; }
-body.document-app h1, body.document-app h2, body.document-app h3 { letter-spacing: normal; line-height: 1.2; }
-body.document-app h1 { font-size: 18px; }
-body.document-app h2 { font-size: 15px; }
-body.document-app h3 { font-size: 13px; }
-body.document-app .document-topbar { min-height: 30px; padding: 3px 6px; background: #0a246a; color: #fff; border: 2px outset #d4d0c8; border-radius: 0; box-shadow: none; backdrop-filter: none; }
-body.document-app .brand-lockup { gap: 8px; }
-body.document-app .brand-lockup .eyebrow, body.document-app .document-topbar .eyebrow, body.document-app .document-topbar .brand-name { margin: 0; color: #fff; font-size: 11px; font-weight: bold; letter-spacing: normal; }
+
+/* Windows XP + Windows 7 fusion theme: blue glass chrome with compact classic panels. */
+html { min-height: 100%; background: linear-gradient(180deg, #79b7e7 0%, #dcebf7 58%, #eef3f8 100%); }
+body.document-app { min-height: 100vh; background: linear-gradient(180deg, #79b7e7 0%, #dcebf7 58%, #eef3f8 100%); color: #18324d; font-family: Tahoma, "MS Sans Serif", Arial, sans-serif; font-size: 12px; line-height: 1.45; }
+body.document-app button, body.document-app input, body.document-app textarea, body.document-app select { font-family: Tahoma, "MS Sans Serif", Arial, sans-serif; font-size: 12px; }
+body.document-app h1, body.document-app h2, body.document-app h3 { letter-spacing: normal; line-height: 1.2; color: #18324d; }
+body.document-app h1 { font-size: 24px; }
+body.document-app h2 { font-size: 18px; }
+body.document-app h3 { font-size: 14px; }
+body.document-app .document-topbar { width: min(calc(100% - 28px), 1180px); min-height: 36px; margin: 12px auto 0; padding: 7px 11px; background: linear-gradient(180deg, #72b5eb 0%, #2d82c9 43%, #1159a7 100%); color: #fff; border: 1px solid #174e87; border-radius: 7px 7px 2px 2px; box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 2px 8px rgba(24,61,98,.35); backdrop-filter: none; }
+body.document-app .brand-lockup { gap: 9px; }
+body.document-app .brand-lockup .eyebrow, body.document-app .document-topbar .eyebrow, body.document-app .document-topbar .brand-name { margin: 0; color: #fff; font-size: 12px; font-weight: bold; letter-spacing: normal; text-shadow: 0 1px 1px #174e87; }
 body.document-app .document-topbar .brand-name { font-weight: normal; }
-body.document-app .document-shell, body.document-app #document-workspace { width: min(100%, 980px); padding: 8px 10px 24px; }
-body.document-app .document-command-bar, body.document-app #document-command-bar { top: 32px; margin-bottom: 8px; padding: 3px; gap: 4px; background: #d4d0c8; border: 1px solid #808080; border-radius: 0; box-shadow: none; backdrop-filter: none; }
-body.document-app .document-commands, body.document-app .command-group, body.document-app .document-header-meta, body.document-app .document-status-row, body.document-app .dialog-actions { gap: 4px; }
-body.document-app .project-switcher, body.document-app .compact-control { gap: 3px; color: #000; font-size: 11px; font-weight: normal; }
-body.document-app button, body.document-app .button { min-height: 22px; padding: 2px 7px; border: 2px outset #d4d0c8; border-radius: 0; background: #d4d0c8; color: #000; box-shadow: none; font-weight: normal; line-height: 1.2; }
-body.document-app button:hover:not(:disabled), body.document-app .button:hover:not(:disabled) { background: #d4d0c8; color: #000; }
-body.document-app button:active:not(:disabled), body.document-app .button:active:not(:disabled) { border-style: inset; }
-body.document-app .button-primary, body.document-app .button-secondary, body.document-app .button-quiet { background: #d4d0c8; color: #000; }
-body.document-app button:disabled, body.document-app .button:disabled, body.document-app [aria-disabled="true"] { color: #808080; opacity: 1; }
-body.document-app select, body.document-app input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]), body.document-app textarea { min-height: 22px; padding: 2px 3px; border: 2px inset #fff; border-radius: 0; background: #fff; color: #000; box-shadow: none; }
-body.document-app textarea { min-height: 72px; }
-body.document-app select:focus, body.document-app input:focus, body.document-app textarea:focus { border-color: #000; box-shadow: none; }
-body.document-app button:focus-visible, body.document-app .button:focus-visible, body.document-app select:focus-visible, body.document-app input:focus-visible, body.document-app textarea:focus-visible, body.document-app summary:focus-visible { outline: 1px dotted #000; outline-offset: 0; }
-body.document-app .eyebrow { margin-bottom: 3px; color: #000080; font-size: 10px; font-weight: bold; letter-spacing: normal; }
-body.document-app .muted, body.document-app .hint, body.document-app .document-meta, body.document-app .document-root { color: #404040; }
-body.document-app .document-header { margin: 0 0 6px; padding: 7px; border: 2px groove #d4d0c8; background: #fff; }
+body.document-app .document-shell, body.document-app #document-workspace { width: min(calc(100% - 28px), 1180px); padding: 8px 12px 30px; background: linear-gradient(180deg, #f8fbfe 0%, #e7eff7 100%); border: 1px solid #90aac2; border-top: 0; border-radius: 0 0 7px 7px; box-shadow: 0 3px 12px rgba(35,74,112,.28); }
+body.document-app .document-command-bar, body.document-app #document-command-bar { top: 50px; margin-bottom: 12px; padding: 5px 7px; gap: 6px; background: linear-gradient(180deg, #fff 0%, #e7edf4 100%); border: 1px solid #9aafc4; border-radius: 4px; box-shadow: inset 0 1px 0 #fff, 0 1px 4px rgba(35,74,112,.2); backdrop-filter: none; }
+body.document-app .document-commands, body.document-app .command-group, body.document-app .document-header-meta, body.document-app .document-status-row, body.document-app .dialog-actions { gap: 6px; }
+body.document-app .project-switcher, body.document-app .compact-control { gap: 4px; color: #315270; font-size: 11px; font-weight: bold; }
+body.document-app button, body.document-app .button { min-height: 25px; padding: 4px 10px; border: 1px solid #7f9db9; border-radius: 3px; background: linear-gradient(180deg, #fff 0%, #e7eef5 47%, #cbd9e6 100%); color: #18324d; box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 2px rgba(35,74,112,.22); font-weight: bold; line-height: 1.2; text-shadow: 0 1px #fff; }
+body.document-app button:hover:not(:disabled), body.document-app .button:hover:not(:disabled) { border-color: #4c8dcc; background: linear-gradient(180deg, #fff 0%, #e5f2ff 47%, #b9d5ed 100%); color: #0d3862; }
+body.document-app button:active:not(:disabled), body.document-app .button:active:not(:disabled) { box-shadow: inset 0 2px 3px rgba(35,74,112,.28); }
+body.document-app .button-primary, body.document-app .button-secondary { border-color: #174e87; background: linear-gradient(180deg, #79b9ed 0%, #2d82c9 47%, #145aa6 100%); color: #fff; text-shadow: 0 -1px #174e87; }
+body.document-app .button-primary:hover:not(:disabled), body.document-app .button-secondary:hover:not(:disabled) { background: linear-gradient(180deg, #9cccf2 0%, #4b98d4 47%, #1b66b4 100%); color: #fff; }
+body.document-app .button-quiet { color: #18324d; }
+body.document-app button:disabled, body.document-app .button:disabled, body.document-app [aria-disabled="true"] { color: #8092a5; opacity: .72; }
+body.document-app select, body.document-app input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]), body.document-app textarea { min-height: 25px; padding: 4px 6px; border: 1px solid #7f9db9; border-radius: 2px; background: #fff; color: #18324d; box-shadow: inset 0 1px 2px rgba(35,74,112,.16); }
+body.document-app textarea { min-height: 82px; }
+body.document-app select:focus, body.document-app input:focus, body.document-app textarea:focus { border-color: #2b78c5; box-shadow: 0 0 0 2px rgba(43,120,197,.25), inset 0 1px 2px rgba(35,74,112,.16); }
+body.document-app button:focus-visible, body.document-app .button:focus-visible, body.document-app select:focus-visible, body.document-app input:focus-visible, body.document-app textarea:focus-visible, body.document-app summary:focus-visible { outline: 1px dotted #173b61; outline-offset: 1px; }
+body.document-app .eyebrow { margin-bottom: 3px; color: #1766a8; font-size: 10px; font-weight: bold; letter-spacing: normal; }
+body.document-app .muted, body.document-app .hint, body.document-app .document-meta, body.document-app .document-root { color: #5c7186; }
+body.document-app .document-header { margin: 0 0 7px; padding: 10px; border: 1px solid #abc0d4; border-radius: 5px; background: linear-gradient(180deg, #fff 0%, #edf4fa 100%); box-shadow: inset 0 1px 0 #fff, 0 1px 4px rgba(35,74,112,.16); }
 body.document-app .document-header-meta { padding-top: 0; }
-body.document-app .document-count, body.document-app .status-pill { border: 1px solid #808080; border-radius: 0; padding: 2px 5px; background: #d4d0c8; color: #000; font-size: 10px; font-weight: normal; }
-body.document-app .document-status-row { min-height: 24px; padding: 3px 4px; border-bottom: 1px solid #808080; }
-body.document-app .document-canvas, body.document-app #block-canvas { gap: 10px; padding-top: 8px; }
-body.document-app .block-section { gap: 5px; }
-body.document-app .block-section-header { gap: 5px; padding: 0 3px; }
-body.document-app .block-section-header input { padding: 2px; background: #fff; font-size: 13px; font-weight: bold; }
-body.document-app .block-list { gap: 7px; }
-body.document-app .document-block, body.document-app .content-block-card { gap: 6px; padding: 6px; border: 1px solid #808080; border-radius: 0; background: #fff; }
-body.document-app .document-block:focus-within, body.document-app .content-block-card:focus-within { border-color: #316ac5; }
-body.document-app .document-block > header strong, body.document-app .content-block-header strong { color: #404040; font-size: 10px; font-weight: bold; letter-spacing: normal; }
-body.document-app .content-block-actions { gap: 3px; opacity: 1; }
-body.document-app .content-block-actions .button { padding: 2px 5px; font-size: 10px; }
-body.document-app .text-block textarea, body.document-app .block-text-editor textarea, body.document-app .rich-text-editor { min-height: 80px; padding: 2px; background: #fff; font-size: 13px; line-height: 1.4; }
-body.document-app .rich-text-editor a { color: #0000ee; }
-body.document-app .rich-text-toolbar { gap: 2px; padding: 2px; border: 2px outset #d4d0c8; border-radius: 0; background: #404040; color: #fff; box-shadow: none; }
-body.document-app .rich-text-toolbar-main, body.document-app .rich-text-link-form { gap: 2px; }
-body.document-app .rich-text-toolbar button { min-width: 24px; min-height: 22px; padding: 2px 5px; border: 2px outset #d4d0c8; border-radius: 0; background: #d4d0c8; color: #000; }
-body.document-app .rich-text-toolbar button:hover, body.document-app .rich-text-toolbar button[aria-pressed="true"] { background: #d4d0c8; color: #000; }
+body.document-app .document-count, body.document-app .status-pill { border: 1px solid #a1b8ce; border-radius: 10px; padding: 3px 8px; background: linear-gradient(180deg, #fff 0%, #dcebf7 100%); color: #1b527f; font-size: 10px; font-weight: bold; }
+body.document-app .document-status-row { min-height: 25px; padding: 4px 5px; border-bottom: 1px solid #a5bbcf; }
+body.document-app .document-canvas, body.document-app #block-canvas { gap: 12px; padding-top: 9px; }
+body.document-app .block-section { gap: 6px; }
+body.document-app .block-section-header { gap: 6px; padding: 0 4px; }
+body.document-app .block-section-header input { padding: 4px; background: #fff; font-size: 15px; font-weight: bold; }
+body.document-app .block-list { gap: 8px; }
+body.document-app .document-block, body.document-app .content-block-card { gap: 7px; padding: 8px; border: 1px solid #b0c3d6; border-radius: 4px; background: #fff; box-shadow: 0 1px 3px rgba(35,74,112,.12); }
+body.document-app .document-block:focus-within, body.document-app .content-block-card:focus-within { border-color: #5b9bd4; box-shadow: 0 0 0 1px rgba(91,155,212,.22), 0 1px 3px rgba(35,74,112,.12); }
+body.document-app .document-block > header strong, body.document-app .content-block-header strong { color: #52708e; font-size: 10px; font-weight: bold; letter-spacing: normal; }
+body.document-app .content-block-actions { gap: 4px; opacity: 1; }
+body.document-app .content-block-actions .button { padding: 3px 7px; font-size: 10px; }
+body.document-app .text-block textarea, body.document-app .block-text-editor textarea, body.document-app .rich-text-editor { min-height: 82px; padding: 4px; background: #fff; color: #18324d; font-size: 14px; line-height: 1.5; }
+body.document-app .rich-text-editor a { color: #0645ad; }
+body.document-app .rich-text-toolbar { gap: 3px; padding: 3px; border: 1px solid #1f1f1f; border-radius: 4px; background: linear-gradient(180deg, #565656 0%, #2d2d2d 100%); color: #fff; box-shadow: 0 3px 10px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.15); }
+body.document-app .rich-text-toolbar-main, body.document-app .rich-text-link-form { gap: 3px; }
+body.document-app .rich-text-toolbar button { min-width: 26px; min-height: 24px; padding: 3px 7px; border: 1px solid #111; border-radius: 2px; background: linear-gradient(180deg, #f5f5f5 0%, #c9c9c9 100%); color: #202020; box-shadow: inset 0 1px 0 #fff, 0 1px 1px #111; text-shadow: 0 1px #fff; }
+body.document-app .rich-text-toolbar button:hover, body.document-app .rich-text-toolbar button[aria-pressed="true"] { background: linear-gradient(180deg, #fff 0%, #e0e0e0 100%); color: #000; }
 body.document-app .rich-text-toolbar label { color: #fff; font-size: 11px; }
-body.document-app .rich-text-toolbar input { width: min(220px, 48vw); padding: 2px 3px; border: 2px inset #fff; border-radius: 0; background: #fff; color: #000; }
+body.document-app .rich-text-toolbar input { width: min(220px, 48vw); padding: 4px 5px; border: 1px solid #7f9db9; border-radius: 2px; background: #fff; color: #18324d; }
 body.document-app .rich-text-toolbar .rich-text-link-error { color: #ffb0b0; font-size: 10px; }
-body.document-app .video-block-card, body.document-app .inline-video-block { gap: 8px; padding: 8px; border: 2px groove #d4d0c8; border-radius: 0; background: #fff; box-shadow: none; }
-body.document-app .video-block-card:focus-within, body.document-app .inline-video-block:focus-within { border-color: #316ac5; }
-body.document-app .inline-video-header { gap: 6px; }
-body.document-app .inline-video-title strong { font-size: 13px; }
-body.document-app .inline-video-title span, body.document-app .inline-video-side h3 { color: #404040; font-size: 11px; }
-body.document-app .inline-video-actions, body.document-app .inline-video-controls { gap: 3px; }
-body.document-app .inline-video-actions .button, body.document-app .inline-video-controls .button { padding: 2px 5px; font-size: 10px; }
-body.document-app .inline-video-grid { gap: 6px; }
-body.document-app .inline-video-side { padding: 6px; border: 1px solid #808080; border-radius: 0; background: #d4d0c8; }
-body.document-app .inline-video-block[data-frame-selected="true"] { outline: 2px solid #316ac5; outline-offset: 1px; box-shadow: none; }
-body.document-app .inline-video-frame { border: 2px inset #fff; border-radius: 0; background: #000; }
-body.document-app .inline-frame-placeholder { color: #fff; font-size: 11px; }
-body.document-app .inline-video-status, body.document-app .inline-frame-player-status { color: #404040; font-size: 10px; }
-body.document-app .inline-video-status[data-state="loaded"], body.document-app .inline-frame-player-status[data-state="loaded"] { color: #006400; }
-body.document-app .inline-video-status[data-state="error"], body.document-app .inline-frame-player-status[data-state="error"] { color: #800000; }
-body.document-app .inline-video-seek, body.document-app .inline-frame-timeline, body.document-app .inline-frame-rate-slider { accent-color: #0a246a; }
-body.document-app .inline-frame-navigation > button { border: 2px outset #d4d0c8; border-radius: 0; background: #d4d0c8; }
-body.document-app .inline-frame-rate-input, body.document-app .inline-frame-rate-reset { border-radius: 0; }
-body.document-app .inline-frame-rate-reset { width: 24px; min-width: 24px; height: 22px; border: 2px outset #d4d0c8; background: #d4d0c8; font-size: 13px; }
-body.document-app .inline-video-details { border-top: 1px solid #808080; padding-top: 6px; }
-body.document-app .inline-video-details summary { color: #000080; font-size: 11px; font-weight: bold; }
-body.document-app .block-insert-actions { gap: 3px; margin: -3px 0; opacity: 1; }
-body.document-app .block-insert-actions::before { background: #808080; }
-body.document-app .block-insert-actions .button { border: 2px outset #d4d0c8; padding: 2px 5px; background: #d4d0c8; color: #000; font-size: 10px; }
-body.document-app .block-config-grid { gap: 6px; padding-top: 6px; }
-body.document-app .block-config-grid > label, body.document-app .video-side-config label { gap: 2px; color: #404040; font-size: 11px; font-weight: normal; }
-body.document-app .video-side-configs { gap: 6px; }
-body.document-app .video-side-config { gap: 5px; padding: 6px; border: 1px solid #808080; border-radius: 0; background: #d4d0c8; }
-body.document-app .video-side-config legend { color: #000; font-size: 11px; font-weight: bold; }
-body.document-app .block-inline-fields { gap: 4px; }
-body.document-app .empty-document { min-height: 50vh; padding: 24px 12px; }
-body.document-app .empty-document p:not(.eyebrow) { margin-bottom: 12px; color: #404040; }
-body.document-app .empty-state { padding: 12px 4px; color: #404040; }
-body.document-app .app-error { margin: 6px auto 0; padding: 5px 7px; color: #800000; background: #fff; border: 1px solid #800000; border-radius: 0; }
-body.document-app .save-state, body.document-app .export-directory-status, body.document-app .export-status { color: #404040; font-size: 10px; }
-body.document-app .save-state[data-state="error"], body.document-app .export-status[data-state="failed"], body.document-app .export-status[data-state="cancelled"] { color: #800000; }
-body.document-app .save-state[data-state="dirty"], body.document-app .export-status[data-state="running"], body.document-app .export-status[data-state="cancelling"] { color: #000080; }
-body.document-app .export-status[data-state="completed"] { color: #006400; }
-body.document-app dialog { padding: 0; border: 2px outset #d4d0c8; border-radius: 0; background: #d4d0c8; box-shadow: none; }
-body.document-app dialog::backdrop { background: rgba(0, 0, 0, .35); }
-body.document-app .dialog-card { width: min(520px, calc(100vw - 24px)); padding: 10px; gap: 5px; background: #d4d0c8; }
-body.document-app .import-preview { max-height: 260px; margin: 0; padding: 5px; border: 2px inset #fff; border-radius: 0; background: #fff; color: #000; font: 11px/1.35 "Courier New", monospace; }
-body.document-app a { color: #0000ee; }
+body.document-app .video-block-card, body.document-app .inline-video-block { gap: 9px; padding: 10px; border: 1px solid #8faac3; border-radius: 6px; background: linear-gradient(180deg, #fff 0%, #edf4fa 100%); box-shadow: 0 2px 6px rgba(35,74,112,.18), inset 0 1px 0 #fff; }
+body.document-app .video-block-card:focus-within, body.document-app .inline-video-block:focus-within { border-color: #4d91cb; }
+body.document-app .inline-video-header { gap: 7px; }
+body.document-app .inline-video-title strong { color: #18324d; font-size: 14px; }
+body.document-app .inline-video-title span, body.document-app .inline-video-side h3 { color: #5c7186; font-size: 11px; }
+body.document-app .inline-video-actions, body.document-app .inline-video-controls { gap: 4px; }
+body.document-app .inline-video-actions .button, body.document-app .inline-video-controls .button { padding: 3px 7px; font-size: 10px; }
+body.document-app .inline-video-grid { gap: 7px; }
+body.document-app .inline-video-side { padding: 7px; border: 1px solid #abc0d4; border-radius: 4px; background: linear-gradient(180deg, #f7fbff 0%, #e5eef6 100%); }
+body.document-app .inline-video-block[data-frame-selected="true"] { outline: 2px solid #2b78c5; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(43,120,197,.2), 0 2px 8px rgba(35,74,112,.24); }
+body.document-app .inline-video-frame { border: 1px solid #5d7891; border-radius: 4px; background: #101820; box-shadow: inset 0 1px 3px rgba(0,0,0,.45); }
+body.document-app .inline-frame-placeholder { color: #e5f2ff; font-size: 11px; }
+body.document-app .inline-video-status, body.document-app .inline-frame-player-status { color: #5c7186; font-size: 10px; }
+body.document-app .inline-video-status[data-state="loaded"], body.document-app .inline-frame-player-status[data-state="loaded"] { color: #176b42; }
+body.document-app .inline-video-status[data-state="error"], body.document-app .inline-frame-player-status[data-state="error"] { color: #9b2d2d; }
+body.document-app .inline-video-seek, body.document-app .inline-frame-timeline, body.document-app .inline-frame-rate-slider, body.document-app input[type="range"] { accent-color: #1769ad; }
+body.document-app .inline-frame-navigation > button { border: 1px solid #7f9db9; border-radius: 3px; background: linear-gradient(180deg, #fff 0%, #e7eef5 47%, #cbd9e6 100%); }
+body.document-app .inline-frame-rate-input, body.document-app .inline-frame-rate-reset { border-radius: 2px; }
+body.document-app .inline-frame-rate-reset { width: 25px; min-width: 25px; height: 24px; border: 1px solid #7f9db9; background: linear-gradient(180deg, #fff 0%, #e7eef5 47%, #cbd9e6 100%); font-size: 14px; }
+body.document-app .inline-video-details { border-top: 1px solid #abc0d4; padding-top: 7px; }
+body.document-app .inline-video-details summary { color: #1766a8; font-size: 11px; font-weight: bold; }
+body.document-app .block-insert-actions { gap: 4px; margin: -4px 0; opacity: 1; }
+body.document-app .block-insert-actions::before { background: #9bb1c7; }
+body.document-app .block-insert-actions .button { border: 1px solid #9aafc4; padding: 3px 7px; background: linear-gradient(180deg, #fff 0%, #e7eef5 100%); color: #315270; font-size: 10px; }
+body.document-app .block-config-grid { gap: 7px; padding-top: 7px; }
+body.document-app .block-config-grid > label, body.document-app .video-side-config label { gap: 3px; color: #52708e; font-size: 11px; font-weight: bold; }
+body.document-app .video-side-configs { gap: 7px; }
+body.document-app .video-side-config { gap: 6px; padding: 7px; border: 1px solid #abc0d4; border-radius: 4px; background: linear-gradient(180deg, #f7fbff 0%, #e5eef6 100%); }
+body.document-app .video-side-config legend { color: #315270; font-size: 11px; font-weight: bold; }
+body.document-app .block-inline-fields { gap: 5px; }
+body.document-app .empty-document { min-height: 50vh; padding: 34px 16px; }
+body.document-app .empty-document p:not(.eyebrow) { margin-bottom: 15px; color: #52708e; }
+body.document-app .empty-state { padding: 14px 5px; color: #52708e; }
+body.document-app .app-error { margin: 7px auto 0; padding: 6px 8px; color: #8b2424; background: #fff5f5; border: 1px solid #d28a8a; border-radius: 3px; box-shadow: 0 1px 3px rgba(35,74,112,.12); }
+body.document-app .save-state, body.document-app .export-directory-status, body.document-app .export-status { color: #5c7186; font-size: 10px; }
+body.document-app .save-state[data-state="error"], body.document-app .export-status[data-state="failed"], body.document-app .export-status[data-state="cancelled"] { color: #9b2d2d; }
+body.document-app .save-state[data-state="dirty"], body.document-app .export-status[data-state="running"], body.document-app .export-status[data-state="cancelling"] { color: #1766a8; }
+body.document-app .export-status[data-state="completed"] { color: #176b42; }
+body.document-app dialog { padding: 0; border: 1px solid #6e8eaa; border-radius: 6px; background: linear-gradient(180deg, #f9fcff 0%, #e5eef6 100%); box-shadow: 0 8px 28px rgba(24,61,98,.4); }
+body.document-app dialog::backdrop { background: rgba(20,57,92,.38); }
+body.document-app .dialog-card { width: min(520px, calc(100vw - 28px)); padding: 14px; gap: 6px; }
+body.document-app .import-preview { max-height: 270px; margin: 0; padding: 6px; border: 1px solid #7f9db9; border-radius: 2px; background: #fff; color: #18324d; font: 11px/1.4 "Courier New", monospace; }
+body.document-app a { color: #0645ad; }
 body.document-app a:visited { color: #551a8b; }
-body.document-app input[type="range"] { accent-color: #0a246a; }
 @media (max-width: 760px) {
-  body.document-app .document-command-bar, body.document-app #document-command-bar { top: 60px; }
-  body.document-app .document-shell, body.document-app #document-workspace { padding-inline: 6px; }
+  body.document-app .document-topbar { width: calc(100% - 16px); margin-top: 8px; }
+  body.document-app .document-command-bar, body.document-app #document-command-bar { top: 52px; }
+  body.document-app .document-shell, body.document-app #document-workspace { width: calc(100% - 16px); padding-inline: 7px; }
 }
 @media (max-width: 520px) {
-  body.document-app .document-command-bar, body.document-app #document-command-bar { margin-bottom: 8px; }
-  body.document-app .dialog-card { padding: 8px; }
+  body.document-app .document-command-bar, body.document-app #document-command-bar { margin-bottom: 9px; }
+  body.document-app .dialog-card { padding: 10px; }
 }
