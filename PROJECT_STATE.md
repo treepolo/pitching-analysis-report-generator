@@ -239,3 +239,9 @@
 - 既有輸出 DOM/data attributes、原生影片、播放／逐幀／速度／重設／循環、點選與鍵盤機制未修改；完整回歸為 166 tests / 165 pass / 0 fail / 1 個既有 automated Electron `file://` harness 明確 skip。
 - 另以真實專案內 MP4 產生 QA 報告，經 Electron Chromium 直接從 `file://` 載入；1260×900 為左右雙欄，390×844 自動上下堆疊，兩者皆無水平溢出或外部資源請求，點選播放器仍使外層 `data-frame-selected` 變為 `true`。
 - Wave 26 計畫、檢核與證據位於 `WAVE_26_EXPORT_XP7_READER_PLAN.md`；專案內 `.tmp` QA 產物不進 Git，使用者既有 `AGENTS.md` 與 `測試輸出/` 變更不納入本 checkpoint。
+
+## Wave 26 follow-up 單影片來源標題列移除（2026-08-29）
+
+- 單影片播放區塊不再渲染可見的「來源標題」列，因此不保留該列的垂直空間；產生器與輸出 HTML 行為一致。
+- 雙影片左右來源標題仍保留；來源標題資料欄位與無障礙標籤仍可用，播放器點選、播放、逐幀、速度與循環機制未改動。
+- 聚焦播放器／輸出測試 19 pass、0 fail、1 個既有 Electron `file://` runtime skip；完整 `npm test` 為 166 pass、0 fail、1 skip。

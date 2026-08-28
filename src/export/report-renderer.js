@@ -245,13 +245,14 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     : '';
   const segmentOut = settings.segment.out > 0 ? String(settings.segment.out) : '';
   const sideLabel = side === 'left' ? '左側' : side === 'right' ? '右側' : '影片';
+  const sideHeading = comparison ? '<div class="portable-player-side-heading"><h3>' + escapeHtml(label) + '</h3></div>' : '';
   const metadata = frameMetadataAttributes(asset);
   return '<div class="portable-player-side native-frame-player-side" data-native-frame-player data-player-side="' + escapeHtml(side) + '" tabindex="-1" aria-selected="false" data-frame-selected="false"'
     + ' data-segment-in="' + escapeHtml(String(settings.segment.in)) + '"'
     + ' data-segment-out="' + escapeHtml(segmentOut) + '"'
     + ' data-loop-enabled="' + (settings.loop.enabled ? 'true' : 'false') + '"'
     + metadata.fpsAttribute + metadata.frameCountAttribute + metadata.frameTimesAttribute + '>'
-    + '<div class="portable-player-side-heading"><h3>' + escapeHtml(label) + '</h3></div>'
+    + sideHeading
     + '<div class="portable-frame-surface" data-frame-surface tabindex="-1" aria-label="' + escapeHtml(sideLabel + '影格畫面') + '">'
     + '<video playsinline preload="metadata" data-player-video src="' + escapeHtml(encodeAssetPath(asset.relativePath)) + '"' + poster + '>'
     + '此瀏覽器不支援內嵌影片。'
@@ -425,6 +426,7 @@ function renderFramePlayerSide(block, side, frameBinding, comparison) {
   const label = sideTitle(block, side, asset);
   const firstFrame = cache.frames[0];
   const sideLabel = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
+  const sideHeading = comparison ? `<div class="portable-player-side-heading"><h3>${escapeHtml(label)}</h3></div>` : '';
   const segmentOut = settings.segment.out > 0 ? String(settings.segment.out) : '';
   return `<div class="portable-player-side portable-frame-side" data-player-side="${side}"
     data-segment-in="${escapeHtml(String(settings.segment.in))}"
@@ -434,7 +436,7 @@ function renderFramePlayerSide(block, side, frameBinding, comparison) {
     data-frame-index-path="${escapeHtml(cache.cache.indexRelativePath)}"
     data-frame-count="${cache.frames.length}"
     data-frame-fps="${escapeHtml(String(cache.fps ?? cache.metadata?.fps ?? cache.metadata?.averageFps ?? 30))}">
-    <div class="portable-player-side-heading"><h3>${escapeHtml(label)}</h3></div>
+    ${sideHeading}
     <div class="portable-frame-surface" data-frame-surface tabindex="-1" aria-label="${escapeHtml(`${sideLabel}影格畫面`)}">
       <img data-player-frame data-inline-frame src="${escapeHtml(encodeAssetPath(firstFrame.relativePath))}" alt="${escapeHtml(`${label}目前影格`)}">
       <span data-frame-placeholder hidden>尚未準備影格</span>

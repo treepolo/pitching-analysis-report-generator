@@ -154,7 +154,7 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
   assert.match(folderHtml, /supportsNativeRate/u);
   assert.match(folderHtml, /setSharedManual/u);
   assert.match(folderHtml, /<h3>Synthetic pitch<\/h3>/u);
-  assert.match(folderHtml, /<h3>Synthetic source<\/h3>/u);
+  assert.doesNotMatch(folderHtml, /<div class="portable-player-side-heading"><h3>Synthetic source<\/h3><\/div>/u);
   assert.match(folderHtml, /data-frame-rate-input[^>]+min="0\.015625"[^>]+max="64"/u);
   assert.match(folderHtml, /requestVideoFrameCallback/u);
   assert.match(folderHtml, /currentTime/u);

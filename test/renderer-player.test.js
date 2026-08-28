@@ -93,6 +93,8 @@ test('document shell exposes the frozen block-editor DOM contract', () => {
   assert.match(renderer, /sourceLabel: asset\?\.displayName/u);
   assert.match(renderer, /block\.sourceLabel = typeof block\.left\?\.label/u);
   assert.match(renderer, /data-inline-side-title/u);
+  assert.match(renderer, /const sideHeading = side === 'single' \? '' :/u);
+  assert.match(renderer, /\$\{sideHeading\}/u);
   assert.match(renderer, /elements\.blockCanvas\?\.addEventListener\('click'/u);
   assert.match(renderer, /function safeInlineMediaSourceUrl\(source\)/u);
   assert.match(renderer, /parsed\.protocol !== 'file:'/u);

@@ -75,6 +75,39 @@ test('fails before rendering when a block contains an empty asset reference', ()
   );
 });
 
+test('removes the single-video source-title row while keeping dual-video side titles', () => {
+  const singleHtml = renderReportHtml({
+    schemaVersion: 1,
+    title: 'Single source title row',
+    sections: [{
+      blocks: [{ type: 'singleVideo', mediaAssetId: 'pitch', sourceLabel: '來源標題' }],
+    }],
+  }, {
+    assetManifest: [{ id: 'pitch', kind: 'video', relativePath: 'videos/pitch.mp4' }],
+  });
+  assert.doesNotMatch(singleHtml, /<div class="portable-player-side-heading">/u);
+  assert.match(singleHtml, /data-player-side="single"/u);
+
+  const dualHtml = renderReportHtml({
+    schemaVersion: 1,
+    title: 'Dual source titles',
+    sections: [{
+      blocks: [{
+        type: 'comparisonVideo',
+        left: { mediaAssetId: 'left', label: '正面' },
+        right: { mediaAssetId: 'right', label: '側面' },
+      }],
+    }],
+  }, {
+    assetManifest: [
+      { id: 'left', kind: 'video', relativePath: 'videos/left.mp4' },
+      { id: 'right', kind: 'video', relativePath: 'videos/right.mp4' },
+    ],
+  });
+  assert.match(dualHtml, /<div class="portable-player-side-heading"><h3>正面<\/h3><\/div>/u);
+  assert.match(dualHtml, /<div class="portable-player-side-heading"><h3>側面<\/h3><\/div>/u);
+});
+
 test('renders independent video playback, loop, and comparison layout settings into portable controls', () => {
   const html = renderReportHtml({
     schemaVersion: 1,

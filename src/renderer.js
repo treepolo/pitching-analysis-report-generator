@@ -1125,9 +1125,10 @@ function renderFramePlayerControls(label, { shared = false, block = null } = {})
 function renderInlineVideoSide(block, side, { playerCard = false, sideControls = false } = {}) {
   const title = playerSideTitle(block, side);
   const escapedTitle = escapeHtml(title);
+  const sideHeading = side === 'single' ? '' : `<h3 data-inline-side-title>${escapedTitle}</h3>`;
   return `
     <div class="inline-video-side" data-inline-side="${side}">
-      <h3 data-inline-side-title>${escapedTitle}</h3>
+      ${sideHeading}
       <div class="inline-video-frame inline-frame-surface" data-frame-surface tabindex="0" aria-label="${escapedTitle}影格畫面">
         <video data-inline-video preload="auto" playsinline aria-label="${escapedTitle}影片"></video>
         <span class="inline-frame-placeholder" data-frame-placeholder>正在載入第一幀…</span>
