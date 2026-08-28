@@ -1,3 +1,12 @@
+## Current Wave 25 generator-only XP-to-Windows-7 visual retrofit (2026-08-29)
+
+- User-selected direction: an authentic 2008–2011 transition-era desktop product that originated on Windows XP and was updated for Windows 7; no modern SaaS/card visual language.
+- Scope is generator-only. `src/index.html` loads `src/generator-xp7.css` after the structural stylesheet; no file under `src/export/` changed, and `src/export/report-renderer.js` retains baseline SHA-256 `71112C22D6233622067D6604D6D3B523C383966DA7EBC4A4323FE8AF9301EDAF`.
+- The theme covers title chrome, compact toolbars, classic menus/buttons/fields, work surfaces, document and video panels, status states, rich-text toolbar, dialogs, focus states, forced colors, and narrow-window rules while retaining every existing command and workflow.
+- Evidence: 9/9 focused UI tests pass; full `npm test` reports 163 total / 162 pass / 0 fail / 1 explicit exported `file://` Electron-runtime unavailable skip. Live Electron capture showed no horizontal overflow and all primary controls visible at 1270×794 and 871×574 content viewports; the minimum-size new-document dialog was unclipped.
+- Existing `scripts/run-electron-smoke.ps1` remains red at `autosaved section content did not persist`: its smoke code assigns `.value` to the rich-text `contenteditable` element. That stale assignment is present in pre-wave `HEAD`; Wave 25 does not change renderer or autosave behavior.
+- Detailed plan, progress, and evidence are recorded in `WAVE_25_GENERATOR_XP7_UI_PLAN.md`.
+
 ## Current Wave 22 project-local generated artifacts (2026-08-25)
 
 - Internal runtime, test, browser/Electron profiles, logs, harnesses, and temporary staging must remain under the project .tmp/ or .runtime/ directories. The selected export destination may still be external when it is the intentional final folder/ZIP delivery location; no internal staging is created there.
