@@ -88,20 +88,20 @@ body.document-app button:focus-visible, body.document-app .button:focus-visible,
 body.document-app .eyebrow { margin-bottom: 3px; color: #245b89; font-size: 10px; font-weight: bold; letter-spacing: normal; text-transform: none; }
 body.document-app .muted, body.document-app .hint, body.document-app .document-meta, body.document-app .document-root { color: var(--xp7-muted); }
 
-body.document-app .document-editor { width: min(100%, 1040px); margin: 0 auto; padding: 7px; border: 1px solid var(--xp7-shadow); background: var(--xp7-face-light); box-shadow: inset 1px 1px 0 #fff; }
+body.document-app .document-editor { width: min(100%, 1040px); margin: 0 auto; padding: 0; border: 0; background: transparent; box-shadow: none; }
 body.document-app .document-header { margin: 0 0 5px; padding: 8px 9px; border: 1px solid #9bb6cf; border-radius: 1px; background: linear-gradient(180deg, #fafdff 0%, #e6f0f8 100%); box-shadow: inset 0 1px 0 #fff; }
 body.document-app .document-header-meta { padding-top: 0; }
 body.document-app .document-count, body.document-app .status-pill { padding: 2px 6px; border: 1px solid #9bb6cf; border-radius: 1px; background: #e8f2fa; color: #24577f; font-size: 10px; font-weight: normal; }
-body.document-app .document-status-row { min-height: 25px; margin: 0 -7px; padding: 4px 7px; border-top: 1px solid #fff; border-bottom: 1px solid #a7a49a; background: var(--xp7-face); font-size: 10px; }
+body.document-app .document-status-row { min-height: 25px; margin: 0; padding: 4px 1px; border: 0; background: transparent; font-size: 10px; }
 body.document-app .document-canvas, body.document-app #block-canvas { gap: 10px; padding-top: 8px; }
-body.document-app .block-section { gap: 5px; padding: 5px; border: 1px solid #9d9a8e; background: #fff; box-shadow: inset 1px 1px 0 #fff; }
+body.document-app .block-section { gap: 5px; padding: 5px; border: 1px solid #9d9a8e; background: #fff; box-shadow: none; }
 body.document-app .block-section-header { gap: 5px; margin: -5px -5px 1px; padding: 4px 6px; border-bottom: 1px solid #7fa2c2; background: linear-gradient(180deg, #e9f4fe 0%, #c7dff2 48%, #b1d0e8 100%); }
 body.document-app .block-section-header input { padding: 2px 4px; border: 1px solid transparent; background: transparent; color: #173b5b; font-size: 13px; font-weight: bold; }
 body.document-app .block-section-header input:hover, body.document-app .block-section-header input:focus { border-color: #7f9db9; background: #fff; box-shadow: none; }
 body.document-app .block-list { gap: 7px; }
-body.document-app .document-block, body.document-app .content-block-card { gap: 6px; padding: 6px; border: 1px solid #b5b2a8; border-radius: 0; background: #fff; box-shadow: none; }
-body.document-app .document-block:focus-within, body.document-app .content-block-card:focus-within { border-color: #4d8ec5; box-shadow: 0 0 0 1px #b7d8f2; }
-body.document-app .document-block > header, body.document-app .content-block-header { min-height: 23px; margin: -6px -6px 0; padding: 3px 5px; border-bottom: 1px solid #cfccc2; background: linear-gradient(180deg, #f8f8f5 0%, #e9e7df 100%); }
+body.document-app .document-block, body.document-app .content-block-card { gap: 5px; padding: 4px 1px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+body.document-app .document-block:focus-within, body.document-app .content-block-card:focus-within { border-color: transparent; box-shadow: none; }
+body.document-app .document-block > header, body.document-app .content-block-header { min-height: 22px; margin: 0; padding: 2px 0; border: 0; background: transparent; }
 body.document-app .document-block > header strong, body.document-app .content-block-header strong { color: #475d70; font-size: 10px; font-weight: bold; letter-spacing: normal; text-transform: none; }
 body.document-app .content-block-actions { gap: 3px; opacity: 1; }
 body.document-app .content-block-actions .button { min-height: 20px; padding: 2px 6px; font-size: 10px; }
@@ -118,7 +118,7 @@ body.document-app .rich-text-toolbar label { color: #1e1e1e; font-size: 10px; }
 body.document-app .rich-text-toolbar input { width: min(220px, 48vw); padding: 3px 5px; border: 1px solid #7f9db9; border-radius: 0; background: #fff; color: #1e1e1e; }
 body.document-app .rich-text-toolbar .rich-text-link-error { color: var(--xp7-danger); font-size: 10px; }
 
-body.document-app .video-block-card, body.document-app .inline-video-block { gap: 8px; padding: 8px; border: 1px solid #8fa9c1; border-radius: 1px; background: #f6f8fa; box-shadow: inset 1px 1px 0 #fff; }
+body.document-app .video-block-card, body.document-app .inline-video-block { gap: 8px; padding: 8px; border: 1px solid #8fa9c1; border-radius: 1px; background: #f6f8fa; box-shadow: none; }
 body.document-app .video-block-card:focus-within, body.document-app .inline-video-block:focus-within { border-color: #3c7fb1; }
 body.document-app .inline-video-header { gap: 6px; padding-bottom: 4px; border-bottom: 1px solid #b9c6d1; }
 body.document-app .inline-video-title strong { color: #1f3f5b; font-size: 13px; }
@@ -126,9 +126,11 @@ body.document-app .inline-video-title span, body.document-app .inline-video-side
 body.document-app .inline-video-actions, body.document-app .inline-video-controls { gap: 3px; }
 body.document-app .inline-video-actions .button, body.document-app .inline-video-controls .button { min-height: 21px; padding: 2px 6px; font-size: 10px; }
 body.document-app .inline-video-grid { gap: 6px; }
-body.document-app .inline-video-side { padding: 6px; border: 1px solid #b1aea3; border-radius: 0; background: var(--xp7-face); box-shadow: inset 1px 1px 0 #fff; }
-body.document-app .inline-video-block[data-frame-selected="true"] { outline: 2px solid #316ac5; outline-offset: 1px; box-shadow: 0 0 0 1px #fff; }
-body.document-app .inline-video-frame { border: 2px inset #fff; border-radius: 0; background: #000; box-shadow: none; }
+body.document-app .inline-video-side { padding: 2px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+body.document-app .inline-video-grid:not([data-layout="stacked"]) .inline-video-side + .inline-video-side { padding-left: 8px; border-left: 1px solid #c2bfb5; }
+body.document-app .inline-video-grid[data-layout="stacked"] .inline-video-side + .inline-video-side { margin-top: 4px; padding-top: 8px; border-top: 1px solid #c2bfb5; }
+body.document-app .inline-video-block[data-frame-selected="true"] { border-color: #1764aa; outline: none; box-shadow: none; background: #eef6fc; }
+body.document-app .inline-video-frame { border: 1px solid #4d4d4d; border-radius: 0; background: #000; box-shadow: none; }
 body.document-app .inline-frame-surface:focus-visible { box-shadow: inset 0 0 0 2px #72aee6; }
 body.document-app .inline-frame-placeholder { color: #fff; font-size: 10px; }
 body.document-app .inline-video-status, body.document-app .inline-frame-player-status { color: #5f6d78; font-size: 9px; }
