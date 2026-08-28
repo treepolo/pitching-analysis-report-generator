@@ -627,6 +627,62 @@ function renderStyles() {
       .portable-frame-rate-row { grid-column: 1; }
       .portable-player-side-controls { grid-template-columns: minmax(0, 1fr) max-content; }
     }
+
+    /* Windows XP Classic theme: the portable report uses the same editor-era controls. */
+    :root { color-scheme: light; font-family: Tahoma, "MS Sans Serif", Arial, sans-serif; }
+    html { background: #d4d0c8; }
+    body { background: #d4d0c8; color: #000; font: 11px/1.35 Tahoma, "MS Sans Serif", Arial, sans-serif; }
+    main { width: min(100% - 1rem, 980px); padding: 8px 0 24px; }
+    .report-header { margin: 0 0 8px; padding: 4px 6px; background: #0a246a; color: #fff; border: 2px outset #d4d0c8; border-radius: 0; }
+    .report-header .eyebrow { margin: 0; color: #fff; font-size: 10px; font-weight: bold; letter-spacing: normal; }
+    .report-header h1 { margin: 0; color: #fff; font-size: 18px; line-height: 1.2; }
+    h1, h2, h3, h4 { line-height: 1.2; letter-spacing: normal; }
+    h2 { margin: 0 0 6px; font-size: 15px; }
+    h3 { margin: 0 0 5px; font-size: 13px; }
+    h4 { margin: 7px 0 3px; font-size: 12px; }
+    .report-section { margin: 0 0 8px; padding: 8px; border: 2px groove #d4d0c8; border-radius: 0; background: #fff; box-shadow: none; }
+    .report-text { line-height: 1.4; }
+    .muted, figcaption { color: #404040; font-size: 10px; }
+    .report-media { margin: 6px 0 0; }
+    .report-media video, .report-media img { border: 2px inset #fff; border-radius: 0; background: #000; }
+    .report-media img { background: #d4d0c8; }
+    .comparison-media { gap: 6px; }
+    .portable-player { padding: 8px; border: 2px groove #d4d0c8; border-radius: 0; background: #fff; box-shadow: none; }
+    .portable-player-header, .portable-player-side-heading, .portable-player-actions { gap: 5px; }
+    .portable-player-header { margin-bottom: 6px; }
+    .portable-player-header h3, .portable-player-side-heading h3 { margin: 0; }
+    .portable-player-grid { gap: 6px; }
+    .portable-player-side { padding: 6px; border: 1px solid #808080; border-radius: 0; background: #d4d0c8; }
+    .portable-player[data-frame-selected="true"] { outline: 2px solid #316ac5; outline-offset: 1px; box-shadow: none; }
+    .portable-player-side-heading { margin-bottom: 4px; }
+    .portable-player-side-heading h3 { font-size: 12px; }
+    .portable-player-side-heading span { color: #404040; font-size: 10px; }
+    .portable-frame-surface { min-height: 160px; border: 2px inset #fff; border-radius: 0; background: #000; }
+    .portable-frame-side-status, .portable-frame-fallback { margin: 4px 0 0; color: #404040; font-size: 10px; }
+    .portable-frame-controls { column-gap: 4px; row-gap: 4px; margin-top: 6px; }
+    .portable-frame-controls button, .portable-player-rate-row button, .portable-frame-rate-row button, .portable-player-actions button { padding: 2px 5px; border: 2px outset #d4d0c8; border-radius: 0; background: #d4d0c8; color: #000; font: 11px Tahoma, "MS Sans Serif", Arial, sans-serif; }
+    .portable-frame-controls button:active, .portable-player-rate-row button:active, .portable-frame-rate-row button:active, .portable-player-actions button:active { border-style: inset; }
+    .portable-frame-controls button:hover, .portable-player-rate-row button:hover, .portable-frame-rate-row button:hover, .portable-player-actions button:hover { background: #d4d0c8; }
+    .portable-frame-controls output, .portable-player-side-controls output { color: #404040; font-size: 11px; }
+    .portable-frame-player-status { color: #404040; font-size: 10px; }
+    .portable-frame-controls .portable-frame-player-status[data-state="loaded"], .portable-frame-controls .portable-frame-player-status[data-state="pending"] { color: #404040; }
+    .portable-frame-controls .portable-frame-player-status[data-state="error"] { color: #800000; }
+    .portable-player-loop, .portable-frame-loop, .portable-player-side-controls label { color: #000; font-size: 10px; }
+    .portable-player-side-controls { gap: 4px; margin-top: 5px; }
+    .portable-player-rate-row { gap: 4px; }
+    .portable-player-rate-input { flex-basis: 4.5rem; width: 4.5rem; }
+    .portable-player-rate-reset, .portable-frame-rate-row button { width: 24px; height: 22px; min-height: 22px; border-radius: 0 !important; font-size: 13px; }
+    .portable-frame-rate-row input[type="number"] { flex-basis: 4.5rem; width: 4.5rem; }
+    input, select, textarea { font: 11px Tahoma, "MS Sans Serif", Arial, sans-serif; }
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { min-height: 22px; padding: 2px 3px; border: 2px inset #fff; border-radius: 0; background: #fff; color: #000; box-shadow: none; }
+    input[type="range"] { accent-color: #0a246a; }
+    input:focus, select:focus, textarea:focus { border-color: #000; box-shadow: none; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 1px dotted #000; outline-offset: 0; }
+    @media (max-width: 700px) {
+      main { width: min(100% - .5rem, 980px); padding-top: 4px; }
+      .report-section { padding: 6px; }
+      .portable-frame-controls { gap: 4px; }
+    }
   `;
 }
 function renderFramePlayerScript() {
