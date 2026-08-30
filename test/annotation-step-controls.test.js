@@ -7,7 +7,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotation-step-controls.js'), 'utf8');
-const coordinator = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotation-editor-coordinator.js'), 'utf8');
+const shortcuts = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotation-shortcuts.js'), 'utf8');
 const index = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.html'), 'utf8');
 
 test('annotation N-frame control runtime compiles as browser JavaScript', () => {
@@ -29,11 +29,12 @@ test('N-frame stepping has independent backward and forward buttons on the canon
   assert.doesNotMatch(source, /seekFramePlayerSideIndex/u);
 });
 
-test('A and D keyboard ownership lives only in the annotation coordinator', () => {
+test('A and D keyboard ownership is captured by the active-editor shortcut runtime', () => {
   assert.doesNotMatch(source, /KeyA|KeyD|addEventListener\('keydown'/u);
-  assert.match(coordinator, /event\.code === 'KeyA'/u);
-  assert.match(coordinator, /event\.code === 'KeyD'/u);
-  assert.match(coordinator, /window\.addEventListener\('keydown', handleAnnotationShortcut, true\)/u);
+  assert.match(shortcuts, /event\.code === 'KeyA'/u);
+  assert.match(shortcuts, /event\.code === 'KeyD'/u);
+  assert.match(shortcuts, /activeEditor = \{ blockId: context\.blockId, side: context\.side \}/u);
+  assert.match(shortcuts, /window\.addEventListener\('keydown', handleShortcut, true\)/u);
 });
 
 test('panel N setting persists through the existing project export settings seam', () => {
