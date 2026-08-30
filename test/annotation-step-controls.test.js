@@ -35,3 +35,10 @@ test('panel N setting persists through the existing project export settings seam
   assert.match(source, /data-annotation-step-input/u);
   assert.match(source, /scheduleSave\(\)/u);
 });
+
+test('annotation step controls do not run a perpetual DOM refresh loop', () => {
+  assert.doesNotMatch(source, /requestAnimationFrame\s*\(\s*refreshLoop/u);
+  assert.doesNotMatch(source, /function\s+refreshLoop\s*\(/u);
+  assert.match(source, /MutationObserver/u);
+  assert.match(source, /textContent !== value/u);
+});
