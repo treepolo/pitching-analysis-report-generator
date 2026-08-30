@@ -163,6 +163,22 @@
     );
   }
 
+  function synchronizeToggleDom() {
+    const activeKey = activeEditor ? contextKey(activeEditor.blockId, activeEditor.side) : '';
+    document.querySelectorAll('[data-annotation-action="toggle-edit"]').forEach((toggle) => {
+      const context = contextFromToggle(toggle);
+      const active = Boolean(context && contextKey(context.blockId, context.side) === activeKey);
+      toggle.classList.toggle('button-primary', active);
+      toggle.classList.toggle('button-quiet', !active);
+      const label = active ? '結束標註' : '開始標註';
+      if (toggle.textContent !== label) toggle.textContent = label;
+    });
+  }
+
+  function queueToggleDomSync() {
+    queueMicrotask(synchronizeToggleDom);
+  }
+
   function handleToggleCapture(event) {
     const toggle = event.target.closest?.('[data-annotation-action="toggle-edit"]');
     if (!toggle) return;
@@ -171,10 +187,12 @@
     const key = contextKey(context.blockId, context.side);
     if (toggleCurrentlyEditing(toggle)) {
       if (activeEditor && contextKey(activeEditor.blockId, activeEditor.side) === key) activeEditor = null;
+      queueToggleDomSync();
       return;
     }
     activeEditor = { blockId: context.blockId, side: context.side };
     deleteUndo.delete(key);
+    queueToggleDomSync();
   }
 
   function handleShortcut(event) {
@@ -183,6 +201,7 @@
 
     if (event.key === 'Escape') {
       activeEditor = null;
+      queueToggleDomSync();
       return;
     }
     if (fieldConsumesEditingKeys(event.target)) return;
