@@ -73,7 +73,7 @@
           <div>
             <p class="eyebrow">報告文件</p>
             <h1 id="project-title">未命名報告</h1>
-            <p id="project-meta" class="document-meta">本機優先文件</p>
+            <p id="project-meta" class="document-meta">本機優先文件 · ${formatDate(project.updatedAt)}</p>
           </div>
           <div class="document-header-meta">
             <span id="block-editor-status" class="document-count">0 個區塊</span>
@@ -137,6 +137,7 @@
     <script src="./report-contract.js"></script>
     <script src="./rich-text.js"></script>
     <script src="./renderer.js"></script>
+    <script src="./renderer-rate-stability.js"></script>
     <script src="./export-directory-memory.js"></script>
     <script src="./annotation-playhead.js"></script>
     <script src="./annotations.js"></script>
