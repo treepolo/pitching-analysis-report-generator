@@ -27,15 +27,14 @@
 
   function resolveShortcutContext() {
     if (!shortcutTarget) return null;
+    const targetKey = contextKey(shortcutTarget.blockId, shortcutTarget.side);
     const cards = [...document.querySelectorAll('[data-inline-video-block][data-frame-player]')];
     const card = cards.find((entry) => entry.dataset.blockId === shortcutTarget.blockId) || null;
     const sideElement = card?.querySelector?.(`[data-inline-side="${shortcutTarget.side}"]`);
     const panel = sideElement?.querySelector?.(`[data-annotation-panel][data-annotation-side="${shortcutTarget.side}"]`);
     if (!card || !sideElement || !panel) {
       shortcutTarget = null;
-      if (editingTarget && contextKey(editingTarget.blockId, editingTarget.side) === contextKey(shortcutTarget?.blockId, shortcutTarget?.side)) {
-        editingTarget = null;
-      }
+      if (editingTarget && contextKey(editingTarget.blockId, editingTarget.side) === targetKey) editingTarget = null;
       return null;
     }
     return { card, side: shortcutTarget.side, panel };
@@ -68,7 +67,16 @@
     return model.normalizeStepFrames(raw, 1);
   }
 
-  function fieldConsumesEditingKeys(target) {
+  function textEntryTarget(target) {
+    const element = target?.closest?.('textarea, input, [contenteditable="true"]');
+    if (!element) return false;
+    if (element.matches?.('textarea, [contenteditable="true"]') || element.isContentEditable) return true;
+    if (!element.matches?.('input')) return false;
+    const type = String(element.type || 'text').toLowerCase();
+    return ['text', 'search', 'email', 'url', 'tel', 'password'].includes(type);
+  }
+
+  function deleteEditingTarget(target) {
     const element = target?.closest?.('textarea, input, [contenteditable="true"]');
     if (!element) return false;
     if (element.matches?.('textarea, [contenteditable="true"]') || element.isContentEditable) return true;
@@ -163,13 +171,6 @@
     return ok;
   }
 
-  function toggleCurrentlyEditing(toggle) {
-    return Boolean(
-      toggle?.classList?.contains('button-primary')
-      || toggle?.textContent?.trim() === '結束標註',
-    );
-  }
-
   function synchronizeToggleDom() {
     const editingKey = editingTarget ? contextKey(editingTarget.blockId, editingTarget.side) : '';
     document.querySelectorAll('[data-annotation-action="toggle-edit"]').forEach((toggle) => {
@@ -203,8 +204,9 @@
     if (!context) return;
     rememberShortcutTarget(context);
     const key = contextKey(context.blockId, context.side);
-    if (toggleCurrentlyEditing(toggle)) {
-      if (editingTarget && contextKey(editingTarget.blockId, editingTarget.side) === key) editingTarget = null;
+    const editingKey = editingTarget ? contextKey(editingTarget.blockId, editingTarget.side) : '';
+    if (editingKey === key) {
+      editingTarget = null;
       queueToggleDomSync();
       return;
     }
@@ -222,10 +224,10 @@
       queueToggleDomSync();
       return;
     }
-    if (fieldConsumesEditingKeys(event.target)) return;
 
     const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
     if (plain && (event.code === 'KeyA' || event.code === 'KeyD')) {
+      if (textEntryTarget(event.target)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       void stepByN(context, event.code === 'KeyA' ? -1 : 1);
@@ -234,13 +236,15 @@
 
     const isDelete = event.key === 'Delete' || event.code === 'Delete' || event.key === 'Del';
     if (plain && isDelete) {
+      if (deleteEditingTarget(event.target)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       deletePoint(context);
       return;
     }
 
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && undoDelete(context)) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+      if (deleteEditingTarget(event.target) || !undoDelete(context)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
     }
