@@ -1,247 +1,31 @@
-## Current Wave 25 generator-only XP-to-Windows-7 visual retrofit (2026-08-29)
-
-- User-selected direction: an authentic 2008–2011 transition-era desktop product that originated on Windows XP and was updated for Windows 7; no modern SaaS/card visual language.
-- Scope is generator-only. `src/index.html` loads `src/generator-xp7.css` after the structural stylesheet; no file under `src/export/` changed, and `src/export/report-renderer.js` retains baseline SHA-256 `71112C22D6233622067D6604D6D3B523C383966DA7EBC4A4323FE8AF9301EDAF`.
-- The theme covers title chrome, compact toolbars, classic menus/buttons/fields, work surfaces, document and video panels, status states, rich-text toolbar, dialogs, focus states, forced colors, and narrow-window rules while retaining every existing command and workflow.
-- Evidence: 9/9 focused UI tests pass; full `npm test` reports 163 total / 162 pass / 0 fail / 1 explicit exported `file://` Electron-runtime unavailable skip. Live Electron capture showed no horizontal overflow and all primary controls visible at 1270×794 and 871×574 content viewports; the minimum-size new-document dialog was unclipped.
-- Existing `scripts/run-electron-smoke.ps1` remains red at `autosaved section content did not persist`: its smoke code assigns `.value` to the rich-text `contenteditable` element. That stale assignment is present in pre-wave `HEAD`; Wave 25 does not change renderer or autosave behavior.
-- Detailed plan, progress, and evidence are recorded in `WAVE_25_GENERATOR_XP7_UI_PLAN.md`.
-
-## Current Wave 22 project-local generated artifacts (2026-08-25)
-
-- Internal runtime, test, browser/Electron profiles, logs, harnesses, and temporary staging must remain under the project .tmp/ or .runtime/ directories. The selected export destination may still be external when it is the intentional final folder/ZIP delivery location; no internal staging is created there.
-
-## Current Wave 21 native-video portable export (2026-08-23)
-
-- Selected design: portable HTML uses the same native browser-video frame-player
-  behavior as the editor; only the source adapter changes from Electron project
-  identity to a relative videos/ path.
-- Export no longer calls the frame-cache reader, stages cache indexes, copies
-  frame PNGs, or writes frame-cache manifest/warning data. Ready-cache input is
-  ignored for compatibility, so repeated folder/ZIP export does not depend on
-  cache presence or free space.
-- Native runtime controls include exact seek confirmation, latest-target drag
-  scrubbing, previous/next/keyboard stepping, independent segment loop bounds,
-  1/64..64 playback rate input/slider/reset, and the extended clock fallback.
-- Automated native-only export tests and syntax checks are complete. Electron
-  file:// playback and real codec/frame-latency behavior remain a manual
-  acceptance boundary.
 # Current Project State
 
-## Current dual-video simplification (2026-08-21)
-
-- Git checkpoint: `14bf39c` (`refactor: make dual video players independent`). The unrelated pre-existing `AGENTS.md` edit is intentionally outside this checkpoint.
-- The editor's single-video and dual-video blocks use the same renderer-owned browser `<video>` surface and frame controls. Each dual-video side is its own player card; play, pause, seek, stepping, rate, and loop state never propagate to the other side.
-- The current comparison synchronisation implementation has been removed from the app-facing frontend, preload bridge, main-process IPC, persistence contract, report contract, and portable export. This is a removal of the current mechanism only; a future synchronisation data model can be designed and implemented after a new user instruction.
-- The user-facing block mode is `雙影片`; the persisted internal discriminator remains `comparisonVideo` for compatibility. `並排` means two columns in one row, while `堆疊` means one column with the two players vertically ordered. The layout selector is rendered only for dual-video blocks; single-video blocks are always rendered as one stacked player card.
-- Video block labels are explicit: the block label is the visible upper-left title, each source label is the source title, and the source selector displays the referenced filename. Renderer updates patch the block title, each side title, and related accessible labels immediately on editor input without rebuilding the active editor. Loop playback uses the same `起點`/`終點` segment values; the former independent loop-bound and relative-offset fields are removed during save/contract normalization.
-- Launcher stability: the production launcher and Electron smoke now leave GPU enabled by default; `src/main.js` still accepts an explicit `PITCHING_DISABLE_GPU=1`/`--disable-gpu` fallback for machines that genuinely cannot start with GPU. GPU-enabled Electron smoke exits successfully; the remaining `os_crypt` line is a non-fatal profile-encryption warning.
-- The frame player now suppresses legacy inline keyboard handling on frame-player cards, cancels stale exact-seek listeners at the renderer boundary, retargets an active approximate seek instead of stacking `fastSeek` calls, and accepts a verified `seeked`/ready current frame when a paused Chromium video does not emit a follow-up `requestVideoFrameCallback`; a seek that is still seeking or lacks current data remains an error. Automated focused tests cover these guards; a manual Electron/media acceptance run is still required for real-frame latency and scroll behavior.
-- Previous/next/toggle frame controls now also have one-time direct card listeners, so a block-canvas focus or repaint cannot swallow their click; unavailable media reports an explicit status instead of silently doing nothing. Arrow stepping is accepted from either the video surface or the frame-control row.
-
-## Historical Wave 20D native single-player implementation (superseded 2026-08-21)
-
-- The latest native surface repair is committed in `8015f65`: the HTML anchor no longer paints a second dark layer, the EVR child handles `WM_PAINT`/`WM_ERASEBKGND`, scroll geometry schedules one coalesced repaint after movement settles, and end-of-stream is treated as a paused boundary so replay/scrub does not time out against an ended Media Session. The source links with the available MinGW-w64 toolchain, and the formal project-local `native/bin/media-foundation-player.exe` was rebuilt at 02:35 after the previous helper session exited. Human reopen/scroll/long-play verification remains pending.
-
-- Latest local product checkpoint is `dc233c8` (`fix: keep Electron launcher paths Unicode-safe`), following `8a512b9` (`fix: keep native surface and end playback in sync`). The bounded Wave20D native single-video path now gates frame-player actions to real clicks, coalesces native scrub targets without calling `Stop()` (so EVR does not clear the visible image), moves the EVR child without forced repaint during scroll, pauses before rate-zero scrubbing, and pauses the native session when the UI reaches the final frame. Replaying from the end resets the native surface and timeline to frame 1 together. The Windows launcher now passes an ASCII-only relative user-data path so a Chinese project directory cannot be mojibaked into new sibling folders. Existing comparison/export frame-cache paths remain unchanged in this wave. The push attempt is currently unavailable because GitHub credentials are not available in this environment.
-- The native path uses Media Foundation Media Session + EVR child surface. Scrub requests set rate 0 and complete only on `MESessionScrubSampleComplete`; stale scrub requests are superseded. The exact previous/next control currently uses this completion-backed native scrub for both directions because EVR `IVideoFrameStep::Step` is asynchronous and has no completion event in this Media Session host; no submission is reported as a displayed frame.
-- JavaScript evidence: `node --check` passes for main/preload/renderer; full `npm test` passes with 167 total / 166 pass / 0 fail / 1 explicit Electron `file://` unavailable skip. No native helper binary is tracked. The launcher regression test passes and verifies the relative user-data argument.
-- Native verification boundary: the updated helper source links successfully with the available MinGW-w64 toolchain, and the formal `native/bin/media-foundation-player.exe` was rebuilt at 02:35 after the previous helper was closed. A prior local Win32 parent-window smoke opened a real project MP4, applied bounds, completed `MESessionScrubSampleComplete`, coalesced rapid scrubs to the latest request, exercised play/pause, observed `ended`, and closed cleanly. Electron renderer HWND and human scroll/end-of-playback acceptance of this build are still pending user verification. The 30 malformed sibling directories reported by the user were verified to contain no files, project records, or media and were removed; the launcher fix was verified not to recreate them during the full test run. No Wave20D requirement is `VERIFIED`; runtime acceptance remains pending those integration steps.
-
-## Current Wave 20B integrator gate (2026-08-20)
-
-- Current provenance tip is the latest branch HEAD on `worker/desktop-vertical-slice` (the real-smoke evidence checkpoint is `3412ab7`); the product code tip is `7c2c40c`. The successful `git push` updated `origin/worker/desktop-vertical-slice`.
-- Provenance chain: frame-cache contract=`c8b9790`, editor seam=`4a1f09e`, Media pipeline=`79e196c`, Bridge/Editor=`5525b49`, Portable Export=`342d6e1`, Integrator hardening=`7c2c40c`.
-- Bounded implementation now wires the v1 frame-cache contract through main/preload/renderer, reads only referenced video caches for export, stages ready index/PNG frames into folder/ZIP outputs, enforces frame-directory containment, and rejects comparison partial-ready rendering as success.
-- Independent regression evidence: `npm test` (`node --test`) → 162 tests, 161 pass, 0 fail, 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. `node --check` passes for 47 JavaScript files; product-scope `git diff --check`, tracked-artifact scan, and credential-pattern scan pass.
-- Additional bounded real local smoke: a project-local generated MP4 was processed by the installed FFmpeg/ffprobe tools into a reused ready cache (`12` CFR frames), then exported as referenced-only folder and ZIP with `0` warnings, valid folder/ZIP parity, a self-contained frame-player HTML (no `<video>` fallback), `12` PNG frames, and an extracted cache index. This is one fixture/tool run, not full product acceptance.
-- Startup/draft recovery fix is committed in `ad88896`: the sandboxed preload no longer imports Node or project-local CommonJS modules, the bridge can initialize, the renderer auto-opens the most recently opened valid draft, and the project empty-state is synchronized with the actual list. Existing drafts remain under `projects/` and were not migrated or deleted.
-- Broader real media/player/sync drift, Electron editor runtime, exported `file://`, native picker, responsive human evidence, and AT-A through AT-G remain incomplete or unavailable. No requirement is `VERIFIED`.
-- Current worktree retains an unrelated pre-existing `AGENTS.md` edit; all current Wave 20 source/test/docs changes are committed. The generated planning file `WAVE_20_FRAME_CACHE_PLAN.md` is kept inside the project.
-
-## Current Wave 19G provenance reconciliation (2026-08-20)
-
-- Actual implementation tip is `b118a6321516a2cb17cec33a8da7f3bfd8e21c1c` on `worker/desktop-vertical-slice`; local `origin/worker/desktop-vertical-slice` tracking ref matches. Code scope is clean; the current worktree is dirty only with the three provenance docs and an unrelated `AGENTS.md` edit.
-- Provenance chain: A=`e4e74983eb9dc8a2117a77acd2f699985100303e`, B=`36d32567c8159476d55aedde9003c85051d9acbb`, renderer test=`faea84ae94516021d252d7bb17666b0c82877a18`, export=`b118a6321516a2cb17cec33a8da7f3bfd8e21c1c`.
-- Committed scope covers comparison sync persistence, continuous inline playback binding, renderer autosave contract coverage, and portable export player/rendering/runtime coverage. No source/test/package files remain uncommitted; only governance-document edits are pending.
-- Independent regression command: `npm test` (`node --test`) → 138 tests, 137 pass, 0 fail, 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. This is automated regression evidence only; the skip is unavailable evidence, not browser verification.
-- Worker/commit evidence remains bounded implementation/contract evidence; real media/player/sync drift, exported `file://`, native picker, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`.
-- Live GitHub SHA verification is unavailable: `git ls-remote origin` failed with `SEC_E_NO_CREDENTIALS`; do not infer live origin state from the matching local tracking ref.
-
-## Historical Wave 18A provenance integration (superseded, 2026-08-15)
-
-- Current implementation tip is `42d2a8a2f427eba02db9cb34cd518cb69d1d558e` on `worker/desktop-vertical-slice`; the clean export collision fix contains only `src/export/exporter.js` and `test/export/app-bridge.test.js`. Local and origin HEAD match before this docs-only checkpoint.
-- Repeated folder, ZIP, and complete-package exports now choose deterministic collision-safe names (`name-2`, then `name-3`, and so on) without overwriting prior folders or ZIP files. Existing output remains preserved and temporary staging is cleaned.
-- Worker-reported export gate is 41 tests total, 40 pass, and 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. This is domain/regression evidence; no requirement is `VERIFIED`.
-- Exported `file://`, native picker, real media/player/sync drift, responsive human evidence, and AT-A through AT-G remain incomplete. Product acceptance remains conditional fail/in progress.
-
-## Historical Wave 17B provenance integration (superseded, 2026-08-15)
-
-- Current implementation tip is `24d3fa53479220a3471a832c6cb364db8574caaa` on `worker/desktop-vertical-slice`; the clean renderer/player commit contains only `src/renderer.js` and `test/renderer-player.test.js`. This docs-only checkpoint does not modify that source/test.
-- Worker-reported bounded real-MP4 Electron smoke covered single/comparison file-source loading, metadata, play/pause/seek, unsupported frame-step fallback, time/frame alignment fallback, anchors, drift-seek policy, loop/reverse domain probing, and safe file-source URL hydration through the media bridge.
-- Test and cleanup evidence is bounded to that smoke/fixture run. Process cleanup was exercised but does not prove that every Electron/fixture process is absent outside the bounded run; synthetic/VFR probes and exported folder/ZIP `file://` runtime remain separate evidence gaps.
-- Real media smoke is not full product acceptance: real player/sync drift, native picker, exported `file://`, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
-
-## Historical Wave 17A provenance integration (superseded, 2026-08-15)
-
-- Current implementation tip is `5883ac74c545868c6836121013589e06c04b11d6` on `worker/desktop-vertical-slice`; the export layout fix is limited to `src/export/layout-validator.js`, `test/export/layout-validator.test.js`, and `test/export/runtime-smoke.test.js`. The worktree is clean before this docs-only checkpoint.
-- Text-only ZIP layout validation now permits folders without empty `videos/` or `images/` directories while still requiring a referenced media root. The runtime regression covers text-only folder output and ZIP extraction; referenced-only media validation remains enforced.
-- Worker-reported regression evidence is 40 tests total, 39 pass, and 1 explicit Electron exported-folder/ZIP `file://` unavailable skip. The ignored `.tmp/wave17-real` harness remains untouched and no private/generated artifact is tracked.
-- Exported `file://` runtime remains unavailable, and native picker, real player/sync drift, real media acceptance, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
-
-## Historical Wave 16G provenance integration (superseded, 2026-08-15)
-
-- Current implementation tip is `5f708ff002157385666254031b5e5d8e1c2f310a` on `worker/desktop-vertical-slice`, with `e6a436b`, `df2d429`, and `f9f355b` in its ancestry; local and origin HEAD match before this docs-only checkpoint.
-- Real Electron smoke exited 0 after the harness was aligned with the canonical block editor; the earlier legacy-selector false failure was corrected. Smoke evidence reports project open, autosave, explicit save, text import, canonical editor, media list, sync fallback, IPC security, invalid-project handling, responsive desktop/narrow controls, close flush/reopen, and payload-schema preservation as true.
-- Worker-reported full regression is 128 npm tests passing with one explicit exported-folder/ZIP `file://` unavailable skip. This records smoke/regression evidence only; the exported `file://` skip is not a pass and native picker interaction was not established.
-- Real local media/player/sync drift acceptance, native picker/human interaction, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
-
-## Historical Wave 16E provenance integration (superseded, 2026-08-15)
-
-- Current implementation tip is `df2d429e3910e6950cf00022ec6b8213e7dab03f` on `worker/desktop-vertical-slice`, with `f9f355b` sync contract coverage and `df2d429` media cancellation cleanup in its ancestry; local and origin HEAD match before this docs-only checkpoint.
-- Wave 16A worker evidence records local `ffmpeg`/`ffprobe` `9.0.1` processing of ignored project-local MP4 fixtures, normalization with 46 progress events, original preservation, and cancellation cleanup. The media cancellation implementation waits for child-process close before rejecting, avoiding Windows cleanup races; the fixture media and evidence remain outside Git.
-- Wave 16B worker evidence records `f9f355b` synthetic public sync contract coverage: 26/26 focused sync tests and a worker-reported 127 npm tests passing with 1 explicit Electron skip. These are synthetic/worker evidence, not real player or browser acceptance.
-- Fresh media scoped checks pass: 34/34 media tests, 8 media JavaScript `node --check` files, and `git diff --check`; no source/test changes are included in this documentation checkpoint. Real Electron/file:// runtime, real player/sync/drift, human responsive evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
-
-## Historical Wave 15C provenance integration (superseded, 2026-08-15)
-
-- Current implementation checkpoint is `12283a429d3da786e105dc53a2e587566321bef3` on `worker/desktop-vertical-slice`; this docs-only reconciliation follows the ZIP staging repair commit `12283a4`.
-- The repaired sequence is folder export followed by ZIP export using the same output root and report name. `outputKind=zip` now builds the report in a unique temporary staging folder, archives that staging tree, cleans it after success, and preserves an existing successful final folder. `outputKind=folder` retains final-folder collision safety; an existing ZIP remains a safe `EXPORT_VALIDATION_FAILED` error and is never overwritten.
-- Fresh export evidence: 33/33 scoped export/bridge/layout tests pass, including text-only and mixed/video folder-to-ZIP and ZIP-to-folder sequences, staging cleanup, ZIP collision behavior, referenced-only assets, and original preservation. Fourteen export JavaScript files pass `node --check`; `git diff --check` and scoped artifact/credential scans pass.
-- Electron/file:// runtime and human acceptance were not run in this gate and remain unavailable evidence, not passes. Real MP4/FFmpeg execution, real player/sync/drift, native picker interaction, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
-
-## Historical Wave 13C Integrator gate (superseded, 2026-08-15)
-
-- Current implementation tip is `c3d136b3cf148a82924d2a6942e9de53f2731a27` on `worker/desktop-vertical-slice`; it is the formal same-content follow-up to `811ac54` for renderer export/picker diagnostics. The preceding export fix is `722f094`, and the worktree is clean before this docs-only checkpoint.
-- `722f094` only changes output-destination policy: an absolute, existing-or-creatable directory outside the project root is allowed when its existing ancestors are directories with no symbolic links. Project-local media/source containment, ZIP target containment, realpath checks, referenced-only traversal, and original preservation remain enforced. `c3d136b` only adds user-visible allowlisted error codes/reasons and focused renderer assertions; no export/domain source was changed by that commit.
-- Fresh safe scoped evidence: renderer/export/style tests pass `44/44`; `node --check` passes for 37 current JavaScript files; package/lock metadata, `git diff --check`, tracked artifact scan, and credential-pattern scan pass. Electron runtime was not started in this gate; the known exported-folder/ZIP `file://` check remains unavailable/skip evidence, not a pass.
-- Three local MP4 files under ignored `projects/` data remain outside Git and were not staged. Real export UI/file:// runtime, real ffprobe/FFmpeg execution, real video/player/sync/drift runtime, native picker/human interaction, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
-
-## Current Wave 12A/B/C Integrator gate (2026-08-15)
-
-- Actual product tip is `f4a59fc302a05a7f156a3fafea40e2ed802407e9` on `worker/desktop-vertical-slice`, including Wave 12A UI commit `f4dc599a18847d961f33d36f6da3e1da5926c200` and this export regression-test commit.
-- Wave 12A handoff reports the select-interaction redraw fix with 12/12 focused tests and 120 passing tests plus one Electron `file://` skip. Wave 12B export request evidence is 19/19 for renderer-shaped text-only, video-only, and mixed folder+ZIP jobs; no exporter source bypass was needed.
-- Static evidence: 36 current JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, tracked artifact/private scan, and credential-pattern scan pass. A smoke launch failed before UI evidence: `render-process-gone` `launch-failed` exitCode 49 and `ERR_FAILED (-2)` loading the app `file://` page.
-- Real export UI/file:// runtime, real ffprobe/FFmpeg execution, real video/player/sync/drift runtime, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`; product acceptance remains conditional fail/in progress.
-
-## Historical Wave 8D Integrator gate (superseded, 2026-08-15)
-
-- Product integration checkpoint: `edeaa95a4ebb682e29fadf26d4dc161c49d19499` on `worker/desktop-vertical-slice`; ancestry includes `5e8b652` media capability discovery, `f478197` export path safety, `7b15f4d` sync hardening, and `edeaa95` honest FFmpeg progress boundaries. This provenance update is a docs-only checkpoint following that product tip.
-- Fresh regression evidence: `npm test` reports 108 tests, 107 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip; 34 current JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/private scan pass.
-- Missing real ffprobe/FFmpeg execution evidence, exported `file://` runtime evidence, real video/player/sync/drift runtime, responsive human evidence, and AT-A through AT-G remain unavailable or incomplete. No requirement is `VERIFIED`.
-
-## Historical legacy-player cleanup gate (superseded, 2026-08-15)
-
-- Current HEAD is `cea6472b120fa81be51f03c02162ec0ff7dd6e72` on `worker/desktop-vertical-slice`; it follows the renderer integration checkpoint and removes unreachable legacy global-player helpers without changing HTML/CSS or domain contracts. Origin matches this HEAD and the worktree is clean.
-- Regression evidence remains 98 npm tests / 97 pass / 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip, 34 JavaScript syntax checks, focused renderer tests 2 pass, and `git diff --check` pass. The legacy global element scan is clean.
-- No product requirement is `VERIFIED`; Electron `file://`, real media/FFmpeg/player/sync, native picker, responsive human evidence, and AT-A through AT-G remain incomplete.
-
-## Historical Integrator renderer gate (superseded, 2026-08-15)
-
-- Current integrated checkpoint: `e65240b6aeabd099af8bb24d56d0af7bb75dd82a` on `worker/desktop-vertical-slice`; ancestry includes the UI redesign crash-recovery guide `2db74bb`, document CSS `05f442e`, document HTML `c4915ff`, and renderer inline-player change `e65240b`. Origin is the configured private repository and `git ls-remote` matches the local HEAD; worktree is clean.
-- Renderer behavior now boots without requiring legacy `#media-library`, `#player-panel`, `#preview`, `#section-list`, or static player controls; video blocks render inline in `#block-canvas`. Partial-DOM guards cover startup/error, block-canvas delegation, import/save, export, and inline player controls. This is implementation evidence, not product acceptance.
-- Fresh regression evidence: 98 npm tests, 97 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip; 34 current JavaScript files pass `node --check`; focused renderer tests pass 2/2; package/lock metadata and `git diff --check` pass; tracked artifact scan shows no private media, generated output, `.tmp`, or environment files.
-- Electron `file://` runtime remains unavailable and is not treated as pass. Real MP4/FFmpeg metadata, real player/sync/drift runtime, native picker interaction, responsive human evidence, and AT-A through AT-G remain incomplete. No requirement is `VERIFIED`.
-
-## Canonical scope/architecture decision (2026-08-14)
-
-- The former fixed-form/editor UI is superseded. It must not remain as an in-product compatibility mode; the canonical UI is a block-based long-form editor.
-- The canonical document contains many text blocks and independent video blocks. Each video block owns one/pair asset selection, single/dual mode, layout, in/out/playback settings, and per-side independent controls; the former block-local sync mechanism is removed pending a future redesign.
-- Export copies only assets referenced by video blocks into self-contained folder/ZIP outputs; unused Media Library assets are excluded and originals remain untouched.
-- Dependency graph: Report Model/Editor defines block schema and persistence; Media Pipeline supplies project-local asset metadata/status; Playback/Sync consumes block-local video configuration; Renderer/Export derives the referenced set and portable output; Shell/QA owns security, recovery, and acceptance gates.
-- This is a planning decision only. Existing implementation evidence does not mark any requirement `VERIFIED`.
-
-## Historical Wave 5 serial integration provenance (2026-08-14)
-
-- Code checkpoint before this docs reconciliation: `d9541b812e9853f2e9b4a08dddad742c293caeb3` on `worker/desktop-vertical-slice`; picker bridge commit `bd9d8ee` is in its ancestry, origin matched, and the worktree was clean.
-- Native export-folder contract reviewed: trusted main IPC opens an `openDirectory` dialog, validates the selected directory through project-root realpath containment, preload returns a safe string or `null`, and renderer preserves a project-safe default when no folder is selected.
-- Fresh evidence: `npm test` reports 95 tests, 94 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip, and 0 failures; 33 JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/security scan pass.
-- Fresh Electron smoke passes persistence/import/block-editor/media-list/player-empty/sync-fallback/IPC-security/responsive desktop+narrow/reopen assertions. Native folder-dialog selection/cancel was not exercised by headless smoke, and exported `file://` runtime remains unavailable; neither is treated as pass.
-- The renderer now displays only a safe folder label, keeps selected output separate from the project default, and does not start a job on picker cancellation. No requirement is `VERIFIED`.
-- Remaining blockers: real video/FFmpeg, actual player/sync/drift, native dialog/human folder-picker evidence, exported folder/ZIP browser `file://`, responsive human evidence, and AT-A through AT-G.
-
-## Historical current provenance snapshot (2026-08-14, Wave 4 serial gate)
-
-- Current code checkpoint before this docs reconciliation: `4ba8704421c75d1b57a98afecd2e3340f4e9fc86` on `worker/desktop-vertical-slice`; origin is `https://github.com/treepolo/pitching-analysis-report-generator.git`, the remote branch SHA matched, and the worktree was clean.
-- Integrated ancestry includes `93ffb61` block editor, `56f7159` media lifecycle, `646df8a` block-local sync, `121d857` referenced-video-only export, `4f83eb3` parallel governance, `d31244b` player runtime, `dad97d0` media timing/tool seam, `21a1bd4` sync hardening, `2278320` export bridge, and `4ba8704` export UI.
-- Fresh evidence: `npm test` reports 94 tests, 93 pass, 1 explicit Electron exported-folder/extracted-ZIP `file://` runtime skip, and 0 failures; 33 JavaScript files pass `node --check`; package/lock metadata, `git diff --check`, and tracked artifact/security scan pass.
-- Fresh Electron smoke reports block-editor, persistence/reopen, media-list, player-empty, sync-fallback, IPC-security, payload-schema, close-flush, and responsive desktop/narrow controls including export. This is synthetic/domain smoke evidence, not real-video or human acceptance.
-- The export UI uses the project-root-safe `output` directory because no arbitrary output-folder picker bridge exists. This is a follow-up UX limitation, not arbitrary-folder evidence and not fake success.
-- QA gate remains `CONDITIONAL FAIL / IN PROGRESS`; no requirement is `VERIFIED`. Real video/FFmpeg, real player/sync, exported folder/ZIP browser `file://`, responsive human evidence, and AT-A through AT-G remain incomplete.
-
-這是本專案跨 Session / Agent 延續所需的最小 current state。治理方向以目前提供的 Layer 1 / Layer 2 為準；不要把本文件擴張成工程 SOP。
+Updated: 2026-08-30
 
 ## Product
 
-- 產品：供投球教練本人建立投球動作分析報告的 Desktop application。
-- 核心結果：可持續編輯的報告專案，包含文字、圖片、單影片與雙影片，最後輸出可線上部署與 desktop `file://` 離線閱讀的 HTML folder/ZIP。
-- 不做：AI 自動判讀或寫作、登入/會員/CRM/付款、雲端 DB/同步/OAuth、學生互動、醫療診斷、自動部署、Google Drive API、自動寄送與 analytics。
+投球報告輸出器是供教練在本機建立投球動作分析報告的 Desktop application。核心結果是可持續編輯的長篇報告，包含文字、圖片、單影片與雙影片，並可輸出成可離線閱讀的 HTML folder 或 ZIP。
 
-## Decisions and boundaries
+## Current implementation
 
-- Generator architecture：Desktop shell + portable web renderer；已由使用者確認。
-- Project data：`PROJECT_ROOT/projects/<project-id>/`；暫存 `.tmp/`；backup `.backups/`；generated output `output/`。私人素材與產物不進 Git。
-- GitHub：預定 Private；目前沒有 `origin`、帳號授權或 push evidence。
-- Repository root：`D:\Vibe Coding\投球報告輸出器`。
+- Electron shell 使用隔離 preload／IPC，專案與報告資料保存在專案邊界內。
+- 文件編輯器支援多個 section、文字／圖片／單影片／雙影片區塊，以及 autosave、明確儲存、重新開啟與文字匯入。
+- 單影片固定為一個播放器；雙影片是兩個獨立播放器，可選並排或堆疊。播放、暫停、拖曳、逐幀、速度與循環狀態不互相傳播。
+- 產生器與輸出 HTML 使用 XP→Windows 7 年代視覺語言。輸出 HTML 內嵌 CSS／JavaScript，媒體使用相對路徑，不依賴 CDN 或網路。
+- 匯出只攜帶報告區塊實際引用的媒體，保留來源檔案，並提供 folder／ZIP parity、路徑 containment、symlink 防護與原子化復原。
 
-## Current repository
+## Deliberate boundaries
 
-- Branch：`worker/desktop-vertical-slice`。
-- Actual HEAD：`b118a6321516a2cb17cec33a8da7f3bfd8e21c1c`; local tracking ref matches; live origin SHA is unavailable because `git ls-remote` authentication failed with `SEC_E_NO_CREDENTIALS`.
-- Shell/Report Model implementation handoff commit：`35c21a430b5c7a16ea065d542fec71a02c47b81b fix: harden report shell persistence boundaries`。
-- `bc0e004 feat: add desktop project vertical slice` 是歷史 implementation baseline；`f678f2e2c1d6601623a08241dc4789b52b426ccc` 是前一個 provenance reconciliation，並非目前整合 HEAD。
-- 目前 code integration checkpoint：`b118a63 fix: complete portable export player`，承接 A=`e4e7498`、B=`36d3256` 與 renderer test=`faea84a`；這些 slice 仍只代表 implementation/contract/regression evidence，不代表完整產品驗收。
-- Recoverable pre-retrofit tag：`checkpoint/pre-governance-retrofit-2026-08-14`。
-- Wave 19G code scope 已提交且 worktree clean；私人素材、generated report、ZIP 與 `.tmp` artifacts 未進 Git。
-- 本地 checkpoint 可回復被刪除的舊治理檔案。
+- AI 判讀／寫作、登入、CRM、雲端同步、付款、學生互動、醫療診斷與 telemetry 不在目前範圍。
+- 舊同步錨點、同步播放、綁定模式與相對偏移欄位已移除；未來若重做，必須先有新的產品與互動決策。
+- 真實媒體 codec／FFmpeg、完整 exported `file://` 播放、真人 responsive 與 AT-A～G 驗收仍需分開建立相稱 evidence，不以程式存在視為 VERIFIED。
 
-## Implemented slice
+## Verification
 
-目前已有 Electron shell、隔離 preload/IPC、project list/create/open/save、project-root persistence、autosave/explicit save/close flush/reopen、最小 section editor、`.txt`/`.md` import persistence、media register/list/remove seam、renderer-only report contract/preview、app-facing 單影片／雙影片獨立播放器；另已整合 media contract/path policy、read-only signature inspection、realpath/symlink tool boundary、FFprobe/FFmpeg adapter verification-pending seam，以及帶 allowlist、project-root realpath/symlink boundary、folder/ZIP checksum/parity、atomic extraction、file URL runtime smoke 的 export slice。這些是 implementation 與 automated evidence，不等於所有 requirement 已驗證。
-
-## Not yet complete or not yet verified
-
-- 真實圖片/影片 metadata、normalization 與可播放 media pipeline。
-- app-facing 單影片／雙影片獨立播放、逐幀控制與 segment loop 已存在；目前的同步錨點、同步播放與綁定模式已移除，待未來重新設計後再評估 real video/frame acceptance。
-- self-contained report folder、offline `file://`、ZIP/完整交付包與 export consumer 仍未完成產品驗收；目前有 fixture-based folder/ZIP seam、atomic recovery 與 explicit Electron `file://` runtime check，但該 runtime 在本環境 unavailable 而 skip，沒有 real-media/browser/human acceptance evidence。
-- 真實 media ingest/metadata/normalization、FFmpeg 與實際播放器 acceptance 仍未完成；同步資料結構與 drift correction 不屬於目前版本。
-- responsive 與 Scenario A–G 真人驗收。
-- IPC sender/source-frame hardening、project/media symlink realpath containment、tool command/path checks 與 ZIP atomic extraction 已有 focused tests/smoke evidence；完整產品 persistence/recovery acceptance 仍未完成。
-- Wave 19G independent evidence：`npm test` 138 tests / 137 pass / 0 fail / 1 explicit Electron `file://` unavailable skip；code scope clean；local tracking ref equals HEAD. Current worktree remains dirty with the three provenance docs and unrelated `AGENTS.md`; live origin SHA is unavailable due to credential failure. Historical worker evidence is not promoted.
-- 沒有 requirement 可只因程式存在而標 `VERIFIED`。
-
-## Execution
-
-- Main control plane 只做規劃、拆分、調度、驗證與交接；開發工作在可見的 persistent project Worker threads 執行。
-- 平行化只限於不共寫的 scope；shared model、shell、renderer contract 使用 single writer，QA 可 read-only 平行。
-- Subagent 只作短期輔助；不要用它取代可見的 Worker thread。
-- 只有帳號授權、外部登入、真人主觀驗收或使用者重大產品決策才建立 Human Checkpoint。
+- 最近一次完整 `npm test`：167 tests、166 pass、0 fail、1 個 Electron exported `file://` runtime unavailable skip。
+- 最新輸出主題與單影片來源標題列移除已建立並推送 Git checkpoint；本地與遠端分支需維持一致。
+- 真實媒體、生成報告、壓縮檔、暫存與本機秘密位於 Git 忽略的本機邊界，不進版本庫。
 
 ## Source of truth
 
-- Product/spec facts：`PRODUCT_REQUIREMENTS.md`、`USER_FLOWS.md`、`UI_UX_SPEC.md`、`DATA_MODEL.md`、`DATA_AND_SYNC.md`、`MEDIA_PIPELINE.md`、`REPORT_OUTPUT_SPEC.md`。
-- Acceptance/evidence：`ACCEPTANCE_TESTS.md`、`TRACEABILITY_MATRIX.md`、`VERTICAL_SLICE_SCOPE.md`。
-- Current implementation status：本文件與實際 Git/source/test evidence；過期敘述不得覆蓋實際 repository。
-
-## Wave 22 選定播放器與鍵盤控制 checkpoint（2026-08-23）
-
-- 產生器與輸出 HTML 使用同一套選定語意：點擊播放器卡片、影片表面或其控制項即選定該播放器；選定外框以亮色提示，並同步 aria-selected 與 data-frame-selected。
-- 未選定播放器時，左右鍵與空白鍵不執行任何影格或播放動作；有選定時只作用於該播放器。雙影片左右側是兩個獨立選定單位，不會把快捷鍵轉送到另一側。
-- 左右鍵執行精確上一幀／下一幀，空白鍵切換播放／暫停；文字輸入、選單、可編輯內容不攔截快捷鍵。輸出 HTML 也保留原生影片速度失敗時的擴充影格時鐘與定位完成回退判定。
-- 單影片輸出固定堆疊；雙影片才讀取並排／堆疊設定。控制列使用播放／暫停、左右箭頭圖示，當前幀與總幀數分置進度條兩側。
-- 驗證邊界：完整 npm test、變更 JavaScript node --check、輸出 HTML renderer/runtime smoke；Electron file:// 實機執行若不可用仍明確標為 skip，不視為通過。
-
-## Wave 26 輸出 HTML XP→Windows 7 閱讀器外觀 checkpoint（2026-08-29）
-
-- 使用者選定「輸出器配套閱讀器」方向：輸出 HTML 與產生器屬同一年代、配色與字體家族，但不加入假的編輯指令或可編輯欄位。
-- `src/export/xp7-reader-theme.js` 是輸出專用 CSS 邊界，由 `report-renderer.js` 內嵌至既有 `<style>`；沒有外部 CSS、字型、圖片、腳本、網路 API 或 `generator-xp7.css` 依賴。
-- 文字固定為章節框＋正文兩個可見層級；影片固定為章節框＋播放器框＋黑色畫面框三個可見層級。雙影片兩側取消各自卡片框，只保留一條分隔線；選取狀態直接改現有播放器邊框與底色，不新增 outline、光暈或判定層。
-- 既有輸出 DOM/data attributes、原生影片、播放／逐幀／速度／重設／循環、點選與鍵盤機制未修改；完整回歸為 166 tests / 165 pass / 0 fail / 1 個既有 automated Electron `file://` harness 明確 skip。
-- 另以真實專案內 MP4 產生 QA 報告，經 Electron Chromium 直接從 `file://` 載入；1260×900 為左右雙欄，390×844 自動上下堆疊，兩者皆無水平溢出或外部資源請求，點選播放器仍使外層 `data-frame-selected` 變為 `true`。
-- Wave 26 計畫、檢核與證據位於 `WAVE_26_EXPORT_XP7_READER_PLAN.md`；專案內 `.tmp` QA 產物不進 Git，使用者既有 `AGENTS.md` 與 `測試輸出/` 變更不納入本 checkpoint。
-
-## Wave 26 follow-up 單影片來源標題列移除（2026-08-29）
-
-- 單影片播放區塊不再渲染可見的「來源標題」列，因此不保留該列的垂直空間；產生器與輸出 HTML 行為一致。
-- 雙影片左右來源標題仍保留；來源標題資料欄位與無障礙標籤仍可用，播放器點選、播放、逐幀、速度與循環機制未改動。
-- 聚焦播放器／輸出測試 19 pass、0 fail、1 個既有 Electron `file://` runtime skip；完整 `npm test` 為 166 pass、0 fail、1 skip。
+產品範圍與狀態以本文件為準；產品需求、架構、UI／流程、資料／媒體、輸出與驗收契約分別見 `PRODUCT_REQUIREMENTS.md`、`ARCHITECTURE.md`、`UI_UX_SPEC.md`、`USER_FLOWS.md`、`DATA_MODEL.md`、`DATA_AND_SYNC.md`、`MEDIA_PIPELINE.md`、`REPORT_OUTPUT_SPEC.md`、`ACCEPTANCE_TESTS.md`。

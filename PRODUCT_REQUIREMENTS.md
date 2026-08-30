@@ -10,7 +10,7 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 - Export produces `report.html` plus copies of only the media assets referenced by video blocks. Unused Media Library assets are excluded, originals remain untouched, and folder/ZIP outputs are self-contained and offline-capable.
 - This is a planning/scope decision. No requirement status is changed to `VERIFIED` by this text update.
 
-目前狀態：**Phase 1/2 planning**；Architecture 與 GitHub visibility 尚未 human-approved。需求 ID 是本專案的穩定 contract；任何實作、測試、驗收與 status 更新都必須回寫 `TRACEABILITY_MATRIX.md` 與 `IMPLEMENTATION_STATUS.md`。
+目前狀態：**Phase 1/2 planning**；Architecture 與 GitHub visibility 尚未 human-approved。需求 ID 是本專案的穩定 contract；任何實作、測試、驗收與狀態更新都必須回寫 `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md`。
 
 ## 1. 產品目的與成功條件
 
@@ -74,7 +74,7 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 | GIT-002 | GitHub repo 建議名為 `pitching-analysis-report-generator`；visibility 已由使用者決定為 Private，remote 建立需授權設定。 | remote 建立後取得實際 URL/branch evidence。 | AWAITING_USER_SETUP |
 | GIT-003 | baseline/handoff/integration/acceptance/release checkpoint 有 push/secret scan 規則；force push 禁止。 | policy review，不能捏造 push evidence。 | NOT_STARTED |
 | QA-001 | Scenario A–G 覆蓋完整流程、offline、重複 asset、不同 FPS、VFR、responsive、error recovery。 | `ACCEPTANCE_TESTS.md` 的 exit criteria。 | NOT_STARTED |
-| QA-002 | unit/integration/E2E/visual/真人驗收 evidence 分層；fixture 不冒充真人；無 evidence 不可 VERIFIED。 | `TRACEABILITY_MATRIX.md` 與 status audit。 | NOT_STARTED |
+| QA-002 | unit/integration/E2E/visual/真人驗收 evidence 分層；fixture 不冒充真人；無 evidence 不可 VERIFIED。 | `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md` audit。 | NOT_STARTED |
 | EDIT-004 | Canonical editor is a block-based long-form canvas; the former fixed-form workflow is not a product mode. | many text/video blocks, reorder, reopen, and focused text editing evidence | NOT_STARTED |
 | EXPORT-004 | Export includes only assets referenced by video blocks and copies them without mutating originals. | referenced-set, unused-asset exclusion, folder/ZIP parity evidence | NOT_STARTED |
 
