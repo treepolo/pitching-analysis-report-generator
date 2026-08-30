@@ -9,7 +9,7 @@ The previous fixed-form/editor configuration is superseded and must not remain a
 - Single-video blocks always use one stacked player card; no layout selector is shown. Dual-video blocks expose `並排` (two columns in one row) or `堆疊` (one column); each side owns an independent player surface while the current runtime also exposes a limited shared timeline/sync-point control row. The former anchor/binding/relative-offset workflow is not a new UX contract.
 - Preview and export consume the same canonical block document. Export UI must communicate that only video-block-referenced assets are copied; unused library assets and originals remain outside the output.
 
-目前狀態：**Phase 1/2 planning**。本文件把產品需求轉成可驗收的互動與資訊架構；產生器採 local browser application 或 desktop application 尚未由使用者核准，故不指定不可逆的 framework 或 shell。
+目前狀態：本文件仍是 canonical UI/UX contract。Desktop application 高層架構已由使用者於 2026-08-14 核准；目前已有 Electron generator 與 block-based editor/player/export implementation，但 visual、responsive、touch、完整 E2E 與真人 evidence 仍依 `PROJECT_STATE.md`／`ACCEPTANCE_TESTS.md` 判定，不因本文件描述或程式存在而視為已驗證。
 
 ## 1. UX 目標與約束
 
@@ -64,7 +64,8 @@ The previous fixed-form/editor configuration is superseded and must not remain a
 ### Dual-video block
 
 - 只提供兩支影片的明確左右／上下排列，不暴露任意 N 支影片 UI。
-- 每側完整提供單影片播放器的播放、seek、上一幀、下一幀、速度與循環控制；速度以進度條下方的連續對數滑桿、數字輸入與 1 倍重設按鈕呈現，範圍為 1/64×–64×。超出瀏覽器原生 `HTMLMediaElement` 範圍時，編輯器改用擴充速度時鐘，不把不支援的值直接寫入影片元素；任何操作都不會控制另一側。
+- 每側完整提供單影片播放器的播放、seek、上一幀、下一幀、速度與循環控制；速度以進度條下方的連續對數滑桿、數字輸入與 1 倍重設按鈕呈現，範圍為 1/64×–64×。超出瀏覽器原生 `HTMLMediaElement` 範圍時，編輯器改用擴充速度時鐘，不把不支援的值直接寫入影片元素；任何 side-specific 操作都不會控制另一側。
+- block-level shared controls 是另一組刻意的共同控制，依既有 `sync`／`commonSegment` 相容映射共同播放、seek、逐幀、速度與循環；這不授權恢復舊 anchor/binding/offset UX。
 - 來源選擇以檔名呈現，來源標題直接綁定該側播放器標題；區塊標題直接綁定卡片左上角標題。
 
 ### Preview / Export / Jobs
@@ -127,7 +128,7 @@ Keyboard 必須支援 focus order、Enter/Space action、Esc 關閉 sheet/dialog
 | Review | 狀態 | 證據 |
 |---|---|---|
 | UX complexity / field audit | DONE（規格審查） | 本文件第 4–5 節 |
-| Lifecycle review | DONE（需求層） | DATA_MODEL.md、PRODUCT_REQUIREMENTS.md |
+| Lifecycle review | DONE（需求層） | `DATA_MODEL.md`、`PRODUCT_REQUIREMENTS.md` |
 | Reachability review | DONE（規格審查） | 本文件第 2、6 節 |
-| Visual / interaction review | PLANNED | 需 implementation 與真人／E2E evidence |
-| Architecture-dependent interaction review | BLOCKED_HUMAN | ARCHITECTURE.md |
+| Visual / interaction review | PLANNED | 需完整 E2E／responsive／真人 evidence |
+| Architecture-dependent interaction review | RESOLVED | Desktop application 高層方向已於 2026-08-14 核准；見 `ARCHITECTURE.md` |

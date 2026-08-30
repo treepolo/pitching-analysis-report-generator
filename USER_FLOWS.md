@@ -7,7 +7,7 @@
 - Dual-video mode offers side-by-side or stacked layout. Each side owns its own source settings and can be operated independently; the current generator/export runtime also retains a limited shared timeline and sync-point compatibility behavior. The former anchor/binding/relative-offset workflow is not exposed as a new product flow.
 - Export derives the referenced asset set from video blocks only, copies those assets into the self-contained folder/ZIP, and never copies unused Media Library assets or mutates originals.
 
-目前狀態：**Phase 1/2 planning**；Architecture 與 GitHub visibility 尚未 human-approved。需求細節見 `PRODUCT_REQUIREMENTS.md`；資料邊界見 `DATA_MODEL.md`；輸出規格見 `REPORT_OUTPUT_SPEC.md`。
+目前狀態：Desktop application 高層架構已由使用者於 2026-08-14 核准，GitHub remote 已存在；目前實作與 evidence 進度以 `PROJECT_STATE.md` 為準。需求細節見 `PRODUCT_REQUIREMENTS.md`；資料邊界見 `DATA_MODEL.md`；輸出規格見 `REPORT_OUTPUT_SPEC.md`；完整驗收狀態見 `ACCEPTANCE_TESTS.md`。
 
 ## 1. 導航與工作區
 
@@ -38,11 +38,11 @@
 4. 使用者在 Media Library 匯入多個 MP4/圖片；系統顯示 metadata 與 compatibility/normalization 狀態，長工作建立 job。
 5. 使用者在 section/issue 選「插入媒體」；系統只提供該 project 可用的 asset，建立一個獨立 Player Block reference。
 6. 單影片區塊直接可播放；雙影片區塊引導選兩個檔名、來源標題與可選循環，沒有第三支影片 UI。
-7. 使用者可在兩側各自播放、seek、逐幀移動或調整速度；側邊 controls 不會改變另一側。若使用 block-level shared controls，系統會刻意把共同播放、seek、逐幀、速度與循環映射到兩側。
+7. 使用者可在兩側各自播放、seek、逐幀移動或調整速度；側邊 controls 不會改變另一側。若使用 block-level shared controls，系統會刻意把共同播放、seek、逐幀、速度與循環依既有 `sync`／`commonSegment` 映射到兩側。
 8. 使用者開 Preview；系統使用同一 report model/renderer 顯示 desktop/narrow/mobile viewport。
 9. 使用者修改 issue 或 block；autosave 顯示已保存狀態，並保存 media references、播放設定與 export settings。
 10. 使用者關閉並重開 project；Projects list 顯示更新時間/未完成 job，重開後內容與引用仍在。
-11. 使用者選「輸出資料夾」或「輸出 ZIP/完整交付包」；系統逐 phase 回報、驗證相對路徑/檔案，再顯示結果位置。
+11. 使用者選「輸出資料夾」或「輸出 ZIP/完整交付包」；系統逐 phase 回報、驗證相對路徑/檔案，再顯示結果位置。正式成品主檔為 `report.html`。
 
 ### Result
 
@@ -66,7 +66,7 @@ Projects 可列出、搜尋/篩選（若實作）、開啟、rename、duplicate�
 
 ## 6. Preview/export flow
 
-`Preview` → `viewport switcher` → `互動驗證` → `Export action` → `job phases`（檢查媒體、正規化、建立 assets、產生 HTML、相對路徑驗證、ZIP、完成）→ `folder/zip result`。Export failure 必須指出 phase、可重試與 source 是否安全。
+`Preview` → `viewport switcher` → `互動驗證` → `Export action` → `job phases`（檢查媒體、必要時正規化、建立 referenced assets、產生 `report.html`、相對路徑／manifest 驗證、ZIP、完成）→ `folder/zip result`。Export failure 必須指出 phase、可重試與 source 是否安全。
 
 ## 7. Error and recovery flow
 

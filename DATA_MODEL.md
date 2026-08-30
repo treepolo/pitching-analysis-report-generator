@@ -6,9 +6,9 @@
 - `ContentBlock` is the editing unit. A project may contain many independent text blocks and video blocks. Each video block owns its single/dual selection, and each video side owns its in/out/playback settings.
 - `MediaAsset` remains project-scoped reusable source metadata. It never owns block-specific playback state or export inclusion state.
 - Export derives `referencedAssetIds` by traversing video blocks in a read-only snapshot. Only those assets receive export copies; originals and unused library assets are untouched and excluded.
-- This model decision changes the canonical target only; migration, persistence, and acceptance remain implementation work and are not verified here.
+- This decision defines the canonical model. Current implementation and verification status are tracked separately in `PROJECT_STATE.md` and `ACCEPTANCE_TESTS.md`.
 
-目前狀態：**Phase 2 planning**。Desktop architecture 與 project-root storage direction 已由使用者確認；舊同步 anchor/binding/offset 資料契約與同步 IPC 已退出，但目前 block model 仍保留 `sync`／`commonSegment` 有限相容欄位，供既有產生器與輸出 shared runtime 使用。
+目前狀態：Desktop architecture 與 project-root storage direction 已由使用者確認；project persistence、media references、block model、export snapshot/renderer 等 implementation 已存在。舊同步 anchor/binding/offset 資料契約與同步 IPC 已退出，但目前 block model 仍保留 `sync`／`commonSegment` 有限相容欄位，供既有產生器與輸出 shared runtime 使用。完整 lifecycle、recovery 與 requirement-level verification 仍依相稱 evidence 判定。
 
 ## 1. Canonical entities
 
@@ -108,7 +108,7 @@ JobEvent 是 append-only；不可把取消、失敗覆寫成成功。reload 後�
 
 ## 9. Persistence and integrity boundary
 
-- 正式 application data storage policy 已決定為 `PROJECT_ROOT/projects/<project-id>/`；技術 adapter、atomic save 與 recovery implementation 尚未開始。
-- storage adapter 必須將 project、media references、playback settings、export settings、job metadata 與 recovery state 以可重開方式保存。
-- export 不可使用 temporary mutation 破壞 source；中斷時 temporary output 只能留在 PROJECT_ROOT/.tmp 下並可辨識為未完成。
+- 正式 application data storage policy 為 `PROJECT_ROOT/projects/<project-id>/`。目前 project storage adapter、atomic project save、autosave/explicit save/close flush 與 reopen 已有 implementation；更完整的 crash/job recovery 與所有 lifecycle acceptance 仍需另行驗證。
+- storage adapter 必須將 project、media references、playback settings、export settings、job metadata 與 recovery state 以可重開方式保存；尚未完整實作的部分不得由 schema 文字假裝已完成。
+- export 不可使用 temporary mutation 破壞 source；internal staging 只能留在 `PROJECT_ROOT/.tmp` 下並在失敗／取消後清理。最終 user-selected export 可位於專案外部輸出位置，但必須通過 export path safety policy。
 - model read/write 要可測試，不把 UI state 直接當 canonical persisted model。

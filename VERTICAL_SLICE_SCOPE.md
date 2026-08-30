@@ -1,36 +1,36 @@
 # Desktop Vertical Slice Scope
 
-## Canonical scope supersession (2026-08-14)
+> Historical handoff note. This file records an early desktop vertical slice and is **not** the current project-state authority. The canonical current state is `PROJECT_STATE.md`; product, architecture, UI/data/output and acceptance contracts are the dedicated documents linked from that file.
 
-- The current fixed-form/minimal section editor is a historical implementation slice only. It is not the canonical product UI and must not be preserved as a compatibility mode.
-- The next canonical editor target is a block-based long-form canvas with many text blocks and independent single/comparison video blocks. Shared storage/security facts remain valid, but the editor/model/renderer owners must realign their implementation boundaries to this target.
-- Export target is `report.html` plus only video-block-referenced copied assets in a portable folder and ZIP; originals and unused Media Library assets remain out of the output.
-- This is a scope decision, not implementation evidence. Existing vertical-slice tests and runtime seams do not establish completion of the new target.
+## Supersession status
 
-這份文件是本輪 implementation handoff note，不改寫 canonical planning files 的 requirement status，也不把任何尚未有相稱 evidence 的需求標成 `VERIFIED`。
+The original vertical-slice note predates the current block editor, media/player implementation and export pipeline. Its older claims that the project had no text import, Media Library, single/comparison player, native frame controls, export consumer, ZIP or offline report are now superseded and must not be used to scope current work.
 
-目前可驗證的 slice：
+The following decisions remain relevant:
 
-- Electron desktop shell，`contextIsolation=true`、`nodeIntegration=false`。
-- 受 `PROJECT_ROOT` realpath boundary 保護的 `projects/<project-id>/project.json` persistence。
-- 建立、列出、開啟、編輯、renderer autosave、explicit save、close flush 與重新開啟。
-- 最小 section editor 與 renderer-only preview；preview 使用可供未來 export consumer 重用的 structural report document contract，但本輪沒有 export consumer。
-- project payload 的 `media` metadata 與 `exportSettings` preservation seam；本輪不執行 media processing 或 export。
+- The former fixed-form/minimal editor is historical only and must not return as a compatibility mode.
+- The canonical editor is the block-based long-form document described by `PRODUCT_REQUIREMENTS.md` and `UI_UX_SPEC.md`.
+- Desktop shell + portable web renderer remains the approved architecture; see `ARCHITECTURE.md`.
+- Project persistence and internal temporary/cache data stay within the project-root safety boundary; final user-selected export may be outside the project root only through the guarded export path policy.
+- Export target is `report.html` plus only assets actually referenced by report blocks; originals and unused Media Library assets remain outside the export set.
+- The old anchor/binding/relative-offset sync workflow is not a product contract. The narrower current `sync`/`commonSegment` shared-control compatibility behavior is documented in `PROJECT_STATE.md`, `DATA_MODEL.md` and `REPORT_OUTPUT_SPEC.md`.
 
-明確尚未支援：
+## Current implementation pointer
 
-- `.txt`/`.md` import。
-- Media Library、實際圖片/影片匯入與 metadata inspection。
-- single video、comparison video、既有 shared timeline／sync-point compatibility、逐幀控制與 playback synchronization；舊式 anchor/binding/offset workflow 不在產品契約。
-- FFmpeg、VFR/codec normalization。
-- self-contained report folder、完整 export、ZIP、offline `file://` delivery。
-- responsive/真人 acceptance、Scenario A–G 全流程與其 requirement-level verification。
+Do not maintain a second implementation-status list in this file. Current implementation, limitations and latest test evidence belong in `PROJECT_STATE.md`. As of the 2026-08-30 documentation reconciliation, that file records:
 
-Preview 目前只驗證 renderer 內的編輯資料呈現；沒有 export consumer，因此不宣稱 preview/export parity。下一個 owner 可在不改變 canonical model 的前提下，沿用 `src/report-contract.js` 接入 export。
+- Electron shell with isolated preload/IPC and project-boundary persistence.
+- Block editor with text/image/single-video/dual-video content, autosave/explicit save/reopen and text import.
+- Native-video single/dual players with side-specific controls and limited dual shared controls.
+- Referenced-only folder/ZIP export with `report.html`, manifest/checksum validation, path/symlink hardening and atomic recovery behavior.
+- Remaining evidence gaps around real media/codec behavior, complete exported `file://` runtime, responsive/human acceptance and the broader Scenario A–G matrix.
 
-本輪可重現 evidence commands：
+## Evidence and commands
 
-- `node --check`：`src/`、`test/`、`scripts/` 下 JavaScript syntax。
-- `npm test`：storage boundary/persistence/payload seam 與 report contract tests。
-- `npm install --package-lock-only --ignore-scripts --dry-run`：package/lock consistency。
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-electron-smoke.ps1`：Electron UI lifecycle、autosave、explicit save、close flush、reopen、IPC/path rejection 與 project file containment smoke。
+Historical evidence commands may still be useful as implementation checks, but they are not a substitute for current acceptance evidence:
+
+- `node --check` for JavaScript syntax when relevant.
+- `npm test` for the current automated suite.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-electron-smoke.ps1` for the maintained Electron smoke path when the local environment supports it.
+
+Any result or completion claim must be recorded against the current contracts in `PROJECT_STATE.md` and `ACCEPTANCE_TESTS.md`, not inferred from this historical vertical-slice document.

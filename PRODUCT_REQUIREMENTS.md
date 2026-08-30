@@ -8,9 +8,9 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 - Each video block independently selects one file or a file pair, supports single/dual mode, and owns its playback segment, in/out range, titles, and playback settings. The layout selector appears only for dual mode.
 - Each dual-video side owns its source settings and can be operated independently; the current generator/export runtime also retains a limited shared timeline, sync-point mapping, and common-loop compatibility behavior. The former anchor/binding/relative-offset workflow is not a product contract and must not be expanded without an explicit data/UX decision.
 - Export produces `report.html` plus copies of only the media assets referenced by video blocks. Unused Media Library assets are excluded, originals remain untouched, and folder/ZIP outputs are self-contained and offline-capable.
-- This is a planning/scope decision. No requirement status is changed to `VERIFIED` by this text update.
+- This scope decision defines the canonical product direction. Requirement status must still follow actual implementation and evidence rather than being inferred from this text.
 
-目前狀態：**Phase 1/2 planning**；Architecture 與 GitHub visibility 尚未 human-approved。需求 ID 是本專案的穩定 contract；任何實作、測試、驗收與狀態更新都必須回寫 `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md`。
+目前狀態：持續實作與驗證中。Desktop architecture 已由使用者於 2026-08-14 核准；GitHub remote 已建立並持續推送 checkpoint。Repository 目前實際 visibility 為 **Public**，與本文件較早記錄的「使用者希望 Private」不一致；若 Private 仍是目標，這是待使用者處理的 repository-setting mismatch，不得以文件文字假裝已完成。需求 ID 是本專案的穩定 contract；任何實作、測試、驗收與狀態更新都必須回寫 `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md`。
 
 ## 1. 產品目的與成功條件
 
@@ -28,7 +28,7 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 
 ## 3. Status 語意
 
-`NOT_STARTED` = 尚未實作；`IN_PROGRESS` = 已開始但未完成；`AWAITING_USER_SETUP` = 等待使用者提供設定/資源；`VERIFIED` = 有相稱的真實 evidence；`DEFERRED` = 明確保留但不在目前里程碑；`NOT_IN_SCOPE` = 明確不做。Architecture 與 GitHub visibility 是另有 `BLOCKED_HUMAN` 語意的人類 checkpoint，不可視為已批准。
+`NOT_STARTED` = 尚未實作；`IN_PROGRESS` = 已開始但未完成；`AWAITING_USER_SETUP` = 等待使用者提供設定/資源；`VERIFIED` = 有相稱的真實 evidence；`DEFERRED` = 明確保留但不在目前里程碑；`NOT_IN_SCOPE` = 明確不做。需要人類高影響決策時可使用 `BLOCKED_HUMAN`；Desktop architecture checkpoint 已解除。任何 repository visibility、遠端或環境事實都應以 GitHub／實際環境 evidence 為準，不以舊 planning 敘述覆蓋現況。
 
 ## 4. In-scope requirements
 
@@ -54,7 +54,7 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 | SYNC-005 | 未來若支援 frame/time fallback，需另建能力與精度契約。 | 新需求與 fixture/真人 evidence 分開記錄。 | DEFERRED |
 | PREVIEW-001 | preview 與 export 共用 renderer/data contract，避免 editor/export 分歧。 | 同一 fixture 的 preview/export structural comparison。 | NOT_STARTED |
 | PREVIEW-002 | preview 可檢查 desktop、narrow desktop、mobile width。 | Scenario F 的 layout/controls evidence。 | NOT_STARTED |
-| EXPORT-001 | 可輸出包含 `index.html`、`videos/`、`images/` 的 self-contained folder。 | `file://` 直接開啟且相對路徑通過驗證。 | NOT_STARTED |
+| EXPORT-001 | 可輸出包含 `report.html` 與實際被引用的 `videos/`、`images/` 資產的 self-contained folder。 | `file://` 直接開啟且相對路徑通過驗證。 | NOT_STARTED |
 | EXPORT-002 | 可將同一 folder 壓成可移動的 ZIP；解壓到任意資料夾仍可用。 | Scenario B 完整離線驗收。 | NOT_STARTED |
 | EXPORT-003 | 「完整交付包」同時產生 folder 與 offline ZIP，並回報結果位置。 | 產物樹與檔案 checksum/數量可檢查。 | NOT_STARTED |
 | OFFLINE-001 | 輸出報告不依賴 internet、CDN、server API、database、Service Worker 或 runtime fetch 取得必要資料。 | 斷網後以 `file://` 開啟 desktop browser。 | NOT_STARTED |
@@ -70,9 +70,9 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 | SEC-002 | logs 不記錄私人影片內容；export/file path、檔名與錯誤訊息經安全處理。 | 不洩漏內容/credential 的 negative test。 | NOT_STARTED |
 | FS-001 | PROJECT_ROOT 下集中管理 `.worktrees`、`.backups`、`.tmp`；不散落 source copy。 | filesystem policy review。 | NOT_STARTED |
 | FS-002 | 正式 application data storage 由 Architecture policy 明確記錄在 project boundary 內。 | 實作後驗證 project data 僅落在 `PROJECT_ROOT/projects/`。 | NOT_STARTED |
-| GIT-001 | 使用 local Git、main、origin、worker/<scope> 與唯一 Integrator policy。 | baseline gate 與 branch policy review。 | NOT_STARTED |
-| GIT-002 | GitHub repo 建議名為 `pitching-analysis-report-generator`；visibility 已由使用者決定為 Private，remote 建立需授權設定。 | remote 建立後取得實際 URL/branch evidence。 | AWAITING_USER_SETUP |
-| GIT-003 | baseline/handoff/integration/acceptance/release checkpoint 有 push/secret scan 規則；force push 禁止。 | policy review，不能捏造 push evidence。 | NOT_STARTED |
+| GIT-001 | 使用 local Git 與 `origin` 保存可追溯 checkpoint；目前分支／遠端狀態以實際 repository evidence 為準，不依賴已刪除的舊 orchestrator/integrator 文件。 | branch/head/remote evidence 可查；治理文件無死引用。 | IN_PROGRESS |
+| GIT-002 | GitHub repo `treepolo/pitching-analysis-report-generator` 已建立；目前實際 visibility 為 Public。若使用者仍要求 Private，需明確調整 repository setting。 | repository metadata 與使用者最終 visibility 決策一致。 | AWAITING_USER_SETUP |
+| GIT-003 | checkpoint／push 不得捏造 evidence；禁止 force push，且 source media、generated report、ZIP、credential 等敏感產物不得進 Git。 | commit/remote evidence 與 sensitive scan 可查。 | IN_PROGRESS |
 | QA-001 | Scenario A–G 覆蓋完整流程、offline、重複 asset、不同 FPS、VFR、responsive、error recovery。 | `ACCEPTANCE_TESTS.md` 的 exit criteria。 | NOT_STARTED |
 | QA-002 | unit/integration/E2E/visual/真人驗收 evidence 分層；fixture 不冒充真人；無 evidence 不可 VERIFIED。 | `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md` audit。 | NOT_STARTED |
 | EDIT-004 | Canonical editor is a block-based long-form canvas; the former fixed-form workflow is not a product mode. | many text/video blocks, reorder, reopen, and focused text editing evidence | NOT_STARTED |
@@ -90,4 +90,4 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 
 ## 6. Mandatory reviews
 
-本需求集必須搭配 `USER_FLOWS.md` 的 workflow review、`UI_UX_SPEC.md` 的 UX complexity/reachability review、`DATA_MODEL.md`/`DATA_AND_SYNC.md` 的 lifecycle/dependency review、`MEDIA_PIPELINE.md` 的 async/recovery review、`REPORT_OUTPUT_SPEC.md` 的 offline review、`ACCEPTANCE_TESTS.md` 的 visual/interaction/security review。
+本需求集必須搭配 `USER_FLOWS.md` 的 workflow review、`UI_UX_SPEC.md` 的 UX complexity/reachability review、`DATA_MODEL.md`/`DATA_AND_SYNC.md` 的 lifecycle/dependency review、`MEDIA_PIPELINE.md` 的 async/recovery review、`REPORT_OUTPUT_SPEC.md` 的 offline review、`ACCEPTANCE_TESTS.md` 的 visual/interaction/security review。最新實作與 evidence 摘要由 `PROJECT_STATE.md` 統一提供。

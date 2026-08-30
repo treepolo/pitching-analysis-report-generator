@@ -2,11 +2,11 @@
 
 ## Architecture decision: block-based report document (2026-08-14)
 
-The product architecture now treats the block-based long-form editor as canonical and supersedes the former fixed-form/editor configuration. The old UI may remain in Git history but must not be exposed as a compatibility mode.
+The product architecture treats the block-based long-form editor as canonical and supersedes the former fixed-form/editor configuration. The old UI may remain in Git history but must not be exposed as a compatibility mode.
 
 - Report Model/Editor owns an ordered block document with many text blocks and independent video blocks.
 - Media Pipeline owns project-local asset records and safe metadata/normalization states; it does not decide export inclusion globally.
-- Playback/Sync owns per-video-block single/comparison playback, in/out settings, source-local time/frame semantics, and block-local anchors.
+- Playback/Sync owns per-video-block single/comparison playback, in/out settings, source-local time/frame semantics, side-specific controls, and the current limited block-level `sync`/`commonSegment` compatibility seam.
 - Renderer/Export traverses video blocks, copies only referenced assets into self-contained folder/ZIP outputs, and never mutates originals or includes unused library assets.
 - Shell owns the project-root boundary, IPC/security, persistence/recovery, and job orchestration around these contracts.
 
@@ -16,7 +16,7 @@ The product architecture now treats the block-based long-form editor as canonica
 
 Each downstream owner must consume the upstream canonical contract; no owner may reintroduce fixed-form UI or infer export inclusion from the whole Media Library.
 
-目前狀態：**Phase 2 planning / ARCHITECTURE APPROVED BY USER（2026-08-14）**。使用者已選擇 Desktop application。本文件的高層架構 checkpoint 已解除；shell/framework、native media strategy 與 packaging 仍採可替換的 implementation decision，不得擴大產品 scope。
+目前狀態：**Desktop architecture APPROVED BY USER（2026-08-14）**，且 desktop shell、project-root persistence、block editor/player、media adapters 與 folder/ZIP export 已有 implementation。Shell/framework、native media strategy 與 packaging 仍是可替換的 technical decision；完整真實媒體、recovery、responsive 與真人驗收狀態以 `PROJECT_STATE.md`／`ACCEPTANCE_TESTS.md` 為準，不因架構文字或程式存在而視為 VERIFIED。
 
 ## 1. Product drivers
 
@@ -95,15 +95,13 @@ Each downstream owner must consume the upstream canonical contract; no owner may
 
 - shell 負責 project filesystem、media pipeline、FFmpeg/native adapter、job persistence、folder/ZIP export。
 - web layer 負責 editor、preview、player UI 與可重用 report renderer。
-- exported report 不依賴 desktop shell；仍遵守 REPORT_OUTPUT_SPEC 的 file:// contract。
-- application data 與 generated output 僅可落在 `PROJECT_STATE.md` 定義的 boundary。
+- exported report 不依賴 desktop shell；正式成品主檔為 `report.html`，並遵守 `REPORT_OUTPUT_SPEC.md` 的 file:// contract。
+- application data、internal temporary/cache 與 generated artifacts 必須遵守 `PROJECT_STATE.md`、`DATA_MODEL.md`、`MEDIA_PIPELINE.md` 與 export path policy 定義的安全邊界。
 
-這是使用者已確認的高層方向。實作仍不得加入帳號、雲端 database 或超出 scope 的服務。第一個 vertical slice 可先使用可替換的 desktop shell adapter 與 web renderer；不因追求速度而把 source media、generated report 或 ZIP 放進 Git。
+這是使用者已確認的高層方向。實作仍不得加入帳號、雲端 database 或超出 scope 的服務。既有 implementation 應持續維持 shell 與 portable report runtime 的邊界；不得為求方便把 source media、generated report 或 ZIP 放進 Git。
 
 ## 6. Human Architecture Checkpoint
 
 狀態：**RESOLVED — Desktop application approved by user on 2026-08-14**。
 
-使用者決定：採 Desktop application。後續仍需以可逆、可測試的 technical decision 逐步確認 shell/framework、native media strategy 與 packaging；不把這些細節冒充新的產品 checkpoint。
-
-已可開始依此高層方向建立 desktop vertical slice。正式 application data storage 採 `PROJECT_STATE.md` 的 project-root 方案；若未來要改為其他位置，必須更新 current state、backup/restore 與 acceptance evidence。
+使用者決定：採 Desktop application。後續以可逆、可測試的 technical decision 維護 shell/framework、native media strategy 與 packaging；不把這些細節冒充新的產品 checkpoint。正式 application data storage 採 `PROJECT_STATE.md` 的 project-root 方案；若未來要改為其他位置，必須同步更新 current state、backup/restore 與 acceptance evidence。

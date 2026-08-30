@@ -9,9 +9,9 @@
 - Explicit frame-based mode is a separate capability. Frame stepping uses each source's valid timestamps/frame timebase; when unavailable, the contract remains time-based/unknown and exposes the limitation.
 - Start anchors identify an event and are separate from the playback relationship. Per-block in/out and playback settings remain independent across repeated uses of the same asset.
 
-目前狀態：**Phase 1/2 planning**。本文件定義比較影片的同步語意、anchor 邊界、frame/time precision 與 fallback；不可在未有人類架構核准前假定特定 browser API 或 FFmpeg 實作。
+> Historical-status note: the following sections describe an earlier sync design proposal. The Desktop application architecture checkpoint has since been resolved, and this anchor/time-drift design has been superseded. Do not treat the old `Phase 1/2 planning` or pre-architecture constraints as current project state; current sync scope is the narrower `sync`/`commonSegment` compatibility seam stated above and in `PROJECT_STATE.md`.
 
-## 1. 同步核心語意
+## 1. 同步核心語意（historical proposal）
 
 - 使用者選擇兩支影片，分別移動到代表同一投球事件的位置，再按「設為同步點」。
 - 使用者不手打秒數、不手算 FPS、不手算 offset。
@@ -19,7 +19,7 @@
 - primary alignment 是共同事件的 relative time；兩支影片 frame number 可以不同。
 - anchor、loop 與 label 皆是 block-local config；同一 asset 可在多個 block 以不同設定使用。
 
-## 2. Anchor evidence
+## 2. Anchor evidence（historical proposal）
 
 每側 anchor 至少保存：
 
@@ -32,7 +32,7 @@
 
 relative t = 0 是比較 block 的語意 anchor；不是把影片檔案的 presentation timestamp 永久改寫。
 
-## 3. Alignment algorithm contract
+## 3. Alignment algorithm contract（historical proposal）
 
 給定 left anchor L、right anchor R，common relative time r 應映射為：
 
@@ -51,7 +51,7 @@ relative t = 0 是比較 block 的語意 anchor；不是把影片檔案的 prese
 
 實作可選 frame-aware browser capability；若不可可靠取得 frame position，必須降級為 time-based fallback 並揭露精度限制。
 
-## 4. Frame stepping
+## 4. Frame stepping（historical proposal）
 
 - 上一幀／下一幀以 source timing metadata 或可靠 frame-aware API 計算。
 - CFR 可使用 frame duration 推導，但仍需驗證 seek precision。
@@ -59,7 +59,7 @@ relative t = 0 是比較 block 的語意 anchor；不是把影片檔案的 prese
 - normalized copy 的 timing metadata 必須與 original 分開保存。
 - 跨瀏覽器或 file:// 能力差異不可由硬編碼 success 掩蓋。
 
-## 5. Validation
+## 5. Validation（historical proposal）
 
 Comparison block export 前至少驗證：
 
@@ -72,16 +72,18 @@ Comparison block export 前至少驗證：
 
 Invalid state 必須指出可修復 action；禁止靜默移動 anchor 或輸出不能工作的 comparison。
 
-## 6. Persistence / recovery
+## 6. Persistence / recovery（historical proposal）
 
 - anchor 設定後立即進入 autosave／save queue，save state 可觀察。
 - crash/reload 必須能辨識未完成 anchor mutation 或恢復前一個可信 revision。
 - export 前建立 read-only snapshot；export 中的 correction 不寫回 source anchor。
 - 同一 asset 在不同 block 的 anchor 修改不得互相污染。
 
-## 7. Required evidence
+## 7. Historical evidence targets
 
-| Evidence | 內容 | 目前狀態 |
+下表屬於已 supersede 的設計所需 evidence，不代表目前產品 acceptance backlog；目前有效的 shared timeline/sync-point acceptance 以 `ACCEPTANCE_TESTS.md` 為準。
+
+| Evidence | 內容 | Historical status |
 |---|---|---|
 | Sync contract tests | 不同 FPS、不同 anchor、不同 duration 的 mapping | NOT_STARTED |
 | Frame precision tests | CFR、VFR、incompatible 與 fallback | NOT_STARTED |

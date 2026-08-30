@@ -7,7 +7,7 @@
 - Original/source files are read-only from export's perspective. Export copies are separate self-contained artifacts with project-relative references; normalization and export must not overwrite originals.
 - Missing, unsupported, unverified, or unplayable referenced assets remain explicit blockers. Unreferenced assets do not become export blockers merely because they are present in the library.
 
-目前狀態：**Phase 1/2 planning**。本文件定義媒體匯入、檢查、正規化與恢復；FFmpeg、native codec tooling 與 application shell 依 Architecture checkpoint 決定。
+目前狀態：Desktop application 架構 checkpoint 已解除。媒體 contract、project-local ingest/path policy、FFprobe/FFmpeg adapter、frame-cache 與 native-video player/export 相關 implementation 已存在；但真實媒體 compatibility、VFR/normalization、完整 progress/cancel/recovery 與跨環境 evidence 仍不得僅憑程式存在視為 `VERIFIED`。最新狀態以 `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md` 為準。
 
 ## 1. Pipeline stages
 
@@ -22,7 +22,7 @@
 
 ## 2. Supported input and output policy
 
-- 正式輸入至少包含 MP4 與常見圖片格式；實際 extension matrix 要在 implementation/fixture 階段定義並測試。
+- 正式輸入至少包含 MP4 與常見圖片格式；實際 extension/container matrix 由 implementation 定義，仍需以 fixture 與真實媒體 evidence 驗證其可播放與 metadata 行為。
 - 目標瀏覽器相容影片格式原則上偏向 MP4/H.264，但不能在未驗證前宣稱所有檔案可播放。
 - 不使用 Base64 內嵌影片。
 - original、normalized copy 與 export copy 是不同角色；source 不被 export 或 normalization 改寫。
@@ -76,13 +76,13 @@ Long job 至少保存：
 - 私人影片內容、影格、完整路徑與 credential 不進一般 log。
 - log 只記錄 safe asset id、phase、非敏感錯誤類型與計數；必要時以 redacted path 表示。
 - 不上傳第三方、不建立無必要 telemetry。
-- generated media 與 output 受 `PROJECT_STATE.md` 的 project-root boundary 管理，不進 Git。
+- original、normalized media、frame cache 與 internal temporary data 保持在 project-local boundary；user-selected final export 可位於專案外的輸出位置，但必須通過 export path containment/symlink policy。上述本機資料與生成產物都不得進 Git。
 
 ## 8. Required evidence
 
-目前沒有實際影片與 pipeline implementation，因此所有項目均為 NOT_STARTED：
+目前已有媒體 domain／adapter／frame-cache 的 automated contract coverage，但下列真實媒體與恢復 evidence 尚未完整建立，不能因 implementation 存在而視為 VERIFIED：
 
-- MP4/image import and metadata fixture
+- MP4/image import and metadata fixture / real-media evidence
 - VFR/incompatible detection
 - original preservation
 - normalized copy verification
