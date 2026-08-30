@@ -21,15 +21,23 @@ test('authoritative annotation shortcut runtime compiles and loads before guessi
   assert.ok(coordinatorIndex > shortcutsIndex);
 });
 
-test('active editor is captured from the actual start-annotation toggle click instead of scanning stale DOM', () => {
-  assert.match(source, /handleToggleCapture/u);
-  assert.match(source, /data-annotation-action="toggle-edit"/u);
-  assert.match(source, /activeEditor = \{ blockId: context\.blockId, side: context\.side \}/u);
-  assert.match(source, /window\.addEventListener\('click', handleToggleCapture, true\)/u);
-  assert.doesNotMatch(source, /querySelectorAll\([^\n]*toggle-edit/u);
+test('shortcut target follows the last interacted annotation side instead of scanning stale active DOM', () => {
+  assert.match(source, /let shortcutTarget = null/u);
+  assert.match(source, /handleInteractionCapture/u);
+  assert.match(source, /rememberShortcutTarget\(context\)/u);
+  assert.match(source, /window\.addEventListener\('pointerdown', handleInteractionCapture, true\)/u);
+  assert.match(source, /window\.addEventListener\('contextmenu', handleInteractionCapture, true\)/u);
+  assert.doesNotMatch(source, /querySelectorAll\([^\n]*button-primary/u);
 });
 
-test('A and D step the captured editor through the canonical playhead', () => {
+test('editing target is separate and stale toggle DOM is normalized to one active registration editor', () => {
+  assert.match(source, /let editingTarget = null/u);
+  assert.match(source, /synchronizeToggleDom/u);
+  assert.match(source, /toggle\.classList\.toggle\('button-primary', active\)/u);
+  assert.match(source, /active \? '結束標註' : '開始標註'/u);
+});
+
+test('A and D step the last interacted side through the canonical playhead', () => {
   assert.match(source, /event\.code === 'KeyA'/u);
   assert.match(source, /event\.code === 'KeyD'/u);
   assert.match(source, /projectStepFrames\(\)/u);
