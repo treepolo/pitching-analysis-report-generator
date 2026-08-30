@@ -33,10 +33,11 @@ test('annotation navigation uses the main player timeline rather than an indepen
 test('Delete prefers an explicitly selected point and otherwise uses the canonical current frame', () => {
   assert.match(coordinator, /annotationSelectedTrackId/u);
   assert.match(coordinator, /annotationSelectedFrame/u);
-  assert.match(coordinator, /const selected = selectedPointTarget\(context\)/u);
-  assert.match(coordinator, /selected \|\| currentPointTarget\(context\)/u);
-  assert.match(coordinator, /playhead\.currentFrame\(context\.card, context\.side\)/u);
+  assert.match(coordinator, /const selected = selectedPointTarget\(fresh\)/u);
+  assert.match(coordinator, /selected \|\| currentPointTarget\(fresh\)/u);
+  assert.match(coordinator, /playhead\.currentFrame\(fresh\.card, fresh\.side\)/u);
   assert.match(coordinator, /target\.track\.points = target\.track\.points\.filter/u);
+  assert.match(coordinator, /event\.key === 'Delete' \|\| event\.code === 'Delete' \|\| event\.key === 'Del'/u);
 });
 
 test('coordinator Delete has its own one-step undo without stealing unrelated Ctrl+Z operations', () => {
@@ -44,6 +45,27 @@ test('coordinator Delete has its own one-step undo without stealing unrelated Ct
   assert.match(coordinator, /undoCoordinatorDelete\(context\)/u);
   assert.match(coordinator, /track\.points\.push\(\{ \.\.\.operation\.point \}\)/u);
   assert.match(coordinator, /if \(!undoCoordinatorDelete\(context\)\) return/u);
+});
+
+test('annotation keyboard shortcuts are window-capture authoritative and A D use the canonical playhead', () => {
+  assert.match(coordinator, /window\.addEventListener\('keydown', handleAnnotationShortcut, true\)/u);
+  assert.match(coordinator, /event\.code === 'KeyA'/u);
+  assert.match(coordinator, /event\.code === 'KeyD'/u);
+  assert.match(coordinator, /void stepByConfiguredFrames\(context, event\.code === 'KeyA' \? -1 : 1\)/u);
+  assert.match(coordinator, /playhead\.seekFrame\(fresh\.card, fresh\.side, requested/u);
+  assert.match(coordinator, /stopImmediatePropagation\(\)/u);
+});
+
+test('timeline ranges and point selectors do not disable Delete or A D shortcuts', () => {
+  assert.match(coordinator, /function typingTarget\(target\)/u);
+  assert.match(coordinator, /\['text', 'search', 'email', 'url', 'tel', 'password'\]\.includes\(type\)/u);
+  assert.doesNotMatch(coordinator, /select, \[contenteditable/u);
+  assert.doesNotMatch(coordinator, /\['range'/u);
+});
+
+test('active annotation context tolerates panel repaint without relying only on a CSS class', () => {
+  assert.match(coordinator, /entry\.classList\?\.contains\('button-primary'\)/u);
+  assert.match(coordinator, /entry\.textContent\?\.trim\(\) === '結束標註'/u);
 });
 
 test('annotation start and end inputs are one-based in UI while staying zero-based in stored data', () => {
