@@ -10,6 +10,7 @@ output/
 logs/
 reports/
 exports/
+測試輸出/
 *.mp4
 *.mov
 *.avi
