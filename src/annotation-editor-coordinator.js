@@ -29,7 +29,9 @@
   }
 
   function activeContext() {
-    const toggle = document.querySelector('[data-annotation-panel] [data-annotation-action="toggle-edit"].button-primary');
+    const toggles = [...document.querySelectorAll('[data-annotation-panel] [data-annotation-action="toggle-edit"]')];
+    const toggle = toggles.find((entry) => entry.classList?.contains('button-primary'))
+      || toggles.find((entry) => entry.textContent?.trim() === '結束標註');
     return contextFromPanel(toggle?.closest?.('[data-annotation-panel]'));
   }
 
@@ -60,11 +62,13 @@
     return model.normalizeStepFrames(raw, 1);
   }
 
-  function editableTarget(target) {
-    return Boolean(
-      target?.matches?.('input, textarea, select, [contenteditable="true"]')
-      || target?.closest?.('input, textarea, select, [contenteditable="true"]'),
-    );
+  function typingTarget(target) {
+    const element = target?.closest?.('textarea, input, [contenteditable="true"]');
+    if (!element) return false;
+    if (element.matches?.('textarea, [contenteditable="true"]') || element.isContentEditable) return true;
+    if (!element.matches?.('input')) return false;
+    const type = String(element.type || 'text').toLowerCase();
+    return ['text', 'search', 'email', 'url', 'tel', 'password'].includes(type);
   }
 
   function setStatus(context, message) {
@@ -89,8 +93,9 @@
   }
 
   function currentPointTarget(context) {
-    const track = activeTrack(context);
-    const frame = playhead.currentFrame(context.card, context.side);
+    const fresh = freshContext(context);
+    const track = activeTrack(fresh);
+    const frame = playhead.currentFrame(fresh.card, fresh.side);
     const point = track?.points?.find((entry) => entry?.frame === frame) || null;
     return track && point ? { track, point, frame } : { track, point: null, frame };
   }
@@ -103,30 +108,32 @@
   }
 
   function deletePoint(context) {
-    const selected = selectedPointTarget(context);
-    const target = selected || currentPointTarget(context);
+    const fresh = freshContext(context);
+    const selected = selectedPointTarget(fresh);
+    const target = selected || currentPointTarget(fresh);
     if (!target?.track || !target.point) {
-      const frame = target?.frame ?? playhead.currentFrame(context.card, context.side);
-      setStatus(context, `第 ${frame + 1} 幀沒有目前圖層可刪除的標註點。`);
+      const frame = target?.frame ?? playhead.currentFrame(fresh.card, fresh.side);
+      setStatus(fresh, `第 ${frame + 1} 幀沒有目前圖層可刪除的標註點。`);
       return false;
     }
-    const key = contextKey(context.card, context.side);
+    const key = contextKey(fresh.card, fresh.side);
     deleteUndoByContext.set(key, {
       trackId: target.track.id,
       point: { ...target.point },
     });
     target.track.points = target.track.points.filter((point) => point.frame !== target.frame);
-    clearSelectedDataset(context);
+    clearSelectedDataset(fresh);
     if (typeof scheduleSave === 'function') scheduleSave();
-    setStatus(context, `已刪除第 ${target.frame + 1} 幀的標註點。Ctrl+Z 可復原。`);
+    setStatus(fresh, `已刪除第 ${target.frame + 1} 幀的標註點。Ctrl+Z 可復原。`);
     return true;
   }
 
   function undoCoordinatorDelete(context) {
-    const key = contextKey(context.card, context.side);
+    const fresh = freshContext(context);
+    const key = contextKey(fresh.card, fresh.side);
     const operation = deleteUndoByContext.get(key);
     if (!operation) return false;
-    const track = tracksFor(context).find((entry) => entry?.id === operation.trackId);
+    const track = tracksFor(fresh).find((entry) => entry?.id === operation.trackId);
     if (!track) {
       deleteUndoByContext.delete(key);
       return false;
@@ -136,19 +143,46 @@
     track.points.sort((left, right) => left.frame - right.frame);
     deleteUndoByContext.delete(key);
     if (typeof scheduleSave === 'function') scheduleSave();
-    setStatus(context, `已復原第 ${operation.point.frame + 1} 幀的標註點。`);
+    setStatus(fresh, `已復原第 ${operation.point.frame + 1} 幀的標註點。`);
     return true;
   }
 
-  function handleDeleteAndUndo(event) {
+  async function stepByConfiguredFrames(context, direction) {
+    const fresh = freshContext(context);
+    const step = projectStepFrames();
+    const from = playhead.currentFrame(fresh.card, fresh.side);
+    const requested = Math.max(0, from + (direction * step));
+    const ok = await playhead.seekFrame(fresh.card, fresh.side, requested, { status: true });
+    const actual = playhead.currentFrame(fresh.card, fresh.side);
+    setStatus(
+      fresh,
+      ok
+        ? `${direction < 0 ? '往回' : '往前'}步進 ${step} 幀；目前第 ${actual + 1} 幀。`
+        : 'N 幀步進定位未完成，請重試。',
+    );
+    return ok;
+  }
+
+  function handleAnnotationShortcut(event) {
     const context = activeContext();
-    if (!context || editableTarget(event.target)) return;
-    if (event.key === 'Delete') {
+    if (!context || typingTarget(event.target)) return;
+
+    const plainKey = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    if (plainKey && (event.code === 'KeyA' || event.code === 'KeyD')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void stepByConfiguredFrames(context, event.code === 'KeyA' ? -1 : 1);
+      return;
+    }
+
+    const isDelete = event.key === 'Delete' || event.code === 'Delete' || event.key === 'Del';
+    if (plainKey && isDelete) {
       event.preventDefault();
       event.stopImmediatePropagation();
       deletePoint(context);
       return;
     }
+
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
       if (!undoCoordinatorDelete(context)) return;
       event.preventDefault();
@@ -217,7 +251,7 @@
       return context;
     }
     if (event.type === 'keydown' && event.code === 'Space') {
-      if (event.repeat || editableTarget(event.target)) return null;
+      if (event.repeat || typingTarget(event.target)) return null;
       return activeContext();
     }
     return null;
@@ -269,7 +303,7 @@
   }
 
   window.addEventListener('change', handleBoundaryChangeCapture, true);
-  window.addEventListener('keydown', handleDeleteAndUndo, true);
+  window.addEventListener('keydown', handleAnnotationShortcut, true);
   window.addEventListener('click', handleRegistrationCapture, true);
   window.addEventListener('keydown', handleRegistrationCapture, true);
 
