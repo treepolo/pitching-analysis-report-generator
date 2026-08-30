@@ -2,7 +2,8 @@
 
 (() => {
   const model = globalThis.pitchingAnnotationModel;
-  if (!model) return;
+  const playhead = globalThis.pitchingAnnotationPlayhead;
+  if (!model || !playhead) return;
 
   function projectStepFrames() {
     const raw = state?.activeProject?.exportSettings?.annotationStepFrames;
@@ -27,15 +28,6 @@
     return { card, side: sideElement.dataset.inlineSide };
   }
 
-  function currentFrame(card, side) {
-    try {
-      if (typeof sideFrameIndexFromVideo === 'function') {
-        return Math.max(0, sideFrameIndexFromVideo(card, side));
-      }
-    } catch {}
-    return 0;
-  }
-
   function setStepStatus(card, side, message) {
     const panel = card?.querySelector?.(`[data-annotation-panel][data-annotation-side="${side}"]`);
     const status = panel?.querySelector?.('[data-annotation-status]');
@@ -45,16 +37,10 @@
   async function stepByConfiguredFrames(card, side, direction) {
     if (!card || !side || ![-1, 1].includes(direction)) return false;
     const step = projectStepFrames();
-    const from = currentFrame(card, side);
+    const from = playhead.currentFrame(card, side);
     const requested = Math.max(0, from + (direction * step));
-    if (typeof seekFramePlayerSideIndex !== 'function') return false;
-    let ok = false;
-    try {
-      ok = await seekFramePlayerSideIndex(card, side, requested, { exact: true, status: true });
-    } catch {
-      ok = false;
-    }
-    const actual = currentFrame(card, side);
+    const ok = await playhead.seekFrame(card, side, requested, { status: true });
+    const actual = playhead.currentFrame(card, side);
     if (ok) {
       setStepStatus(card, side, `${direction < 0 ? '往回' : '往前'}步進 ${step} 幀；目前第 ${actual + 1} 幀。`);
     } else {
@@ -110,7 +96,7 @@
     const help = panel.querySelector('.annotation-help');
     setTextIfChanged(
       help,
-      '標註模式：移動滑鼠定位；左鍵或空白鍵確定。←／→ 永遠逐 1 幀；A／D 依 N 幀步進，Delete 刪除目前幀的點，Ctrl+Z 復原，Esc 結束。',
+      '標註模式：左鍵或空白鍵註冊；右鍵選取既有點。←／→ 永遠逐 1 幀；A／D 依 N 幀步進。Delete 優先刪除選取點，未選取時刪除目前幀的點；Ctrl+Z 復原；Esc 結束。',
     );
   }
 
