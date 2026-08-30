@@ -4,10 +4,15 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotation-point-controls.js'), 'utf8');
 const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotations.css'), 'utf8');
 const index = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.html'), 'utf8');
+
+test('annotation point control runtime compiles as browser JavaScript', () => {
+  assert.doesNotThrow(() => new vm.Script(source));
+});
 
 test('loads point navigation after annotation editor', () => {
   const annotationIndex = index.indexOf('./annotations.js');
