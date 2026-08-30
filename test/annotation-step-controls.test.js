@@ -29,11 +29,11 @@ test('N-frame stepping has independent backward and forward buttons on the canon
   assert.doesNotMatch(source, /seekFramePlayerSideIndex/u);
 });
 
-test('A and D keyboard ownership is captured by the active-editor shortcut runtime', () => {
+test('A and D keyboard ownership follows the last interacted annotation side', () => {
   assert.doesNotMatch(source, /KeyA|KeyD|addEventListener\('keydown'/u);
   assert.match(shortcuts, /event\.code === 'KeyA'/u);
   assert.match(shortcuts, /event\.code === 'KeyD'/u);
-  assert.match(shortcuts, /activeEditor = \{ blockId: context\.blockId, side: context\.side \}/u);
+  assert.match(shortcuts, /shortcutTarget = \{ blockId: context\.blockId, side: context\.side \}/u);
   assert.match(shortcuts, /window\.addEventListener\('keydown', handleShortcut, true\)/u);
 });
 
