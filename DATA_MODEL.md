@@ -8,7 +8,7 @@
 - Export derives `referencedAssetIds` by traversing video blocks in a read-only snapshot. Only those assets receive export copies; originals and unused library assets are untouched and excluded.
 - This model decision changes the canonical target only; migration, persistence, and acceptance remain implementation work and are not verified here.
 
-目前狀態：**Phase 2 planning**。Desktop architecture 與 project-root storage direction 已由使用者確認；目前同步資料結構與同步 IPC 已移除，待未來另行設計後再加入本文件。
+目前狀態：**Phase 2 planning**。Desktop architecture 與 project-root storage direction 已由使用者確認；舊同步 anchor/binding/offset 資料契約與同步 IPC 已退出，但目前 block model 仍保留 `sync`／`commonSegment` 有限相容欄位，供既有產生器與輸出 shared runtime 使用。
 
 ## 1. Canonical entities
 
@@ -59,7 +59,7 @@ ContentBlock 必須以 discriminated type 表示：
 - text：結構化 rich text／安全 markup，不接受任意 script。
 - image：一個 project-local MediaAsset reference 與可選 caption/alt。
 - singleVideo：一個 MediaAsset reference、獨立的區塊 label 與 sourceLabel、playback options、segment loop。
-- comparisonVideo（使用者介面稱雙影片）：兩個 side references；每側 filename、source title、segment、playback 與 loop。兩側是獨立的單影片播放器。
+- comparisonVideo（使用者介面稱雙影片）：兩個 side references；每側 filename、source title、segment、playback 與 loop。兩側各自是獨立的單影片播放器，另由 block-level shared runtime 提供有限共同控制。
 
 空 title、空 optional fields 不應在 export renderer 產生空白 section 或裝飾性 placeholder。
 
@@ -80,7 +80,7 @@ MediaAsset 不得保存 block-specific loop、label 或播放狀態。
 
 ## 6. PlayerBlockConfig
 
-PlayerBlockConfig 保存使用情境；同一 MediaAsset 被不同 block 使用時，設定互不污染。雙影片兩側的 PlayerBlockConfig 完全獨立；目前不保存舊同步錨點、相對偏移或綁定模式。
+PlayerBlockConfig 保存使用情境；同一 MediaAsset 被不同 block 使用時，設定互不污染。雙影片兩側的 PlayerBlockConfig 各自保存來源設定；block-level `sync`／`commonSegment` 僅是既有 shared runtime 的相容資料，不保存舊式 anchor、相對偏移或 binding mode。
 
 ## 7. ExportJob / JobEvent
 

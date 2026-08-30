@@ -21,7 +21,7 @@
 
 - `.txt`/`.md` import。
 - Media Library、實際圖片/影片匯入與 metadata inspection。
-- single video、comparison video、sync anchor、逐幀控制與 playback synchronization。
+- single video、comparison video、既有 shared timeline／sync-point compatibility、逐幀控制與 playback synchronization；舊式 anchor/binding/offset workflow 不在產品契約。
 - FFmpeg、VFR/codec normalization。
 - self-contained report folder、完整 export、ZIP、offline `file://` delivery。
 - responsive/真人 acceptance、Scenario A–G 全流程與其 requirement-level verification。

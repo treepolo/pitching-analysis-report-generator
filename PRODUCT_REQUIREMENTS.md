@@ -6,7 +6,7 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 
 - The canonical report is a long-form document made of many ordered text blocks and many independent video blocks. Text-editor features are limited to the content needs of those text blocks; video players are inserted as blocks.
 - Each video block independently selects one file or a file pair, supports single/dual mode, and owns its playback segment, in/out range, titles, and playback settings. The layout selector appears only for dual mode.
-- Each dual-video side uses the single-video player independently. The former comparison synchronisation mechanism is removed and deferred until a future data/UX design is explicitly approved.
+- Each dual-video side owns its source settings and can be operated independently; the current generator/export runtime also retains a limited shared timeline, sync-point mapping, and common-loop compatibility behavior. The former anchor/binding/relative-offset workflow is not a product contract and must not be expanded without an explicit data/UX decision.
 - Export produces `report.html` plus copies of only the media assets referenced by video blocks. Unused Media Library assets are excluded, originals remain untouched, and folder/ZIP outputs are self-contained and offline-capable.
 - This is a planning/scope decision. No requirement status is changed to `VERIFIED` by this text update.
 
@@ -47,10 +47,10 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 | PLAYER-001 | Single Video Block 支援 play/pause、seek、playback rate、上一幀/下一幀、fullscreen、可選 loop。 | Scenario B 與 touch/keyboard evidence。 | NOT_STARTED |
 | PLAYER-002 | 雙影片區塊支援兩支影片，兩邊各有檔名、來源標題、segment、播放速度與循環；並排／堆疊只在雙影片顯示。 | 寬螢幕左右排、窄螢幕上下排且 controls 可達。 | IN_PROGRESS |
 | PLAYER-003 | 同一 block 可顯示合理的媒體缺失、不可播放、超界與 loop validation 狀態。 | 錯誤不會靜默 export。 | NOT_STARTED |
-| SYNC-001 | 舊同步錨點機制已移除；未來重新設計時另訂資料與互動契約。 | 新需求與新驗收完成前不提供同步控制。 | DEFERRED |
+| SYNC-001 | 舊同步錨點工作流不是產品契約；目前僅保留既有雙影片 frame sync point 相容資料。 | 不新增 anchor 編輯流程；既有 sync point mapping 需維持可讀與可恢復。 | DEFERRED |
 | SYNC-002 | 舊同步綁定／控制側／相對偏移狀態已移除。 | 儲存、IPC、匯出不得產生舊欄位。 | DEFERRED |
 | SYNC-003 | 未來同步語意需由新產品設計明確定義。 | 新方案通過後再建立驗收。 | DEFERRED |
-| SYNC-004 | 目前雙影片兩側不得同步播放、同步 seek 或 drift correction。 | 兩側操作保持獨立。 | DEFERRED |
+| SYNC-004 | 目前雙影片 runtime 可透過 shared timeline 對兩側播放、seek、逐幀與 loop 做映射；這是既有相容行為，不等同於舊式 drift-correction 產品契約。 | 共同控制與兩側映射可運作；不得新增 anchor/binding/offset workflow。 | IN_PROGRESS |
 | SYNC-005 | 未來若支援 frame/time fallback，需另建能力與精度契約。 | 新需求與 fixture/真人 evidence 分開記錄。 | DEFERRED |
 | PREVIEW-001 | preview 與 export 共用 renderer/data contract，避免 editor/export 分歧。 | 同一 fixture 的 preview/export structural comparison。 | NOT_STARTED |
 | PREVIEW-002 | preview 可檢查 desktop、narrow desktop、mobile width。 | Scenario F 的 layout/controls evidence。 | NOT_STARTED |
@@ -61,7 +61,7 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 | OFFLINE-002 | offline support boundary 明確標記 desktop 正式支援、mobile local-file 風險。 | 文件與 UI capability statement 一致。 | NOT_STARTED |
 | RESP-001 | 報告與產生器在 desktop wide、narrow、iPhone、Android viewport 無 overlap/水平爆版。 | Scenario F visual evidence。 | NOT_STARTED |
 | RESP-002 | responsive 不刪除正式功能；比較 controls、playback、frame controls 在窄螢幕可觸控。 | mobile reachability map 與 touch test。 | NOT_STARTED |
-| PERSIST-001 | autosave/explicit save 保存內容、media references、playback settings、export settings。 | 關閉/重開後資料一致，舊同步欄位被清除。 | IN_PROGRESS |
+| PERSIST-001 | autosave/explicit save 保存內容、media references、playback settings、export settings，以及既有雙影片 sync/commonSegment 相容資料。 | 關閉/重開後資料一致；舊 anchor/binding/offset 欄位被清除。 | IN_PROGRESS |
 | PERSIST-002 | crash/reload recovery 可辨識未完成變更或 job，且不破壞 source project。 | recovery fixture 與 evidence。 | NOT_STARTED |
 | PERSIST-003 | export 是 source project 的讀取衍生流程，不改壞原始資料。 | export 前後 canonical model hash/semantic comparison。 | NOT_STARTED |
 | ASYNC-001 | import/inspection/normalization/transcode/ZIP/export 依實際耗時建模為 short async 或 persisted long job。 | phase、processed/total、success/skipped/failed 可觀察。 | NOT_STARTED |

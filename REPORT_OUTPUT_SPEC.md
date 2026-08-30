@@ -3,7 +3,7 @@
 ## Canonical output decision: referenced media only (2026-08-14)
 
 - The canonical source is the block-based long-form report document. `report.html` and its output renderer must preserve text blocks and independent single/dual video blocks without editor-only state.
-- A dual-video block is two independent single-video players. Each side keeps its own source filename, source title, segment, playback rate, and loop settings; the current synchronisation/anchoring/binding mechanism is not part of the output contract and may be redesigned only by a future explicit requirement.
+- A dual-video block has two side-specific single-video players, each retaining its own source filename, source title, segment, playback rate, and loop settings, plus a limited block-level shared timeline/sync-point runtime. The former anchor/binding/relative-offset workflow is not part of the output contract; changes to the existing shared behavior require a future explicit requirement.
 - Before staging, export computes the set of MediaAsset IDs referenced by video blocks. The folder and ZIP contain copies of only that set; unused Media Library assets are excluded.
 - Originals remain untouched. Output copies live under the self-contained export tree with portable relative paths; the same referenced set and content must be used for folder and ZIP variants.
 - A missing/invalid referenced asset blocks export. An unused asset is not included and is not a reason to fail an otherwise valid report.

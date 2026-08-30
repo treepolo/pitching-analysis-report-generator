@@ -1,6 +1,6 @@
 # Data and Sync Contract
 
-> Current status (2026-08-21): the former synchronization anchors, binding modes, control-side state, relative offsets, and sync IPC are removed from the product. The material below is retained as historical design context only; it is not an active storage, renderer, export, or backend contract. A future synchronization redesign requires a new explicit product decision.
+> Current status (2026-08-30): the former anchor, binding-mode, control-side, relative-offset, and sync-IPC workflow is not a product contract. The current code still has a narrower block-local `sync`/`commonSegment` compatibility seam used by the generator and shared export runtime. The material below is historical design context and must not be read as authorization to expand that seam; any removal or redesign requires an explicit product decision.
 
 ## Historical block-local sync proposal (superseded 2026-08-21)
 

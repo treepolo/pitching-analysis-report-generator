@@ -6,7 +6,7 @@ These checks supersede any assumption that the former fixed-form editor is accep
 
 - Long-form editor: create many text blocks and many independent video blocks, reorder/remove them, reopen, and confirm focused text editing features without a fixed-form compatibility path.
 - Video blocks: independently choose one asset or a pair; single uses one stacked player card, while dual exposes side-by-side/stacked layout (layout is shown only for dual), and preserves per-block and per-side in/out/playback settings.
-- Dual-video blocks: verify that both sides expose the single-video controls independently; the current synchronisation, anchor, binding, control-side, and relative-offset mechanism is absent from the UI, persistence, IPC, and export contract. Future synchronisation requires a new design and acceptance set.
+- Dual-video blocks: verify that both sides expose their independent controls and that the existing shared timeline/sync-point compatibility behavior maps both sides correctly in generator and export runtime. The former anchor, binding, control-side, and relative-offset workflow remains absent from the product contract and must not be reintroduced without a new design and acceptance set.
 - Referenced export: a report with unused Media Library assets exports only video-block-referenced copies; originals remain byte-preserved and folder/ZIP contain the same referenced set.
 
 目前狀態：**Phase 1/2 planning**。本文件定義 automated、interaction、visual、offline、recovery、security 與真人驗收的 exit criteria；目前沒有 implementation、影片 fixture、generated report 或真人 evidence。
@@ -64,7 +64,7 @@ Acceptance ID：AT-B
 1. 解壓 ZIP 到任意一般資料夾。
 2. 斷網。
 3. desktop modern browser 以 file:// 開啟 index.html。
-4. 驗證文字、圖片、single video、dual video、playback rate、loop、上一幀／下一幀；確認雙影片兩側互不連動。
+4. 驗證文字、圖片、single video、dual video、playback rate、loop、上一幀／下一幀；確認 side-specific controls 互不連動，並確認 shared controls 能按既有映射共同控制兩側。
 
 Pass criteria：必要資料不依賴 network、CDN、server API、database、Service Worker 或 runtime fetch；支援邊界與實際能力一致。
 
@@ -85,9 +85,9 @@ Pass criteria：每個 Player Block instance 與每個 dual side 的設定獨立
 
 Acceptance ID：AT-D
 
-匯入兩支不同 FPS 的可用影片，分別驗證 frame/time metadata、上一幀／下一幀、segment loop 與長時間獨立播放；不要求兩側對齊或同步。
+匯入兩支不同 FPS 的可用影片，分別驗證 frame/time metadata、上一幀／下一幀、segment loop 與獨立播放；另驗證既有 shared timeline 在可用 sync point 下能正確映射兩側，不把不同 FPS 當成相同原始 frame index。
 
-Pass criteria：每側以自身媒體時間軸正確運作；一側的播放、seek 或逐幀操作不改變另一側。
+Pass criteria：每側以自身媒體時間軸正確運作；side-specific 操作不改變另一側，shared timeline 則按既有 sync-point mapping 正確映射兩側。
 
 ## 7. Scenario E — VFR / incompatible media
 
@@ -105,7 +105,7 @@ Acceptance ID：AT-F
 
 - 無 overlap、水平爆版、被遮住的 controls。
 - dual 可左右或上下排列，controls 仍可達。
-- keyboard／touch 可執行 playback、frame、loop、export、recovery；目前不驗收同步控制。
+- keyboard／touch 可執行 playback、frame、loop、export、recovery；雙影片 shared timeline／sync-point 相容控制若出現，需驗收可達性與兩側映射，不驗收未定義的舊 anchor/binding/offset 流程。
 - Projects、Editor、Media Library、Preview、Export、Jobs、Settings 都有入口與返回路徑。
 
 ## 9. Scenario G — 錯誤恢復

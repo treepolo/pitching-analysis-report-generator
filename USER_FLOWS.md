@@ -4,7 +4,7 @@
 
 - Supersede the former fixed-form editor flow; do not expose it as a compatibility mode.
 - The editor opens a long-form canvas where the user inserts, edits, reorders, and removes independent text and video blocks. A video block chooses one file or a pair and owns its playback segment/settings.
-- Dual-video mode offers side-by-side or stacked layout. Each side is an independent single-video player; the current synchronisation mechanism is removed pending a future design.
+- Dual-video mode offers side-by-side or stacked layout. Each side owns its own source settings and can be operated independently; the current generator/export runtime also retains a limited shared timeline and sync-point compatibility behavior. The former anchor/binding/relative-offset workflow is not exposed as a new product flow.
 - Export derives the referenced asset set from video blocks only, copies those assets into the self-contained folder/ZIP, and never copies unused Media Library assets or mutates originals.
 
 目前狀態：**Phase 1/2 planning**；Architecture 與 GitHub visibility 尚未 human-approved。需求細節見 `PRODUCT_REQUIREMENTS.md`；資料邊界見 `DATA_MODEL.md`；輸出規格見 `REPORT_OUTPUT_SPEC.md`。
@@ -38,7 +38,7 @@
 4. 使用者在 Media Library 匯入多個 MP4/圖片；系統顯示 metadata 與 compatibility/normalization 狀態，長工作建立 job。
 5. 使用者在 section/issue 選「插入媒體」；系統只提供該 project 可用的 asset，建立一個獨立 Player Block reference。
 6. 單影片區塊直接可播放；雙影片區塊引導選兩個檔名、來源標題與可選循環，沒有第三支影片 UI。
-7. 使用者在兩側各自播放、seek、逐幀移動或調整速度；速度可由進度條下方的連續滑桿或數字輸入調整，也可一鍵重設為 1 倍；任一側操作不會改變另一側。
+7. 使用者可在兩側各自播放、seek、逐幀移動或調整速度；側邊 controls 不會改變另一側。若使用 block-level shared controls，系統會刻意把共同播放、seek、逐幀、速度與循環映射到兩側。
 8. 使用者開 Preview；系統使用同一 report model/renderer 顯示 desktop/narrow/mobile viewport。
 9. 使用者修改 issue 或 block；autosave 顯示已保存狀態，並保存 media references、播放設定與 export settings。
 10. 使用者關閉並重開 project；Projects list 顯示更新時間/未完成 job，重開後內容與引用仍在。
@@ -62,7 +62,7 @@ Projects 可列出、搜尋/篩選（若實作）、開啟、rename、duplicate�
 
 ## 5. Dual-video settings flow
 
-`雙影片區塊` → `選兩個檔名` → `編輯左右來源標題` → `各自設定起點／終點、速度、循環` → `各側獨立播放與逐幀控制` → `autosave`。同步錨點、同步播放與綁定模式目前不在流程內，待未來重新設計。
+`雙影片區塊` → `選兩個檔名` → `編輯左右來源標題` → `各自設定起點／終點、速度、循環` → `各側獨立播放與逐幀控制` → `可選既有共同時間軸／同步點控制` → `autosave`。舊式 anchor、binding 與相對偏移不在流程內；現有 shared 行為屬相容層，不應直接推導新功能。
 
 ## 6. Preview/export flow
 

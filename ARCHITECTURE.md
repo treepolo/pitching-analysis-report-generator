@@ -25,7 +25,7 @@ Each downstream owner must consume the upstream canonical contract; no owner may
 - Windows 上教練本人低負擔使用。
 - project lifecycle、local persistence、media metadata、VFR/codec normalization。
 - directory export、real ZIP、relative paths、file:// offline desktop report。
-- single/comparison player、frame stepping、relative-time sync、drift correction。
+- single/comparison player、frame stepping、雙影片 shared timeline／frame sync mapping；舊式 relative-time anchor 與 drift-correction 契約不在目前產品範圍。
 - responsive online report 與明確 offline capability boundary。
 - source media/privacy containment，不上傳學生素材。
 
