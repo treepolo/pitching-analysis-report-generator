@@ -1,6 +1,9 @@
 'use strict';
 
 (() => {
+  const playhead = globalThis.pitchingAnnotationPlayhead;
+  if (!playhead) return;
+
   const selectedByContext = new Map();
   const lastPrimaryClickByContext = new Map();
   let refreshQueued = false;
@@ -12,7 +15,7 @@
   function contextFromPanel(panel) {
     const sideElement = panel?.closest?.('[data-inline-side]');
     const card = sideElement?.closest?.('[data-inline-video-block][data-frame-player]');
-    if (!card || !sideElement) return null;
+    if (!card || !sideElement || !panel) return null;
     return { card, side: sideElement.dataset.inlineSide, panel };
   }
 
@@ -55,12 +58,7 @@
   }
 
   function currentFrame(card, side) {
-    try {
-      if (typeof sideFrameIndexFromVideo === 'function') {
-        return Math.max(0, sideFrameIndexFromVideo(card, side));
-      }
-    } catch {}
-    return 0;
+    return playhead.currentFrame(card, side);
   }
 
   function annotationModeActive(context) {
@@ -107,13 +105,13 @@
     const video = sideElement?.querySelector('[data-inline-video]');
     const rect = actualVideoRect(surface, video);
     const track = activeTrack(context);
-    if (!surface || !video || !rect || !track || !layerVisibleAtFrame(track, currentFrame(context.card, context.side))) return null;
+    const frame = currentFrame(context.card, context.side);
+    if (!surface || !video || !rect || !track || !layerVisibleAtFrame(track, frame)) return null;
 
     const localX = event.clientX - rect.surfaceRect.left;
     const localY = event.clientY - rect.surfaceRect.top;
     if (localX < rect.left || localX > rect.left + rect.width || localY < rect.top || localY > rect.top + rect.height) return null;
 
-    const frame = currentFrame(context.card, context.side);
     const candidates = Array.isArray(track.points)
       ? track.points.filter((point) => Number.isInteger(point?.frame) && point.frame <= frame)
       : [];
@@ -129,6 +127,21 @@
       }
     }
     return best ? { track, point: best } : null;
+  }
+
+  function clearSelectedDataset(panel) {
+    if (!panel) return;
+    delete panel.dataset.annotationSelectedTrackId;
+    delete panel.dataset.annotationSelectedFrame;
+  }
+
+  function writeSelectedDataset(panel, trackId, frame) {
+    if (!panel || !trackId || !Number.isInteger(frame) || frame < 0) {
+      clearSelectedDataset(panel);
+      return;
+    }
+    panel.dataset.annotationSelectedTrackId = trackId;
+    panel.dataset.annotationSelectedFrame = String(frame);
   }
 
   function ensurePointControl(panel) {
@@ -161,6 +174,8 @@
       ? selected.frame
       : null;
     if (selected && validSelected === null) selectedByContext.delete(key);
+    if (validSelected === null) clearSelectedDataset(panel);
+    else writeSelectedDataset(panel, track.id, validSelected);
 
     const select = row.querySelector('[data-annotation-point-select]');
     const count = row.querySelector('[data-annotation-point-count]');
@@ -193,7 +208,8 @@
   }
 
   function setStatus(context, message) {
-    const status = context.panel.querySelector('[data-annotation-status]');
+    const panel = context.card.querySelector(`[data-annotation-panel][data-annotation-side="${context.side}"]`);
+    const status = panel?.querySelector('[data-annotation-status]');
     if (status && status.textContent !== message) status.textContent = message;
   }
 
@@ -209,25 +225,20 @@
     const key = contextKey(context.card, context.side);
     if (!track || !pointFrames(track).includes(frame)) {
       selectedByContext.delete(key);
+      clearSelectedDataset(context.panel);
       queueRefresh();
       return false;
     }
     selectedByContext.set(key, { trackId: track.id, frame });
+    writeSelectedDataset(context.panel, track.id, frame);
     setStatus(context, `正在跳到第 ${frame + 1} 幀的標註點…`);
-    let ok = false;
-    try {
-      if (typeof seekFramePlayerSideIndex === 'function') {
-        ok = await seekFramePlayerSideIndex(context.card, context.side, frame, { exact: true, status: true });
-      }
-    } catch {
-      ok = false;
-    }
+    const ok = await playhead.seekFrame(context.card, context.side, frame, { status: true });
     focusSurface(context);
     setStatus(
       context,
       ok
         ? `已選取第 ${frame + 1} 幀的標註點；按 Delete 可刪除。`
-        : `第 ${frame + 1} 幀定位未完成，請重新選取此點。`,
+        : `第 ${frame + 1} 幀不在目前正式播放區間，請調整播放區間後重試。`,
     );
     queueRefresh();
     return ok;
@@ -243,6 +254,7 @@
       const track = activeTrack(context);
       if (!Number.isInteger(frame) || frame < 0 || !track) {
         selectedByContext.delete(contextKey(context.card, context.side));
+        clearSelectedDataset(panel);
         queueRefresh();
         return;
       }
@@ -255,6 +267,7 @@
       const panel = trackSelect.closest('[data-annotation-panel]');
       const context = contextFromPanel(panel);
       if (context) selectedByContext.delete(contextKey(context.card, context.side));
+      clearSelectedDataset(panel);
       queueRefresh();
     }
   }
@@ -272,16 +285,7 @@
   }
 
   function navigationBusy(context) {
-    const video = context.card.querySelector(`[data-inline-side="${context.side}"] [data-inline-video]`);
-    if (video?.seeking) return true;
-    try {
-      if (typeof framePlayerSideRuntime === 'function') {
-        const sideState = framePlayerSideRuntime(context.card, context.side);
-        if (sideState?.exactPromise) return true;
-        if (sideState?.exactTarget !== null && sideState?.exactTarget !== undefined) return true;
-      }
-    } catch {}
-    return false;
+    return playhead.navigationBusy(context.card, context.side);
   }
 
   function blockPrimaryRegistration(event) {
@@ -378,7 +382,10 @@
     const selectedVisible = selectedPoint
       && selectedPoint.frame <= frame
       && layerVisibleAtFrame(selectedTrack, frame);
-    if (selected && !selectedPoint) selectedByContext.delete(key);
+    if (selected && !selectedPoint) {
+      selectedByContext.delete(key);
+      clearSelectedDataset(panel);
+    }
     showEffect(selectedCircle, rect, selectedVisible ? selectedPoint : null, selectedTrack, 11);
 
     const track = activeTrack(context);
