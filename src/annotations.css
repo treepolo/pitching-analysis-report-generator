@@ -6,14 +6,22 @@
   position: relative;
 }
 
-.annotation-overlay {
+.annotation-overlay,
+.annotation-selection-overlay {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
   overflow: visible;
+}
+
+.annotation-overlay {
   z-index: 3;
+}
+
+.annotation-selection-overlay {
+  z-index: 4;
 }
 
 .annotation-line {
@@ -34,6 +42,44 @@
   stroke-width: 2.5;
   stroke-dasharray: 4 3;
   vector-effect: non-scaling-stroke;
+}
+
+.annotation-selection-ring {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.annotation-selection-explicit {
+  stroke-width: 3;
+  animation: annotation-selected-pulse .8s ease-in-out infinite;
+}
+
+.annotation-selection-current {
+  stroke-width: 2.5;
+  stroke-dasharray: 4 3;
+  animation: annotation-current-pulse .65s ease-in-out infinite;
+}
+
+@keyframes annotation-selected-pulse {
+  0%, 100% {
+    opacity: 1;
+    stroke-width: 3;
+  }
+  50% {
+    opacity: .35;
+    stroke-width: 6;
+  }
+}
+
+@keyframes annotation-current-pulse {
+  0%, 100% {
+    opacity: .95;
+  }
+  50% {
+    opacity: .25;
+  }
 }
 
 .annotation-editor-panel {
@@ -86,7 +132,8 @@
   min-width: 7.5rem;
 }
 
-.annotation-point-count {
+.annotation-point-count,
+.annotation-point-hint {
   color: #505a63;
 }
 
