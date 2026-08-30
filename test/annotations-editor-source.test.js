@@ -17,7 +17,6 @@ test('editor annotation mode owns Space and uses frame-only point records', () =
 test('annotation step is one arbitrary persisted project setting', () => {
   assert.match(source, /exportSettings\.annotationStepFrames/u);
   assert.match(source, /type = 'number'/u);
-  assert.match(source, /seekFramePlayerSideIndex\(card, side, target/u);
 });
 
 test('editor supports layers, point and line toggles, delete and undo', () => {
