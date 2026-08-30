@@ -16,8 +16,6 @@
       state.activeProject.exportSettings = {};
     }
     state.activeProject.exportSettings.annotationStepFrames = step;
-    const legacyInput = document.querySelector('#annotation-step-frames');
-    if (legacyInput && document.activeElement !== legacyInput) legacyInput.value = String(step);
     if (typeof scheduleSave === 'function') scheduleSave();
     return step;
   }
@@ -41,7 +39,7 @@
   function setStepStatus(card, side, message) {
     const panel = card?.querySelector?.(`[data-annotation-panel][data-annotation-side="${side}"]`);
     const status = panel?.querySelector?.('[data-annotation-status]');
-    if (status) status.textContent = message;
+    if (status && status.textContent !== message) status.textContent = message;
   }
 
   async function stepByConfiguredFrames(card, side, direction) {
@@ -63,6 +61,10 @@
       setStepStatus(card, side, 'N 幀步進定位未完成，請重試。');
     }
     return ok;
+  }
+
+  function setTextIfChanged(element, value) {
+    if (element && element.textContent !== value) element.textContent = value;
   }
 
   function ensurePanelControls(panel) {
@@ -89,21 +91,27 @@
     const input = panel.querySelector('[data-annotation-step-input]');
     const backward = panel.querySelector('[data-annotation-step-action="backward"]');
     const forward = panel.querySelector('[data-annotation-step-action="forward"]');
-    if (input && document.activeElement !== input) input.value = String(step);
+    const stepText = String(step);
+    if (input && document.activeElement !== input && input.value !== stepText) input.value = stepText;
     if (backward) {
-      backward.textContent = `← ${step} 幀（A）`;
-      backward.setAttribute('aria-label', `往回步進 ${step} 幀`);
-      backward.title = `往回 ${step} 幀（A）`;
+      setTextIfChanged(backward, `← ${step} 幀（A）`);
+      const label = `往回步進 ${step} 幀`;
+      if (backward.getAttribute('aria-label') !== label) backward.setAttribute('aria-label', label);
+      const title = `往回 ${step} 幀（A）`;
+      if (backward.title !== title) backward.title = title;
     }
     if (forward) {
-      forward.textContent = `${step} 幀 →（D）`;
-      forward.setAttribute('aria-label', `往前步進 ${step} 幀`);
-      forward.title = `往前 ${step} 幀（D）`;
+      setTextIfChanged(forward, `${step} 幀 →（D）`);
+      const label = `往前步進 ${step} 幀`;
+      if (forward.getAttribute('aria-label') !== label) forward.setAttribute('aria-label', label);
+      const title = `往前 ${step} 幀（D）`;
+      if (forward.title !== title) forward.title = title;
     }
     const help = panel.querySelector('.annotation-help');
-    if (help) {
-      help.textContent = '標註模式：移動滑鼠定位；左鍵或空白鍵確定。←／→ 永遠逐 1 幀；A／D 依 N 幀步進，Delete 刪除目前幀的點，Ctrl+Z 復原，Esc 結束。';
-    }
+    setTextIfChanged(
+      help,
+      '標註模式：移動滑鼠定位；左鍵或空白鍵確定。←／→ 永遠逐 1 幀；A／D 依 N 幀步進，Delete 刪除目前幀的點，Ctrl+Z 復原，Esc 結束。',
+    );
   }
 
   function ensureAllPanelControls() {
@@ -165,14 +173,10 @@
 
   const canvas = document.querySelector('#block-canvas');
   if (canvas) {
-    new MutationObserver(ensureAllPanelControls).observe(canvas, { childList: true, subtree: true });
-  }
-
-  function refreshLoop() {
-    ensureAllPanelControls();
-    requestAnimationFrame(refreshLoop);
+    new MutationObserver(() => {
+      ensureAllPanelControls();
+    }).observe(canvas, { childList: true, subtree: true });
   }
 
   ensureAllPanelControls();
-  requestAnimationFrame(refreshLoop);
 })();
