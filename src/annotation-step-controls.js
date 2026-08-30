@@ -126,36 +126,8 @@
     ensureAllPanelControls();
   }
 
-  function activeAnnotationContext() {
-    const toggle = document.querySelector(
-      '[data-annotation-panel] [data-annotation-action="toggle-edit"].button-primary',
-    );
-    const panel = toggle?.closest?.('[data-annotation-panel]');
-    return panel ? cardAndSideFromPanel(panel) : null;
-  }
-
-  function editableTarget(target) {
-    return Boolean(
-      target?.matches?.('input, textarea, select, [contenteditable="true"]')
-      || target?.closest?.('input, textarea, select, [contenteditable="true"]'),
-    );
-  }
-
-  function handleStepKeydown(event) {
-    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-    if (editableTarget(event.target)) return;
-    const direction = event.code === 'KeyA' ? -1 : event.code === 'KeyD' ? 1 : 0;
-    if (!direction) return;
-    const context = activeAnnotationContext();
-    if (!context) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    void stepByConfiguredFrames(context.card, context.side, direction);
-  }
-
   document.addEventListener('click', handleStepClick);
   document.addEventListener('change', handleStepChange);
-  document.addEventListener('keydown', handleStepKeydown, true);
 
   const canvas = document.querySelector('#block-canvas');
   if (canvas) {
