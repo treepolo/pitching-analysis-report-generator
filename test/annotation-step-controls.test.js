@@ -4,9 +4,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotation-step-controls.js'), 'utf8');
 const index = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.html'), 'utf8');
+
+test('annotation N-frame control runtime compiles as browser JavaScript', () => {
+  assert.doesNotThrow(() => new vm.Script(source));
+});
 
 test('loads annotation N-frame controls after the base annotation editor', () => {
   const annotationIndex = index.indexOf('./annotations.js');
@@ -15,11 +20,12 @@ test('loads annotation N-frame controls after the base annotation editor', () =>
   assert.ok(stepIndex > annotationIndex);
 });
 
-test('N-frame stepping has independent backward and forward buttons', () => {
+test('N-frame stepping has independent backward and forward buttons on the canonical playhead', () => {
   assert.match(source, /data-annotation-step-action="backward"/u);
   assert.match(source, /data-annotation-step-action="forward"/u);
   assert.match(source, /from \+ \(direction \* step\)/u);
-  assert.match(source, /seekFramePlayerSideIndex\(card, side, requested/u);
+  assert.match(source, /playhead\.seekFrame\(card, side, requested/u);
+  assert.doesNotMatch(source, /seekFramePlayerSideIndex/u);
 });
 
 test('A and D own N-frame shortcuts only while annotation mode is active', () => {
