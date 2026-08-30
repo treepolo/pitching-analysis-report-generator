@@ -30,9 +30,10 @@ test('single-player rate changes keep the current mode alive and switch modes on
   assert.doesNotMatch(patched, /if \(wasManual\) \{ cancelManual\(\); runtime\.playing = false; video\.pause\(\); \}/u);
 });
 
-test('shared extended clock updates video frames only when the target frame changes', () => {
+test('shared extended clock updates only when the target frame changes and both seeks are settled', () => {
   assert.match(patched, /const nextIndex = clamp\(Math\.floor\(nextFrame\)/u);
-  assert.match(patched, /if \(nextIndex !== state\.index\)/u);
+  assert.match(patched, /const readyToPresent = videos\.every\(\(video\) => !video\?\.seeking\)/u);
+  assert.match(patched, /if \(nextIndex !== state\.index && readyToPresent\)/u);
   assert.doesNotMatch(patched, /state\.manualTime = nextFrame; state\.index = clamp\(Math\.floor\(nextFrame\)/u);
 });
 
