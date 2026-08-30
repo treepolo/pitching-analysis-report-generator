@@ -21,10 +21,11 @@ test('loads point navigation after annotation editor', () => {
   assert.ok(pointIndex > annotationIndex);
 });
 
-test('point selector lists frame-only annotation points and seeks exactly to the chosen frame', () => {
+test('point selector lists frame-only annotation points and seeks on the canonical playhead', () => {
   assert.match(source, /data-annotation-point-select/u);
   assert.match(source, /第 \$\{frame \+ 1\} 幀/u);
-  assert.match(source, /seekFramePlayerSideIndex\(context\.card, context\.side, frame, \{ exact: true, status: true \}\)/u);
+  assert.match(source, /playhead\.seekFrame\(context\.card, context\.side, frame, \{ status: true \}\)/u);
+  assert.doesNotMatch(source, /seekFramePlayerSideIndex/u);
 });
 
 test('visible annotation points are selected by right-click instead of primary click', () => {
@@ -35,18 +36,18 @@ test('visible annotation points are selected by right-click instead of primary c
   assert.match(source, /void selectPoint\(context, hit\.track, hit\.point\.frame\)/u);
 });
 
-test('point selection keeps existing Delete handling authoritative', () => {
-  assert.match(source, /surface\.tabIndex = -1/u);
+test('point selection exposes selected track and frame for authoritative Delete handling', () => {
+  assert.match(source, /annotationSelectedTrackId/u);
+  assert.match(source, /annotationSelectedFrame/u);
   assert.match(source, /surface\.focus/u);
   assert.match(source, /按 Delete 可刪除/u);
   assert.doesNotMatch(source, /track\.points\s*=\s*track\.points\.filter/u);
 });
 
-test('registration input rejects duplicate clicks and input while exact navigation is busy', () => {
+test('registration input rejects duplicate clicks and input while canonical navigation is busy', () => {
   assert.match(source, /event\.detail > 1/u);
   assert.match(source, /navigationBusy\(context\)/u);
-  assert.match(source, /sideState\?\.exactTarget/u);
-  assert.match(source, /video\?\.seeking/u);
+  assert.match(source, /playhead\.navigationBusy\(context\.card, context\.side\)/u);
   assert.match(source, /window\.addEventListener\('click', blockPrimaryRegistration, true\)/u);
 });
 
