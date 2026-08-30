@@ -1,5 +1,5 @@
-.annotation-step-control input {
-  width: 4.5rem;
+.annotation-step-control {
+  display: none;
 }
 
 .inline-frame-surface {
@@ -45,6 +45,7 @@
 }
 
 .annotation-toolbar-row,
+.annotation-step-navigation,
 .annotation-track-settings,
 .annotation-track-visibility {
   display: flex;
@@ -54,6 +55,7 @@
 }
 
 .annotation-toolbar-row label,
+.annotation-step-navigation-setting,
 .annotation-track-settings label,
 .annotation-track-toggle {
   display: inline-flex;
@@ -64,6 +66,20 @@
 .annotation-toolbar-row select,
 .annotation-track-settings input[type="text"] {
   min-width: 8rem;
+}
+
+.annotation-step-navigation {
+  margin-top: .4rem;
+  padding-top: .4rem;
+  border-top: 1px solid #ccd3da;
+}
+
+.annotation-step-navigation input[type="number"] {
+  width: 5.25rem;
+}
+
+.annotation-step-navigation .button {
+  min-width: 7.5rem;
 }
 
 .annotation-track-settings {
@@ -102,6 +118,7 @@
 
 @media (max-width: 760px) {
   .annotation-toolbar-row,
+  .annotation-step-navigation,
   .annotation-track-settings {
     align-items: flex-start;
   }
