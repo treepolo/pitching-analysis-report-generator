@@ -16,8 +16,8 @@ test('loads annotation N-frame controls after the base annotation editor', () =>
 });
 
 test('N-frame stepping has independent backward and forward buttons', () => {
-  assert.match(source, /data-annotation-step-action=\"backward\"/u);
-  assert.match(source, /data-annotation-step-action=\"forward\"/u);
+  assert.match(source, /data-annotation-step-action="backward"/u);
+  assert.match(source, /data-annotation-step-action="forward"/u);
   assert.match(source, /from \+ \(direction \* step\)/u);
   assert.match(source, /seekFramePlayerSideIndex\(card, side, requested/u);
 });
