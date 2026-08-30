@@ -50,9 +50,13 @@
     setFramePlayerStatus(card, '正在切換播放速度…', 'pending');
     updateFramePlayerControls(card);
 
+    // Always ask the media element for its play promise while a native resume
+    // is in flight. HTMLMediaElement.paused can become false before the pending
+    // play promise settles, so paused=false alone is not proof that playback
+    // has actually resumed.
     const playRequests = videos.map((video) => {
       try {
-        return video.paused ? video.play() : Promise.resolve();
+        return video.play();
       } catch (error) {
         return Promise.reject(error);
       }
