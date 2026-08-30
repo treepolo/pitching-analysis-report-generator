@@ -5,15 +5,15 @@
   const playhead = globalThis.pitchingAnnotationPlayhead;
   if (!model || !playhead) return;
 
-  let activeEditor = null;
+  let shortcutTarget = null;
+  let editingTarget = null;
   const deleteUndo = new Map();
 
   function contextKey(blockId, side) {
     return `${blockId || ''}:${side || ''}`;
   }
 
-  function contextFromToggle(toggle) {
-    const sideElement = toggle?.closest?.('[data-inline-side]');
+  function contextFromSideElement(sideElement) {
     const card = sideElement?.closest?.('[data-inline-video-block][data-frame-player]');
     const blockId = card?.dataset?.blockId || '';
     const side = sideElement?.dataset?.inlineSide || '';
@@ -21,17 +21,24 @@
     return { card, blockId, side };
   }
 
-  function resolveActiveContext() {
-    if (!activeEditor) return null;
+  function contextFromTarget(target) {
+    return contextFromSideElement(target?.closest?.('[data-inline-side]'));
+  }
+
+  function resolveShortcutContext() {
+    if (!shortcutTarget) return null;
     const cards = [...document.querySelectorAll('[data-inline-video-block][data-frame-player]')];
-    const card = cards.find((entry) => entry.dataset.blockId === activeEditor.blockId) || null;
-    const sideElement = card?.querySelector?.(`[data-inline-side="${activeEditor.side}"]`);
-    const panel = sideElement?.querySelector?.(`[data-annotation-panel][data-annotation-side="${activeEditor.side}"]`);
+    const card = cards.find((entry) => entry.dataset.blockId === shortcutTarget.blockId) || null;
+    const sideElement = card?.querySelector?.(`[data-inline-side="${shortcutTarget.side}"]`);
+    const panel = sideElement?.querySelector?.(`[data-annotation-panel][data-annotation-side="${shortcutTarget.side}"]`);
     if (!card || !sideElement || !panel) {
-      activeEditor = null;
+      shortcutTarget = null;
+      if (editingTarget && contextKey(editingTarget.blockId, editingTarget.side) === contextKey(shortcutTarget?.blockId, shortcutTarget?.side)) {
+        editingTarget = null;
+      }
       return null;
     }
-    return { card, side: activeEditor.side, panel };
+    return { card, side: shortcutTarget.side, panel };
   }
 
   function configFor(context) {
@@ -164,10 +171,10 @@
   }
 
   function synchronizeToggleDom() {
-    const activeKey = activeEditor ? contextKey(activeEditor.blockId, activeEditor.side) : '';
+    const editingKey = editingTarget ? contextKey(editingTarget.blockId, editingTarget.side) : '';
     document.querySelectorAll('[data-annotation-action="toggle-edit"]').forEach((toggle) => {
-      const context = contextFromToggle(toggle);
-      const active = Boolean(context && contextKey(context.blockId, context.side) === activeKey);
+      const context = contextFromTarget(toggle);
+      const active = Boolean(context && contextKey(context.blockId, context.side) === editingKey);
       toggle.classList.toggle('button-primary', active);
       toggle.classList.toggle('button-quiet', !active);
       const label = active ? '結束標註' : '開始標註';
@@ -179,28 +186,39 @@
     queueMicrotask(synchronizeToggleDom);
   }
 
+  function rememberShortcutTarget(context) {
+    if (!context) return;
+    shortcutTarget = { blockId: context.blockId, side: context.side };
+  }
+
+  function handleInteractionCapture(event) {
+    const context = contextFromTarget(event.target);
+    if (context) rememberShortcutTarget(context);
+  }
+
   function handleToggleCapture(event) {
     const toggle = event.target.closest?.('[data-annotation-action="toggle-edit"]');
     if (!toggle) return;
-    const context = contextFromToggle(toggle);
+    const context = contextFromTarget(toggle);
     if (!context) return;
+    rememberShortcutTarget(context);
     const key = contextKey(context.blockId, context.side);
     if (toggleCurrentlyEditing(toggle)) {
-      if (activeEditor && contextKey(activeEditor.blockId, activeEditor.side) === key) activeEditor = null;
+      if (editingTarget && contextKey(editingTarget.blockId, editingTarget.side) === key) editingTarget = null;
       queueToggleDomSync();
       return;
     }
-    activeEditor = { blockId: context.blockId, side: context.side };
+    editingTarget = { blockId: context.blockId, side: context.side };
     deleteUndo.delete(key);
     queueToggleDomSync();
   }
 
   function handleShortcut(event) {
-    const context = resolveActiveContext();
+    const context = resolveShortcutContext();
     if (!context) return;
 
     if (event.key === 'Escape') {
-      activeEditor = null;
+      editingTarget = null;
       queueToggleDomSync();
       return;
     }
@@ -228,6 +246,8 @@
     }
   }
 
+  window.addEventListener('pointerdown', handleInteractionCapture, true);
+  window.addEventListener('contextmenu', handleInteractionCapture, true);
   window.addEventListener('click', handleToggleCapture, true);
   window.addEventListener('keydown', handleShortcut, true);
 })();
