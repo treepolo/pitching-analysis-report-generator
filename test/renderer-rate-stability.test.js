@@ -179,6 +179,29 @@ test('extended-to-native crossing resumes native playback without converting the
   assert.equal(harness.runtime.rateTransition, false);
 });
 
+test('continued native slider input waits for the newest pending native resume', async () => {
+  const pendingPlay = deferred();
+  const video = fakeVideo({ paused: true, playDeferred: pendingPlay });
+  const harness = createRuntime({ manual: true, playing: true, rate: 8, video });
+
+  harness.context.applyFramePlayerRate(harness.card, 2);
+  assert.equal(harness.runtime.rateTransition, true);
+  assert.equal(harness.video.playCalls, 1);
+
+  harness.context.applyFramePlayerRate(harness.card, 3);
+  assert.equal(harness.runtime.rateTransition, true);
+  assert.equal(harness.video.playCalls, 2);
+  assert.equal(harness.runtime.playbackRate, 3);
+
+  pendingPlay.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(harness.runtime.rateTransition, false);
+  assert.equal(harness.runtime.manualPlayback, false);
+  assert.equal(harness.runtime.playing, true);
+  assert.equal(harness.runtime.playbackRate, 3);
+});
+
 test('rapidly crossing back to extended mode wins over a stale native play promise', async () => {
   const pendingPlay = deferred();
   const video = fakeVideo({ paused: true, playDeferred: pendingPlay });
