@@ -209,12 +209,14 @@ function patchNativeFramePlayerScript(source) {
 
 function patchNativeFramePlayerHtml(html) {
   const source = renderNativeFramePlayerScript();
-  const patched = patchNativeFramePlayerScript(source);
   const document = String(html);
   if (!document.includes(source)) {
-    throw new Error('Rendered report does not contain the expected native frame-player runtime');
+    if (document.includes('data-native-frame-player-block')) {
+      throw new Error('Rendered report contains a native player but not the expected native frame-player runtime');
+    }
+    return document;
   }
-  return document.replace(source, patched);
+  return document.replace(source, patchNativeFramePlayerScript(source));
 }
 
 module.exports = {
