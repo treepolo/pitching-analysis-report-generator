@@ -123,7 +123,8 @@ function patchNativeFramePlayerScript(source) {
           actions.forEach((action, i) => action.setFrame?.(map.starts[i] + state.index)); update(); scheduleSharedManual(tick);`,
     `          state.manualTime = nextFrame;
           const nextIndex = clamp(Math.floor(nextFrame), 0, map.count - 1);
-          if (nextIndex !== state.index) {
+          const readyToPresent = videos.every((video) => !video?.seeking);
+          if (nextIndex !== state.index && readyToPresent) {
             state.index = nextIndex;
             actions.forEach((action, i) => action.setFrame?.(map.starts[i] + state.index));
           }
