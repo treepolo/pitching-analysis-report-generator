@@ -41,15 +41,6 @@
       .sort((a, b) => a - b);
   }
 
-  function escapeHtml(value) {
-    return String(value ?? '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;');
-  }
-
   function ensurePointControl(panel) {
     if (!panel) return;
     let row = panel.querySelector('[data-annotation-point-navigation]');
@@ -91,12 +82,6 @@
       const text = `共 ${frames.length} 點`;
       if (count.textContent !== text) count.textContent = text;
     }
-
-    const help = panel.querySelector('.annotation-help');
-    if (help) {
-      const text = '標註模式：移動滑鼠定位；左鍵或空白鍵確定。←／→ 永遠逐 1 幀；A／D 依 N 幀步進。可從「標註點」選取既有點並跳到該幀，Delete 刪除目前選取／所在幀的點，Ctrl+Z 復原，Esc 結束。';
-      if (help.textContent !== text) help.textContent = text;
-    }
   }
 
   function ensureAllPointControls() {
@@ -137,6 +122,7 @@
     }
     const surface = context.card.querySelector(`[data-inline-side="${context.side}"] [data-frame-surface]`);
     if (surface && typeof surface.focus === 'function') {
+      if (!surface.hasAttribute('tabindex')) surface.tabIndex = -1;
       try { surface.focus({ preventScroll: true }); } catch { surface.focus(); }
     }
     setStatus(
