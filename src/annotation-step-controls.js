@@ -9,6 +9,19 @@
     return model.normalizeStepFrames(raw, 1);
   }
 
+  function persistStepFrames(value) {
+    if (!state?.activeProject) return projectStepFrames();
+    const step = model.normalizeStepFrames(value, 1);
+    if (!state.activeProject.exportSettings || typeof state.activeProject.exportSettings !== 'object') {
+      state.activeProject.exportSettings = {};
+    }
+    state.activeProject.exportSettings.annotationStepFrames = step;
+    const legacyInput = document.querySelector('#annotation-step-frames');
+    if (legacyInput && document.activeElement !== legacyInput) legacyInput.value = String(step);
+    if (typeof scheduleSave === 'function') scheduleSave();
+    return step;
+  }
+
   function cardAndSideFromPanel(panel) {
     const sideElement = panel?.closest?.('[data-inline-side]');
     const card = sideElement?.closest?.('[data-inline-video-block][data-frame-player]');
@@ -47,7 +60,7 @@
     if (ok) {
       setStepStatus(card, side, `${direction < 0 ? '往回' : '往前'}步進 ${step} 幀；目前第 ${actual + 1} 幀。`);
     } else {
-      setStepStatus(card, side, `N 幀步進定位未完成，請重試。`);
+      setStepStatus(card, side, 'N 幀步進定位未完成，請重試。');
     }
     return ok;
   }
@@ -58,7 +71,10 @@
     row.className = 'annotation-step-navigation';
     row.dataset.annotationStepNavigation = '';
     row.innerHTML = `
-      <span class="annotation-step-navigation-label" data-annotation-step-label></span>
+      <label class="annotation-step-navigation-setting">N 幀步進
+        <input type="number" min="1" max="10000" step="1" data-annotation-step-input aria-label="N 幀步進幀數">
+        <span>幀</span>
+      </label>
       <button type="button" class="button button-quiet" data-annotation-step-action="backward"></button>
       <button type="button" class="button button-quiet" data-annotation-step-action="forward"></button>`;
     const toolbar = panel.querySelector('.annotation-toolbar-row');
@@ -70,10 +86,10 @@
   function updatePanelControls(panel) {
     if (!panel) return;
     const step = projectStepFrames();
-    const label = panel.querySelector('[data-annotation-step-label]');
+    const input = panel.querySelector('[data-annotation-step-input]');
     const backward = panel.querySelector('[data-annotation-step-action="backward"]');
     const forward = panel.querySelector('[data-annotation-step-action="forward"]');
-    if (label) label.textContent = `N 幀步進：${step} 幀`;
+    if (input && document.activeElement !== input) input.value = String(step);
     if (backward) {
       backward.textContent = `← ${step} 幀（A）`;
       backward.setAttribute('aria-label', `往回步進 ${step} 幀`);
@@ -83,6 +99,10 @@
       forward.textContent = `${step} 幀 →（D）`;
       forward.setAttribute('aria-label', `往前步進 ${step} 幀`);
       forward.title = `往前 ${step} 幀（D）`;
+    }
+    const help = panel.querySelector('.annotation-help');
+    if (help) {
+      help.textContent = '標註模式：移動滑鼠定位；左鍵或空白鍵確定。←／→ 永遠逐 1 幀；A／D 依 N 幀步進，Delete 刪除目前幀的點，Ctrl+Z 復原，Esc 結束。';
     }
   }
 
@@ -102,6 +122,14 @@
     event.preventDefault();
     const direction = button.dataset.annotationStepAction === 'backward' ? -1 : 1;
     void stepByConfiguredFrames(context.card, context.side, direction);
+  }
+
+  function handleStepChange(event) {
+    const input = event.target.closest?.('[data-annotation-step-input]');
+    if (!input) return;
+    const step = persistStepFrames(input.value);
+    input.value = String(step);
+    ensureAllPanelControls();
   }
 
   function activeAnnotationContext() {
@@ -132,6 +160,7 @@
   }
 
   document.addEventListener('click', handleStepClick);
+  document.addEventListener('change', handleStepChange);
   document.addEventListener('keydown', handleStepKeydown, true);
 
   const canvas = document.querySelector('#block-canvas');
