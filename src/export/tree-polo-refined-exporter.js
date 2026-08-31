@@ -24,7 +24,7 @@ async function pathExists(candidate) {
 function shortenBrandSuffix(value) {
   const text = String(value ?? '');
   return text.includes(LEGACY_BRAND_SUFFIX)
-    ? text.replace(LEGACY_BRAND_SUFFIX, BRAND_SUFFIX)
+    ? text.replaceAll(LEGACY_BRAND_SUFFIX, BRAND_SUFFIX)
     : text;
 }
 
@@ -44,10 +44,15 @@ body>main .tree-polo-report-header::after{content:"";position:absolute;z-index:1
    masked or made transparent; the surrounding molten field handles fusion. */
 body>main .tree-polo-brand-logo{z-index:2;left:10px;top:8px;width:54px;height:54px;object-fit:cover;border:0!important;border-radius:3px;background:#000!important;box-shadow:0 2px 3px rgba(0,0,0,.34),0 -1px 1px rgba(218,255,194,.14);mix-blend-mode:normal!important;opacity:1;transform:translateY(-1px) scale(1.018);filter:saturate(1.06) contrast(1.04)}
 body>main .tree-polo-brand-copy{position:relative;z-index:2;min-width:0}
+/* Windows XP used Tahoma extensively; Windows 7 moved to Segoe UI. Keep both
+   ahead of the CJK fallback so the title bar inherits that desktop-era feel. */
+body>main .tree-polo-report-header h1{font-family:Tahoma,"Segoe UI","Microsoft JhengHei","Microsoft YaHei",sans-serif!important;font-weight:700;letter-spacing:.01em}
 
 .report-help-backdrop{background:rgba(10,37,27,.34)}
 .report-help-dialog{border-color:#688d79;background:#f5faf7;color:#183126;box-shadow:0 18px 54px rgba(0,44,28,.32),inset 1px 1px 0 #fff}
-.report-help-header{top:8px;margin:10px 10px 0;padding:15px 16px 13px;border:1px solid #668d78!important;border-radius:3px;background:linear-gradient(#fbfffc,#e2f1e8);box-shadow:inset 1px 1px 0 rgba(255,255,255,.92),0 2px 5px rgba(21,79,52,.16)}
+/* Do not pin the help heading while the dialog scrolls. It is a normal framed
+   section at the top of the document, not a floating/sticky application bar. */
+.report-help-header{position:relative!important;top:auto!important;margin:10px 10px 0;padding:15px 16px 13px;border:1px solid #668d78!important;border-radius:3px;background:linear-gradient(#fbfffc,#e2f1e8);box-shadow:inset 1px 1px 0 rgba(255,255,255,.92),0 2px 5px rgba(21,79,52,.16)}
 /* Base report CSS also styles h2 headings; override the help title itself so
    the strip cannot retain the old blue gradient. */
 .report-help-header h2{margin:0 0 4px!important;padding:4px 8px!important;border:1px solid #83a994!important;border-bottom-color:#5f8f76!important;border-radius:2px;background:linear-gradient(180deg,#edf8f2 0%,#d7eee1 48%,#c2e2d0 100%)!important;box-shadow:inset 1px 1px 0 rgba(255,255,255,.88);color:#174e36!important}
