@@ -7,6 +7,7 @@ const test = require('node:test');
 const {
   BRAND_SUFFIX,
   LEGACY_BRAND_SUFFIX,
+  addLogoColorSource,
   exportReport,
   refineHtml,
   refinedThemeCss,
@@ -36,7 +37,8 @@ test('refined theme creates a fused raised glass logo and recolors help content 
   assert.match(css, /mix-blend-mode:screen/u);
   assert.match(css, /mask-image:radial-gradient/u);
   assert.match(css, /tree-polo-report-header::before/u);
-  assert.match(css, /radial-gradient\(ellipse at 51% 47%/u);
+  assert.match(css, /var\(--tree-polo-logo\)/u);
+  assert.match(css, /filter:blur\(11px\) saturate\(1\.48\)/u);
   assert.match(css, /drop-shadow/u);
   assert.match(css, /\.report-help-dialog\{/u);
   assert.match(css, /\.report-help-header\{/u);
@@ -45,12 +47,19 @@ test('refined theme creates a fused raised glass logo and recolors help content 
   assert.doesNotMatch(css, /\.report-help-trigger\{/u);
 });
 
+test('logo source is reused as the molten color field around the raised logo', () => {
+  const source = '<header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo" src="images/tree-polo-logo.webp" alt="小樹Polo"></header>';
+  const html = addLogoColorSource(source);
+  assert.match(html, /style="--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)"/u);
+});
+
 test('refineHtml shortens visible title text and appends the refinement layer', () => {
-  const source = `<html><head><title>王小明${LEGACY_BRAND_SUFFIX}</title></head><body><main><header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo"><div class="tree-polo-brand-copy"><h1>王小明${LEGACY_BRAND_SUFFIX}</h1></div></header></main><button class="report-help-trigger">使用教學</button></body></html>`;
+  const source = `<html><head><title>王小明${LEGACY_BRAND_SUFFIX}</title></head><body><main><header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo" src="images/tree-polo-logo.webp"><div class="tree-polo-brand-copy"><h1>王小明${LEGACY_BRAND_SUFFIX}</h1></div></header></main><button class="report-help-trigger">使用教學</button></body></html>`;
   const html = refineHtml(source);
   assert.match(html, new RegExp(`王小明${BRAND_SUFFIX}`, 'u'));
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
   assert.match(html, /data-tree-polo-refined-theme/u);
+  assert.match(html, /--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)/u);
   assert.match(html, /report-help-trigger/u);
 });
 
@@ -88,6 +97,7 @@ test('refined exporter uses the shorter folder and HTML suffix and rebuilds ZIP 
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
   assert.match(html, /data-tree-polo-refined-theme/u);
   assert.match(html, /mix-blend-mode:screen/u);
+  assert.match(html, /--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)/u);
   assert.match(html, /\.report-help-dialog\{/u);
 
   const manifest = JSON.parse(await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8'));
