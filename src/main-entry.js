@@ -1,12 +1,20 @@
 'use strict';
 
-// Install the branded export wrapper before main.js loads app-bridge.
-// app-bridge destructures exportReport at module load, so this ordering keeps
-// the rest of the Electron main process unchanged while making every desktop
-// export use the Tree Polo naming, branding, manifest and ZIP post-processing.
-const exporterModule = require('./export/exporter');
-const { exportReport } = require('./export/tree-polo-branded-exporter');
+// main.js imports ExportJobController from app-bridge and constructs it with no
+// arguments. Replace only that exported controller with a subclass whose
+// default exporter is the Tree Polo wrapper. The underlying exporter module is
+// left untouched, so the branded wrapper can safely call the original exporter
+// without recursive self-invocation.
+const appBridge = require('./export/app-bridge');
+const { exportReport: brandedExportReport } = require('./export/tree-polo-branded-exporter');
 
-exporterModule.exportReport = exportReport;
+const BaseExportJobController = appBridge.ExportJobController;
+class TreePoloExportJobController extends BaseExportJobController {
+  constructor(options = {}) {
+    super({ exporter: brandedExportReport, ...options });
+  }
+}
+
+appBridge.ExportJobController = TreePoloExportJobController;
 
 require('./main');
