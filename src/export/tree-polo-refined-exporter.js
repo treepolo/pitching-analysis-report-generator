@@ -28,6 +28,13 @@ function shortenBrandSuffix(value) {
     : text;
 }
 
+function stylizeBrandSignature(html) {
+  return String(html).replace(
+    /(<h1>[^<]*?報告by)小樹Polo(<\/h1>)/u,
+    '$1<span class="tree-polo-signature-tree">小樹</span><span class="tree-polo-signature-polo">Polo</span>$2',
+  );
+}
+
 function refinedThemeCss() {
   return `<style data-tree-polo-refined-theme>
 /* Report and help content use the Tree Polo green family. Help buttons keep
@@ -44,9 +51,12 @@ body>main .tree-polo-report-header::after{content:"";position:absolute;z-index:1
    masked or made transparent; the surrounding molten field handles fusion. */
 body>main .tree-polo-brand-logo{z-index:2;left:10px;top:8px;width:54px;height:54px;object-fit:cover;border:0!important;border-radius:3px;background:#000!important;box-shadow:0 2px 3px rgba(0,0,0,.34),0 -1px 1px rgba(218,255,194,.14);mix-blend-mode:normal!important;opacity:1;transform:translateY(-1px) scale(1.018);filter:saturate(1.06) contrast(1.04)}
 body>main .tree-polo-brand-copy{position:relative;z-index:2;min-width:0}
-/* Windows XP used Tahoma extensively; Windows 7 moved to Segoe UI. Keep both
-   ahead of the CJK fallback so the title bar inherits that desktop-era feel. */
-body>main .tree-polo-report-header h1{font-family:Tahoma,"Segoe UI","Microsoft JhengHei","Microsoft YaHei",sans-serif!important;font-weight:700;letter-spacing:.01em}
+/* Keep the platform font stack but remove the heavy web-banner treatment.
+   The title is smaller/lighter, with wider breathing room and only a faint
+   one-pixel lower-edge shadow. */
+body>main .tree-polo-report-header h1{font-family:Tahoma,"Segoe UI","Microsoft JhengHei","Microsoft YaHei",sans-serif!important;font-size:18px!important;font-weight:500!important;line-height:1.28!important;letter-spacing:.035em!important;color:#f3f8f5!important;text-shadow:0 1px 0 rgba(0,39,25,.24)!important}
+body>main .tree-polo-signature-tree{color:#42d392!important;font-weight:600;text-shadow:0 1px 0 rgba(0,49,30,.26)}
+body>main .tree-polo-signature-polo{color:#b9ff68!important;font-weight:600;text-shadow:0 1px 0 rgba(0,49,30,.24)}
 
 .report-help-backdrop{background:rgba(10,37,27,.34)}
 .report-help-dialog{border-color:#688d79;background:#f5faf7;color:#183126;box-shadow:0 18px 54px rgba(0,44,28,.32),inset 1px 1px 0 #fff}
@@ -69,7 +79,7 @@ body>main .tree-polo-report-header h1{font-family:Tahoma,"Segoe UI","Microsoft J
 .report-help-tutorial-panel{border-color:#668d78;background:#f5faf7;color:#173c2b;box-shadow:0 8px 28px rgba(0,46,30,.28),inset 1px 1px 0 #fff}
 .report-help-tutorial-panel-header{border-bottom-color:#afc8bb;background:linear-gradient(#fbfffc,#dfeee6)}
 .report-help-tutorial-step{color:#4d685a}.report-help-tutorial-copy p{color:#456052}
-@media(max-width:700px){body>main .tree-polo-report-header{min-height:62px;padding-left:66px}body>main .tree-polo-brand-logo{left:9px;top:8px;width:46px;height:46px}body>main .tree-polo-report-header::before{left:2px;top:4px;width:75px;height:54px;border-radius:9px;background-position:center,9px center;background-size:100% 100%,46px 46px;filter:blur(6px) saturate(1.28)}body>main .tree-polo-report-header::after{left:6px;top:6px;width:55px;height:49px;border-radius:7px}}
+@media(max-width:700px){body>main .tree-polo-report-header{min-height:62px;padding-left:66px}body>main .tree-polo-brand-logo{left:9px;top:8px;width:46px;height:46px}body>main .tree-polo-report-header::before{left:2px;top:4px;width:75px;height:54px;border-radius:9px;background-position:center,9px center;background-size:100% 100%,46px 46px;filter:blur(6px) saturate(1.28)}body>main .tree-polo-report-header::after{left:6px;top:6px;width:55px;height:49px;border-radius:7px}body>main .tree-polo-report-header h1{font-size:16px!important;letter-spacing:.025em!important}}
 </style>`;
 }
 
@@ -86,6 +96,7 @@ function addLogoColorSource(html) {
 
 function refineHtml(html) {
   let output = shortenBrandSuffix(String(html));
+  output = stylizeBrandSignature(output);
   output = addLogoColorSource(output);
   const css = refinedThemeCss();
   if (output.includes('data-tree-polo-refined-theme')) return output;
@@ -232,4 +243,5 @@ module.exports = {
   refineHtml,
   refinedThemeCss,
   shortenBrandSuffix,
+  stylizeBrandSignature,
 };
