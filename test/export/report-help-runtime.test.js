@@ -5,6 +5,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const {
+  HELP_ITEMS,
   helpCss,
   helpMarkup,
   helpScript,
@@ -20,7 +21,7 @@ test('report help runtime compiles as browser JavaScript', () => {
 test('help dialog stays inset so the underlying report remains visible', () => {
   const css = helpCss();
   assert.match(css, /\.report-help-backdrop\{[^}]*padding:5vh 6vw/u);
-  assert.match(css, /\.report-help-dialog\{[^}]*width:min\(900px,88vw\)[^}]*max-height:84vh/u);
+  assert.match(css, /\.report-help-dialog\{[^}]*width:min\(920px,88vw\)[^}]*max-height:84vh/u);
   assert.doesNotMatch(css, /\.report-help-dialog\{[^}]*width:100vw/u);
   assert.doesNotMatch(css, /\.report-help-dialog\{[^}]*height:100vh/u);
 });
@@ -42,10 +43,12 @@ test('help modal blocks report playback shortcuts while it is open', () => {
   assert.match(script, /event\.stopImmediatePropagation\(\)/u);
 });
 
-test('help content includes annotated controls and shortcut explanations', () => {
+test('help content includes every control and shortcut explanation', () => {
   const markup = helpMarkup();
+  assert.equal(HELP_ITEMS.length, 12);
   assert.match(markup, /data-report-help-open/u);
   assert.match(markup, /報告播放器使用教學/u);
+  assert.match(markup, /data-report-help-preview/u);
   for (let number = 1; number <= 12; number += 1) {
     assert.match(markup, new RegExp(`data-report-help-item="${number}"`, 'u'));
   }
@@ -57,8 +60,21 @@ test('help content includes annotated controls and shortcut explanations', () =>
   assert.match(markup, /<kbd>D<\/kbd>/u);
 });
 
-test('tutorial mode targets real exported controls rather than a separate mock player', () => {
+test('help illustration clones the actual exported player instead of drawing a mock control bar', () => {
   const script = helpScript();
+  const markup = helpMarkup();
+  assert.match(script, /const clone = player\.cloneNode\(true\)/u);
+  assert.match(script, /previewHost\.append\(clone\)/u);
+  assert.match(script, /clone\.querySelectorAll\('video'\)/u);
+  assert.match(script, /video\.removeAttribute\('src'\)/u);
+  assert.match(script, /player\.querySelector\('\.report-annotation-controls'\)/u);
+  assert.doesNotMatch(markup, /report-help-demo-screen/u);
+  assert.doesNotMatch(markup, /report-help-demo-controls/u);
+});
+
+test('tutorial mode targets real controls and provides persistent text guidance', () => {
+  const script = helpScript();
+  const markup = helpMarkup();
   assert.match(script, /figure\.report-video/u);
   assert.match(script, /\[data-frame-action="toggle"\]/u);
   assert.match(script, /\[data-frame-timeline\]/u);
@@ -66,7 +82,21 @@ test('tutorial mode targets real exported controls rather than a separate mock p
   assert.match(script, /\[data-annotation-jump="previous"\]/u);
   assert.match(script, /\[data-annotation-jump="next"\]/u);
   assert.match(script, /\.report-annotation-controls/u);
-  assert.match(script, /report-help-live-marker/u);
+  assert.match(script, /tutorialDescription\.textContent = guide\?\.text/u);
+  assert.match(script, /activeGuideIndex = index/u);
+  assert.match(markup, /data-report-help-tutorial-panel/u);
+  assert.match(markup, /data-report-help-tutorial-title/u);
+  assert.match(markup, /data-report-help-tutorial-description/u);
+  assert.match(markup, /data-report-help-tutorial-previous/u);
+  assert.match(markup, /data-report-help-tutorial-next/u);
+  assert.match(markup, /data-report-help-tutorial-stop>結束教學/u);
+});
+
+test('tutorial mode has direct exit and full-guide actions', () => {
+  const script = helpScript();
+  assert.match(script, /tutorialStop\.addEventListener\('click', stopTutorial\)/u);
+  assert.match(script, /tutorialFull\?\.addEventListener\('click', \(\) => openHelp/u);
+  assert.match(script, /if \(event\.key === 'Escape' && tutorialActive\)/u);
 });
 
 test('help is injected at the start of body so its capture handler owns modal shortcuts first', () => {
