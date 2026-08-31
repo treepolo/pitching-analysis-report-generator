@@ -34,7 +34,7 @@ function helpCss() {
 .report-help-tutorial-stop{position:fixed;right:16px;bottom:16px;z-index:3900;min-height:34px;padding:6px 12px;border:1px solid #6c7680;border-radius:4px;background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.24);color:#202a33;font:600 .8rem/1.2 system-ui,sans-serif;cursor:pointer}.report-help-tutorial-stop[hidden]{display:none}
 .report-help-live-marker{position:absolute;z-index:3800;display:grid;place-items:center;width:26px;height:26px;padding:0;border:2px solid #fff;border-radius:50%;background:#245f94;box-shadow:0 2px 7px rgba(0,0,0,.42);color:#fff;font:bold 12px/1 system-ui,sans-serif;cursor:pointer;transform:translate(-50%,-50%)}
 .report-help-live-target{outline:2px solid rgba(36,95,148,.78)!important;outline-offset:2px!important}
-@media(max-width:720px){.report-help-backdrop{padding:4vh 4vw}.report-help-dialog{width:92vw;max-height:86vh}.report-help-content{padding:14px}.report-help-guide{grid-template-columns:1fr}.report-help-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.report-help-demo-controls{grid-template-columns:auto auto minmax(70px,1fr);}.report-help-demo-controls .is-range{grid-column:1/-1}.report-help-demo-rate{grid-template-columns:70px 1fr auto}.report-help-demo-rate .is-range{grid-column:1/-1}.report-help-trigger{top:8px;right:8px}}
+@media(max-width:720px){.report-help-backdrop{padding:4vh 4vw}.report-help-dialog{width:92vw;max-height:86vh}.report-help-content{padding:14px}.report-help-guide{grid-template-columns:1fr}.report-help-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.report-help-demo-controls{grid-template-columns:auto auto minmax(70px,1fr)}.report-help-demo-controls .is-range{grid-column:1/-1}.report-help-demo-rate{grid-template-columns:70px 1fr auto}.report-help-demo-rate .is-range{grid-column:1/-1}.report-help-trigger{top:8px;right:8px}}
 @media print{.report-help-trigger,.report-help-backdrop,.report-help-tutorial-stop,.report-help-live-marker{display:none!important}.report-help-live-target{outline:none!important}}
 </style>`;
 }
@@ -50,8 +50,9 @@ function helpMarkup() {
     ['7','播放速度拖桿','連續調整播放速度；可直接跨越一般播放與超慢／超快範圍。'],
     ['8','重置速度','按 ↻ 立即回到 1.00×。'],
     ['9','循環播放','開啟後會在此影片／共同播放區間內重複播放。'],
-    ['10','上一／下一標註幀','快速跳到時間上最近的上一個或下一個標註幀；鍵盤 A／D 功能相同。'],
-    ['11','標註顯示','「點」控制標註點、「線」控制軌跡連線；各圖層勾選框可個別顯示或隱藏。'],
+    ['10','上一標註幀','跳到目前位置之前最近的一個標註幀；鍵盤 A 功能相同。'],
+    ['11','下一標註幀','跳到目前位置之後最近的一個標註幀；鍵盤 D 功能相同。'],
+    ['12','標註顯示','「點」控制標註點、「線」控制軌跡連線；各圖層勾選框可個別顯示或隱藏。'],
   ];
   const itemHtml = items.map(([number,title,text]) => `<li data-report-help-item="${number}"><span class="report-help-number">${number}</span><div><strong>${title}</strong><p>${text}</p></div></li>`).join('');
   return `<button type="button" class="report-help-trigger" data-report-help-open aria-haspopup="dialog"><span class="report-help-icon" aria-hidden="true">i</span><span>使用教學</span></button>
@@ -77,8 +78,9 @@ function helpMarkup() {
           <span class="report-help-demo-control">☑ 循環<span class="report-help-demo-badge">9</span></span>
         </div>
         <div class="report-help-demo-annotation" aria-hidden="true">
-          <span class="report-help-demo-control is-wide">← 上一標註幀　下一標註幀 →<span class="report-help-demo-badge">10</span></span>
-          <span class="report-help-demo-control is-annotation">☑ 點　☐ 線　☑ 圖層<span class="report-help-demo-badge">11</span></span>
+          <span class="report-help-demo-control">← 上一標註幀<span class="report-help-demo-badge">10</span></span>
+          <span class="report-help-demo-control">下一標註幀 →<span class="report-help-demo-badge">11</span></span>
+          <span class="report-help-demo-control is-annotation">☑ 點　☐ 線　☑ 圖層<span class="report-help-demo-badge">12</span></span>
         </div>
         <figcaption>示意圖中的編號與下方說明相同；實際控制項會依單影片／雙影片與是否含標註略有不同。</figcaption>
       </figure>
@@ -128,8 +130,9 @@ function helpScript() {
     { number: 7, title: '播放速度拖桿', selector: '[data-frame-rate]' },
     { number: 8, title: '重置播放速度', selector: '[data-frame-action="reset-rate"]' },
     { number: 9, title: '循環播放', selector: '[data-frame-loop]' },
-    { number: 10, title: '上一／下一標註幀', selector: '[data-annotation-frame-navigation]' },
-    { number: 11, title: '標註顯示控制', selector: '.report-annotation-controls' },
+    { number: 10, title: '上一標註幀', selector: '[data-annotation-jump="previous"]' },
+    { number: 11, title: '下一標註幀', selector: '[data-annotation-jump="next"]' },
+    { number: 12, title: '標註顯示控制', selector: '.report-annotation-controls' },
   ];
 
   function openHelp(number = null) {
