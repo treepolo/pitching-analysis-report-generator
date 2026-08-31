@@ -57,6 +57,10 @@ test('rendered annotated report contains all requested reader enhancements toget
   assert.match(html, /data-xp7-range-theme/u);
   assert.match(html, /::-webkit-slider-runnable-track/u);
   assert.match(html, /::-webkit-slider-thumb/u);
+  assert.match(html, /data-report-help-style/u);
+  assert.match(html, /data-report-help-open/u);
+  assert.match(html, /data-report-help-runtime/u);
+  assert.match(html, /在報告中顯示教學標記/u);
 });
 
 test('rendered report uses the fixed extended clock and mode-aware rate transition runtime', () => {
@@ -72,6 +76,6 @@ test('every inline script in the enhanced annotated report compiles', () => {
   const html = annotatedReportHtml();
   const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>\s*([\s\S]*?)\s*<\/script>/gu)]
     .map((match) => match[1]);
-  assert.ok(scripts.length >= 3);
+  assert.ok(scripts.length >= 4);
   scripts.forEach((script) => assert.doesNotThrow(() => new vm.Script(script)));
 });
