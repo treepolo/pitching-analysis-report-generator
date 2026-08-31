@@ -60,7 +60,13 @@ test('rendered annotated report contains all requested reader enhancements toget
   assert.match(html, /data-report-help-style/u);
   assert.match(html, /data-report-help-open/u);
   assert.match(html, /data-report-help-runtime/u);
+  assert.match(html, /data-report-help-preview/u);
+  assert.match(html, /data-report-help-tutorial-panel/u);
+  assert.match(html, /data-report-help-tutorial-description/u);
+  assert.match(html, /結束教學/u);
   assert.match(html, /在報告中顯示教學標記/u);
+  assert.match(html, /cloneNode\(true\)/u);
+  assert.doesNotMatch(html, /report-help-demo-screen/u);
 });
 
 test('rendered report uses the fixed extended clock and mode-aware rate transition runtime', () => {
