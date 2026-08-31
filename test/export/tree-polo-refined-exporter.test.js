@@ -27,8 +27,12 @@ test.after(async () => {
   if (testRoot) await fs.rm(testRoot, { recursive: true, force: true });
 });
 
-test('shortens the brand suffix without changing the report name', () => {
+test('shortens every legacy brand suffix without changing the report name', () => {
   assert.equal(shortenBrandSuffix(`王小明${LEGACY_BRAND_SUFFIX}`), `王小明${BRAND_SUFFIX}`);
+  assert.equal(
+    shortenBrandSuffix(`王小明${LEGACY_BRAND_SUFFIX}|王小明${LEGACY_BRAND_SUFFIX}`),
+    `王小明${BRAND_SUFFIX}|王小明${BRAND_SUFFIX}`,
+  );
   assert.equal(shortenBrandSuffix('王小明'), '王小明');
 });
 
@@ -46,12 +50,13 @@ test('refined theme preserves the prior title bar, keeps the black logo field an
   assert.match(css, /background:#000!important/u);
   assert.match(css, /mix-blend-mode:normal!important/u);
   assert.doesNotMatch(css, /mix-blend-mode:screen/u);
+  assert.match(css, /font-family:Tahoma,"Segoe UI","Microsoft JhengHei","Microsoft YaHei",sans-serif!important/u);
 });
 
-test('help content is green, its h2 strip is explicitly green, and help buttons keep their base styling', () => {
+test('help content is green, its h2 strip is explicitly green, and its header is not sticky', () => {
   const css = refinedThemeCss();
   assert.match(css, /\.report-help-dialog\{/u);
-  assert.match(css, /\.report-help-header\{/u);
+  assert.match(css, /\.report-help-header\{position:relative!important;top:auto!important/u);
   assert.match(css, /border:1px solid #668d78!important/u);
   assert.match(css, /\.report-help-header h2\{/u);
   assert.match(css, /background:linear-gradient\(180deg,#edf8f2 0%,#d7eee1 48%,#c2e2d0 100%\)!important/u);
@@ -69,10 +74,10 @@ test('logo source is reused as the rectangular molten color field around the rai
   assert.match(html, /style="--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)"/u);
 });
 
-test('refineHtml shortens visible title text and appends the refinement layer', () => {
+test('refineHtml shortens every visible title occurrence and appends the refinement layer', () => {
   const source = `<html><head><title>王小明${LEGACY_BRAND_SUFFIX}</title></head><body><main><header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo" src="images/tree-polo-logo.webp"><div class="tree-polo-brand-copy"><h1>王小明${LEGACY_BRAND_SUFFIX}</h1></div></header></main><button class="report-help-trigger">使用教學</button></body></html>`;
   const html = refineHtml(source);
-  assert.match(html, new RegExp(`王小明${BRAND_SUFFIX}`, 'u'));
+  assert.equal((html.match(new RegExp(`王小明${BRAND_SUFFIX}`, 'gu')) || []).length, 2);
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
   assert.match(html, /data-tree-polo-refined-theme/u);
   assert.match(html, /--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)/u);
@@ -116,6 +121,7 @@ test('refined exporter uses the shorter folder and HTML suffix and rebuilds ZIP 
   assert.match(html, /background:#000!important/u);
   assert.match(html, /--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)/u);
   assert.match(html, /\.report-help-header h2\{/u);
+  assert.match(html, /position:relative!important;top:auto!important/u);
 
   const manifest = JSON.parse(await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8'));
   assert.equal(manifest.report.safeName, result.safeName);
