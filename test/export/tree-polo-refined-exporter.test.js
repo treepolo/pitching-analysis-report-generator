@@ -32,22 +32,38 @@ test('shortens the brand suffix without changing the report name', () => {
   assert.equal(shortenBrandSuffix('王小明'), '王小明');
 });
 
-test('refined theme creates a fused raised glass logo and recolors help content without touching the launcher', () => {
+test('refined theme preserves the prior title bar, keeps the black logo field and uses rectangular fusion', () => {
   const css = refinedThemeCss();
-  assert.match(css, /mix-blend-mode:screen/u);
-  assert.match(css, /mask-image:radial-gradient/u);
+  assert.match(css, /min-height:70px/u);
+  assert.match(css, /padding:8px 12px 8px 76px/u);
+  assert.match(css, /#2aa56e 0%,#188b5b 42%,#10754b 48%,#09593a 100%/u);
   assert.match(css, /tree-polo-report-header::before/u);
   assert.match(css, /var\(--tree-polo-logo\)/u);
-  assert.match(css, /filter:blur\(11px\) saturate\(1\.48\)/u);
-  assert.match(css, /drop-shadow/u);
+  assert.match(css, /width:86px;height:64px/u);
+  assert.match(css, /border-radius:11px/u);
+  assert.doesNotMatch(css, /border-radius:50%/u);
+  assert.doesNotMatch(css, /mask-image:radial-gradient/u);
+  assert.match(css, /background:#000!important/u);
+  assert.match(css, /mix-blend-mode:normal!important/u);
+  assert.doesNotMatch(css, /mix-blend-mode:screen/u);
+});
+
+test('help content is green, its h2 strip is explicitly green, and help buttons keep their base styling', () => {
+  const css = refinedThemeCss();
   assert.match(css, /\.report-help-dialog\{/u);
   assert.match(css, /\.report-help-header\{/u);
   assert.match(css, /border:1px solid #668d78!important/u);
+  assert.match(css, /\.report-help-header h2\{/u);
+  assert.match(css, /background:linear-gradient\(180deg,#edf8f2 0%,#d7eee1 48%,#c2e2d0 100%\)!important/u);
   assert.match(css, /\.report-help-number/u);
   assert.doesNotMatch(css, /\.report-help-trigger\{/u);
+  assert.doesNotMatch(css, /\.report-help-close\{/u);
+  assert.doesNotMatch(css, /\.report-help-tutorial-button\{/u);
+  assert.doesNotMatch(css, /\.report-help-tutorial-stop\{/u);
+  assert.doesNotMatch(css, /\.report-help-tutorial-controls button\{/u);
 });
 
-test('logo source is reused as the molten color field around the raised logo', () => {
+test('logo source is reused as the rectangular molten color field around the raised logo', () => {
   const source = '<header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo" src="images/tree-polo-logo.webp" alt="小樹Polo"></header>';
   const html = addLogoColorSource(source);
   assert.match(html, /style="--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)"/u);
@@ -96,9 +112,10 @@ test('refined exporter uses the shorter folder and HTML suffix and rebuilds ZIP 
   assert.match(html, new RegExp(`王小明${BRAND_SUFFIX}`, 'u'));
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
   assert.match(html, /data-tree-polo-refined-theme/u);
-  assert.match(html, /mix-blend-mode:screen/u);
+  assert.match(html, /mix-blend-mode:normal!important/u);
+  assert.match(html, /background:#000!important/u);
   assert.match(html, /--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)/u);
-  assert.match(html, /\.report-help-dialog\{/u);
+  assert.match(html, /\.report-help-header h2\{/u);
 
   const manifest = JSON.parse(await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8'));
   assert.equal(manifest.report.safeName, result.safeName);
