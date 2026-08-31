@@ -12,6 +12,7 @@ const {
   brandedReportName,
   exportReport,
 } = require('../../src/export/tree-polo-branded-exporter');
+const { runLocalFileRuntimeSmoke } = require('../../src/export/runtime-smoke');
 const { readZipArchive } = require('../../src/export/zip-archive');
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
@@ -57,6 +58,15 @@ test('brand HTML replaces the old two-line header and keeps help styling intact'
   assert.doesNotMatch(html, /Pitching analysis report/u);
   assert.match(html, /\.report-help-trigger\{background:#245f94\}/u);
   assert.match(html, /data-tree-polo-brand-theme/u);
+});
+
+test('desktop package routes Electron through the non-mutating branded entry', async () => {
+  const packageJson = JSON.parse(await fs.readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
+  const mainEntry = await fs.readFile(path.join(repositoryRoot, 'src', 'main-entry.js'), 'utf8');
+  assert.equal(packageJson.main, 'src/main-entry.js');
+  assert.match(mainEntry, /class TreePoloExportJobController extends BaseExportJobController/u);
+  assert.match(mainEntry, /appBridge\.ExportJobController = TreePoloExportJobController/u);
+  assert.doesNotMatch(mainEntry, /exporterModule\.exportReport\s*=/u);
 });
 
 test('branded exporter renames folder and HTML, stages the logo, revalidates manifest and rebuilds ZIP', async () => {
@@ -105,6 +115,13 @@ test('branded exporter renames folder and HTML, stages the logo, revalidates man
   assert.equal(manifest.files.some((file) => file.relativePath === 'report.html'), false);
   assert.equal(manifest.files.some((file) => file.relativePath === 'images/tree-polo-logo.webp'), true);
   assert.equal(manifest.assets.some((asset) => asset.label === '小樹Polo Logo'), true);
+
+  const runtime = await runLocalFileRuntimeSmoke({
+    folderPath: result.folderPath,
+    electronPath: path.join(testRoot, 'missing-electron.exe'),
+  });
+  assert.equal(runtime.status, 'unavailable');
+  assert.equal(decodeURIComponent(runtime.fileUrl).endsWith(`/${result.reportFileName}`), true);
 
   const zipEntries = await readZipArchive(result.zipPath);
   assert.equal(zipEntries.has(result.reportFileName), true);
