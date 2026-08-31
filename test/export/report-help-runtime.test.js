@@ -28,8 +28,18 @@ test('help dialog stays inset so the underlying report remains visible', () => {
 test('clicking outside the help panel and pressing Escape close the help', () => {
   const script = helpScript();
   assert.match(script, /if \(event\.target === backdrop\) closeHelp\(\)/u);
-  assert.match(script, /if \(event\.key !== 'Escape'\) return/u);
+  assert.match(script, /event\.key === 'Escape'/u);
   assert.match(script, /dialog\.addEventListener\('click', \(event\) => event\.stopPropagation\(\)\)/u);
+});
+
+test('help modal blocks report playback shortcuts while it is open', () => {
+  const script = helpScript();
+  assert.match(script, /if \(!backdrop\.hidden\)/u);
+  assert.match(script, /event\.key === 'ArrowLeft'/u);
+  assert.match(script, /event\.key === 'ArrowRight'/u);
+  assert.match(script, /event\.code === 'KeyA'/u);
+  assert.match(script, /event\.code === 'KeyD'/u);
+  assert.match(script, /event\.stopImmediatePropagation\(\)/u);
 });
 
 test('help content includes annotated controls and shortcut explanations', () => {
@@ -59,12 +69,14 @@ test('tutorial mode targets real exported controls rather than a separate mock p
   assert.match(script, /report-help-live-marker/u);
 });
 
-test('help is injected as self-contained CSS markup and script', () => {
-  const base = '<html><head></head><body><main>report</main></body></html>';
+test('help is injected at the start of body so its capture handler owns modal shortcuts first', () => {
+  const base = '<html><head></head><body><main>report</main><script>window.player=true;</script></body></html>';
   const html = injectReportHelpHtml(base);
   assert.match(html, /data-report-help-style/u);
   assert.match(html, /data-report-help-open/u);
   assert.match(html, /data-report-help-backdrop/u);
   assert.match(html, /data-report-help-runtime/u);
   assert.match(html, /data-report-help-tutorial/u);
+  assert.ok(html.indexOf('data-report-help-runtime') < html.indexOf('<main>report</main>'));
+  assert.ok(html.indexOf('data-report-help-runtime') < html.indexOf('window.player=true'));
 });
