@@ -142,7 +142,7 @@ function helpScript() {
     dialog.focus({ preventScroll: true });
     if (number !== null) {
       const item = dialog.querySelector('[data-report-help-item="' + number + '"]');
-      item?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+      if (item) dialog.scrollTop = Math.max(0, item.offsetTop - (dialog.clientHeight / 2) + (item.clientHeight / 2));
     } else dialog.scrollTop = 0;
   }
 
@@ -242,14 +242,22 @@ function helpScript() {
   });
   dialog.addEventListener('click', (event) => event.stopPropagation());
   window.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
     if (!backdrop.hidden) {
-      event.preventDefault();
-      closeHelp();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeHelp();
+        return;
+      }
+      const blockedShortcut = event.key === ' ' || event.key === 'Spacebar'
+        || event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+        || event.code === 'KeyA' || event.code === 'KeyD';
+      if (blockedShortcut) event.stopImmediatePropagation();
       return;
     }
-    if (tutorialActive) {
+    if (event.key === 'Escape' && tutorialActive) {
       event.preventDefault();
+      event.stopImmediatePropagation();
       stopTutorial();
     }
   }, true);
@@ -263,10 +271,13 @@ function injectReportHelpHtml(html) {
   let output = String(html);
   const css = helpCss();
   output = output.includes('</head>') ? output.replace('</head>', `${css}\n</head>`) : `${css}\n${output}`;
-  const markup = helpMarkup();
-  const script = helpScript();
-  const addition = `${markup}\n${script}`;
-  output = output.includes('</body>') ? output.replace('</body>', `${addition}\n</body>`) : `${output}\n${addition}`;
+  const addition = `${helpMarkup()}\n${helpScript()}`;
+  const bodyPattern = /<body\b[^>]*>/iu;
+  if (bodyPattern.test(output)) {
+    output = output.replace(bodyPattern, (match) => `${match}\n${addition}`);
+  } else {
+    output = `${addition}\n${output}`;
+  }
   return output;
 }
 
