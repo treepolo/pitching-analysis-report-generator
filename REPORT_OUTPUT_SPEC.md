@@ -2,13 +2,13 @@
 
 ## Canonical output decision: referenced media only (2026-08-14)
 
-- The canonical source is the block-based long-form report document. `report.html` and its output renderer must preserve text blocks and independent single/dual video blocks without editor-only state.
+- The canonical source is the block-based long-form report document. The portable HTML report and its output renderer must preserve text blocks and independent single/dual video blocks without editor-only state.
 - A dual-video block has two side-specific single-video players, each retaining its own source filename, source title, segment, playback rate, and loop settings, plus a limited block-level shared timeline/sync-point runtime. The former anchor/binding/relative-offset workflow is not part of the output contract; changes to the existing shared behavior require a future explicit requirement.
 - Before staging, export computes the set of MediaAsset IDs referenced by video blocks. The folder and ZIP contain copies of only that set; unused Media Library assets are excluded.
 - Originals remain untouched. Output copies live under the self-contained export tree with portable relative paths; the same referenced set and content must be used for folder and ZIP variants.
 - A missing/invalid referenced asset blocks export. An unused asset is not included and is not a reason to fail an otherwise valid report.
 
-目前狀態：匯出 folder／ZIP、`report.html` renderer、相對路徑驗證、manifest/checksum 與 native-video portable runtime 已有實作及自動化測試；真實媒體、完整 desktop `file://`、responsive 與真人驗收仍需各自建立相稱 evidence。最新完成度以 `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md` 為準，本文件本身不把任何 requirement 升為 `VERIFIED`。
+目前狀態：匯出 folder／ZIP、portable HTML renderer、相對路徑驗證、manifest/checksum 與 native-video portable runtime 已有實作及自動化測試；真實媒體、完整 desktop `file://`、responsive 與真人驗收仍需各自建立相稱 evidence。最新完成度以 `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md` 為準，本文件本身不把任何 requirement 升為 `VERIFIED`。
 
 ## 1. Renderer contract
 
@@ -20,16 +20,24 @@
 
 ## 2. Output forms
 
+### 品牌命名（adopted 2026-09-01）
+
+- 對外輸出名稱以報告名稱為基礎，固定追加 `報告by小樹Polo`。
+- 若原始報告名為 `王小明`，則 folder 為 `王小明報告by小樹Polo`，主 HTML 為 `王小明報告by小樹Polo.html`。
+- Windows／portable filename 不安全字元仍必須經既有 safe-name 規則清理；撞名時沿用既有不覆寫策略追加序號。
+- 報告左上標頭顯示同一品牌名稱，並使用隨輸出封裝的 Tree Polo logo；logo 與所有報告資產必須可離線讀取。
+- 報告本體使用 Tree Polo 綠色系。使用教學入口按鈕保留原本藍色辨識度；教學視窗內容可使用綠色系，但不得影響入口按鈕的獨立視覺辨識。
+
 ### Folder
 
 最小形式：
 
     <safe-report-name>/
-    ├─ report.html
+    ├─ <safe-report-name>.html
     ├─ videos/
     └─ images/
 
-`images/` 只在存在實際圖片／poster 資產時需要；純文字或純影片輸出不必為空目錄建立假資產。可依需求增加其他 self-contained static assets，但不得把必要資料留在 generator runtime、database、server API 或 CDN。
+`images/` 只在存在實際圖片／poster／品牌 logo 資產時需要；不得為其他不存在的媒體建立假資產。可依需求增加其他 self-contained static assets，但不得把必要資料留在 generator runtime、database、server API 或 CDN。
 
 ### ZIP
 
@@ -43,16 +51,16 @@
 
     output/
     ├─ <safe-report-name>/
-    │  ├─ report.html
+    │  ├─ <safe-report-name>.html
     │  ├─ videos/
     │  └─ images/
     └─ <safe-report-name>_offline.zip
 
-Result 必須分別回報 folder 與 ZIP 位置、檔案數、warnings、validation outcome。
+Result 必須分別回報 folder 與 ZIP 位置、主 HTML 檔名、檔案數、warnings、validation outcome。
 
 ## 3. file:// and offline contract
 
-輸出 `report.html` 必須：
+輸出主 HTML 必須：
 
 - 可由 desktop modern browser 直接以 `file://` 開啟。
 - 不依賴 internet、CDN、server-side API、database、Service Worker 或 runtime fetch 取得必要 report data。
@@ -70,11 +78,12 @@ Online static report 正式支援 desktop modern browsers、iPhone/iPad Safari�
 2. validate project/blocks/media/segments/loops
 3. inspect or prepare normalized media when required
 4. stage referenced videos/images
-5. render `report.html`
-6. validate relative paths, asset set and manifest/checksums
-7. create ZIP when requested
-8. validate folder/ZIP parity when ZIP exists
-9. complete job and show result locations
+5. render portable HTML
+6. apply final brand name/theme/logo and final HTML filename
+7. validate relative paths, asset set and manifest/checksums
+8. create ZIP when requested
+9. validate folder/ZIP parity when ZIP exists
+10. complete job and show result locations
 
 每一 phase 都要有可理解的 state；failure 必須標示 phase、source 是否安全、可否 retry。
 
@@ -87,7 +96,10 @@ Online static report 正式支援 desktop modern browsers、iPhone/iPad Safari�
 
 ## 6. Output validation checklist
 
-- [ ] `report.html` 存在且可讀
+- [ ] manifest 所指定的主 HTML 存在且可讀
+- [ ] folder 與主 HTML 都使用同一 `<safe-report-name>`
+- [ ] 主名稱固定含 `報告by小樹Polo`，不再使用舊的 `投球分析報告by小樹Polo`
+- [ ] Tree Polo logo 存在且使用 export-local relative path
 - [ ] videos/images 目錄與實際 references 一致
 - [ ] 沒有 missing asset、broken relative path 或 external runtime dependency
 - [ ] safe filename 不穿越目錄、不含不安全字元
@@ -105,12 +117,12 @@ This section supersedes the earlier frame-cache export wording for portable vide
 
 - Every exported single-video or dual-video side is rendered as a native video element with an export-local relative source such as `videos/filename.mp4`.
 - The inline runtime controls exact frame seeking from `currentTime`, frame stepping, keyboard arrows, independent segment loop bounds, playback rate input/slider/reset, and the extended-rate `requestAnimationFrame` clock used only when the browser rejects a native rate.
-- Export never reads, stages, copies, or references `images/frame-cache`. The `images` directory is optional and is used only for real image/poster assets. Folder and ZIP outputs contain the same referenced source media.
+- Export never reads, stages, copies, or references `images/frame-cache`. The `images` directory is optional and is used only for real image/poster/brand assets. Folder and ZIP outputs contain the same referenced source media.
 - Electron IPC and frame-cache preparation remain available to the editor's media pipeline, but are not an export prerequisite and cannot alter the portable report player.
 
 ## 播放器選定與快捷鍵輸出契約（adopted 2026-08-23）
 
-- 產生器與 portable `report.html` 都必須有明確的播放器選定狀態。點擊某個播放器卡片、影片表面或控制項即選定該卡片；選定的是外層播放器區塊，不是影片邊框，外層以亮色外框提示。
+- 產生器與 portable HTML 都必須有明確的播放器選定狀態。點擊某個播放器卡片、影片表面或控制項即選定該卡片；選定的是外層播放器區塊，不是影片邊框，外層以亮色外框提示。
 - 左右鍵與空白鍵只作用於目前選定的播放器；沒有選定時不執行動作。可編輯輸入與選單不攔截這些快捷鍵。雙影片的 side-specific controls 保持各側獨立；block-level shared controls 依既有相容映射共同控制兩側。
 - 單影片輸出固定使用堆疊版面；並排／堆疊選項只影響雙影片。影格控制列以播放／暫停圖示、上一幀／下一幀箭頭呈現，當前幀顯示在進度條左側，總幀數顯示在右側。
 - 播放速度輸入、連續速度滑桿與重設按鈕維持同步；輸出播放器在瀏覽器不接受要求速度時使用擴充影格時鐘，切換速度不得因載入狀態競態而無聲暫停。精確定位在影格已穩定但未觸發 frame callback 時仍可完成。
