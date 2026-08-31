@@ -4,7 +4,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { ExportValidationError } = require('./asset-paths');
+const { ExportValidationError, normalizeRelativeAssetPath } = require('./asset-paths');
 
 const ELECTRON_HARNESS = String.raw`
 'use strict';
@@ -226,8 +226,43 @@ function spawnElectron(electronPath, args, timeoutMs, resultPath, logPath) {
   });
 }
 
+async function manifestHtmlName(folderPath) {
+  try {
+    const raw = await fs.readFile(path.join(folderPath, 'export-manifest.json'), 'utf8');
+    const manifest = JSON.parse(raw);
+    const entries = Array.isArray(manifest?.files) ? manifest.files : [];
+    const htmlFiles = entries
+      .map((entry) => entry?.relativePath)
+      .filter((value) => typeof value === 'string' && /\.html$/iu.test(value));
+    if (htmlFiles.length !== 1) return null;
+    return normalizeRelativeAssetPath(htmlFiles[0], { allowRootFile: true });
+  } catch {
+    return null;
+  }
+}
+
+async function resolveRuntimeHtmlPath(folderPath, explicitFileName) {
+  const candidates = [];
+  if (typeof explicitFileName === 'string' && explicitFileName.trim() !== '') {
+    candidates.push(normalizeRelativeAssetPath(explicitFileName, { allowRootFile: true }));
+  }
+  candidates.push('report.html', 'index.html');
+  const discovered = await manifestHtmlName(folderPath);
+  if (discovered) candidates.push(discovered);
+
+  for (const relativePath of [...new Set(candidates)]) {
+    const candidate = path.resolve(folderPath, ...relativePath.split('/'));
+    const relative = path.relative(path.resolve(folderPath), candidate);
+    if (relative === '' || relative.startsWith(`..${path.sep}`) || relative === '..' || path.isAbsolute(relative)) continue;
+    const stats = await fs.stat(candidate).catch(() => null);
+    if (stats?.isFile()) return { path: candidate, relativePath };
+  }
+  return null;
+}
+
 async function runLocalFileRuntimeSmoke({
   folderPath,
+  reportFileName,
   electronPath,
   timeoutMs = 15000,
   expectedKinds = [],
@@ -236,15 +271,11 @@ async function runLocalFileRuntimeSmoke({
     throw new ExportValidationError('Runtime smoke folderPath is required');
   }
   const resolvedFolder = path.resolve(folderPath);
-  const reportPath = path.join(resolvedFolder, 'report.html');
-  const indexPath = path.join(resolvedFolder, 'index.html');
-  const reportStats = await fs.stat(reportPath).catch(() => null);
-  const indexStats = reportStats?.isFile() ? reportStats : await fs.stat(indexPath).catch(() => null);
-  const htmlPath = reportStats?.isFile() ? reportPath : indexPath;
-  if (!indexStats?.isFile()) {
-    throw new ExportValidationError(`Runtime smoke report HTML is unavailable: ${reportPath}`);
+  const htmlFile = await resolveRuntimeHtmlPath(resolvedFolder, reportFileName);
+  if (!htmlFile) {
+    throw new ExportValidationError(`Runtime smoke report HTML is unavailable: ${resolvedFolder}`);
   }
-  const fileUrl = pathToFileURL(htmlPath).href;
+  const fileUrl = pathToFileURL(htmlFile.path).href;
   const resolvedElectron = await resolveElectronPath(electronPath);
   if (!resolvedElectron) {
     return {
@@ -258,42 +289,36 @@ async function runLocalFileRuntimeSmoke({
   // Keep harness, logs, and the isolated Electron profile inside the project.
   // The exported folder itself may be an intentional user-selected destination;
   // only runtime-smoke's internal files are constrained here.
-  const runtimeTempRoot = path.resolve(__dirname, '..', '..', '.tmp', 'export-runtime');
-  await fs.mkdir(runtimeTempRoot, { recursive: true });
-  const runtimeRoot = await fs.mkdtemp(path.join(runtimeTempRoot, 'pitch-report-export-runtime-'));
-  try {
-    const harnessPath = path.join(runtimeRoot, 'harness.cjs');
-    const resultPath = path.join(runtimeRoot, 'result.json');
-    const logPath = path.join(runtimeRoot, 'electron.log');
-    const profilePath = path.join(runtimeRoot, 'profile');
-    await fs.writeFile(harnessPath, ELECTRON_HARNESS, 'utf8');
-    await fs.writeFile(path.join(runtimeRoot, 'package.json'), JSON.stringify({
-      name: 'pitch-report-export-runtime-smoke',
-      main: 'harness.cjs',
-    }), 'utf8');
-    const runtimeResult = await spawnElectron(resolvedElectron.command, [
-      ...resolvedElectron.args,
-      '--disable-gpu',
-      '--no-sandbox',
-      '--enable-logging=file',
-      `--log-file=${logPath}`,
-      `--user-data-dir=${profilePath}`,
-      runtimeRoot,
-      fileUrl,
-      resultPath,
-    ], timeoutMs, resultPath, logPath);
-    const mediaKinds = new Set((runtimeResult.mediaElements || []).map((media) => media.kind));
-    const missingKinds = expectedKinds.filter((kind) => !mediaKinds.has(kind));
-    if (runtimeResult.status === 'passed' && missingKinds.length > 0) {
-      runtimeResult.status = 'failed';
-      runtimeResult.reason = `Runtime document did not contain expected media kinds: ${missingKinds.join(', ')}`;
-    }
-    runtimeResult.fileUrl = runtimeResult.fileUrl || fileUrl;
-    runtimeResult.runtime = runtimeResult.runtime || 'electron';
-    return runtimeResult;
-  } finally {
-    await fs.rm(runtimeRoot, { recursive: true, force: true });
-  }
+  const projectRoot = path.resolve(__dirname, '..', '..');
+  await fs.mkdir(path.join(projectRoot, '.tmp'), { recursive: true });
+  const harnessRoot = await fs.mkdtemp(path.join(projectRoot, '.tmp', 'runtime-smoke-'));
+  const harnessPath = path.join(harnessRoot, 'electron-runtime-harness.cjs');
+  const resultPath = path.join(harnessRoot, 'result.json');
+  const logPath = path.join(harnessRoot, 'electron.log');
+  const userDataPath = path.join(harnessRoot, 'electron-user-data');
+  await fs.writeFile(harnessPath, ELECTRON_HARNESS, 'utf8');
+  const env = { ...process.env, ELECTRON_ENABLE_LOGGING: '1' };
+  const args = [
+    ...resolvedElectron.args,
+    harnessPath,
+    '--no-sandbox',
+    `--user-data-dir=${userDataPath}`,
+    `--log-file=${logPath}`,
+    fileUrl,
+    resultPath,
+  ];
+  const result = await spawnElectron(resolvedElectron.command, args, timeoutMs, resultPath, logPath);
+  await fs.rm(harnessRoot, { recursive: true, force: true }).catch(() => {});
+  if (result.status !== 'passed') return result;
+  const mediaKinds = new Set(result.mediaElements.map((media) => media.kind));
+  const missingKinds = expectedKinds.filter((kind) => !mediaKinds.has(kind));
+  return missingKinds.length === 0
+    ? result
+    : {
+      ...result,
+      status: 'failed',
+      reason: `Expected rendered media kinds were missing: ${missingKinds.join(', ')}`,
+    };
 }
 
 module.exports = {
