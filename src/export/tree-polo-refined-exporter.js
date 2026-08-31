@@ -30,8 +30,8 @@ function shortenBrandSuffix(value) {
 
 function stylizeBrandSignature(html) {
   return String(html).replace(
-    /(<h1>[^<]*?報告by)小樹Polo(<\/h1>)/u,
-    '$1<span class="tree-polo-signature-tree">小樹</span><span class="tree-polo-signature-polo">Polo</span>$2',
+    /(<h1>[^<]*?報告)by小樹Polo(<\/h1>)/u,
+    '$1<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹</span><span class="tree-polo-signature-polo">Polo</span></span>$2',
   );
 }
 
@@ -55,8 +55,10 @@ body>main .tree-polo-brand-copy{position:relative;z-index:2;min-width:0}
    The title is smaller/lighter, with wider breathing room and only a faint
    one-pixel lower-edge shadow. */
 body>main .tree-polo-report-header h1{font-family:Tahoma,"Segoe UI","Microsoft JhengHei","Microsoft YaHei",sans-serif!important;font-size:18px!important;font-weight:500!important;line-height:1.28!important;letter-spacing:.035em!important;color:#f3f8f5!important;text-shadow:0 1px 0 rgba(0,39,25,.24)!important}
-body>main .tree-polo-signature-tree{color:#42d392!important;font-weight:600;text-shadow:0 1px 0 rgba(0,49,30,.26)}
-body>main .tree-polo-signature-polo{color:#b9ff68!important;font-weight:600;text-shadow:0 1px 0 rgba(0,49,30,.24)}
+/* The byline is deliberately subordinate to the report/person name. */
+body>main .tree-polo-signature{display:inline-block;font-size:.86em;font-weight:500;letter-spacing:.025em;margin-left:.08em;vertical-align:.035em}
+body>main .tree-polo-signature-tree{color:#42d392!important;font-weight:550;text-shadow:0 1px 0 rgba(0,49,30,.24)}
+body>main .tree-polo-signature-polo{color:#b9ff68!important;font-weight:550;text-shadow:0 1px 0 rgba(0,49,30,.22)}
 
 .report-help-backdrop{background:rgba(10,37,27,.34)}
 .report-help-dialog{border-color:#688d79;background:#f5faf7;color:#183126;box-shadow:0 18px 54px rgba(0,44,28,.32),inset 1px 1px 0 #fff}
@@ -79,7 +81,7 @@ body>main .tree-polo-signature-polo{color:#b9ff68!important;font-weight:600;text
 .report-help-tutorial-panel{border-color:#668d78;background:#f5faf7;color:#173c2b;box-shadow:0 8px 28px rgba(0,46,30,.28),inset 1px 1px 0 #fff}
 .report-help-tutorial-panel-header{border-bottom-color:#afc8bb;background:linear-gradient(#fbfffc,#dfeee6)}
 .report-help-tutorial-step{color:#4d685a}.report-help-tutorial-copy p{color:#456052}
-@media(max-width:700px){body>main .tree-polo-report-header{min-height:62px;padding-left:66px}body>main .tree-polo-brand-logo{left:9px;top:8px;width:46px;height:46px}body>main .tree-polo-report-header::before{left:2px;top:4px;width:75px;height:54px;border-radius:9px;background-position:center,9px center;background-size:100% 100%,46px 46px;filter:blur(6px) saturate(1.28)}body>main .tree-polo-report-header::after{left:6px;top:6px;width:55px;height:49px;border-radius:7px}body>main .tree-polo-report-header h1{font-size:16px!important;letter-spacing:.025em!important}}
+@media(max-width:700px){body>main .tree-polo-report-header{min-height:62px;padding-left:66px}body>main .tree-polo-brand-logo{left:9px;top:8px;width:46px;height:46px}body>main .tree-polo-report-header::before{left:2px;top:4px;width:75px;height:54px;border-radius:9px;background-position:center,9px center;background-size:100% 100%,46px 46px;filter:blur(6px) saturate(1.28)}body>main .tree-polo-report-header::after{left:6px;top:6px;width:55px;height:49px;border-radius:7px}body>main .tree-polo-report-header h1{font-size:16px!important;letter-spacing:.025em!important}body>main .tree-polo-signature{font-size:.84em}}
 </style>`;
 }
 
