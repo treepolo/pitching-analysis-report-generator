@@ -1,0 +1,72 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const test = require('node:test');
+const vm = require('node:vm');
+const {
+  injectReportEntrySpotlight,
+  spotlightCss,
+  spotlightMarkup,
+  spotlightScript,
+} = require('../../src/export/report-entry-spotlight');
+
+const repositoryRoot = path.resolve(__dirname, '..', '..');
+
+test('entry spotlight dims the report while keeping help above it', () => {
+  const css = spotlightCss();
+  assert.match(css, /\.report-entry-spotlight\{/u);
+  assert.match(css, /z-index:875/u);
+  assert.match(css, /background:rgba\(5,14,10,\.58\)/u);
+  assert.match(css, /report-entry-spotlight-active \.report-help-trigger/u);
+  assert.match(css, /z-index:910!important/u);
+});
+
+test('entry spotlight blocks one outside click and then dismisses', () => {
+  const script = spotlightScript();
+  const source = script.match(/<script data-report-entry-spotlight-runtime>\s*([\s\S]*?)\s*<\/script>/u)?.[1];
+  assert.ok(source);
+  assert.doesNotThrow(() => new vm.Script(source));
+  assert.match(source, /overlay\.addEventListener\('click'/u);
+  assert.match(source, /event\.preventDefault\(\)/u);
+  assert.match(source, /event\.stopImmediatePropagation\(\)/u);
+  assert.match(source, /overlay\.hidden = true/u);
+});
+
+test('clicking help dismisses spotlight without swallowing the help click', () => {
+  const script = spotlightScript();
+  assert.match(script, /helpTrigger\.addEventListener\('click', \(\) => \{\s*dismiss\(\);\s*\}, true\)/u);
+  assert.doesNotMatch(script, /helpTrigger\.addEventListener[\s\S]*?stopImmediatePropagation/u);
+});
+
+test('playback shortcuts are blocked until the spotlight is dismissed', () => {
+  const script = spotlightScript();
+  assert.match(script, /event\.key === 'ArrowLeft'/u);
+  assert.match(script, /event\.key === 'ArrowRight'/u);
+  assert.match(script, /event\.code === 'KeyA'/u);
+  assert.match(script, /event\.code === 'KeyD'/u);
+  assert.match(script, /event\.key === ' '/u);
+  assert.match(script, /if \(!active\) return/u);
+});
+
+test('spotlight markup and runtime are injected exactly once', () => {
+  const base = '<html><head></head><body><main>report</main></body></html>';
+  const once = injectReportEntrySpotlight(base);
+  const twice = injectReportEntrySpotlight(once);
+  assert.match(spotlightMarkup(), /data-report-entry-spotlight/u);
+  assert.equal((twice.match(/data-report-entry-spotlight-runtime/g) || []).length, 1);
+  assert.equal((twice.match(/data-report-entry-spotlight-style/g) || []).length, 1);
+  assert.ok(once.indexOf('data-report-entry-spotlight') < once.indexOf('<main>report</main>'));
+});
+
+test('renderer injects spotlight after help and floating UI refinements', async () => {
+  const source = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-renderer.js'), 'utf8');
+  assert.match(source, /require\('\.\/report-entry-spotlight'\)/u);
+  const helpIndex = source.indexOf('html = injectReportHelpHtml(html);');
+  const floatingIndex = source.indexOf('html = injectReportFloatingUiRefinement(html);');
+  const spotlightIndex = source.indexOf('html = injectReportEntrySpotlight(html);');
+  assert.ok(helpIndex >= 0);
+  assert.ok(floatingIndex > helpIndex);
+  assert.ok(spotlightIndex > floatingIndex);
+});
