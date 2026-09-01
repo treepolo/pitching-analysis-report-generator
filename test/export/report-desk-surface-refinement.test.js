@@ -26,7 +26,7 @@ test('report body keeps its existing surface and only gains a cast shadow', () =
   assert.match(css, /0 9px 18px rgba\(0, 0, 0, \.34\)/u);
   assert.doesNotMatch(css, /body>main::before/u);
   assert.doesNotMatch(css, /body>main::after/u);
-  assert.doesNotMatch(css, /paper/u);
+  assert.doesNotMatch(css, /body>main \{[\s\S]*?border-width:/u);
 });
 
 test('mobile reveals a narrow desk edge and uses a tighter shadow', () => {
