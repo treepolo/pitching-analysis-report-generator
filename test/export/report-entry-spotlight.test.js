@@ -14,13 +14,34 @@ const {
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
 
-test('entry spotlight dims the report while keeping help above it', () => {
+test('entry spotlight dims the report more strongly while keeping help above it', () => {
   const css = spotlightCss();
   assert.match(css, /\.report-entry-spotlight\{/u);
   assert.match(css, /z-index:875/u);
-  assert.match(css, /background:rgba\(5,14,10,\.58\)/u);
+  assert.match(css, /background:rgba\(3,10,7,\.72\)/u);
+  assert.match(css, /@media\(max-width:720px\)[\s\S]*?background:rgba\(3,10,7,\.76\)/u);
   assert.match(css, /report-entry-spotlight-active \.report-help-trigger/u);
   assert.match(css, /z-index:910!important/u);
+});
+
+test('entry spotlight renders a center-to-help animated guide', () => {
+  const css = spotlightCss();
+  const markup = spotlightMarkup();
+  const script = spotlightScript();
+  assert.match(markup, /data-report-entry-guide/u);
+  assert.match(markup, /report-entry-guide-origin/u);
+  assert.match(markup, /report-entry-guide-track/u);
+  assert.match(markup, /report-entry-guide-comet/u);
+  assert.match(css, /--guide-distance/u);
+  assert.match(css, /--guide-angle/u);
+  assert.match(css, /@keyframes report-entry-guide-travel/u);
+  assert.match(css, /@media\(prefers-reduced-motion:reduce\)/u);
+  assert.match(script, /helpTrigger\.getBoundingClientRect\(\)/u);
+  assert.match(script, /Math\.hypot\(dx, dy\)/u);
+  assert.match(script, /Math\.atan2\(dy, dx\)/u);
+  assert.match(script, /guide\.style\.setProperty\('--guide-distance'/u);
+  assert.match(script, /guide\.style\.setProperty\('--guide-angle'/u);
+  assert.match(script, /window\.addEventListener\('resize', updateGuideGeometry\)/u);
 });
 
 test('entry spotlight blocks one outside click and then dismisses', () => {
@@ -55,6 +76,7 @@ test('spotlight markup and runtime are injected exactly once', () => {
   const once = injectReportEntrySpotlight(base);
   const twice = injectReportEntrySpotlight(once);
   assert.match(spotlightMarkup(), /data-report-entry-spotlight/u);
+  assert.match(spotlightMarkup(), /data-report-entry-guide/u);
   assert.equal((twice.match(/data-report-entry-spotlight-runtime/g) || []).length, 1);
   assert.equal((twice.match(/data-report-entry-spotlight-style/g) || []).length, 1);
   assert.ok(once.indexOf('data-report-entry-spotlight') < once.indexOf('<main>report</main>'));
