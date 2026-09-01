@@ -90,6 +90,66 @@ body>main .tree-polo-signature-polo{color:#b9ff68!important;font-weight:550;text
 .report-help-tutorial-panel-header{border-bottom-color:#afc8bb;background:linear-gradient(#fbfffc,#dfeee6)}
 .report-help-tutorial-step{color:#4d685a}.report-help-tutorial-copy p{color:#456052}
 @media(max-width:700px){body>main .tree-polo-report-header{min-height:62px;padding-left:66px}body>main .tree-polo-brand-logo{left:9px;top:8px;width:46px;height:46px}body>main .tree-polo-report-header::before{left:2px;top:4px;width:75px;height:54px;border-radius:9px;background-position:center,9px center;background-size:100% 100%,46px 46px;filter:blur(6px) saturate(1.28)}body>main .tree-polo-report-header::after{left:6px;top:6px;width:55px;height:49px;border-radius:7px}body>main .tree-polo-report-header h1{font-size:16px!important;letter-spacing:.025em!important}body>main .tree-polo-signature{font-size:.84em}}
+
+/* Medium-inspired visual layer. This deliberately changes appearance only:
+   existing report/player/help geometry, control count and player layouts stay intact. */
+:root{--reader-face:#fff;--reader-face-light:#fafafa;--reader-text:#242424;--reader-muted:#6b6b6b;--reader-line:#e6e6e6;--reader-input-line:#d0d0d0;--reader-blue:#1a8917;--reader-blue-dark:#156d12;--reader-green:#1a8917}
+body>main{border-color:#e6e6e6!important;background:#fff!important;box-shadow:0 2px 12px rgba(0,0,0,.08)!important;color:#242424!important}
+body>main .tree-polo-report-header{border-bottom-color:#e6e6e6!important;background:#fff!important;box-shadow:none!important;color:#242424!important}
+body>main .tree-polo-report-header::before,body>main .tree-polo-report-header::after{display:none!important}
+body>main .tree-polo-brand-logo{box-shadow:none!important;filter:none!important}
+body>main .tree-polo-report-header h1{color:#242424!important;text-shadow:none!important}
+body>main .tree-polo-signature{color:#6b6b6b!important}
+body>main .tree-polo-signature-tree,body>main .tree-polo-signature-polo{color:#1a8917!important;text-shadow:none!important}
+body>main h2{border-bottom-color:#e6e6e6!important;background:#fff!important;box-shadow:none!important;color:#242424!important}
+body>main h3{color:#242424!important}
+body>main h4{border-bottom-color:#e6e6e6!important;color:#6b6b6b!important}
+body>main .report-section{border-color:#e6e6e6!important;background:#fff!important;box-shadow:none!important}
+body>main .report-text{color:#242424!important;font-family:Georgia,"Times New Roman","Noto Serif TC","PMingLiU",serif}
+body>main figcaption{color:#6b6b6b!important}
+body>main .report-media img{border-color:#e6e6e6!important;background:#fff!important}
+body>main .portable-player{border-color:#e6e6e6!important;border-radius:8px!important;background:#fafafa!important;box-shadow:none!important}
+body>main .portable-player-header{border-bottom-color:#e6e6e6!important}
+body>main .portable-player-grid-side-by-side>.portable-player-side+.portable-player-side{border-left-color:#e6e6e6!important}
+body>main .portable-player-grid-stacked>.portable-player-side+.portable-player-side{border-top-color:#e6e6e6!important}
+body>main .portable-player[data-frame-selected="true"]{border-color:#1a8917!important;background:#f5fbf5!important;box-shadow:0 0 0 1px rgba(26,137,23,.12)!important}
+body>main .portable-player-side-heading h3{color:#242424!important}
+body>main .portable-frame-loop,body>main .portable-player-loop,body>main .portable-player-side-controls label{color:#6b6b6b!important}
+body>main .portable-frame-side-status,body>main .portable-frame-fallback,body>main .portable-frame-player-status{color:#6b6b6b!important}
+body>main .portable-frame-controls output,body>main .portable-player-side-controls output{color:#6b6b6b!important}
+body>main .portable-frame-rate-row input[type="number"],body>main .portable-player-rate-row input[type="number"]{border-color:#d0d0d0!important;border-radius:4px!important;background:#fff!important;box-shadow:none!important;color:#242424!important}
+body>main input[type="range"],body>main input[type="checkbox"]{accent-color:#1a8917!important}
+:where(body>main .portable-frame-controls button,body>main .portable-player-rate-row button,body>main .portable-frame-rate-row button,body>main .portable-player-actions button,body>main .report-annotation-controls button){border-color:#d0d0d0!important;border-radius:999px!important;background:#fff!important;box-shadow:none!important;color:#242424!important;text-shadow:none!important}
+:where(body>main .portable-frame-controls button,body>main .portable-player-rate-row button,body>main .portable-frame-rate-row button,body>main .portable-player-actions button,body>main .report-annotation-controls button):hover:not(:disabled){border-color:#242424!important;background:#f2f2f2!important;color:#242424!important}
+:where(body>main .portable-frame-controls button,body>main .portable-player-rate-row button,body>main .portable-frame-rate-row button,body>main .portable-player-actions button,body>main .report-annotation-controls button):active:not(:disabled){background:#eaeaea!important;box-shadow:none!important}
+:where(body>main .portable-frame-controls button,body>main .portable-player-rate-row button,body>main .portable-frame-rate-row button,body>main .portable-player-actions button,body>main .report-annotation-controls button):disabled{border-color:#e6e6e6!important;background:#f2f2f2!important;color:#b3b3b3!important;box-shadow:none!important}
+:where(body>main .portable-frame-controls button,body>main .portable-player-actions button,body>main .report-annotation-controls button,body>main input):focus-visible{outline:2px solid #1a8917!important;outline-offset:2px!important}
+body>main .report-annotation-controls{border-color:#e6e6e6!important;background:#fafafa!important;box-shadow:none!important}
+body>main .report-annotation-track-toggle{border-color:#e6e6e6!important;background:#fff!important;color:#242424!important}
+
+.report-help-backdrop{background:rgba(0,0,0,.32)!important}
+.report-help-dialog{border-color:#e6e6e6!important;border-radius:12px!important;background:#fff!important;box-shadow:0 16px 48px rgba(0,0,0,.18)!important;color:#242424!important}
+.report-help-header{border-color:#e6e6e6!important;background:#fff!important;box-shadow:none!important}
+.report-help-header h2{border:0!important;background:transparent!important;box-shadow:none!important;color:#242424!important;text-shadow:none!important}
+.report-help-header p,.report-help-figure figcaption,.report-help-guide p,.report-help-actions span,.report-help-tutorial-step,.report-help-tutorial-copy p{color:#6b6b6b!important}
+.report-help-content h3{color:#242424!important}
+.report-help-figure{border-color:#e6e6e6!important;border-radius:8px!important;background:#fafafa!important;box-shadow:none!important}
+.report-help-live-preview{border-radius:6px!important;box-shadow:none!important}
+.report-help-live-preview-empty{border-color:#d0d0d0!important;background:#fafafa!important;color:#6b6b6b!important}
+.report-help-guide li{border-color:#e6e6e6!important;border-radius:8px!important;background:#fff!important;box-shadow:none!important}
+.report-help-number,.report-help-preview-marker{background:#1a8917!important}
+.report-help-live-target{outline-color:rgba(26,137,23,.68)!important}.report-help-live-target.is-current{outline-color:#156d12!important}
+.report-help-shortcut{border-color:#e6e6e6!important;border-radius:8px!important;background:#fff!important}.report-help-shortcut kbd{border-color:#d0d0d0!important;border-radius:4px!important;background:#f7f7f7!important;box-shadow:none!important;color:#242424!important}
+.report-help-note{border-left-color:#1a8917!important;background:#f7f7f7!important;color:#525252!important}
+.report-help-actions{border-top-color:#e6e6e6!important}
+.report-help-tutorial-panel{border-color:#e6e6e6!important;border-radius:12px!important;background:#fff!important;box-shadow:0 10px 30px rgba(0,0,0,.16)!important;color:#242424!important}
+.report-help-tutorial-panel-header{border-bottom-color:#e6e6e6!important;background:#fff!important}
+.report-help-icon{border-color:#242424!important;background:#242424!important;box-shadow:none!important;color:#fff!important}
+:where(.report-help-trigger,.report-help-close,.report-help-tutorial-button,.report-help-tutorial-stop,.report-help-tutorial-controls button){border-color:#d0d0d0!important;border-radius:999px!important;background:#fff!important;box-shadow:none!important;color:#242424!important;text-shadow:none!important}
+:where(.report-help-trigger,.report-help-close,.report-help-tutorial-button,.report-help-tutorial-stop,.report-help-tutorial-controls button):hover:not(:disabled){border-color:#242424!important;background:#f2f2f2!important;color:#242424!important}
+:where(.report-help-trigger,.report-help-close,.report-help-tutorial-button,.report-help-live-marker,.report-help-tutorial-panel button):focus-visible{outline:2px solid #1a8917!important;outline-offset:2px!important}
+.report-help-tutorial-button,.report-help-tutorial-controls [data-report-help-tutorial-full]{border-color:#1a8917!important;background:#1a8917!important;color:#fff!important}
+.report-help-tutorial-button:hover,.report-help-tutorial-controls [data-report-help-tutorial-full]:hover{border-color:#156d12!important;background:#156d12!important;color:#fff!important}
 </style>`;
 }
 
