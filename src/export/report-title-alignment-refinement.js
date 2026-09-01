@@ -23,10 +23,10 @@ body>main header.tree-polo-report-header .tree-polo-brand-copy h1 {
   text-overflow: ellipsis !important;
   text-align: center !important;
 }
-/* Make the author signature read as a quiet byline rather than part of the
-   primary report name. */
+/* Keep the author signature subordinate to the primary report title, but large
+   enough to remain intentional beside the longer "投球分析報告" wording. */
 body>main header.tree-polo-report-header .tree-polo-signature {
-  font-size: .72em !important;
+  font-size: .80em !important;
   font-weight: 500 !important;
   letter-spacing: .02em !important;
   margin-left: .12em !important;
@@ -38,7 +38,7 @@ body>main header.tree-polo-report-header .tree-polo-signature {
     max-width: calc(100% - 136px) !important;
   }
   body>main header.tree-polo-report-header .tree-polo-signature {
-    font-size: .70em !important;
+    font-size: .78em !important;
   }
 }
 
