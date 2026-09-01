@@ -42,7 +42,9 @@ function stylizeBrandSignature(html) {
 
 function refinedThemeCss() {
   return `<style data-tree-polo-refined-theme>
-html,body{background-color:#d8e8df!important;background-image:url("${REPORT_BACKGROUND_RELATIVE_PATH}")!important;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important}
+html{background:#d8e8df!important}
+body{background:transparent!important;position:relative;isolation:isolate}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-color:#d8e8df;background-image:url("${REPORT_BACKGROUND_RELATIVE_PATH}");background-size:cover;background-position:center;background-repeat:no-repeat}
 /* Report and help content use the Tree Polo green family. Help buttons keep
    their original styling so interactive affordances remain visually distinct. */
 body>main .tree-polo-report-header{position:relative;display:flex;align-items:center;isolation:isolate;overflow:hidden;min-height:70px;margin:0 -8px 8px;padding:8px 12px 8px 76px;border-bottom:1px solid #084a31;background:linear-gradient(180deg,#2aa56e 0%,#188b5b 42%,#10754b 48%,#09593a 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -2px 0 rgba(177,255,101,.28),0 1px 2px rgba(0,0,0,.28);color:#fff}

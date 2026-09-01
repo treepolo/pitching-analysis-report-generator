@@ -27,13 +27,16 @@ test.after(async () => {
   if (testRoot) await fs.rm(testRoot, { recursive: true, force: true });
 });
 
-test('report background CSS uses the exported JPEG without a data URI or fixed attachment', () => {
+test('report background uses a fixed viewport layer so scrolling does not move or vertically crop the landscape photo', () => {
   const css = refinedThemeCss();
-  assert.match(css, /background-image:url\("images\/tree-polo-report-background\.jpg"\)!important/u);
-  assert.match(css, /background-size:cover!important/u);
-  assert.match(css, /background-position:center!important/u);
-  assert.match(css, /background-repeat:no-repeat!important/u);
-  assert.doesNotMatch(css, /background-attachment\s*:\s*fixed/iu);
+  assert.match(css, /body\{background:transparent!important;position:relative;isolation:isolate\}/u);
+  assert.match(css, /body::before\{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none/u);
+  assert.match(css, /background-image:url\("images\/tree-polo-report-background\.jpg"\)/u);
+  assert.match(css, /background-size:cover/u);
+  assert.match(css, /background-position:center/u);
+  assert.match(css, /background-repeat:no-repeat/u);
+  assert.doesNotMatch(css, /html,body\{[^}]*background-image/iu);
+  assert.doesNotMatch(css, /background-attachment\s*:/iu);
   assert.doesNotMatch(css, /data:image\/jpeg;base64/iu);
 });
 
@@ -69,9 +72,11 @@ test('refined export stages the original JPEG through the normal asset pipeline 
   assert.deepEqual(exported, source);
 
   const html = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
-  assert.match(html, /background-image:url\("images\/tree-polo-report-background\.jpg"\)!important/u);
+  assert.match(html, /body::before\{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none/u);
+  assert.match(html, /background-image:url\("images\/tree-polo-report-background\.jpg"\)/u);
+  assert.doesNotMatch(html, /html,body\{[^}]*background-image/iu);
   assert.doesNotMatch(html, /data:image\/jpeg;base64/iu);
-  assert.doesNotMatch(html, /background-attachment\s*:\s*fixed/iu);
+  assert.doesNotMatch(html, /background-attachment\s*:/iu);
 
   const manifest = JSON.parse(await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8'));
   const sourceSha256 = crypto.createHash('sha256').update(source).digest('hex');
