@@ -66,6 +66,22 @@ test('routine playback status line is hidden but errors remain visible', () => {
   assert.match(css, /\.report-help-live-preview \.portable-frame-player-status/u);
 });
 
+test('mobile annotation points shrink without changing their position selectors', () => {
+  const css = reportLayoutRefinementCss();
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.report-annotation-point[\s\S]*?r: 3\.2px !important[\s\S]*?stroke-width: \.8 !important/u);
+  assert.match(css, /@media \(max-width: 420px\)[\s\S]*?\.report-annotation-point[\s\S]*?r: 2\.6px !important[\s\S]*?stroke-width: \.65 !important/u);
+  assert.doesNotMatch(css, /\.report-annotation-point[^}]*\b(?:cx|cy)\s*:/u);
+});
+
+test('mobile help typography is compact, especially the dialog title', () => {
+  const css = reportLayoutRefinementCss();
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.report-help-header h2 \{[\s\S]*?font-size: 15px !important/u);
+  assert.match(css, /\.report-help-header p \{[\s\S]*?font-size: 10px !important/u);
+  assert.match(css, /\.report-help-guide strong \{[\s\S]*?font-size: 11px !important/u);
+  assert.match(css, /\.report-help-guide p,[\s\S]*?font-size: 10px !important/u);
+  assert.match(css, /@media \(max-width: 420px\)[\s\S]*?\.report-help-header h2 \{[\s\S]*?font-size: 14px !important/u);
+});
+
 test('mobile layout replaces the old wrapping navigation with an explicit compact grid', () => {
   const css = reportLayoutRefinementCss();
   assert.match(css, /@media \(max-width: 700px\)/u);
@@ -85,7 +101,7 @@ test('mobile layout replaces the old wrapping navigation with an explicit compac
 test('layout refinement explicitly covers the help clone as well as report body', () => {
   const css = reportLayoutRefinementCss();
   const helpSelectors = css.match(/\.report-help-live-preview/g) || [];
-  assert.ok(helpSelectors.length >= 20);
+  assert.ok(helpSelectors.length >= 22);
 });
 
 test('layout refinement injects once before the closing head', () => {
