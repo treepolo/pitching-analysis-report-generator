@@ -19,10 +19,16 @@ test('mobile report shell is truly edge-to-edge and centered', () => {
   assert.match(css, /@media \(max-width: 700px\)/u);
   assert.match(css, /body>main \{[\s\S]*?width: 100% !important/u);
   assert.match(css, /body>main \{[\s\S]*?margin: 0 !important/u);
-  assert.match(css, /padding: 0 5px 12px !important/u);
+  assert.match(css, /padding: 70px 5px 12px !important/u);
   assert.match(css, /border-left: 0 !important/u);
   assert.match(css, /border-right: 0 !important/u);
   assert.match(css, /header\.tree-polo-report-header \{[\s\S]*?margin: 0 -5px 8px !important/u);
+});
+
+test('mobile shell reserves fixed title space from first paint and releases it for print', () => {
+  const css = mobileShellCss();
+  assert.match(css, /padding: 70px 5px 12px !important/u);
+  assert.match(css, /@media print[\s\S]*?padding-top: 0 !important/u);
 });
 
 test('mobile viewport locks page scaling while preserving range dragging', () => {
