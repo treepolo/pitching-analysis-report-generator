@@ -10,6 +10,7 @@ const { injectReportLayoutRefinement } = require('./report-layout-refinement');
 const { injectReportFloatingUiRefinement } = require('./report-floating-ui-refinement');
 const { injectReportTitleAlignmentRefinement } = require('./report-title-alignment-refinement');
 const { injectReportEntrySpotlight } = require('./report-entry-spotlight');
+const { injectReportVisibleTitleRuntime } = require('./report-visible-title-runtime');
 
 function renderReportHtml(reportDocument, options = {}) {
   const portable = base.toPortableReportDocument(reportDocument);
@@ -23,6 +24,7 @@ function renderReportHtml(reportDocument, options = {}) {
   html = injectReportFloatingUiRefinement(html);
   html = injectReportTitleAlignmentRefinement(html);
   html = injectReportEntrySpotlight(html);
+  html = injectReportVisibleTitleRuntime(html);
   return html;
 }
 
