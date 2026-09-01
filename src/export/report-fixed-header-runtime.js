@@ -21,18 +21,27 @@ body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
   display: block;
 }
 @media (max-width: 700px) {
+  /* Pin the phone title bar from the first painted frame. The runtime only
+     supplies the spacer and exact pixel width afterwards. */
+  body>main header.tree-polo-report-header,
   body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
+    position: fixed !important;
+    top: 0 !important;
     left: 0 !important;
     right: auto !important;
+    width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
+    z-index: 850 !important;
   }
 }
 @media print {
+  body>main header.tree-polo-report-header,
   body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
     position: relative !important;
     top: auto !important;
     left: auto !important;
+    right: auto !important;
     width: auto !important;
     margin: 0 -8px 8px !important;
   }
