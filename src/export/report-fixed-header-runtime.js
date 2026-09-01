@@ -22,7 +22,8 @@ body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
 }
 @media (max-width: 700px) {
   /* Pin the phone title bar from the first painted frame. The runtime only
-     supplies the spacer and exact pixel width afterwards. */
+     supplies the exact pixel width afterwards; mobile content spacing is
+     reserved by the shell CSS, not by a late spacer. */
   body>main header.tree-polo-report-header,
   body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
     position: fixed !important;
@@ -33,6 +34,10 @@ body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
     max-width: none !important;
     margin: 0 !important;
     z-index: 850 !important;
+  }
+  .report-fixed-header-spacer,
+  .report-fixed-header-spacer[data-active="true"] {
+    display: none !important;
   }
 }
 @media print {
@@ -70,6 +75,7 @@ function fixedHeaderScript() {
   let fixed = false;
   let printing = false;
   let rafId = 0;
+  let wasMobile = mobileQuery.matches;
 
   const numeric = (value) => {
     const parsed = Number.parseFloat(value);
@@ -116,7 +122,7 @@ function fixedHeaderScript() {
     if (fixed === next) return;
     fixed = next;
     if (fixed) {
-      spacer.dataset.active = 'true';
+      spacer.dataset.active = mobileQuery.matches ? 'false' : 'true';
       header.dataset.reportHeaderFixed = 'true';
       applyFixedGeometry();
       return;
@@ -130,13 +136,17 @@ function fixedHeaderScript() {
     rafId = 0;
     if (printing) return;
 
+    const isMobile = mobileQuery.matches;
+    if (isMobile !== wasMobile) {
+      setFixed(false);
+      wasMobile = isMobile;
+      readNaturalMetrics();
+    }
+
     /* Phone layout is fixed from the start. There is no initial top gap and no
        later threshold transition that can nudge the bar upward by a few px. */
-    if (mobileQuery.matches) {
-      if (!fixed) {
-        readNaturalMetrics();
-        setFixed(true);
-      }
+    if (isMobile) {
+      if (!fixed) setFixed(true);
       applyFixedGeometry();
       return;
     }
@@ -160,6 +170,7 @@ function fixedHeaderScript() {
   };
   const afterPrint = () => {
     printing = false;
+    wasMobile = mobileQuery.matches;
     readNaturalMetrics();
     scheduleUpdate();
   };
