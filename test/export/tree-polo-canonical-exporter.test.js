@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const test = require('node:test');
@@ -13,6 +14,10 @@ const { readZipArchive } = require('../../src/export/zip-archive');
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
 let testRoot;
+
+function sha256(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
 
 test.before(async () => {
   await fs.mkdir(path.join(repositoryRoot, '.tmp'), { recursive: true });
@@ -67,10 +72,19 @@ test('delivers folder, HTML and ZIP with the canonical Tree Polo report name onl
   const html = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
   assert.match(html, new RegExp(`王小明${BRAND_SUFFIX}`, 'u'));
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
+  assert.equal((html.match(/<style\b/gu) || []).length, 1);
+  assert.match(html, /data-report-style-bundle/u);
+  assert.match(html, /report-style-source:data-report-mobile-shell-refinement; role:functional-layout/u);
+  assert.match(html, /report-style-source:data-tree-polo-brand-theme; role:legacy-visual/u);
+  assert.match(html, /report-style-source:data-tree-polo-refined-theme; role:final-visual/u);
 
   const manifest = JSON.parse(await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8'));
   assert.equal(manifest.report.safeName, canonicalName);
-  assert.equal(manifest.files.some((file) => file.relativePath === `${canonicalName}.html`), true);
+  const htmlFile = manifest.files.find((file) => file.relativePath === `${canonicalName}.html`);
+  assert.ok(htmlFile);
+  const htmlBuffer = Buffer.from(html, 'utf8');
+  assert.equal(htmlFile.byteLength, htmlBuffer.length);
+  assert.equal(htmlFile.sha256, sha256(htmlBuffer));
 
   const zipEntries = await readZipArchive(result.zipPath);
   assert.equal(zipEntries.has(`${canonicalName}.html`), true);

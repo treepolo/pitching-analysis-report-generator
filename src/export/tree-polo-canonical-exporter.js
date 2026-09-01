@@ -1,8 +1,10 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { ExportValidationError } = require('./asset-paths');
+const { bundleReportStyles } = require('./report-style-bundler');
 const { exportReport: exportRefinedReport } = require('./tree-polo-refined-exporter');
 const { validateExportLayout } = require('./layout-validator');
 const { createZipArchive, validateZipParity } = require('./zip-archive');
@@ -10,6 +12,10 @@ const { createZipArchive, validateZipParity } = require('./zip-archive');
 const LEGACY_BRAND_SUFFIX = '投球分析報告by小樹Polo';
 const BRAND_SUFFIX = '報告by小樹Polo';
 const outputLocks = new Map();
+
+function sha256(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
 
 function outputLockKey(outputRoot) {
   const resolved = path.resolve(outputRoot);
@@ -112,12 +118,22 @@ async function retargetStagedExport(stagedResult, safeName) {
     );
   }
 
-  const html = await fs.readFile(path.join(folderPath, htmlFileName), 'utf8');
+  const htmlPath = path.join(folderPath, htmlFileName);
+  const sourceHtml = await fs.readFile(htmlPath, 'utf8');
+  const html = bundleReportStyles(sourceHtml);
+  if (html !== sourceHtml) await fs.writeFile(htmlPath, html, 'utf8');
+
   const manifest = JSON.parse(await fs.readFile(path.join(folderPath, 'export-manifest.json'), 'utf8'));
   if (manifest.report && typeof manifest.report === 'object') manifest.report.safeName = safeName;
+  const htmlBuffer = Buffer.from(html, 'utf8');
   manifest.files = (manifest.files || []).map((file) => (
     file?.relativePath === oldHtmlFileName
-      ? { ...file, relativePath: htmlFileName }
+      ? {
+        ...file,
+        relativePath: htmlFileName,
+        byteLength: htmlBuffer.length,
+        sha256: sha256(htmlBuffer),
+      }
       : file
   ));
   await rewriteManifest(folderPath, manifest);
