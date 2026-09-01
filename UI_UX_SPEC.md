@@ -11,6 +11,14 @@ The previous fixed-form/editor configuration is superseded and must not remain a
 
 目前狀態：本文件仍是 canonical UI/UX contract。Desktop application 高層架構已由使用者於 2026-08-14 核准；目前已有 Electron generator 與 block-based editor/player/export implementation，但 visual、responsive、touch、完整 E2E 與真人 evidence 仍依 `PROJECT_STATE.md`／`ACCEPTANCE_TESTS.md` 判定，不因本文件描述或程式存在而視為已驗證。
 
+## Visual direction governance（2026-09-01）
+
+- 本文件的硬性 UI/UX 契約是資訊架構、功能可達性、互動語意、responsive、keyboard/touch、accessibility、狀態與錯誤回饋；這些不得因視覺改版而退化。
+- 色盤、漸層、陰影、圓角、材質、擬物／扁平程度、年代風格、字體氣質與其他美術語言，預設都屬於可替換的 visual direction，不因曾出現在實作、截圖或歷史討論中而自動成為產品契約。
+- 既有 XP／Windows 7、Tree Polo 綠色主體、特定藍色教學按鈕等視覺選擇，除非另有最新且明確的使用者決策提升為 contract，否則只視為當時 implementation，不限制後續整體改版。
+- 品牌名稱、必要品牌資產與功能辨識可以是產品契約；但品牌存在不等於固定某一套配色或裝飾風格。
+- 視覺改版仍需維持文字可讀性、焦點可見性、狀態不只靠顏色辨識、控制項可達、不同 viewport 不爆版，以及 preview/export 的一致性。
+
 ## 1. UX 目標與約束
 
 - 主要使用者是投球教練／分析者本人；學生只閱讀輸出報告。
