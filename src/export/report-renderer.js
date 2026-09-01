@@ -9,6 +9,7 @@ const { injectReportHelpHtml } = require('./report-help-runtime');
 const { injectReportLayoutRefinement } = require('./report-layout-refinement');
 const { injectReportFloatingUiRefinement } = require('./report-floating-ui-refinement');
 const { injectReportTitleAlignmentRefinement } = require('./report-title-alignment-refinement');
+const { injectReportPlayerSelectionRefinement } = require('./report-player-selection-refinement');
 const { injectReportEntrySpotlight } = require('./report-entry-spotlight');
 const { injectReportVisibleTitleRuntime } = require('./report-visible-title-runtime');
 
@@ -23,6 +24,7 @@ function renderReportHtml(reportDocument, options = {}) {
   html = injectReportLayoutRefinement(html);
   html = injectReportFloatingUiRefinement(html);
   html = injectReportTitleAlignmentRefinement(html);
+  html = injectReportPlayerSelectionRefinement(html);
   html = injectReportEntrySpotlight(html);
   html = injectReportVisibleTitleRuntime(html);
   return html;
