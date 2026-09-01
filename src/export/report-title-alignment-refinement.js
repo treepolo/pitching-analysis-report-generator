@@ -26,7 +26,7 @@ body>main header.tree-polo-report-header .tree-polo-brand-copy h1 {
 /* Keep the author signature subordinate to the primary report title, but large
    enough to remain intentional beside the longer "投球分析報告" wording. */
 body>main header.tree-polo-report-header .tree-polo-signature {
-  font-size: .80em !important;
+  font-size: .84em !important;
   font-weight: 500 !important;
   letter-spacing: .02em !important;
   margin-left: .12em !important;
@@ -38,7 +38,7 @@ body>main header.tree-polo-report-header .tree-polo-signature {
     max-width: calc(100% - 136px) !important;
   }
   body>main header.tree-polo-report-header .tree-polo-signature {
-    font-size: .78em !important;
+    font-size: .82em !important;
   }
 }
 
