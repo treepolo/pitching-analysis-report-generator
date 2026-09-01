@@ -6,6 +6,7 @@ const { injectAnnotationNavigationHtml } = require('./annotation-navigation-runt
 const { patchNativeFramePlayerHtml } = require('./native-frame-player-fixes');
 const { injectXp7RangeTheme } = require('./xp7-range-theme');
 const { injectReportHelpHtml } = require('./report-help-runtime');
+const { injectReportLayoutRefinement } = require('./report-layout-refinement');
 
 function renderReportHtml(reportDocument, options = {}) {
   const portable = base.toPortableReportDocument(reportDocument);
@@ -15,6 +16,7 @@ function renderReportHtml(reportDocument, options = {}) {
   html = injectAnnotationNavigationHtml(html, portable);
   html = injectXp7RangeTheme(html);
   html = injectReportHelpHtml(html);
+  html = injectReportLayoutRefinement(html);
   return html;
 }
 
