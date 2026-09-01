@@ -11,6 +11,12 @@ const {
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
 
+test('report title is bold while the smaller byline remains subordinate', () => {
+  const css = reportLayoutRefinementCss();
+  assert.match(css, /tree-polo-brand-copy h1 \{\s*font-weight: 700 !important/u);
+  assert.match(css, /tree-polo-signature \{\s*font-weight: 500 !important/u);
+});
+
 test('annotation controls lose their outer sub-panel frame and stay compact', () => {
   const css = reportLayoutRefinementCss();
   assert.match(css, /body>main \.report-annotation-controls/u);
@@ -53,10 +59,33 @@ test('frame timeline consumes remaining width while frame labels shrink to conte
   assert.match(css, /width: 100% !important/u);
 });
 
+test('routine playback status line is hidden but errors remain visible', () => {
+  const css = reportLayoutRefinementCss();
+  assert.match(css, /\.portable-frame-player-status \{[\s\S]*?display: none !important/u);
+  assert.match(css, /\.portable-frame-player-status\[data-state="error"\][\s\S]*?display: block !important/u);
+  assert.match(css, /\.report-help-live-preview \.portable-frame-player-status/u);
+});
+
+test('mobile layout replaces the old wrapping navigation with an explicit compact grid', () => {
+  const css = reportLayoutRefinementCss();
+  assert.match(css, /@media \(max-width: 700px\)/u);
+  assert.match(css, /\.portable-frame-navigation \{[\s\S]*?display: grid !important/u);
+  assert.match(
+    css,
+    /grid-template-columns: 32px 32px max-content minmax\(0, 1fr\) max-content 32px !important/u,
+  );
+  assert.match(css, /\.portable-frame-rate-row \{[\s\S]*?grid-template-columns: 4\.5rem minmax\(0, 1fr\) 32px !important/u);
+  assert.match(css, /@media \(max-width: 420px\)/u);
+  assert.match(
+    css,
+    /grid-template-columns: 30px 30px max-content minmax\(0, 1fr\) max-content 30px !important/u,
+  );
+});
+
 test('layout refinement explicitly covers the help clone as well as report body', () => {
   const css = reportLayoutRefinementCss();
   const helpSelectors = css.match(/\.report-help-live-preview/g) || [];
-  assert.ok(helpSelectors.length >= 10);
+  assert.ok(helpSelectors.length >= 20);
 });
 
 test('layout refinement injects once before the closing head', () => {
