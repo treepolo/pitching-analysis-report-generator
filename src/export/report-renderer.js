@@ -8,9 +8,11 @@ const { injectXp7RangeTheme } = require('./xp7-range-theme');
 const { injectReportHelpHtml } = require('./report-help-runtime');
 const { injectReportLayoutRefinement } = require('./report-layout-refinement');
 const { injectReportFloatingUiRefinement } = require('./report-floating-ui-refinement');
+const { injectReportDeskSurfaceRefinement } = require('./report-desk-surface-refinement');
 const { injectReportTitleAlignmentRefinement } = require('./report-title-alignment-refinement');
 const { injectReportPlayerSelectionRefinement } = require('./report-player-selection-refinement');
 const { injectReportEntrySpotlight } = require('./report-entry-spotlight');
+const { injectReportFixedHeaderRuntime } = require('./report-fixed-header-runtime');
 const { injectReportVisibleTitleRuntime } = require('./report-visible-title-runtime');
 
 function renderReportHtml(reportDocument, options = {}) {
@@ -23,9 +25,11 @@ function renderReportHtml(reportDocument, options = {}) {
   html = injectReportHelpHtml(html);
   html = injectReportLayoutRefinement(html);
   html = injectReportFloatingUiRefinement(html);
+  html = injectReportDeskSurfaceRefinement(html);
   html = injectReportTitleAlignmentRefinement(html);
   html = injectReportPlayerSelectionRefinement(html);
   html = injectReportEntrySpotlight(html);
+  html = injectReportFixedHeaderRuntime(html);
   html = injectReportVisibleTitleRuntime(html);
   return html;
 }
