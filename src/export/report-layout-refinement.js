@@ -103,6 +103,102 @@ body>main .portable-frame-player-status[data-state="error"],
 }
 
 @media (max-width: 700px) {
+  /* The annotation overlay uses a fixed 5px SVG radius on desktop. Reduce only
+     the point geometry on narrow screens; cx/cy and video-rect positioning are
+     untouched, so annotation coordinates cannot drift. */
+  body>main .report-annotation-point,
+  .report-help-live-preview .report-annotation-point {
+    r: 3.2px !important;
+    stroke-width: .8 !important;
+  }
+
+  /* Mobile help typography should read like a compact system dialog rather
+     than a desktop manual squeezed into a phone viewport. */
+  .report-help-header {
+    gap: 8px !important;
+    padding: 10px 11px 9px !important;
+  }
+  .report-help-header h2 {
+    margin-bottom: 3px !important;
+    padding: 3px 6px !important;
+    font-size: 15px !important;
+    line-height: 1.18 !important;
+  }
+  .report-help-header p {
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+  }
+  .report-help-content {
+    padding: 10px !important;
+  }
+  .report-help-content h3 {
+    margin: .9rem 0 .42rem !important;
+    font-size: 12px !important;
+  }
+  .report-help-figure {
+    padding: 7px !important;
+  }
+  .report-help-figure figcaption {
+    margin-top: 6px !important;
+    font-size: 9.5px !important;
+    line-height: 1.4 !important;
+  }
+  .report-help-guide {
+    gap: 6px !important;
+  }
+  .report-help-guide li {
+    grid-template-columns: 22px minmax(0, 1fr) !important;
+    gap: 6px !important;
+    padding: 6px !important;
+  }
+  .report-help-number {
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 10px !important;
+  }
+  .report-help-guide strong {
+    margin-bottom: 1px !important;
+    font-size: 11px !important;
+  }
+  .report-help-guide p,
+  .report-help-shortcut,
+  .report-help-note {
+    font-size: 10px !important;
+  }
+  .report-help-guide p {
+    line-height: 1.4 !important;
+  }
+  .report-help-shortcut {
+    padding: 6px !important;
+  }
+  .report-help-shortcut kbd {
+    min-width: 24px !important;
+    margin-right: 4px !important;
+    font-size: 9px !important;
+  }
+  .report-help-note {
+    padding: 7px 8px !important;
+    line-height: 1.42 !important;
+  }
+  .report-help-actions {
+    gap: 6px !important;
+    margin-top: 12px !important;
+    padding-top: 9px !important;
+  }
+  .report-help-actions span {
+    font-size: 9.5px !important;
+  }
+  .report-help-tutorial-copy {
+    padding: 9px !important;
+  }
+  .report-help-tutorial-copy strong {
+    font-size: 12px !important;
+  }
+  .report-help-tutorial-copy p,
+  .report-help-tutorial-step {
+    font-size: 10px !important;
+  }
+
   /* Annotation toolbar: keep it compact but allow semantic groups to wrap. */
   body>main .report-annotation-controls,
   .report-help-live-preview .report-annotation-controls {
@@ -206,6 +302,23 @@ body>main .portable-frame-player-status[data-state="error"],
 }
 
 @media (max-width: 420px) {
+  body>main .report-annotation-point,
+  .report-help-live-preview .report-annotation-point {
+    r: 2.6px !important;
+    stroke-width: .65 !important;
+  }
+  .report-help-header h2 {
+    font-size: 14px !important;
+  }
+  .report-help-header p {
+    font-size: 9.5px !important;
+  }
+  .report-help-content {
+    padding: 8px !important;
+  }
+  .report-help-content h3 {
+    font-size: 11.5px !important;
+  }
   body>main .portable-frame-navigation,
   .report-help-live-preview .portable-frame-navigation {
     grid-template-columns: 30px 30px max-content minmax(0, 1fr) max-content 30px !important;
