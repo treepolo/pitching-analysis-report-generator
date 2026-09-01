@@ -31,20 +31,24 @@ test('desktop fixed header preserves layout with a spacer and locks horizontal g
   assert.match(script, /header\.dataset\.reportHeaderFixed = 'true'/u);
 });
 
-test('phone header is fixed immediately and uses exact viewport width', () => {
+test('phone header is fixed from first paint and uses exact viewport width without a spacer', () => {
   const script = fixedHeaderScript();
+  const css = fixedHeaderStyle();
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?body>main header\.tree-polo-report-header,[\s\S]*?position: fixed !important/u);
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?top: 0 !important[\s\S]*?left: 0 !important/u);
+  assert.match(css, /\.report-fixed-header-spacer\[data-active="true"\][\s\S]*?display: none !important/u);
   assert.match(script, /const mobileQuery = window\.matchMedia\('\(max-width: 700px\)'\)/u);
   assert.match(script, /if \(mobileQuery\.matches\) setFixed\(true\)/u);
+  assert.match(script, /spacer\.dataset\.active = mobileQuery\.matches \? 'false' : 'true'/u);
   assert.match(script, /document\.documentElement\.clientWidth/u);
   assert.match(script, /header\.style\.setProperty\('left', '0px', 'important'\)/u);
   assert.match(script, /header\.style\.setProperty\('width', viewportWidth\(\) \+ 'px', 'important'\)/u);
-  const css = fixedHeaderStyle();
-  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?left: 0 !important/u);
-  assert.match(css, /max-width: none !important/u);
 });
 
-test('fixed header runtime follows viewport changes and releases itself for printing', () => {
+test('fixed header runtime handles viewport-mode changes and releases itself for printing', () => {
   const script = fixedHeaderScript();
+  assert.match(script, /let wasMobile = mobileQuery\.matches/u);
+  assert.match(script, /if \(isMobile !== wasMobile\)/u);
   assert.match(script, /addEventListener\('scroll', scheduleUpdate/u);
   assert.match(script, /addEventListener\('resize', scheduleUpdate/u);
   assert.match(script, /visualViewport\?\.addEventListener\('resize', scheduleUpdate/u);
