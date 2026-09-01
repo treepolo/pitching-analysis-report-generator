@@ -1,0 +1,69 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const test = require('node:test');
+const vm = require('node:vm');
+const {
+  fixedHeaderScript,
+  fixedHeaderStyle,
+  injectReportFixedHeaderRuntime,
+} = require('../../src/export/report-fixed-header-runtime');
+
+const repositoryRoot = path.resolve(__dirname, '..', '..');
+
+test('fixed header state uses true viewport-fixed positioning after the sticky threshold', () => {
+  const css = fixedHeaderStyle();
+  assert.match(css, /data-report-header-fixed="true"[\s\S]*?position: fixed !important/u);
+  assert.match(css, /top: 0 !important/u);
+  assert.match(css, /margin: 0 !important/u);
+  assert.match(css, /z-index: 850 !important/u);
+});
+
+test('fixed header runtime preserves layout with a spacer and locks horizontal geometry', () => {
+  const script = fixedHeaderScript();
+  assert.match(script, /report-fixed-header-spacer/u);
+  assert.match(script, /rect\.height \+ Math\.max\(0, numeric\(style\.marginBottom\)\)/u);
+  assert.match(script, /header\.style\.setProperty\('left', rect\.left \+ 'px', 'important'\)/u);
+  assert.match(script, /header\.style\.setProperty\('width', rect\.width \+ 'px', 'important'\)/u);
+  assert.match(script, /scrollY > anchorY \+ 0\.5/u);
+  assert.match(script, /header\.dataset\.reportHeaderFixed = 'true'/u);
+});
+
+test('fixed header runtime follows viewport changes and releases itself for printing', () => {
+  const script = fixedHeaderScript();
+  assert.match(script, /addEventListener\('scroll', scheduleUpdate/u);
+  assert.match(script, /addEventListener\('resize', scheduleUpdate/u);
+  assert.match(script, /visualViewport\?\.addEventListener\('resize', scheduleUpdate/u);
+  assert.match(script, /addEventListener\('orientationchange', scheduleUpdate/u);
+  assert.match(script, /addEventListener\('beforeprint', beforePrint\)/u);
+  assert.match(script, /setFixed\(false\)/u);
+});
+
+test('fixed header runtime script is valid JavaScript', () => {
+  const markup = fixedHeaderScript();
+  const body = markup.replace(/^<script[^>]*>/u, '').replace(/<\/script>$/u, '');
+  assert.doesNotThrow(() => new vm.Script(body));
+});
+
+test('fixed header runtime injects once', () => {
+  const source = '<html><head></head><body><main></main></body></html>';
+  const once = injectReportFixedHeaderRuntime(source);
+  const twice = injectReportFixedHeaderRuntime(once);
+  assert.equal((twice.match(/data-report-fixed-header-style/g) || []).length, 1);
+  assert.equal((twice.match(/data-report-fixed-header-runtime/g) || []).length, 1);
+});
+
+test('renderer installs hard-fixed header runtime after visual refinements', async () => {
+  const source = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-renderer.js'), 'utf8');
+  assert.match(source, /require\('\.\/report-fixed-header-runtime'\)/u);
+  const selectionIndex = source.indexOf('html = injectReportPlayerSelectionRefinement(html);');
+  const spotlightIndex = source.indexOf('html = injectReportEntrySpotlight(html);');
+  const fixedIndex = source.indexOf('html = injectReportFixedHeaderRuntime(html);');
+  const visibleTitleIndex = source.indexOf('html = injectReportVisibleTitleRuntime(html);');
+  assert.ok(selectionIndex >= 0);
+  assert.ok(spotlightIndex > selectionIndex);
+  assert.ok(fixedIndex > spotlightIndex);
+  assert.ok(visibleTitleIndex > fixedIndex);
+});
