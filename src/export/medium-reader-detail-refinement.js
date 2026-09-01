@@ -7,10 +7,10 @@ function mediumReaderDetailCss() {
    aligned to that text column, not by boxed panels. */
 html body>main section.report-section{position:relative!important;margin:0 0 12px!important;padding:8px 5px 22px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
 html body>main section.report-section+section.report-section{margin-top:16px!important;padding-top:30px!important}
-html body>main section.report-section+section.report-section::before{content:"";position:absolute;top:0;left:50%;width:calc(100% - 40px);max-width:680px;height:1px;background:#cfcfcf;transform:translateX(-50%)}
-html body>main section.report-section>h2{position:relative;width:calc(100% - 40px);max-width:680px;margin:0 auto 20px!important;padding:0 0 13px!important;border:0!important;background:transparent!important;box-shadow:none!important;color:#242424!important;font-size:26px!important;font-weight:700!important;line-height:1.22!important;letter-spacing:-.015em!important}
+html body>main section.report-section+section.report-section::before{content:"";position:absolute;top:0;left:50%;width:calc(100% - 40px);max-width:560px;height:1px;background:#cfcfcf;transform:translateX(-50%)}
+html body>main section.report-section>h2{position:relative;width:calc(100% - 40px);max-width:560px;margin:0 auto 20px!important;padding:0 0 13px!important;border:0!important;background:transparent!important;box-shadow:none!important;color:#242424!important;font-size:26px!important;font-weight:700!important;line-height:1.22!important;letter-spacing:-.015em!important}
 html body>main section.report-section>h2::after{content:"";display:block;width:76px;height:2px;margin-top:11px;border-radius:999px;background:#1a8917}
-html body>main section.report-section>.report-text,html body>main section.report-section>h4,html body>main section.report-section>.muted{box-sizing:border-box;width:calc(100% - 40px)!important;max-width:680px!important;margin-left:auto!important;margin-right:auto!important}
+html body>main section.report-section>.report-text,html body>main section.report-section>h4,html body>main section.report-section>.muted{box-sizing:border-box;width:calc(100% - 40px)!important;max-width:560px!important;margin-left:auto!important;margin-right:auto!important}
 html body>main section.report-section>h4{font-size:18px!important;line-height:1.35!important}
 html body>main section.report-section>.muted{display:block}
 
