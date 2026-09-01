@@ -31,11 +31,11 @@ test('centered title protects the logo area and long names', () => {
 
 test('Tree Polo byline remains subordinate but is large enough for the longer visible title', () => {
   const css = titleAlignmentCss();
-  assert.match(css, /\.tree-polo-signature \{[\s\S]*?font-size: \.80em !important/u);
+  assert.match(css, /\.tree-polo-signature \{[\s\S]*?font-size: \.84em !important/u);
   assert.match(css, /font-weight: 500 !important/u);
-  assert.match(css, /font-size: \.78em !important/u);
-  assert.doesNotMatch(css, /font-size: \.72em !important/u);
-  assert.doesNotMatch(css, /font-size: \.70em !important/u);
+  assert.match(css, /font-size: \.82em !important/u);
+  assert.doesNotMatch(css, /font-size: \.80em !important/u);
+  assert.doesNotMatch(css, /font-size: \.78em !important/u);
 });
 
 test('title alignment refinement injects once', () => {
