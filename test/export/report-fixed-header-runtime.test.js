@@ -13,7 +13,7 @@ const {
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
 
-test('fixed header state uses true viewport-fixed positioning after the sticky threshold', () => {
+test('fixed header state uses true viewport-fixed positioning', () => {
   const css = fixedHeaderStyle();
   assert.match(css, /data-report-header-fixed="true"[\s\S]*?position: fixed !important/u);
   assert.match(css, /top: 0 !important/u);
@@ -21,7 +21,7 @@ test('fixed header state uses true viewport-fixed positioning after the sticky t
   assert.match(css, /z-index: 850 !important/u);
 });
 
-test('fixed header runtime preserves layout with a spacer and locks horizontal geometry', () => {
+test('desktop fixed header preserves layout with a spacer and locks horizontal geometry', () => {
   const script = fixedHeaderScript();
   assert.match(script, /report-fixed-header-spacer/u);
   assert.match(script, /rect\.height \+ Math\.max\(0, numeric\(style\.marginBottom\)\)/u);
@@ -31,12 +31,25 @@ test('fixed header runtime preserves layout with a spacer and locks horizontal g
   assert.match(script, /header\.dataset\.reportHeaderFixed = 'true'/u);
 });
 
+test('phone header is fixed immediately and uses exact viewport width', () => {
+  const script = fixedHeaderScript();
+  assert.match(script, /const mobileQuery = window\.matchMedia\('\(max-width: 700px\)'\)/u);
+  assert.match(script, /if \(mobileQuery\.matches\) setFixed\(true\)/u);
+  assert.match(script, /document\.documentElement\.clientWidth/u);
+  assert.match(script, /header\.style\.setProperty\('left', '0px', 'important'\)/u);
+  assert.match(script, /header\.style\.setProperty\('width', viewportWidth\(\) \+ 'px', 'important'\)/u);
+  const css = fixedHeaderStyle();
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?left: 0 !important/u);
+  assert.match(css, /max-width: none !important/u);
+});
+
 test('fixed header runtime follows viewport changes and releases itself for printing', () => {
   const script = fixedHeaderScript();
   assert.match(script, /addEventListener\('scroll', scheduleUpdate/u);
   assert.match(script, /addEventListener\('resize', scheduleUpdate/u);
   assert.match(script, /visualViewport\?\.addEventListener\('resize', scheduleUpdate/u);
   assert.match(script, /addEventListener\('orientationchange', scheduleUpdate/u);
+  assert.match(script, /mobileQuery\.addEventListener\?\.\('change', scheduleUpdate\)/u);
   assert.match(script, /addEventListener\('beforeprint', beforePrint\)/u);
   assert.match(script, /setFixed\(false\)/u);
 });
