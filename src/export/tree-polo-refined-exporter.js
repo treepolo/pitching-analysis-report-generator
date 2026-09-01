@@ -3,12 +3,17 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { ExportValidationError } = require('./asset-paths');
 const { exportReport: exportLegacyBrandedReport } = require('./tree-polo-branded-exporter');
 const { validateExportLayout } = require('./layout-validator');
 const { createZipArchive, validateZipParity } = require('./zip-archive');
 
 const LEGACY_BRAND_SUFFIX = '投球分析報告by小樹Polo';
 const BRAND_SUFFIX = '報告by小樹Polo';
+const REPORT_BACKGROUND_ASSET_ID = '__tree_polo_report_background__';
+const REPORT_BACKGROUND_MEDIA_TYPE = 'image/jpeg';
+const REPORT_BACKGROUND_RELATIVE_PATH = 'images/tree-polo-report-background.jpg';
+const REPORT_BACKGROUND_SOURCE_PATH = path.join(__dirname, 'tree-polo-report-background.jpg');
 
 function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
@@ -37,6 +42,7 @@ function stylizeBrandSignature(html) {
 
 function refinedThemeCss() {
   return `<style data-tree-polo-refined-theme>
+html,body{background-color:#d8e8df!important;background-image:url("${REPORT_BACKGROUND_RELATIVE_PATH}")!important;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important}
 /* Report and help content use the Tree Polo green family. Help buttons keep
    their original styling so interactive affordances remain visually distinct. */
 body>main .tree-polo-report-header{position:relative;display:flex;align-items:center;isolation:isolate;overflow:hidden;min-height:70px;margin:0 -8px 8px;padding:8px 12px 8px 76px;border-bottom:1px solid #084a31;background:linear-gradient(180deg,#2aa56e 0%,#188b5b 42%,#10754b 48%,#09593a 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -2px 0 rgba(177,255,101,.28),0 1px 2px rgba(0,0,0,.28);color:#fff}
@@ -190,11 +196,27 @@ async function refineFolder(baseResult, options, needsZip) {
   };
 }
 
+async function createReportBackgroundAsset() {
+  return {
+    id: REPORT_BACKGROUND_ASSET_ID,
+    kind: 'image',
+    relativePath: REPORT_BACKGROUND_RELATIVE_PATH,
+    label: '小樹Polo 報告背景',
+    mediaType: REPORT_BACKGROUND_MEDIA_TYPE,
+    data: await fs.readFile(REPORT_BACKGROUND_SOURCE_PATH),
+    requiredForExport: true,
+  };
+}
+
 async function exportReport(options = {}) {
   const outputKind = requestedOutputKind(options);
   const needsZip = options.createZip === true || outputKind === 'zip' || outputKind === 'both';
+  const sourceAssets = options.assets ?? [];
+  if (!Array.isArray(sourceAssets)) throw new ExportValidationError('Export assets must be an array');
+  const backgroundAsset = await createReportBackgroundAsset();
   const legacyResult = await exportLegacyBrandedReport({
     ...options,
+    assets: [...sourceAssets, backgroundAsset],
     outputKind: needsZip ? 'both' : 'folder',
     createZip: needsZip,
   });
@@ -240,6 +262,10 @@ async function exportReport(options = {}) {
 module.exports = {
   BRAND_SUFFIX,
   LEGACY_BRAND_SUFFIX,
+  REPORT_BACKGROUND_ASSET_ID,
+  REPORT_BACKGROUND_MEDIA_TYPE,
+  REPORT_BACKGROUND_RELATIVE_PATH,
+  REPORT_BACKGROUND_SOURCE_PATH,
   addLogoColorSource,
   exportReport,
   refineHtml,

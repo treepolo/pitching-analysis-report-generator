@@ -576,7 +576,13 @@ async function exportReport({
   }
   const { lexicalRoot: projectRootLexical, realRoot: projectRootReal } = await resolveProjectRoots(projectRoot);
   const safeReportDocument = toPortableReportDocument(reportDocument);
-  const referencedAssetIds = new Set(collectReferencedVideoAssetIds(safeReportDocument));
+  const referencedAssetIds = new Set([
+    ...collectReferencedVideoAssetIds(safeReportDocument),
+    ...assets
+      .filter((asset) => asset && typeof asset === 'object' && asset.requiredForExport === true)
+      .map((asset) => asset.id)
+      .filter((id) => typeof id === 'string' && id.length > 0),
+  ]);
   const outputRoot = path.resolve(outputDirectory);
   if (typeof outputDirectory !== 'string' || outputDirectory.trim() === '' || !path.isAbsolute(outputDirectory)) {
     throw new ExportValidationError('Export outputDirectory must be an absolute safe path');
