@@ -20,6 +20,14 @@ body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
 .report-fixed-header-spacer[data-active="true"] {
   display: block;
 }
+@media (max-width: 700px) {
+  body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
+    left: 0 !important;
+    right: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+}
 @media print {
   body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
     position: relative !important;
@@ -42,6 +50,7 @@ function fixedHeaderScript() {
   const main = header?.closest('main');
   if (!header || !main) return;
 
+  const mobileQuery = window.matchMedia('(max-width: 700px)');
   const spacer = document.createElement('div');
   spacer.className = 'report-fixed-header-spacer';
   spacer.setAttribute('aria-hidden', 'true');
@@ -57,6 +66,11 @@ function fixedHeaderScript() {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
   };
+
+  const viewportWidth = () => Math.max(
+    1,
+    Math.round(document.documentElement.clientWidth || window.innerWidth || 1),
+  );
 
   const clearFixedGeometry = () => {
     header.style.removeProperty('left');
@@ -77,6 +91,12 @@ function fixedHeaderScript() {
   };
 
   const applyFixedGeometry = () => {
+    if (mobileQuery.matches) {
+      header.style.setProperty('left', '0px', 'important');
+      header.style.setProperty('right', 'auto', 'important');
+      header.style.setProperty('width', viewportWidth() + 'px', 'important');
+      return;
+    }
     const rect = spacer.getBoundingClientRect();
     header.style.setProperty('left', rect.left + 'px', 'important');
     header.style.setProperty('right', 'auto', 'important');
@@ -100,11 +120,24 @@ function fixedHeaderScript() {
   const update = () => {
     rafId = 0;
     if (printing) return;
+
+    /* Phone layout is fixed from the start. There is no initial top gap and no
+       later threshold transition that can nudge the bar upward by a few px. */
+    if (mobileQuery.matches) {
+      if (!fixed) {
+        readNaturalMetrics();
+        setFixed(true);
+      }
+      applyFixedGeometry();
+      return;
+    }
+
     const scrollY = window.scrollY || window.pageYOffset || 0;
+    if (fixed && scrollY <= anchorY + 0.5) setFixed(false);
+    if (!fixed) readNaturalMetrics();
     const shouldFix = scrollY > anchorY + 0.5;
     setFixed(shouldFix);
     if (fixed) applyFixedGeometry();
-    else readNaturalMetrics();
   };
 
   const scheduleUpdate = () => {
@@ -123,12 +156,14 @@ function fixedHeaderScript() {
   };
 
   readNaturalMetrics();
+  if (mobileQuery.matches) setFixed(true);
   scheduleUpdate();
   window.addEventListener('scroll', scheduleUpdate, { passive: true });
   window.addEventListener('resize', scheduleUpdate, { passive: true });
   window.addEventListener('orientationchange', scheduleUpdate, { passive: true });
   window.addEventListener('beforeprint', beforePrint);
   window.addEventListener('afterprint', afterPrint);
+  mobileQuery.addEventListener?.('change', scheduleUpdate);
   window.visualViewport?.addEventListener('resize', scheduleUpdate, { passive: true });
 })();
 </script>`;
