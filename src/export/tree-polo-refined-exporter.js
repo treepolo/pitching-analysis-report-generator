@@ -40,6 +40,16 @@ function stylizeBrandSignature(html) {
   );
 }
 
+function removeRedundantHelpCopy(html) {
+  return String(html)
+    .replace('<p>以下圖解直接使用這份報告中的實際播放器介面。</p>', '')
+    .replace('<h3>實際播放器圖解</h3>', '')
+    .replace(
+      '<figcaption>這裡會直接複製本報告中的實際播放器介面，因此按鈕排列、標註控制、進度條與速度控制會和你正在看的報告一致。藍色編號與下方說明相同。</figcaption>',
+      '',
+    );
+}
+
 function refinedThemeCss() {
   return `<style data-tree-polo-refined-theme>
 html{background:#d8e8df!important}
@@ -124,6 +134,25 @@ body>main input[type="range"],body>main input[type="checkbox"]{accent-color:#1a8
 :where(body>main .portable-frame-controls button,body>main .portable-player-rate-row button,body>main .portable-frame-rate-row button,body>main .portable-player-actions button,body>main .report-annotation-controls button):active:not(:disabled){background:#eaeaea!important;box-shadow:none!important}
 :where(body>main .portable-frame-controls button,body>main .portable-player-rate-row button,body>main .portable-frame-rate-row button,body>main .portable-player-actions button,body>main .report-annotation-controls button):disabled{border-color:#e6e6e6!important;background:#f2f2f2!important;color:#b3b3b3!important;box-shadow:none!important}
 :where(body>main .portable-frame-controls button,body>main .portable-player-actions button,body>main .report-annotation-controls button,body>main input):focus-visible{outline:2px solid #1a8917!important;outline-offset:2px!important}
+body>main .portable-frame-navigation>button{display:grid!important;place-items:center!important;padding:0!important;line-height:1!important;text-align:center!important}
+body>main .portable-frame-navigation>button[data-frame-action="previous"],body>main .portable-frame-navigation>button[data-frame-action="next"]{font-size:0!important}
+body>main .portable-frame-navigation>button[data-frame-action="previous"]::before{content:"←";font-size:14px;line-height:1;transform:translateX(.5px)}
+body>main .portable-frame-navigation>button[data-frame-action="next"]::before{content:"→";font-size:14px;line-height:1;transform:translateX(-.5px)}
+/* Keep the speed slider visually distinct; only the seek/progress timeline gets
+   the quiet Medium-like track and round thumb. */
+body>main input[data-frame-timeline][type="range"]{appearance:none!important;-webkit-appearance:none!important;height:20px!important;margin:0!important;padding:0!important;background:transparent!important;cursor:pointer}
+body>main input[data-frame-timeline][type="range"]::-webkit-slider-runnable-track{height:3px!important;border:0!important;border-radius:999px!important;background:#d9d9d9!important;box-shadow:none!important}
+body>main input[data-frame-timeline][type="range"]::-webkit-slider-thumb{appearance:none!important;-webkit-appearance:none!important;width:12px!important;height:12px!important;margin-top:-4.5px!important;border:0!important;border-radius:50%!important;background:#242424!important;box-shadow:none!important}
+body>main input[data-frame-timeline][type="range"]:hover::-webkit-slider-thumb{background:#1a8917!important}
+body>main input[data-frame-timeline][type="range"]:focus-visible::-webkit-slider-thumb{outline:2px solid rgba(26,137,23,.28)!important;outline-offset:2px!important}
+body>main input[data-frame-timeline][type="range"]:disabled::-webkit-slider-runnable-track{background:#ececec!important}
+body>main input[data-frame-timeline][type="range"]:disabled::-webkit-slider-thumb{background:#b3b3b3!important}
+body>main input[data-frame-timeline][type="range"]::-moz-range-track{height:3px!important;border:0!important;border-radius:999px!important;background:#d9d9d9!important;box-shadow:none!important}
+body>main input[data-frame-timeline][type="range"]::-moz-range-progress{height:3px!important;border:0!important;border-radius:999px!important;background:#6b6b6b!important}
+body>main input[data-frame-timeline][type="range"]::-moz-range-thumb{width:12px!important;height:12px!important;border:0!important;border-radius:50%!important;background:#242424!important;box-shadow:none!important}
+body>main input[data-frame-timeline][type="range"]:hover::-moz-range-thumb{background:#1a8917!important}
+body>main input[data-frame-timeline][type="range"]:disabled::-moz-range-track{background:#ececec!important}
+body>main input[data-frame-timeline][type="range"]:disabled::-moz-range-thumb{background:#b3b3b3!important}
 body>main .report-annotation-controls{border-color:#e6e6e6!important;background:#fafafa!important;box-shadow:none!important}
 body>main .report-annotation-track-toggle{border-color:#e6e6e6!important;background:#fff!important;color:#242424!important}
 
@@ -133,7 +162,7 @@ body>main .report-annotation-track-toggle{border-color:#e6e6e6!important;backgro
 .report-help-header h2{border:0!important;background:transparent!important;box-shadow:none!important;color:#242424!important;text-shadow:none!important}
 .report-help-header p,.report-help-figure figcaption,.report-help-guide p,.report-help-actions span,.report-help-tutorial-step,.report-help-tutorial-copy p{color:#6b6b6b!important}
 .report-help-content h3{color:#242424!important}
-.report-help-figure{border-color:#e6e6e6!important;border-radius:8px!important;background:#fafafa!important;box-shadow:none!important}
+.report-help-figure{border:1px solid #e6e6e6!important;border-radius:10px!important;background:#fafafa!important;box-shadow:none!important;overflow:hidden!important}
 .report-help-live-preview{border-radius:6px!important;box-shadow:none!important}
 .report-help-live-preview-empty{border-color:#d0d0d0!important;background:#fafafa!important;color:#6b6b6b!important}
 .report-help-guide li{border-color:#e6e6e6!important;border-radius:8px!important;background:#fff!important;box-shadow:none!important}
@@ -168,6 +197,7 @@ function refineHtml(html) {
   let output = shortenBrandSuffix(String(html));
   output = stylizeBrandSignature(output);
   output = addLogoColorSource(output);
+  output = removeRedundantHelpCopy(output);
   const css = refinedThemeCss();
   if (output.includes('data-tree-polo-refined-theme')) return output;
   return output.includes('</head>')
