@@ -1,0 +1,426 @@
+/* Final generator parity layer: reuse the portable report's visual language instead
+   of giving the editor a separate app identity. DOM order, controls and player
+   layouts remain unchanged. */
+:root {
+  --report-face: #ffffff;
+  --report-soft: #fafafa;
+  --report-text: #242424;
+  --report-muted: #6b6b6b;
+  --report-line: #e6e6e6;
+  --report-line-strong: #d0d0d0;
+  --report-green: #1a8917;
+  --report-green-dark: #156d12;
+  --report-danger: #b42318;
+}
+
+html { background: #d8e8df !important; }
+body.document-app {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  background: transparent !important;
+  color: var(--report-text) !important;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "Noto Sans TC", sans-serif !important;
+}
+body.document-app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: #d8e8df;
+  background-image: url("./export/tree-polo-report-background.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Match the exported report paper and header footprint. */
+body.document-app .document-topbar,
+body.document-app .document-shell {
+  box-sizing: border-box;
+  width: min(1260px, calc(100% - 32px)) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  background: var(--report-face) !important;
+}
+body.document-app .document-topbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 12 !important;
+  min-height: 70px !important;
+  padding: 8px 12px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--report-line) !important;
+  border-radius: 0 !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,.08) !important;
+  color: var(--report-text) !important;
+}
+body.document-app .brand-lockup {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 54px !important;
+  width: 100% !important;
+  gap: 5px !important;
+  padding-left: 66px !important;
+  padding-right: 66px !important;
+}
+body.document-app .brand-lockup::before {
+  content: "TREE\A POLO" !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 54px !important;
+  height: 54px !important;
+  border: 0 !important;
+  border-radius: 3px !important;
+  background: #000 !important;
+  box-shadow: none !important;
+  color: #8bd450 !important;
+  white-space: pre !important;
+  text-align: center !important;
+  font: 700 12px/1.05 Arial, sans-serif !important;
+  letter-spacing: -.03em !important;
+}
+body.document-app .brand-lockup .eyebrow,
+body.document-app .document-topbar .eyebrow {
+  margin: 0 !important;
+  color: var(--report-text) !important;
+  font-size: 18px !important;
+  font-weight: 500 !important;
+  line-height: 1.28 !important;
+  letter-spacing: .02em !important;
+  text-shadow: none !important;
+}
+body.document-app .document-topbar .brand-name {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  color: var(--report-green) !important;
+  font-size: 14px !important;
+  font-weight: 550 !important;
+  text-shadow: none !important;
+}
+
+body.document-app .document-shell,
+body.document-app #document-workspace {
+  min-height: calc(100vh - 70px);
+  padding: 0 12px 40px !important;
+  background: var(--report-face) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,.08) !important;
+}
+body.document-app .document-command-bar,
+body.document-app #document-command-bar {
+  position: sticky !important;
+  top: 70px !important;
+  z-index: 10 !important;
+  min-height: 48px !important;
+  margin: 0 -12px 18px !important;
+  padding: 8px 12px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--report-line) !important;
+  border-radius: 0 !important;
+  background: rgba(255,255,255,.98) !important;
+  box-shadow: none !important;
+}
+body.document-app .command-group + .command-group {
+  border-left-color: var(--report-line) !important;
+  box-shadow: none !important;
+}
+
+/* Reuse the same button/input language as the portable player and help UI. */
+body.document-app button,
+body.document-app .button,
+body.document-app .project-control > summary {
+  border: 1px solid var(--report-line-strong) !important;
+  border-radius: 999px !important;
+  background: var(--report-face) !important;
+  box-shadow: none !important;
+  color: var(--report-text) !important;
+  text-shadow: none !important;
+}
+body.document-app button:hover:not(:disabled),
+body.document-app .button:hover:not(:disabled),
+body.document-app .project-control > summary:hover,
+body.document-app .project-control[open] > summary {
+  border-color: var(--report-text) !important;
+  background: #f2f2f2 !important;
+  color: var(--report-text) !important;
+}
+body.document-app .button-primary,
+body.document-app #save-project,
+body.document-app #export-report,
+body.document-app #empty-new-project,
+body.document-app #confirm-import-text {
+  border-color: var(--report-green) !important;
+  background: var(--report-green) !important;
+  color: #fff !important;
+}
+body.document-app .button-primary:hover:not(:disabled),
+body.document-app #save-project:hover:not(:disabled),
+body.document-app #export-report:hover:not(:disabled),
+body.document-app #empty-new-project:hover:not(:disabled),
+body.document-app #confirm-import-text:hover:not(:disabled) {
+  border-color: var(--report-green-dark) !important;
+  background: var(--report-green-dark) !important;
+  color: #fff !important;
+}
+body.document-app select,
+body.document-app input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]),
+body.document-app textarea {
+  border-color: var(--report-line-strong) !important;
+  border-radius: 4px !important;
+  background: var(--report-face) !important;
+  box-shadow: none !important;
+  color: var(--report-text) !important;
+}
+body.document-app select:focus,
+body.document-app input:focus,
+body.document-app textarea:focus {
+  border-color: var(--report-green) !important;
+  box-shadow: 0 0 0 2px rgba(26,137,23,.10) !important;
+}
+body.document-app button:focus-visible,
+body.document-app .button:focus-visible,
+body.document-app select:focus-visible,
+body.document-app input:focus-visible,
+body.document-app textarea:focus-visible,
+body.document-app summary:focus-visible {
+  outline: 2px solid var(--report-green) !important;
+  outline-offset: 2px !important;
+}
+body.document-app .eyebrow { color: var(--report-green) !important; }
+body.document-app .muted,
+body.document-app .hint,
+body.document-app .document-meta,
+body.document-app .document-root { color: var(--report-muted) !important; }
+
+/* The editor now follows the exported report's centered reading column for text,
+   while video/media blocks keep the wider paper width. */
+body.document-app .document-editor { width: 100% !important; max-width: none !important; }
+body.document-app .document-header {
+  box-sizing: border-box !important;
+  width: calc(100% - 40px) !important;
+  max-width: 560px !important;
+  margin: 0 auto 18px !important;
+  padding: 22px 0 16px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--report-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body.document-app .document-header h1 { font-size: 26px !important; line-height: 1.22 !important; }
+body.document-app .document-status-row {
+  box-sizing: border-box !important;
+  width: calc(100% - 40px) !important;
+  max-width: 560px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  color: var(--report-muted) !important;
+}
+body.document-app .document-canvas,
+body.document-app #block-canvas { gap: 0 !important; padding-top: 8px !important; }
+body.document-app .block-section {
+  position: relative !important;
+  gap: 10px !important;
+  padding: 18px 4px 26px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body.document-app .block-section + .block-section { margin-top: 12px !important; padding-top: 30px !important; }
+body.document-app .block-section + .block-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: calc(100% - 40px);
+  max-width: 560px;
+  height: 1px;
+  background: #cfcfcf;
+  transform: translateX(-50%);
+}
+body.document-app .block-section-header {
+  position: relative !important;
+  box-sizing: border-box !important;
+  width: calc(100% - 40px) !important;
+  max-width: 560px !important;
+  margin: 0 auto 18px !important;
+  padding: 0 0 13px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+body.document-app .block-section-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 76px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--report-green);
+}
+body.document-app .block-section-header input {
+  min-height: 42px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--report-text) !important;
+  font-size: 26px !important;
+  font-weight: 700 !important;
+  line-height: 1.22 !important;
+  letter-spacing: -.015em !important;
+}
+body.document-app .block-section-header input:hover,
+body.document-app .block-section-header input:focus { border: 0 !important; background: transparent !important; box-shadow: none !important; }
+body.document-app .block-list { gap: 14px !important; }
+body.document-app .text-block,
+body.document-app .block-text-editor {
+  box-sizing: border-box !important;
+  width: calc(100% - 40px) !important;
+  max-width: 560px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+body.document-app .text-block textarea,
+body.document-app .block-text-editor textarea,
+body.document-app .rich-text-editor {
+  padding: 12px 14px !important;
+  border: 1px solid var(--report-line) !important;
+  border-radius: 6px !important;
+  background: var(--report-face) !important;
+  color: var(--report-text) !important;
+  font-family: Georgia, "Times New Roman", "Noto Serif TC", "PMingLiU", serif !important;
+  font-size: 16px !important;
+  line-height: 1.65 !important;
+}
+body.document-app .document-block,
+body.document-app .content-block-card { border: 0 !important; background: transparent !important; box-shadow: none !important; }
+body.document-app .video-block,
+body.document-app .comparison-video-block,
+body.document-app .media-card,
+body.document-app .player-card {
+  width: 100% !important;
+  max-width: none !important;
+  border: 1px solid var(--report-line) !important;
+  border-radius: 8px !important;
+  background: var(--report-soft) !important;
+  box-shadow: none !important;
+}
+body.document-app .video-block .content-block-header strong,
+body.document-app .comparison-video-block .content-block-header strong,
+body.document-app .media-card .content-block-header strong,
+body.document-app .player-card .content-block-header strong {
+  color: var(--report-text) !important;
+  font-size: 21px !important;
+  font-weight: 700 !important;
+  line-height: 1.28 !important;
+}
+body.document-app .annotation-panel,
+body.document-app .annotation-controls,
+body.document-app .annotation-point-controls {
+  border-color: var(--report-line) !important;
+  border-radius: 8px !important;
+  background: var(--report-soft) !important;
+  box-shadow: none !important;
+}
+body.document-app .is-selected,
+body.document-app [aria-selected="true"] {
+  border-color: var(--report-green) !important;
+  box-shadow: 0 0 0 1px rgba(26,137,23,.12) !important;
+}
+
+/* Match the portable player's differentiated progress/rate controls. */
+body.document-app input[type="checkbox"] { accent-color: var(--report-green) !important; }
+body.document-app input[type="range"] { appearance: none !important; -webkit-appearance: none !important; background: transparent !important; }
+body.document-app input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #d9d9d9 !important;
+  box-shadow: none !important;
+}
+body.document-app input[type="range"]::-webkit-slider-thumb {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 12px !important;
+  height: 12px !important;
+  margin-top: -4.5px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: var(--report-text) !important;
+  box-shadow: none !important;
+}
+body.document-app input[data-frame-rate][type="range"]::-webkit-slider-thumb,
+body.document-app input[data-player-rate][type="range"]::-webkit-slider-thumb {
+  width: 8px !important;
+  height: 16px !important;
+  margin-top: -6.5px !important;
+  border-radius: 2px !important;
+}
+body.document-app input[type="range"]::-moz-range-track {
+  height: 3px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #d9d9d9 !important;
+  box-shadow: none !important;
+}
+body.document-app input[type="range"]::-moz-range-thumb {
+  width: 12px !important;
+  height: 12px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: var(--report-text) !important;
+  box-shadow: none !important;
+}
+body.document-app input[data-frame-rate][type="range"]::-moz-range-thumb,
+body.document-app input[data-player-rate][type="range"]::-moz-range-thumb {
+  width: 8px !important;
+  height: 16px !important;
+  border-radius: 2px !important;
+}
+
+body.document-app dialog {
+  border: 1px solid var(--report-line) !important;
+  border-radius: 14px !important;
+  background: var(--report-face) !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,.18) !important;
+  color: var(--report-text) !important;
+}
+body.document-app dialog::backdrop { background: rgba(0,0,0,.30) !important; backdrop-filter: blur(2px); }
+body.document-app .import-preview { border-color: var(--report-line) !important; background: var(--report-soft) !important; }
+body.document-app .app-error { color: var(--report-danger) !important; }
+
+@media (max-width: 760px) {
+  body.document-app .document-topbar,
+  body.document-app .document-shell { width: calc(100% - 16px) !important; }
+  body.document-app .document-topbar { min-height: 62px !important; padding: 8px !important; }
+  body.document-app .brand-lockup { min-height: 46px !important; padding-left: 56px !important; padding-right: 8px !important; justify-content: flex-start !important; }
+  body.document-app .brand-lockup::before { width: 46px !important; height: 46px !important; font-size: 10px !important; }
+  body.document-app .brand-lockup .eyebrow,
+  body.document-app .document-topbar .eyebrow { font-size: 16px !important; }
+  body.document-app .document-topbar .brand-name { font-size: 12px !important; }
+  body.document-app .document-shell { min-height: calc(100vh - 62px); padding-left: 8px !important; padding-right: 8px !important; }
+  body.document-app .document-command-bar,
+  body.document-app #document-command-bar { top: 62px !important; margin-left: -8px !important; margin-right: -8px !important; padding-left: 8px !important; padding-right: 8px !important; }
+  body.document-app .command-group + .command-group { margin-left: 0 !important; padding-left: 0 !important; border-left: 0 !important; }
+  body.document-app .document-header,
+  body.document-app .document-status-row,
+  body.document-app .block-section-header,
+  body.document-app .block-section + .block-section::before,
+  body.document-app .text-block,
+  body.document-app .block-text-editor { width: calc(100% - 24px) !important; }
+  body.document-app .document-header h1,
+  body.document-app .block-section-header input { font-size: 23px !important; }
+  body.document-app .video-block .content-block-header strong,
+  body.document-app .comparison-video-block .content-block-header strong { font-size: 19px !important; }
+}
