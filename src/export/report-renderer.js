@@ -8,6 +8,7 @@ const { injectXp7RangeTheme } = require('./xp7-range-theme');
 const { injectReportHelpHtml } = require('./report-help-runtime');
 const { injectReportLayoutRefinement } = require('./report-layout-refinement');
 const { injectReportFloatingUiRefinement } = require('./report-floating-ui-refinement');
+const { injectReportTitleAlignmentRefinement } = require('./report-title-alignment-refinement');
 const { injectReportEntrySpotlight } = require('./report-entry-spotlight');
 
 function renderReportHtml(reportDocument, options = {}) {
@@ -20,6 +21,7 @@ function renderReportHtml(reportDocument, options = {}) {
   html = injectReportHelpHtml(html);
   html = injectReportLayoutRefinement(html);
   html = injectReportFloatingUiRefinement(html);
+  html = injectReportTitleAlignmentRefinement(html);
   html = injectReportEntrySpotlight(html);
   return html;
 }
