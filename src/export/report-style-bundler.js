@@ -7,7 +7,6 @@ const DATA_ATTRIBUTE_PATTERN = /\b(data-[a-z0-9:_-]+)(?:\s*=\s*(?:"[^"]*"|'[^']*
 const STYLE_SOURCE_ROLES = Object.freeze({
   'data-annotation-reader-style': 'functional-layout',
   'data-annotation-navigation-style': 'functional-layout',
-  'data-xp7-range-theme': 'legacy-visual',
   'data-report-help-style': 'mixed-functional-visual',
   'data-report-layout-refinement': 'functional-layout',
   'data-report-floating-ui-refinement': 'functional-layout',

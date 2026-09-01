@@ -54,7 +54,10 @@ test('rendered annotated report contains all requested reader enhancements toget
   assert.match(html, /下一標註幀 →/u);
   assert.match(html, /event\.code === 'KeyA'/u);
   assert.match(html, /event\.code === 'KeyD'/u);
-  assert.match(html, /data-xp7-range-theme/u);
+  assert.doesNotMatch(html, /data-xp7-range-theme/u);
+  assert.match(html, /data-medium-reader-detail-refinement/u);
+  assert.match(html, /input\[data-frame-timeline\]\[type="range"\]/u);
+  assert.match(html, /input\[data-frame-rate\]\[type="range"\]/u);
   assert.match(html, /::-webkit-slider-runnable-track/u);
   assert.match(html, /::-webkit-slider-thumb/u);
   assert.match(html, /data-report-help-style/u);

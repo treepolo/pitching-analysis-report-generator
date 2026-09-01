@@ -42,10 +42,11 @@ test('leaves style tags with semantic attributes untouched', () => {
   assert.equal(bundleReportStyles(source), source);
 });
 
-test('classifies known style layers for later dead-override pruning', () => {
-  assert.equal(STYLE_SOURCE_ROLES['data-xp7-range-theme'], 'legacy-visual');
+test('classifies current style layers for later dead-override pruning', () => {
   assert.equal(styleSourceRole('data-report-layout-refinement'), 'functional-layout');
   assert.equal(styleSourceRole('data-report-player-selection-refinement'), 'visual-only');
+  assert.equal(styleSourceRole('data-tree-polo-brand-theme'), 'legacy-visual');
   assert.equal(styleSourceRole('data-tree-polo-refined-theme'), 'final-visual');
   assert.equal(styleSourceRole('data-unknown-style'), 'unclassified');
+  assert.equal(Object.hasOwn(STYLE_SOURCE_ROLES, 'data-xp7-range-theme'), false);
 });
