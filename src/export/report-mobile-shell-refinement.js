@@ -14,13 +14,14 @@ function mobileShellCss() {
     overflow-x: hidden !important;
   }
 
-  /* The phone report is edge-to-edge. Its five-pixel inner gutter belongs to
-     report content only; the title bar cancels that gutter exactly. */
+  /* The phone report is edge-to-edge. Reserve the fixed 62px title bar plus
+     its original 8px visual gap from the first paint, so no spacer insertion
+     can shift content after load. */
   body>main {
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
-    padding: 0 5px 12px !important;
+    padding: 70px 5px 12px !important;
     border-left: 0 !important;
     border-right: 0 !important;
   }
@@ -38,6 +39,12 @@ function mobileShellCss() {
   }
   input[type="range"] {
     touch-action: pan-x !important;
+  }
+}
+
+@media print {
+  body>main {
+    padding-top: 0 !important;
   }
 }
 </style>`;
