@@ -2,6 +2,15 @@
 
 function reportLayoutRefinementCss() {
   return `<style data-report-layout-refinement>
+/* The report/person title is the primary identity. Keep the smaller byline
+   subordinate even though the main h1 text is now bold. */
+body>main header.tree-polo-report-header .tree-polo-brand-copy h1 {
+  font-weight: 700 !important;
+}
+body>main header.tree-polo-report-header .tree-polo-signature {
+  font-weight: 500 !important;
+}
+
 /* Annotation controls already live inside the player panel. Remove the extra
    framed sub-panel and keep the row compact so it reads as a lightweight
    auxiliary toolbar instead of a second player control deck. */
