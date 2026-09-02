@@ -796,6 +796,10 @@ function setSaveState(value, stateName = '') {
   elements.saveState.dataset.state = stateName;
 }
 
+const EXPORT_DIRECTORY_STORAGE_KEY = 'pitching-analysis-report-generator.last-export-directory.v1';
+const EXPORT_DIRECTORY_MAX_PATH_LENGTH = 4096;
+const EXPORT_DIRECTORY_CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
+
 function defaultExportDirectory() {
   const root = typeof state.projectRoot === 'string' ? state.projectRoot.replace(/[\\/]+$/u, '') : '';
   if (!root) return '';
@@ -827,17 +831,58 @@ function normalizeExportDirectoryPick(result) {
   return { canceled: false, directory: candidate.trim() };
 }
 
+function normalizeRememberedExportDirectory(value) {
+  if (typeof value !== 'string') return '';
+  const directory = value.trim();
+  if (!directory
+    || directory.length > EXPORT_DIRECTORY_MAX_PATH_LENGTH
+    || EXPORT_DIRECTORY_CONTROL_CHARACTER_PATTERN.test(directory)) return '';
+  return directory;
+}
+
+function readRememberedExportDirectory() {
+  try {
+    return normalizeRememberedExportDirectory(window.localStorage?.getItem(EXPORT_DIRECTORY_STORAGE_KEY));
+  } catch {
+    return '';
+  }
+}
+
+function rememberExportDirectory(value) {
+  const directory = normalizeRememberedExportDirectory(value);
+  if (!directory) return false;
+  try {
+    window.localStorage?.setItem(EXPORT_DIRECTORY_STORAGE_KEY, directory);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function restoreRememberedExportDirectory() {
+  const directory = readRememberedExportDirectory();
+  if (!directory || !state?.export) return false;
+  state.export.outputDirectory = directory;
+  state.export.directoryNotice = '';
+  return true;
+}
+
 function resetExportSelection() {
   state.export.outputDirectory = '';
   state.export.directoryNotice = '';
+  restoreRememberedExportDirectory();
 }
 
 async function chooseExportDirectory() {
-  if (!state.activeProject || ['running', 'cancelling'].includes(state.export.status)) return;
+  if (!state.activeProject || ['running', 'cancelling'].includes(state.export.status)) {
+    rememberExportDirectory(state?.export?.outputDirectory);
+    return;
+  }
   const picker = exportDirectoryPicker();
   if (!picker) {
     state.export.directoryNotice = displayErrorMessage({ code: 'EXPORT_PICKER_UNAVAILABLE' });
     renderExportControls();
+    rememberExportDirectory(state?.export?.outputDirectory);
     return;
   }
   try {
@@ -854,6 +899,7 @@ async function chooseExportDirectory() {
     state.export.directoryNotice = displayErrorMessage(error, 'EXPORT_PICKER_FAILED');
   }
   renderExportControls();
+  rememberExportDirectory(state?.export?.outputDirectory);
 }
 
 function exportResultLabel(snapshot) {
@@ -3735,6 +3781,8 @@ elements.blockCanvas?.addEventListener('focusout', () => {
 if (typeof window.pitchingApp?.onBeforeClose === 'function') {
   window.pitchingApp.onBeforeClose(() => flushPendingChanges());
 }
+
+if (restoreRememberedExportDirectory()) renderExportControls();
 
 (async function bootstrap() {
   try {
