@@ -1261,7 +1261,7 @@ function syncFramePlayerSelectionDom() {
   }
   players.forEach((card) => {
     const selected = Boolean(state.player.selectedPlayerKey)
-      && framePlayerSelectionKey(card) === state.player.selectedPlayerKey;
+      && framePlayerSelectionKey(card) === selectedKey;
     card.dataset.frameSelected = selected ? 'true' : 'false';
     card.setAttribute('aria-selected', selected ? 'true' : 'false');
   });
@@ -1490,6 +1490,9 @@ function updateFramePlayerControls(card) {
   const commonLoopInput = controlRoot.querySelector('[data-frame-common-loop]');
   const pendingSeek = runtime.lifecycle === 'loading' || runtime.exactSeek !== null;
   const available = count > 0 && !pendingSeek;
+  const rateAvailable = entry.block?.type === 'comparisonVideo'
+    ? count > 0 && runtime.lifecycle !== 'loading'
+    : available;
   const map = entry.block?.type === 'comparisonVideo' ? framePlayerControlMap(entry.block, runtime, card) : null;
   if (timeline) {
     timeline.min = '0';
@@ -1509,15 +1512,15 @@ function updateFramePlayerControls(card) {
     toggle.setAttribute('aria-label', playing ? '暫停' : '播放');
     toggle.title = playing ? '暫停' : '播放';
   }
-  if (resetRate) resetRate.disabled = !available;
+  if (resetRate) resetRate.disabled = !rateAvailable;
   const rate = clampPlaybackRate(runtime.playbackRate);
   if (rateSlider) {
     rateSlider.value = String(playbackRateToSliderValue(rate));
-    rateSlider.disabled = !available;
+    rateSlider.disabled = !rateAvailable;
   }
   if (rateInput) {
     rateInput.value = formatPlaybackRate(rate);
-    rateInput.disabled = !available;
+    rateInput.disabled = !rateAvailable;
   }
   if (syncButton) syncButton.disabled = !available || !map || !map.ranges?.left || !map.ranges?.right;
   if (syncInfo) {
