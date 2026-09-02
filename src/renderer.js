@@ -1210,6 +1210,7 @@ function framePlayerRuntimeForCard(card) {
       rateTransition: false,
       rateSerial: 0,
       rateSyncGuard: false,
+      rateInteractionGuard: false,
       frameEngineGuard: false,
       primarySide: 'single',
       controlMap: null,
@@ -2511,54 +2512,167 @@ function resetFramePlayerRate(card) {
   setFramePlayerStatus(card, '播放速度已重置為 1.00 倍。', 'loaded');
 }
 
+function videosFor(card, block) {
+  return framePlayerSides(block, card)
+    .map((side) => framePlayerVideoForSide(card, side))
+    .filter(Boolean);
+}
+
+function independentSideIsActive(card, block) {
+  return framePlayerSides(block, card).some((side) => {
+    const sideState = framePlayerSideRuntime(card, side);
+    return Boolean(sideState?.active || sideState?.playing);
+  });
+}
+
+function mainPlaybackIsActive(card, block, runtime, videos) {
+  if (runtime.playing) return true;
+  if (runtime.manualPlayback) return true;
+  if (runtime.lifecycle !== 'playing') return false;
+  return videos.some((video) => video && !video.paused);
+}
+
+function applyRequestedRate(card, runtime, videos, requestedRate) {
+  runtime.playbackRate = requestedRate;
+  const support = videos.map((video) => setSafePlaybackRate(card, video, requestedRate));
+  return videos.length === 0 || support.every(Boolean);
+}
+
+function pauseStaleNativeResume(runtime, videos) {
+  if (!runtime.manualPlayback) return;
+  runtime.rateInteractionGuard = true;
+  try {
+    videos.forEach((video) => {
+      try { video.pause(); } catch {}
+    });
+  } finally {
+    runtime.rateInteractionGuard = false;
+  }
+}
+
+function resumeNativePlayback(card, runtime, videos, rateSerial) {
+  runtime.rateTransition = true;
+  runtime.rateInteractionGuard = true;
+  runtime.playing = true;
+  runtime.lifecycle = 'playing';
+  setFramePlayerStatus(card, '正在切換播放速度…', 'pending');
+  updateFramePlayerControls(card);
+
+  const playRequests = videos.map((video) => {
+    try {
+      return video.play();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  });
+
+  void Promise.all(playRequests).then(() => {
+    if (runtime.rateSerial !== rateSerial || runtime.manualPlayback) {
+      pauseStaleNativeResume(runtime, videos);
+      return;
+    }
+    runtime.rateTransition = false;
+    runtime.rateInteractionGuard = false;
+    runtime.playing = true;
+    runtime.lifecycle = 'playing';
+    setFramePlayerStatus(card, '播放中。', 'loaded');
+    updateFramePlayerControls(card);
+  }).catch((error) => {
+    if (runtime.rateSerial !== rateSerial) return;
+    runtime.rateTransition = false;
+    runtime.rateInteractionGuard = false;
+    if (unsupportedPlaybackRateError(error) && startManualFramePlayer(card)) {
+      runtime.playing = true;
+      runtime.lifecycle = 'playing';
+      setFramePlayerStatus(card, '播放中（使用擴充速度時鐘）。', 'loaded');
+      updateFramePlayerControls(card);
+      return;
+    }
+    runtime.playing = false;
+    runtime.lifecycle = 'error';
+    setFramePlayerStatus(card, '播放失敗：' + (error?.message || '請重試。'), 'error');
+    updateFramePlayerControls(card);
+  });
+}
+
 function applyFramePlayerRate(card, rate) {
   const entry = blockForEditorCard(card);
   const block = entry.block;
   if (!block) return false;
-  clearIndependentSideControls(card);
-  const normalizedRate = clampPlaybackRate(rate);
+
   const runtime = framePlayerRuntimeForCard(card);
-  const wasPlaying = runtime.playing || framePlayerSides(block, card).some((side) => {
-    const video = framePlayerVideoForSide(card, side);
-    return Boolean(video && !video.paused && runtime.lifecycle === 'playing');
-  });
-  const wasManual = runtime.manualPlayback;
+  const videos = videosFor(card, block);
+  const wasPlaying = mainPlaybackIsActive(card, block, runtime, videos);
+  const wasManual = runtime.manualPlayback === true;
+  const hadIndependentSide = independentSideIsActive(card, block);
+  const normalizedRate = clampPlaybackRate(rate, runtime.playbackRate);
   const rateSerial = (runtime.rateSerial || 0) + 1;
   runtime.rateSerial = rateSerial;
-  runtime.playbackRate = normalizedRate;
-  const videos = framePlayerSides(block, card).map((side) => framePlayerVideoForSide(card, side)).filter(Boolean);
-  const nativeRate = videos.length === 0 || videos.every((video) => setSafePlaybackRate(card, video, normalizedRate));
-  if (wasManual) {
-    cancelManualFramePlayer(card);
-    runtime.playing = false;
-    videos.forEach((video) => video.pause());
+
+  if (hadIndependentSide) {
+    runtime.rateInteractionGuard = true;
+    try { clearIndependentSideControls(card); }
+    finally { runtime.rateInteractionGuard = false; }
   }
-  const finishTransition = () => {
-    if (runtime.rateSerial !== rateSerial) return;
+
+  const nativeSupported = applyRequestedRate(card, runtime, videos, normalizedRate);
+
+  if (!wasPlaying) {
+    if (wasManual) cancelManualFramePlayer(card);
     runtime.rateTransition = false;
+    runtime.rateInteractionGuard = false;
     updateFramePlayerControls(card);
-  };
-  const failTransition = (error) => {
-    if (runtime.rateSerial !== rateSerial) return;
-    runtime.playing = false;
-    runtime.lifecycle = 'error';
+    return true;
+  }
+
+  if (wasManual && !nativeSupported) {
     runtime.rateTransition = false;
-    setFramePlayerStatus(card, '播放失敗：' + (error?.message || '請重試。'), 'error');
+    runtime.rateInteractionGuard = false;
+    runtime.playing = true;
+    runtime.lifecycle = 'playing';
+    setFramePlayerStatus(card, '播放中（使用擴充速度時鐘）。', 'loaded');
     updateFramePlayerControls(card);
-  };
-  if (wasPlaying && nativeRate) {
+    return true;
+  }
+
+  if (!wasManual && nativeSupported) {
+    const nativeAlreadyRunning = videos.length > 0 && videos.every((video) => !video.paused);
+    if (nativeAlreadyRunning && !runtime.rateTransition) {
+      runtime.playing = true;
+      runtime.lifecycle = 'playing';
+      setFramePlayerStatus(card, '播放中。', 'loaded');
+      updateFramePlayerControls(card);
+      return true;
+    }
+    resumeNativePlayback(card, runtime, videos, rateSerial);
+    return true;
+  }
+
+  if (!nativeSupported) {
     runtime.rateTransition = true;
-    setFramePlayerStatus(card, '正在切換播放速度…', 'pending');
+    runtime.rateInteractionGuard = true;
+    const started = startManualFramePlayer(card);
+    runtime.rateTransition = false;
+    runtime.rateInteractionGuard = false;
+    if (!started) {
+      runtime.playing = false;
+      runtime.lifecycle = 'error';
+      setFramePlayerStatus(card, '播放失敗：影片尚未準備。', 'error');
+    } else {
+      runtime.playing = true;
+      runtime.lifecycle = 'playing';
+      setFramePlayerStatus(card, '播放中（使用擴充速度時鐘）。', 'loaded');
+    }
     updateFramePlayerControls(card);
-    void playFramePlayer(card, { fromRateTransition: true }).then(finishTransition).catch(failTransition);
-  } else if (!nativeRate) {
-    videos.forEach((video) => video.pause());
-    runtime.rateTransition = false;
-    if (wasPlaying) void playFramePlayer(card).catch(failTransition);
-  } else {
-    runtime.rateTransition = false;
+    return started;
   }
-  updateFramePlayerControls(card);
+
+  runtime.rateTransition = true;
+  runtime.rateInteractionGuard = true;
+  cancelManualFramePlayer(card);
+  runtime.playing = true;
+  runtime.lifecycle = 'playing';
+  resumeNativePlayback(card, runtime, videos, rateSerial);
   return true;
 }
 function handleFramePlayerEvent(event) {
@@ -2604,7 +2718,7 @@ function handleFramePlayerEvent(event) {
       runtime.scrubActive = false;
       runtime.dragTarget = null;
       if (runtime.dragFrame !== null) {
-        window.cancelAnimationFrame?.(runtime.dragFrame);
+        window.cancelAnimationFrame(runtime.dragFrame);
         runtime.dragFrame = null;
       }
       try {
@@ -2796,6 +2910,20 @@ function syncFramePlayerProgress(card, block, side, video) {
 function bindInlineVideoRuntime(card, block, side, video) {
   if (!video || video.dataset.inlineRuntimeBound === 'true') return;
   video.dataset.inlineRuntimeBound = 'true';
+  video.addEventListener('ratechange', (event) => {
+    const current = blockForEditorCard(card).block;
+    if (!current || !['singleVideo', 'comparisonVideo'].includes(current.type)) return;
+    event.stopImmediatePropagation();
+    updateFramePlayerControls(card);
+  }, true);
+  video.addEventListener('pause', (event) => {
+    const current = blockForEditorCard(card).block;
+    if (!current || !['singleVideo', 'comparisonVideo'].includes(current.type)) return;
+    const runtime = framePlayerRuntimeForCard(card);
+    if (!runtime.rateTransition && !runtime.rateInteractionGuard && !runtime.manualPlayback) return;
+    event.stopImmediatePropagation();
+    updateFramePlayerControls(card);
+  }, true);
   video.addEventListener('timeupdate', () => {
     hideFramePlayerPlaceholder(video);
     const sideElement = video.closest('[data-inline-side]');
@@ -2856,19 +2984,6 @@ function bindInlineVideoRuntime(card, block, side, video) {
       frameRuntime.lifecycle = 'paused';
       updateFramePlayerControls(card);
     }
-  });
-  video.addEventListener('ratechange', () => {
-    const current = blockForEditorCard(card).block;
-    if (!current || !['singleVideo', 'comparisonVideo'].includes(current.type)) return;
-    const frameRuntime = framePlayerRuntimeForCard(card);
-    if (frameRuntime.rateSyncGuard || frameRuntime.manualPlayback) {
-      updateFramePlayerControls(card);
-      return;
-    }
-    const rate = clampPlaybackRate(video.playbackRate);
-    if (!Number.isFinite(rate)) return;
-    frameRuntime.playbackRate = rate;
-    updateFramePlayerControls(card);
   });
   video.addEventListener('ended', () => {
     const current = blockForEditorCard(card).block;
