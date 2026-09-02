@@ -3,7 +3,6 @@
 const base = require('./report-renderer-base');
 const { injectAnnotationReportHtml } = require('./annotation-report-runtime');
 const { injectAnnotationNavigationHtml } = require('./annotation-navigation-runtime');
-const { patchNativeFramePlayerHtml } = require('./native-frame-player-fixes');
 const { injectReportHelpHtml } = require('./report-help-runtime');
 const { injectReportLayoutRefinement } = require('./report-layout-refinement');
 const { injectReportFloatingUiRefinement } = require('./report-floating-ui-refinement');
@@ -19,7 +18,6 @@ const { injectReportHelpMarkerRefinement } = require('./report-help-marker-refin
 function renderReportHtml(reportDocument, options = {}) {
   const portable = base.toPortableReportDocument(reportDocument);
   let html = base.renderReportHtml(portable, options);
-  html = patchNativeFramePlayerHtml(html);
   html = injectAnnotationReportHtml(html, portable);
   html = injectAnnotationNavigationHtml(html, portable);
   html = injectReportHelpHtml(html);
