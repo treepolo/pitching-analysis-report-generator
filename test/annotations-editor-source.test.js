@@ -14,6 +14,29 @@ test('editor annotation mode owns Space and uses frame-only point records', () =
   assert.doesNotMatch(source, /point\s*=\s*\{[^}]*time:/u);
 });
 
+test('base editor owns capture-phase registration guards without changing placement handlers', () => {
+  assert.match(source, /function blockDuplicateRegistrationClick\(event\)/u);
+  assert.match(source, /event\.detail > 1/u);
+  assert.match(source, /lastPrimaryClickAt/u);
+  assert.match(source, /registrationNavigationBusy\(context\.card, context\.side\)/u);
+  assert.match(source, /function blockBusyRegistrationSpace\(event\)/u);
+  assert.match(source, /event\.repeat/u);
+  assert.match(source, /window\.addEventListener\('click', blockDuplicateRegistrationClick, true\)/u);
+  assert.match(source, /window\.addEventListener\('keydown', blockBusyRegistrationSpace, true\)/u);
+
+  const clickStart = source.indexOf('function handleSurfaceClick(');
+  const activeContextStart = source.indexOf('function activeContext(', clickStart);
+  assert.ok(clickStart >= 0 && activeContextStart > clickStart);
+  const clickSource = source.slice(clickStart, activeContextStart);
+  assert.doesNotMatch(clickSource, /event\.detail|lastPrimaryClickAt|registrationNavigationBusy/u);
+
+  const keyStart = source.indexOf('function handleAnnotationKeydown(');
+  const listenerStart = source.indexOf("window.addEventListener('click', blockDuplicateRegistrationClick", keyStart);
+  assert.ok(keyStart >= 0 && listenerStart > keyStart);
+  const keySource = source.slice(keyStart, listenerStart);
+  assert.doesNotMatch(keySource, /event\.repeat|registrationNavigationBusy/u);
+});
+
 test('base editor reads the persisted annotation step without rendering a duplicate global control', () => {
   const stepStart = source.indexOf('function projectStepFrames()');
   const nextFunction = source.indexOf('function newTrackId()', stepStart);

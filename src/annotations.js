@@ -22,6 +22,7 @@
         undo: [],
         status: '',
         lastFrame: null,
+        lastPrimaryClickAt: -Infinity,
       });
     }
     return editorState.get(key);
@@ -100,6 +101,15 @@
     const video = sideElement?.querySelector('[data-inline-video]');
     const fps = Number(framePlayerRuntimeForCard?.(card)?.caches?.[side]?.fps) || 30;
     return Math.max(0, Math.round((Number(video?.currentTime) || 0) * fps));
+  }
+
+  function registrationNavigationBusy(card, side) {
+    try {
+      const playhead = globalThis.pitchingAnnotationPlayhead;
+      return Boolean(playhead && typeof playhead.navigationBusy === 'function' && playhead.navigationBusy(card, side));
+    } catch {
+      return false;
+    }
   }
 
   function stopSide(card, side) {
@@ -562,6 +572,35 @@
     return { card, side };
   }
 
+  function blockDuplicateRegistrationClick(event) {
+    const surface = event.target.closest?.('[data-frame-surface]');
+    if (!surface || event.button !== 0) return false;
+    const context = cardAndSideFromTarget(surface);
+    if (!context) return false;
+    const uiState = stateFor(context.card, context.side);
+    if (!uiState.editing) return false;
+    const now = typeof performance?.now === 'function' ? performance.now() : Date.now();
+    const duplicate = event.detail > 1
+      || (now - uiState.lastPrimaryClickAt) < 180
+      || registrationNavigationBusy(context.card, context.side);
+    if (!duplicate) {
+      uiState.lastPrimaryClickAt = now;
+      return false;
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return true;
+  }
+
+  function blockBusyRegistrationSpace(event) {
+    if (event.code !== 'Space') return;
+    const context = activeContext();
+    if (!context) return;
+    if (!event.repeat && !registrationNavigationBusy(context.card, context.side)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+
   function editableTarget(target) {
     return Boolean(target?.matches?.('input, textarea, select, [contenteditable="true"]') || target?.closest?.('input, textarea, select, [contenteditable="true"]'));
   }
@@ -608,6 +647,8 @@
     }
   }
 
+  window.addEventListener('click', blockDuplicateRegistrationClick, true);
+  window.addEventListener('keydown', blockBusyRegistrationSpace, true);
   document.addEventListener('click', handlePanelClick);
   document.addEventListener('change', handlePanelChange);
   document.addEventListener('pointermove', handleSurfacePointerMove);

@@ -55,17 +55,13 @@ test('point selection exposes selected track and frame to the base editor withou
   assert.doesNotMatch(source, /track\.points\s*=\s*track\.points\.filter/u);
 });
 
-test('registration input rejects duplicate clicks and input while canonical navigation is busy', () => {
-  assert.match(source, /event\.detail > 1/u);
-  assert.match(source, /navigationBusy\(context\)/u);
-  assert.match(source, /playhead\.navigationBusy\(context\.card, context\.side\)/u);
-  assert.match(source, /window\.addEventListener\('click', blockPrimaryRegistration, true\)/u);
-});
-
-test('Space auto-repeat is blocked before the annotation editor key handler', () => {
-  assert.match(source, /event\.code !== 'Space'/u);
-  assert.match(source, /event\.repeat/u);
-  assert.match(source, /window\.addEventListener\('keydown', handleKeydownCapture, true\)/u);
+test('point controls no longer suppress registration input owned by the base editor', () => {
+  assert.doesNotMatch(source, /lastPrimaryClickByContext/u);
+  assert.doesNotMatch(source, /blockPrimaryRegistration/u);
+  assert.doesNotMatch(source, /handleKeydownCapture/u);
+  assert.doesNotMatch(source, /playhead\.navigationBusy/u);
+  assert.doesNotMatch(source, /window\.addEventListener\('click'/u);
+  assert.doesNotMatch(source, /window\.addEventListener\('keydown'/u);
 });
 
 test('selected and current-frame points have a separate non-interactive highlight overlay', () => {

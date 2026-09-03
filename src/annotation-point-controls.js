@@ -5,7 +5,6 @@
   if (!playhead) return;
 
   const selectedByContext = new Map();
-  const lastPrimaryClickByContext = new Map();
   let refreshQueued = false;
 
   function contextKey(card, side) {
@@ -289,39 +288,6 @@
     void selectPoint(context, hit.track, hit.point.frame);
   }
 
-  function navigationBusy(context) {
-    return playhead.navigationBusy(context.card, context.side);
-  }
-
-  function blockPrimaryRegistration(event) {
-    const surface = event.target.closest?.('[data-frame-surface]');
-    if (!surface || event.button !== 0) return false;
-    const context = contextFromTarget(surface);
-    if (!context || !annotationModeActive(context)) return false;
-    const key = contextKey(context.card, context.side);
-    const now = typeof performance?.now === 'function' ? performance.now() : Date.now();
-    const previous = lastPrimaryClickByContext.get(key) || -Infinity;
-    const duplicate = event.detail > 1 || (now - previous) < 180 || navigationBusy(context);
-    if (!duplicate) {
-      lastPrimaryClickByContext.set(key, now);
-      return false;
-    }
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    return true;
-  }
-
-  function handleKeydownCapture(event) {
-    if (event.code !== 'Space') return;
-    const activePanel = document.querySelector('[data-annotation-panel] [data-annotation-action="toggle-edit"].button-primary')
-      ?.closest?.('[data-annotation-panel]');
-    const context = contextFromPanel(activePanel);
-    if (!context) return;
-    if (!event.repeat && !navigationBusy(context)) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }
-
   function ensureSelectionOverlay(surface) {
     let overlay = surface?.querySelector?.('[data-annotation-selection-overlay]');
     if (overlay || !surface) return overlay;
@@ -413,8 +379,6 @@
 
   document.addEventListener('change', handleChange);
   document.addEventListener('contextmenu', handleContextMenu);
-  window.addEventListener('click', blockPrimaryRegistration, true);
-  window.addEventListener('keydown', handleKeydownCapture, true);
 
   const canvas = document.querySelector('#block-canvas');
   if (canvas) new MutationObserver(queueRefresh).observe(canvas, { childList: true, subtree: true });
