@@ -1,8 +1,6 @@
 'use strict';
 const {
   ExportValidationError,
-  normalizeRelativeAssetPath,
-  portableAssetPathKey,
   validateReferencedVideoAssetReferences,
 } = require('./asset-paths');
 const { toReportDocument } = require('../report-contract');
@@ -124,9 +122,6 @@ function renderText(block) {
 function renderCaption(label) {
   return label ? `<figcaption>${escapeHtml(label)}</figcaption>` : '';
 }
-function finiteSetting(value, fallback = null) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
 function clampPlaybackRate(value, fallback = PLAYBACK_RATE_DEFAULT) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
@@ -202,15 +197,6 @@ function sidePosterAssetId(block, side) {
   if (directId) return directId;
   return side === 'single' ? firstReferenceId(block, ['posterAssetId', 'posterImageAssetId']) : null;
 }
-function formatSeconds(value) {
-  return value === null || value === undefined ? '未設定' : `${Number(value).toFixed(2)} 秒`;
-}
-function formatLoop(loop, segment = { in: 0, out: 0 }) {
-  if (!loop.enabled) return '關閉';
-  return !(segment.out > 0)
-    ? `開啟（${formatSeconds(segment.in)}起）`
-    : `開啟（${formatSeconds(segment.in)}–${formatSeconds(segment.out)}）`;
-}
 function renderImage(asset, label) {
   const alt = label || asset.label || 'Report image';
   return '<figure class="report-media report-image">'
@@ -279,207 +265,6 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     + '</div>')
     + '</div>';
 }
-function frameCacheFramePath(frame, assetId, frameIndex) {
-  if (!frame || typeof frame !== 'object' || typeof frame.relativePath !== 'string') {
-    throw new ExportValidationError(`Frame cache ${assetId} frame ${frameIndex} is invalid`);
-  }
-  try {
-    return normalizeRelativeAssetPath(frame.relativePath, { allowRootFile: true });
-  } catch (error) {
-    throw new ExportValidationError(`Frame cache ${assetId} frame ${frameIndex} path is invalid`, { cause: error });
-  }
-}
-function frameCachePathInside(root, candidate) {
-  const relative = root === candidate ? '' : candidate.slice(`${root}/`.length);
-  return root === candidate || (candidate.startsWith(`${root}/`) && relative.length > 0 && !relative.startsWith('../'));
-}
-function normalizeRendererFrameCaches(frameCacheManifest) {
-  if (frameCacheManifest === null || frameCacheManifest === undefined) return new Map();
-  const entries = Array.isArray(frameCacheManifest)
-    ? frameCacheManifest
-    : (frameCacheManifest && typeof frameCacheManifest === 'object'
-      ? Object.entries(frameCacheManifest).map(([assetId, value]) => ({
-        ...(value && typeof value === 'object' ? value : {}),
-        assetId: value?.assetId ?? assetId,
-      }))
-      : null);
-  if (!entries) throw new ExportValidationError('Frame cache manifest must be an array or object');
-  const byAssetId = new Map();
-  entries.forEach((entry, entryIndex) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-      throw new ExportValidationError(`Frame cache manifest entry ${entryIndex} is invalid`);
-    }
-    const assetId = typeof entry.assetId === 'string' && entry.assetId.length > 0
-      ? entry.assetId
-      : null;
-    if (!assetId) throw new ExportValidationError(`Frame cache manifest entry ${entryIndex} has no assetId`);
-    if (byAssetId.has(assetId)) throw new ExportValidationError(`Duplicate frame cache manifest asset id: ${assetId}`);
-    const status = typeof entry.status === 'string' ? entry.status : 'ready';
-    if (status !== 'ready') {
-      byAssetId.set(assetId, {
-        assetId,
-        status,
-        ready: false,
-        error: entry.error || null,
-      });
-      return;
-    }
-    const cache = entry.cache && typeof entry.cache === 'object' && !Array.isArray(entry.cache)
-      ? entry.cache
-      : entry;
-    const frames = Array.isArray(cache.frames) ? cache.frames : entry.frames;
-    if (!Array.isArray(frames) || frames.length === 0) {
-      throw new ExportValidationError(`Ready frame cache manifest for asset ${assetId} has no frames`);
-    }
-    const seen = new Set();
-    const normalizedFrames = frames.map((frame, frameIndex) => {
-      if (!frame || typeof frame !== 'object' || frame.frameNumber !== frameIndex) {
-        throw new ExportValidationError(`Frame cache ${assetId} frame mapping is invalid`);
-      }
-      const relativePath = frameCacheFramePath(frame, assetId, frameIndex);
-      const key = portableAssetPathKey(relativePath);
-      if (seen.has(key)) throw new ExportValidationError(`Frame cache ${assetId} contains duplicate frame paths`);
-      seen.add(key);
-      return {
-        frameNumber: frameIndex,
-        pts: finiteSetting(frame.pts, null),
-        time: finiteSetting(frame.time, null),
-        width: finiteSetting(frame.width, null),
-        height: finiteSetting(frame.height, null),
-        relativePath,
-      };
-    });
-    const descriptor = cache.cache && typeof cache.cache === 'object' ? cache.cache : entry.cache;
-    if (!descriptor || descriptor.format !== 'png') {
-      throw new ExportValidationError(`Frame cache ${assetId} does not declare PNG format`);
-    }
-    const indexRelativePath = frameCacheFramePath(
-      { relativePath: descriptor.indexRelativePath },
-      assetId,
-      'index',
-    );
-    const frameDirectoryRelativePath = frameCacheFramePath(
-      { relativePath: descriptor.frameDirectoryRelativePath },
-      assetId,
-      'directory',
-    );
-    const rootRelativePath = frameCacheFramePath(
-      { relativePath: descriptor.rootRelativePath },
-      assetId,
-      'root',
-    );
-    if (!frameCachePathInside(rootRelativePath, indexRelativePath)
-      || !frameCachePathInside(rootRelativePath, frameDirectoryRelativePath)
-      || indexRelativePath === rootRelativePath
-      || frameDirectoryRelativePath === rootRelativePath) {
-      throw new ExportValidationError(`Frame cache ${assetId} paths are outside its root`);
-    }
-    if (normalizedFrames.some((frame) => !frameCachePathInside(frameDirectoryRelativePath, frame.relativePath)
-      || !/\.png$/iu.test(frame.relativePath))) {
-      throw new ExportValidationError(`Frame cache ${assetId} frame paths are outside its directory`);
-    }
-    const output = {
-      ...entry,
-      assetId,
-      status: 'ready',
-      ready: true,
-      cache: {
-        ...cache,
-        cache: {
-          ...descriptor,
-          rootRelativePath,
-          indexRelativePath,
-          frameDirectoryRelativePath,
-          format: 'png',
-        },
-        frames: normalizedFrames,
-        frameCount: normalizedFrames.length,
-      },
-    };
-    byAssetId.set(assetId, output);
-  });
-  return byAssetId;
-}
-function frameCacheForSide(block, side, byId, frameCaches) {
-  const assetId = sideAssetId(block, side);
-  if (!assetId) return null;
-  const asset = byId.get(assetId);
-  const cache = frameCaches.get(assetId);
-  if (!asset || !cache || cache.ready !== true || !cache.cache?.frames?.length) return null;
-  return { asset, cache: cache.cache };
-}
-function frameCacheFallbackStatus(block, frameCaches) {
-  const sides = block.type === 'comparisonVideo' ? ['left', 'right'] : ['single'];
-  return sides
-    .map((side) => sideAssetId(block, side))
-    .filter(Boolean)
-    .map((assetId) => frameCaches.get(assetId))
-    .find((entry) => entry && entry.ready !== true) || null;
-}
-function frameCacheJson(cache) {
-  return escapeHtml(JSON.stringify(cache.frames).replaceAll('<', '\\u003c'));
-}
-function renderFramePlayerSide(block, side, frameBinding, comparison) {
-  const { asset, cache } = frameBinding;
-  const config = sideConfig(block, side);
-  const settings = playbackSettings(config);
-  const label = sideTitle(block, side, asset);
-  const firstFrame = cache.frames[0];
-  const sideLabel = side === 'left' ? '左側來源' : side === 'right' ? '右側來源' : '影片來源';
-  const sideHeading = comparison ? `<div class="portable-player-side-heading"><h3>${escapeHtml(label)}</h3></div>` : '';
-  const segmentOut = settings.segment.out > 0 ? String(settings.segment.out) : '';
-  return `<div class="portable-player-side portable-frame-side" data-player-side="${side}"
-    data-segment-in="${escapeHtml(String(settings.segment.in))}"
-    data-segment-out="${escapeHtml(segmentOut)}"
-    data-loop-enabled="${settings.loop.enabled ? 'true' : 'false'}"
-    data-frame-index="${frameCacheJson(cache)}"
-    data-frame-index-path="${escapeHtml(cache.cache.indexRelativePath)}"
-    data-frame-count="${cache.frames.length}"
-    data-frame-fps="${escapeHtml(String(cache.fps ?? cache.metadata?.fps ?? cache.metadata?.averageFps ?? 30))}">
-    ${sideHeading}
-    <div class="portable-frame-surface" data-frame-surface tabindex="-1" aria-label="${escapeHtml(`${sideLabel}影格畫面`)}">
-      <img data-player-frame data-inline-frame src="${escapeHtml(encodeAssetPath(firstFrame.relativePath))}" alt="${escapeHtml(`${label}目前影格`)}">
-      <span data-frame-placeholder hidden>尚未準備影格</span>
-    </div>
-    <p class="portable-frame-side-status" data-frame-side-status role="status">影格快取已就緒 · ${cache.frames.length} 幀。</p>
-  </div>`;
-}
-function renderFramePlayer(block, byId, comparison, frameCaches) {
-  const sides = comparison ? ['left', 'right'] : ['single'];
-  const bindings = sides.map((side) => frameCacheForSide(block, side, byId, frameCaches));
-  if (bindings.some((binding) => !binding)) return '';
-  const layout = block.layout === 'stacked' ? 'stacked' : 'side-by-side';
-  const blockLabel = typeof block.label === 'string' ? block.label.trim() : '';
-  const accessibleBlockLabel = blockLabel || (comparison ? '雙影片' : '單一影片');
-  const renderedPlayers = bindings.map((binding, index) => {
-    const side = sides[index];
-    const count = binding.cache.frames.length;
-    const sideLabel = side === 'left' ? '左側影片' : side === 'right' ? '右側影片' : accessibleBlockLabel;
-    const settings = playbackSettings(sideConfig(block, side));
-    return `<div class="portable-player portable-frame-player" data-portable-player data-frame-player data-frame-mode="cache" tabindex="0" aria-label="${escapeHtml(`${sideLabel}播放器`)}">
-      ${renderFramePlayerSide(block, side, binding, comparison)}
-      <div class="portable-frame-controls" data-frame-controls role="group" aria-label="${escapeHtml(`${sideLabel}影格播放器控制`)}">
-        <div class="portable-frame-navigation">
-          <button type="button" data-frame-action="previous">上一幀</button>
-          <input data-frame-timeline type="range" min="0" max="${Math.max(0, count - 1)}" step="1" value="0" aria-label="${escapeHtml(`${sideLabel}影格時間軸`)}">
-          <button type="button" data-frame-action="next">下一幀</button>
-          <output data-frame-position>第 1 / ${count} 幀</output>
-          <button type="button" data-frame-action="toggle" aria-pressed="false">播放</button>
-        </div>
-        <div class="portable-frame-rate-row" data-frame-rate-row>
-          <input data-frame-rate-input type="number" min="${PLAYBACK_RATE_MIN}" max="${PLAYBACK_RATE_MAX}" step="any" value="${escapeHtml(formatPlaybackRate(settings.rate))}" aria-label="${escapeHtml(`${sideLabel}播放速度數值`)}">
-          <input data-frame-rate type="range" min="${PLAYBACK_RATE_SLIDER_MIN}" max="${PLAYBACK_RATE_SLIDER_MAX}" step="${PLAYBACK_RATE_SLIDER_STEP}" value="${escapeHtml(String(playbackRateToSliderValue(settings.rate)))}" aria-label="${escapeHtml(`${sideLabel}播放速度控制條`)}">
-          <button type="button" data-frame-action="reset-rate" aria-label="${escapeHtml(`${sideLabel}重置播放速度為 1 倍`)}" title="重置為 1 倍">↻</button>
-        </div>
-        <span data-frame-player-status role="status" data-state="loaded">影格快取已就緒；可獨立逐幀播放。</span>
-      </div>
-    </div>`;
-  }).join('');
-  return `<figure class="report-media report-video portable-player portable-dual-player" data-portable-player aria-label="${escapeHtml(`${accessibleBlockLabel}播放器`)}" data-player-layout="${layout}">
-    ${blockLabel ? `<header class="portable-player-header"><h3>${escapeHtml(blockLabel)}</h3></header>` : ''}
-    <div class="portable-player-grid portable-player-grid-${layout}">${renderedPlayers}</div>
-  </figure>`;
-}
 function renderNativeSharedControls(label, block) {
   const escaped = escapeHtml(label);
   const leftSettings = playbackSettings(sideConfig(block, 'left'));
@@ -524,7 +309,7 @@ function renderPlayer(block, byId, comparison) {
 function renderComparison(block, byId) {
   return renderPlayer(block, byId, true);
 }
-function renderBlock(block, byId, frameCaches) {
+function renderBlock(block, byId) {
   const safeBlock = block && typeof block === 'object' ? block : {};
   const type = typeof safeBlock.type === 'string' ? safeBlock.type.toLowerCase() : 'unknown';
   const label = typeof safeBlock.label === 'string'
@@ -536,10 +321,10 @@ function renderBlock(block, byId, frameCaches) {
     return image ? renderImage(image, label) : renderText(safeBlock);
   }
   if (type === 'singlevideo' || type === 'video' || type === 'video-block') {
-    return renderPlayer(safeBlock, byId, false, frameCaches);
+    return renderPlayer(safeBlock, byId, false);
   }
   if (type === 'comparisonvideo' || type === 'comparison-video' || type === 'comparison') {
-    return renderComparison(safeBlock, byId, frameCaches);
+    return renderComparison(safeBlock, byId);
   }
   if (type === 'heading' || type === 'subheading') {
     return `<h4>${escapeHtml(label || blockText(safeBlock))}</h4>`;
@@ -549,284 +334,18 @@ function renderBlock(block, byId, frameCaches) {
 function renderStyles() {
   return renderXp7ReaderTheme();
 }
-function renderFramePlayerScript() {
-  return `
-  document.querySelectorAll('[data-frame-player]').forEach((player) => {
-    const side = player.querySelector('[data-player-side]');
-    if (!side) return;
-    const frames = JSON.parse(side.dataset.frameIndex || '[]');
-    const image = side.querySelector('[data-player-frame]');
-    const sideStatus = side.querySelector('[data-frame-side-status]');
-    const start = numberValue(side.dataset.segmentIn, 0);
-    const end = numberValue(side.dataset.segmentOut);
-    const rateInput = player.querySelector('[data-frame-rate-input]');
-    const rateSlider = player.querySelector('[data-frame-rate]');
-    const resetRate = player.querySelector('[data-frame-action="reset-rate"]');
-    let rate = 1;
-    const loopEnabled = side.dataset.loopEnabled === 'true';
-    const count = frames.length;
-    const timeline = player.querySelector('[data-frame-timeline]');
-    const position = player.querySelector('[data-frame-position]');
-    const status = player.querySelector('[data-frame-player-status]');
-    const toggle = player.querySelector('[data-frame-action="toggle"]');
-    let index = 0;
-    let playing = false;
-    let timer = null;
-    let playbackTime = null;
-    let lastTimestamp = null;
-    let scheduleTick = null;
-    const setStatus = (message) => { if (status) status.textContent = message; };
-    const rateToSlider = (value) => Math.log2(clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX}));
-    const sliderToRate = (value) => 2 ** clamp(numberValue(value, 0), ${PLAYBACK_RATE_SLIDER_MIN}, ${PLAYBACK_RATE_SLIDER_MAX});
-    const formatRate = (value) => {
-      const normalized = clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
-      if (normalized < 0.1) return normalized.toFixed(4);
-      if (normalized < 1) return normalized.toFixed(3);
-      return normalized.toFixed(2);
-    };
-    const updateRateControls = () => {
-      if (rateInput) rateInput.value = formatRate(rate);
-      if (rateSlider) rateSlider.value = String(rateToSlider(rate));
-      const videos = [...player.querySelectorAll('[data-player-video]')];
-      videos.forEach((video) => { video.playbackRate = rate; });
-    };
-    const clockNow = () => (typeof performance !== 'undefined' && Number.isFinite(performance.now()) ? performance.now() : Date.now());
-    const setRate = (value) => {
-      rate = clamp(value, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
-      updateRateControls();
-      if (playing) {
-        lastTimestamp = clockNow();
-        scheduleTick?.();
-      }
-    };
-    const frameTime = (value) => {
-      const frame = frames[value];
-      return Number.isFinite(frame?.time) ? frame.time : value / Math.max(1, numberValue(side.dataset.frameFps, 30));
-    };
-    const frameDuration = (value) => {
-      const current = frameTime(value);
-      const duration = value < count - 1
-        ? frameTime(value + 1) - current
-        : current - frameTime(Math.max(0, value - 1));
-      return Number.isFinite(duration) && duration > 0
-        ? duration
-        : 1 / Math.max(1, numberValue(side.dataset.frameFps, 30));
-    };
-    const frameIndexAtTime = (value) => {
-      if (count <= 0) return 0;
-      let low = 0;
-      let high = count - 1;
-      while (low < high) {
-        const middle = Math.ceil((low + high) / 2);
-        if (frameTime(middle) <= value) low = middle;
-        else high = middle - 1;
-      }
-      return low;
-    };
-    const updateControls = () => {
-      const maximum = Math.max(0, count - 1);
-      if (timeline) { timeline.max = String(maximum); timeline.value = String(index); timeline.disabled = count <= 0; }
-      if (position) position.textContent = count > 0 ? ('第 ' + (index + 1) + ' / ' + count + ' 幀') : '尚未準備';
-      const previous = player.querySelector('[data-frame-action="previous"]');
-      const next = player.querySelector('[data-frame-action="next"]');
-      if (previous) previous.disabled = count <= 0 || index <= 0;
-      if (next) next.disabled = count <= 0 || index >= maximum;
-      if (toggle) { toggle.textContent = playing ? '暫停' : '播放'; toggle.setAttribute('aria-pressed', playing ? 'true' : 'false'); }
-    };
-    const renderIndex = (nextIndex) => {
-      if (count <= 0) return;
-      index = Math.min(Math.max(0, Math.round(nextIndex)), count - 1);
-      if (!playing) playbackTime = frameTime(index);
-      const frame = frames[index];
-      if (frame && image) image.src = frame.relativePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
-      if (sideStatus) sideStatus.textContent = '已顯示第 ' + (index + 1) + ' 幀。';
-      updateControls();
-    };
-    const stop = (message) => { playing = false; lastTimestamp = null; if (timer) clearTimeout(timer); timer = null; updateControls(); if (message) setStatus(message); };
-    const tick = () => {
-      if (!playing || count <= 0) return;
-      const timestamp = clockNow();
-      if (!Number.isFinite(lastTimestamp)) lastTimestamp = timestamp;
-      const elapsed = Math.max(0, timestamp - lastTimestamp) / 1000;
-      lastTimestamp = timestamp;
-      if (!Number.isFinite(playbackTime)) playbackTime = frameTime(index);
-      playbackTime += elapsed * rate;
-      const loopStartIndex = frames.findIndex((frame, frameIndex) => frameTime(frameIndex) >= start);
-      const loopStartTime = frameTime(loopStartIndex >= 0 ? loopStartIndex : 0);
-      const finalFrameTime = frameTime(count - 1);
-      const loopEndTime = end === null
-        ? finalFrameTime + frameDuration(count - 1)
-        : Math.max(loopStartTime + 0.000001, end);
-      if (loopEnabled) {
-        const loopDuration = loopEndTime - loopStartTime;
-        if (loopDuration > 0 && playbackTime >= loopEndTime) {
-          playbackTime = loopStartTime + ((playbackTime - loopStartTime) % loopDuration);
-        }
-        if (playbackTime < loopStartTime) playbackTime = loopStartTime;
-      } else if (playbackTime >= finalFrameTime) {
-        renderIndex(count - 1);
-        stop('已到達最後一幀。');
-        return;
-      }
-      const renderTime = loopEnabled
-        ? Math.min(playbackTime, Math.max(loopStartTime, loopEndTime - 0.000001))
-        : Math.min(playbackTime, finalFrameTime);
-      renderIndex(frameIndexAtTime(renderTime));
-      scheduleTick?.();
-    };
-    scheduleTick = () => {
-      if (!playing || count <= 0) return;
-      if (timer) clearTimeout(timer);
-      const nextIndex = Math.min(count - 1, index + 1);
-      const nextTime = nextIndex > index ? frameTime(nextIndex) : frameTime(index) + frameDuration(index);
-      const waitSeconds = Math.max(0.001, nextTime - (Number.isFinite(playbackTime) ? playbackTime : frameTime(index)));
-      timer = setTimeout(() => { timer = null; tick(); }, Math.max(4, Math.round(waitSeconds * 1000 / Math.max(rate, ${PLAYBACK_RATE_MIN}))));
-    };
-    player.querySelector('[data-frame-action="previous"]')?.addEventListener('click', () => { stop(); renderIndex(index - 1); setStatus('已顯示上一幀。'); });
-    player.querySelector('[data-frame-action="next"]')?.addEventListener('click', () => { stop(); renderIndex(index + 1); setStatus('已顯示下一幀。'); });
-    toggle?.addEventListener('click', () => {
-      if (playing) stop('已暫停。');
-      else {
-        if (index >= count - 1 && !loopEnabled) renderIndex(segmentStartIndex >= 0 ? segmentStartIndex : 0);
-        if (!Number.isFinite(playbackTime)) playbackTime = frameTime(index);
-        lastTimestamp = clockNow();
-        playing = true;
-        updateControls();
-        setStatus('已開始逐幀播放。');
-        tick();
-      }
-    });
-    timeline?.addEventListener('input', (event) => { stop(); renderIndex(numberValue(event.target.value, 0)); setStatus('已切換至指定影格。'); });
-    rateSlider?.addEventListener('input', (event) => { setRate(sliderToRate(event.target.value)); });
-    rateInput?.addEventListener('input', (event) => {
-      const value = numberValue(event.target.value, null);
-      if (value !== null) setRate(value);
-    });
-    rateInput?.addEventListener('change', (event) => { setRate(numberValue(event.target.value, rate)); });
-    resetRate?.addEventListener('click', () => { setRate(1); setStatus('播放速度已重置為 1.00 倍。'); });
-    player.addEventListener('keydown', (event) => {
-      if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
-      event.preventDefault(); stop(); renderIndex(index + (event.key === 'ArrowLeft' ? -1 : 1)); setStatus('已用鍵盤逐幀切換。');
-    });
-    const segmentStartIndex = frames.findIndex((frame, frameIndex) => frameTime(frameIndex) >= start);
-    updateRateControls();
-    renderIndex(segmentStartIndex >= 0 ? segmentStartIndex : 0);
-    updateControls();
-  });`;
-}
-function renderLegacyPlayerScript() {
-  return `
-  document.querySelectorAll('[data-portable-player]:not([data-frame-player])').forEach((player) => {
-    const sides = [...player.querySelectorAll('[data-player-side]')];
-    const settingsFor = (side) => {
-      const video = side.querySelector('[data-player-video]');
-      const rateInput = side.querySelector('[data-player-rate-input]');
-      const rateSlider = side.querySelector('[data-player-rate]');
-      const resetRate = side.querySelector('[data-player-rate-reset]');
-      const loopInput = side.querySelector('[data-player-loop]');
-      return { side, video, rateInput, rateSlider, resetRate, loopInput, start: numberValue(side.dataset.segmentIn, 0), end: numberValue(side.dataset.segmentOut), rate: 1, loopEnabled: side.dataset.loopEnabled === 'true' };
-    };
-    const updateRateControls = (settings) => { if (settings.rateInput) settings.rateInput.value = settings.rate < .1 ? settings.rate.toFixed(4) : settings.rate < 1 ? settings.rate.toFixed(3) : settings.rate.toFixed(2); if (settings.rateSlider) settings.rateSlider.value = String(Math.log2(settings.rate)); };
-    const rateCandidates = (requested) => {
-      const desired = clamp(requested, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
-      return desired >= 1
-        ? [desired, 16, 8, 4, 2, 1, .5, .25, .125, .0625]
-        : [desired, .0625, .125, .25, .5, 1, 2, 4, 8, 16];
-    };
-    const setPlaybackRate = (settings, requested, candidates = null) => {
-      const desired = clamp(requested, ${PLAYBACK_RATE_MIN}, ${PLAYBACK_RATE_MAX});
-      const values = Array.isArray(candidates) && candidates.length > 0
-        ? candidates
-        : rateCandidates(desired);
-      for (const candidate of values) {
-        try {
-          settings.video.playbackRate = candidate;
-          const actual = Number(settings.video.playbackRate);
-          if (Number.isFinite(actual) && Math.abs(actual - candidate) < 0.001) {
-            settings.rate = actual;
-            updateRateControls(settings);
-            return actual;
-          }
-        } catch {}
-      }
-      settings.rate = 1;
-      try { settings.video.playbackRate = 1; } catch {}
-      updateRateControls(settings);
-      return settings.rate;
-    };
-    const unsupportedPlaybackRateError = (error) => {
-      const message = String(error?.message || error || '').toLowerCase();
-      return message.includes('playbackrate')
-        || message.includes('playback rate')
-        || message.includes('supported playback range');
-    };
-    const playVideo = async (settings) => {
-      let lastError = null;
-      const attemptedRates = new Set();
-      for (const requested of rateCandidates(settings.rate)) {
-        const actual = setPlaybackRate(settings, requested, [requested]);
-        if (!Number.isFinite(actual) || attemptedRates.has(actual)) continue;
-        attemptedRates.add(actual);
-        try {
-          await settings.video.play();
-          return actual;
-        } catch (error) {
-          lastError = error;
-          if (!unsupportedPlaybackRateError(error)) throw error;
-        }
-      }
-      throw lastError || new Error('影片無法播放。');
-    };
-    const updateSide = (settings) => { const { video, side } = settings; if (!video) return; const seek = side.querySelector('[data-player-seek]'); const output = side.querySelector('[data-player-time]'); const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : settings.end; if (seek) { seek.min = String(settings.start); seek.max = String(Math.max(settings.start, settings.end ?? duration ?? settings.start)); seek.value = String(clamp(video.currentTime || settings.start, settings.start, Number(seek.max))); seek.disabled = false; } if (output) output.textContent = String((video.currentTime || 0).toFixed(2)) + ' 秒'; updateRateControls(settings); };
-    const applySettings = (settings, seekToStart = true) => { if (!settings.video) return; setPlaybackRate(settings, settings.rate); if (settings.loopInput) settings.loopInput.checked = settings.loopEnabled; if (seekToStart && Number.isFinite(settings.start)) settings.video.currentTime = settings.start; updateSide(settings); };
-    sides.forEach((side) => {
-      const settings = settingsFor(side);
-      applySettings(settings);
-      settings.video?.addEventListener('loadedmetadata', () => applySettings(settings));
-      settings.video?.addEventListener('timeupdate', () => {
-        const loopEnabled = settings.loopInput?.checked;
-        if (settings.end !== null && settings.video.currentTime >= settings.end) {
-          if (loopEnabled) { settings.video.currentTime = settings.start; playVideo(settings).catch(() => {}); }
-          else { settings.video.currentTime = settings.end; settings.video.pause(); }
-        }
-        updateSide(settings);
-      });
-      settings.video?.addEventListener('ended', () => {
-        if (settings.loopInput?.checked) { settings.video.currentTime = settings.start; playVideo(settings).catch(() => {}); }
-      });
-      settings.video?.addEventListener('error', () => { const status = side.querySelector('[data-player-time]'); if (status) status.textContent = '媒體載入失敗'; });
-      side.querySelector('[data-player-seek]')?.addEventListener('input', (event) => { settings.video.currentTime = numberValue(event.target.value, settings.start); updateSide(settings); });
-      settings.rateInput?.addEventListener('input', (event) => { const value = numberValue(event.target.value, null); if (value !== null) setPlaybackRate(settings, value); });
-      settings.rateInput?.addEventListener('change', (event) => { setPlaybackRate(settings, numberValue(event.target.value, settings.rate)); });
-      settings.rateSlider?.addEventListener('input', (event) => { setPlaybackRate(settings, 2 ** clamp(numberValue(event.target.value, 0), -6, 6)); });
-      settings.resetRate?.addEventListener('click', () => { setPlaybackRate(settings, 1); });
-      settings.loopInput?.addEventListener('change', () => { settings.loopEnabled = settings.loopInput.checked; });
-    });
-    const primary = sides.length === 1 ? settingsFor(sides[0]) : null;
-    if (primary?.video) {
-      const reset = () => { primary.video.pause(); primary.video.currentTime = primary.start; updateSide(primary); };
-      player.querySelector('[data-player-action="play"]')?.addEventListener('click', () => playVideo(primary).catch(() => {}));
-      player.querySelector('[data-player-action="pause"]')?.addEventListener('click', () => primary.video.pause());
-      player.querySelector('[data-player-action="reset"]')?.addEventListener('click', reset);
-      player.addEventListener('keydown', (event) => { if (event.target !== player || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return; event.preventDefault(); const duration = Number.isFinite(primary.video.duration) && primary.video.duration > 0 ? primary.video.duration : primary.end; const maximum = primary.end ?? duration ?? primary.start; primary.video.currentTime = clamp(primary.video.currentTime + (event.key === 'ArrowLeft' ? -1 : 1) * 0.1, primary.start, Math.max(primary.start, maximum)); updateSide(primary); });
-    }
-  });`;
-}
 function renderPlayerScript({ includeNative = true } = {}) {
   const body = includeNative ? renderNativeFramePlayerScript() : '';
   return '<script>' + String.fromCharCode(10) + body + String.fromCharCode(10) + '</script>';
 }
 function renderReportHtml(
   reportDocument,
-  { assetManifest = [], frameCacheManifest = [], frameCacheWarnings = [] } = {},
+  { assetManifest = [] } = {},
 ) {
   assertReportDocument(reportDocument);
   const safeReportDocument = toPortableReportDocument(reportDocument);
   const { manifest } = validateReferencedVideoAssetReferences(safeReportDocument, assetManifest);
   const byId = new Map(manifest.map((asset) => [asset.id, asset]));
-  // Portable reports always use the native video player. The optional
-  // frame-cache arguments remain accepted for backwards-compatible callers,
-  // but are intentionally ignored so exports never depend on PNG caches.
   const title = typeof safeReportDocument.title === 'string' && safeReportDocument.title.length > 0
     ? safeReportDocument.title
     : 'Pitching analysis report';

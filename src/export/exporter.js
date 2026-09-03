@@ -563,9 +563,6 @@ async function exportReport({
   createZip = false,
   outputKind = 'folder',
   zipPath,
-  frameCaches = null,
-  requireReadyFrameCache = false,
-  frameCacheFallbackReason = null,
   signal,
 } = {}) {
   if (typeof outputDirectory !== 'string' || outputDirectory.length === 0) {

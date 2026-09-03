@@ -1,10 +1,14 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
 const test = require('node:test');
 const exportApi = require('../../src/export');
 const mediaApi = require('../../src/media');
 const { renderReportHtml } = require('../../src/export/report-renderer');
+
+const repositoryRoot = path.resolve(__dirname, '..', '..');
 
 test('retires export PNG frame-cache packaging while preserving the live media frame cache', () => {
   assert.equal(exportApi.FRAME_CACHE_OUTPUT_ROOT, undefined);
@@ -39,4 +43,48 @@ test('portable reports use native video assets and contain no packaged frame-cac
   assert.match(html, /data-native-frame-player\b/u);
   assert.doesNotMatch(html, /data-frame-player="/u);
   assert.doesNotMatch(html, /images\/frame-cache|data-frame-index|frame-cache-status|cache-miss/u);
+});
+
+test('legacy export frame-cache plumbing is absent while the generator frame-cache bridge remains live', async () => {
+  const [rendererBase, exporter, appBridge, main] = await Promise.all([
+    fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-renderer-base.js'), 'utf8'),
+    fs.readFile(path.join(repositoryRoot, 'src', 'export', 'exporter.js'), 'utf8'),
+    fs.readFile(path.join(repositoryRoot, 'src', 'export', 'app-bridge.js'), 'utf8'),
+    fs.readFile(path.join(repositoryRoot, 'src', 'main.js'), 'utf8'),
+  ]);
+
+  for (const retired of [
+    'frameCacheManifest',
+    'frameCacheWarnings',
+    'normalizeRendererFrameCaches',
+    'frameCacheForSide',
+    'frameCacheFallbackStatus',
+    'frameCacheJson',
+    'renderFramePlayerSide',
+    'renderFramePlayer',
+    'renderFramePlayerScript',
+    'renderLegacyPlayerScript',
+  ]) {
+    assert.doesNotMatch(rendererBase, new RegExp(`\\b${retired}\\b`, 'u'));
+  }
+  for (const retired of ['frameCaches', 'requireReadyFrameCache', 'frameCacheFallbackReason']) {
+    assert.doesNotMatch(exporter, new RegExp(`\\b${retired}\\b`, 'u'));
+    assert.doesNotMatch(appBridge, new RegExp(`\\b${retired}\\b`, 'u'));
+  }
+  assert.doesNotMatch(main, /\breadExportFrameCaches\b/u);
+  assert.doesNotMatch(main, /\bcollectReferencedVideoAssetIds\b/u);
+  assert.doesNotMatch(main, /\brandomUUID\b/u);
+
+  for (const channel of [
+    'frame-cache:prepare',
+    'frame-cache:read',
+    'frame-cache:cleanup',
+    'frame-cache:cancel',
+    'frame-cache:frame',
+  ]) {
+    assert.match(main, new RegExp(channel, 'u'));
+  }
+  assert.match(main, /\bprepareFrameCache\b/u);
+  assert.match(main, /\breadFrameCache\b/u);
+  assert.match(main, /\bcleanupFrameCache\b/u);
 });

@@ -177,8 +177,6 @@ async function normalizeExportRequest(request) {
     projectRoot: path.resolve(request.projectRoot),
     reportDocument: request.reportDocument,
     assets: request.assets,
-    frameCaches: request.frameCaches ?? null,
-    requireReadyFrameCache: request.requireReadyFrameCache === true,
     outputDirectory,
     reportName: assertReportName(request.reportName),
     outputKind,

@@ -10,7 +10,6 @@ if (gpuDisabled) {
 
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { randomUUID } = require('node:crypto');
 const { pathToFileURL } = require('node:url');
 const {
   createProjectStore,
@@ -21,7 +20,6 @@ const {
   ExportJobController,
   validatePickedExportDirectory,
 } = require('./export/app-bridge');
-const { collectReferencedVideoAssetIds } = require('./export/asset-paths');
 const {
   FRAME_CACHE_BRIDGE_METHODS,
   FRAME_CACHE_CONTRACT_VERSION,
@@ -233,33 +231,6 @@ async function resolveFrameCacheAsset(request) {
     sourceReference,
     sourcePath: resolved.sourcePath,
   };
-}
-
-async function readExportFrameCaches(project) {
-  const assetIds = collectReferencedVideoAssetIds(project);
-  return Promise.all(assetIds.map(async (assetId) => {
-    const request = {
-      schemaVersion: FRAME_CACHE_CONTRACT_VERSION,
-      operation: FRAME_CACHE_BRIDGE_METHODS.READ,
-      requestId: `export-${randomUUID()}`,
-      projectId: project.id,
-      assetId,
-    };
-    try {
-      const resolved = await resolveFrameCacheAsset(request);
-      const response = normalizeFrameCacheResponse(await readFrameCache({
-        ...request,
-        sourceReference: resolved.sourceReference,
-        projectRoot: PROJECT_ROOT,
-      }));
-      return { assetId, response };
-    } catch (error) {
-      return {
-        assetId,
-        response: frameCacheFailure(request, frameCacheStatusForError(error), error),
-      };
-    }
-  }));
 }
 
 async function invokeFrameCacheOperation(event, payload, operation, operationFn) {
@@ -839,7 +810,6 @@ async function runElectronSmoke() {
     let responsiveEvidence;
     try {
       const desktop = await window.webContents.executeJavaScript(responsiveProbe, true);
-      // Smoke-only viewport override; production launch keeps the normal minimum size.
       window.setMinimumSize(320, 480);
       window.setSize(600, 900);
       await new Promise((resolve) => setTimeout(resolve, 100));
