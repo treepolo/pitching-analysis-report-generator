@@ -6,6 +6,7 @@ const path = require('node:path');
 const test = require('node:test');
 const {
   injectReportPlayerSelectionRefinement,
+  playerPlaybackOwnershipScript,
   playerSelectionCss,
 } = require('../../src/export/report-player-selection-refinement');
 
@@ -25,14 +26,29 @@ test('selection glow also covers the cloned player shown in help', () => {
   assert.match(css, /\.report-help-live-preview \.portable-player\[data-frame-selected="true"\]/u);
 });
 
-test('selection refinement injects exactly once', () => {
+test('portable player playback ownership covers click, keyboard, and native play entry points', () => {
+  const script = playerPlaybackOwnershipScript();
+  assert.match(script, /data-report-player-playback-ownership/u);
+  assert.match(script, /const claimPlayback = \(activeBlock\)/u);
+  assert.match(script, /block !== activeBlock && blockIsPlaying\(block\)/u);
+  assert.match(script, /document\.addEventListener\('click',[\s\S]*\}, true\);/u);
+  assert.match(script, /document\.addEventListener\('keydown',[\s\S]*\}, true\);/u);
+  assert.match(script, /document\.addEventListener\('play',[\s\S]*\}, true\);/u);
+  assert.match(script, /toggle\.getAttribute\('aria-pressed'\) !== 'true'/u);
+  assert.match(script, /typeof actions\?\.stop === 'function'/u);
+  assert.match(script, /toggle\.click\(\)/u);
+  assert.match(script, /video\.pause\(\)/u);
+});
+
+test('selection refinement injects styling and playback ownership exactly once', () => {
   const base = '<html><head></head><body><main></main></body></html>';
   const once = injectReportPlayerSelectionRefinement(base);
   const twice = injectReportPlayerSelectionRefinement(once);
   assert.equal((twice.match(/data-report-player-selection-refinement/g) || []).length, 1);
+  assert.equal((twice.match(/data-report-player-playback-ownership/g) || []).length, 1);
 });
 
-test('renderer applies selection styling without touching the selection runtime', async () => {
+test('renderer applies selection refinement without replacing the native selection state machine', async () => {
   const renderer = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-renderer.js'), 'utf8');
   const player = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'native-frame-player.js'), 'utf8');
   assert.match(renderer, /require\('\.\/report-player-selection-refinement'\)/u);
