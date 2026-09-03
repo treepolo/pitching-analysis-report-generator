@@ -7,18 +7,20 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotation-step-controls.js'), 'utf8');
-const shortcuts = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotation-shortcuts.js'), 'utf8');
+const shortcutsPath = path.join(__dirname, '..', 'src', 'annotation-shortcuts.js');
 const index = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.html'), 'utf8');
 
 test('annotation N-frame control runtime compiles as browser JavaScript', () => {
   assert.doesNotThrow(() => new vm.Script(source));
 });
 
-test('loads annotation N-frame controls after the base annotation editor', () => {
+test('loads the consolidated annotation step runtime after the base editor', () => {
   const annotationIndex = index.indexOf('./annotations.js');
   const stepIndex = index.indexOf('./annotation-step-controls.js');
   assert.ok(annotationIndex >= 0);
   assert.ok(stepIndex > annotationIndex);
+  assert.doesNotMatch(index, /annotation-shortcuts\.js/u);
+  assert.equal(fs.existsSync(shortcutsPath), false);
 });
 
 test('N-frame stepping has independent backward and forward buttons on the canonical playhead', () => {
@@ -29,12 +31,16 @@ test('N-frame stepping has independent backward and forward buttons on the canon
   assert.doesNotMatch(source, /seekFramePlayerSideIndex/u);
 });
 
-test('A and D keyboard ownership follows the last interacted annotation side', () => {
-  assert.doesNotMatch(source, /KeyA|KeyD|addEventListener\('keydown'/u);
-  assert.match(shortcuts, /event\.code === 'KeyA'/u);
-  assert.match(shortcuts, /event\.code === 'KeyD'/u);
-  assert.match(shortcuts, /shortcutTarget = \{ blockId: context\.blockId, side: context\.side \}/u);
-  assert.match(shortcuts, /window\.addEventListener\('keydown', handleShortcut, true\)/u);
+test('A and D keyboard ownership follows the last interacted annotation side in the same runtime', () => {
+  assert.match(source, /let shortcutTarget = null/u);
+  assert.match(source, /handleInteractionCapture/u);
+  assert.match(source, /shortcutTarget = \{ blockId: context\.blockId, side: context\.side \}/u);
+  assert.match(source, /event\.code !== 'KeyA' && event\.code !== 'KeyD'/u);
+  assert.match(source, /stepByConfiguredFrames\(context\.card, context\.side, event\.code === 'KeyA' \? -1 : 1\)/u);
+  assert.match(source, /window\.addEventListener\('pointerdown', handleInteractionCapture, true\)/u);
+  assert.match(source, /window\.addEventListener\('contextmenu', handleInteractionCapture, true\)/u);
+  assert.match(source, /window\.addEventListener\('keydown', handleStepShortcut, true\)/u);
+  assert.doesNotMatch(source, /editingTarget|synchronizeToggleDom/u);
 });
 
 test('panel N setting persists through the existing project export settings seam', () => {

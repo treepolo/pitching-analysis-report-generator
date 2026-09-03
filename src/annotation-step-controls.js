@@ -5,6 +5,8 @@
   const playhead = globalThis.pitchingAnnotationPlayhead;
   if (!model || !playhead) return;
 
+  let shortcutTarget = null;
+
   function projectStepFrames() {
     const raw = state?.activeProject?.exportSettings?.annotationStepFrames;
     return model.normalizeStepFrames(raw, 1);
@@ -19,6 +21,45 @@
     state.activeProject.exportSettings.annotationStepFrames = step;
     if (typeof scheduleSave === 'function') scheduleSave();
     return step;
+  }
+
+  function contextFromSideElement(sideElement) {
+    const card = sideElement?.closest?.('[data-inline-video-block][data-frame-player]');
+    const blockId = card?.dataset?.blockId || '';
+    const side = sideElement?.dataset?.inlineSide || '';
+    if (!card || !blockId || !side) return null;
+    return { card, blockId, side };
+  }
+
+  function contextFromTarget(target) {
+    return contextFromSideElement(target?.closest?.('[data-inline-side]'));
+  }
+
+  function resolveShortcutContext() {
+    if (!shortcutTarget) return null;
+    const cards = [...document.querySelectorAll('[data-inline-video-block][data-frame-player]')];
+    const card = cards.find((entry) => entry.dataset.blockId === shortcutTarget.blockId) || null;
+    const sideElement = card?.querySelector?.(`[data-inline-side="${shortcutTarget.side}"]`);
+    const panel = sideElement?.querySelector?.(`[data-annotation-panel][data-annotation-side="${shortcutTarget.side}"]`);
+    if (!card || !sideElement || !panel) {
+      shortcutTarget = null;
+      return null;
+    }
+    return { card, side: shortcutTarget.side, panel };
+  }
+
+  function rememberShortcutTarget(context) {
+    if (!context) return;
+    shortcutTarget = { blockId: context.blockId, side: context.side };
+  }
+
+  function textEntryTarget(target) {
+    const element = target?.closest?.('textarea, input, [contenteditable="true"]');
+    if (!element) return false;
+    if (element.matches?.('textarea, [contenteditable="true"]') || element.isContentEditable) return true;
+    if (!element.matches?.('input')) return false;
+    const type = String(element.type || 'text').toLowerCase();
+    return ['text', 'search', 'email', 'url', 'tel', 'password'].includes(type);
   }
 
   function cardAndSideFromPanel(panel) {
@@ -126,8 +167,27 @@
     ensureAllPanelControls();
   }
 
+  function handleInteractionCapture(event) {
+    const context = contextFromTarget(event.target);
+    if (context) rememberShortcutTarget(context);
+  }
+
+  function handleStepShortcut(event) {
+    const context = resolveShortcutContext();
+    if (!context) return;
+    const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    if (!plain || (event.code !== 'KeyA' && event.code !== 'KeyD')) return;
+    if (textEntryTarget(event.target)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    void stepByConfiguredFrames(context.card, context.side, event.code === 'KeyA' ? -1 : 1);
+  }
+
   document.addEventListener('click', handleStepClick);
   document.addEventListener('change', handleStepChange);
+  window.addEventListener('pointerdown', handleInteractionCapture, true);
+  window.addEventListener('contextmenu', handleInteractionCapture, true);
+  window.addEventListener('keydown', handleStepShortcut, true);
 
   const canvas = document.querySelector('#block-canvas');
   if (canvas) {
