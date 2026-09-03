@@ -58,7 +58,12 @@
   }
 
   function currentFrame(card, side) {
-    return playhead.currentFrame(card, side);
+    try {
+      if (typeof sideFrameIndexFromVideo === 'function') return Math.max(0, sideFrameIndexFromVideo(card, side));
+    } catch {}
+    const video = card.querySelector(`[data-inline-side="${side}"] [data-inline-video]`);
+    const fps = Number(framePlayerRuntimeForCard?.(card)?.caches?.[side]?.fps) || 30;
+    return Math.max(0, Math.round((Number(video?.currentTime) || 0) * fps));
   }
 
   function annotationModeActive(context) {

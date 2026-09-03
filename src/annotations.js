@@ -227,8 +227,9 @@
     const step = projectStepFrames();
     const target = frame + step;
     try {
-      if (typeof seekFramePlayerSideIndex === 'function') {
-        await seekFramePlayerSideIndex(card, side, target, { exact: true, status: true });
+      const playhead = globalThis.pitchingAnnotationPlayhead;
+      if (playhead && typeof playhead.seekFrame === 'function') {
+        await playhead.seekFrame(card, side, target, { status: true });
       }
     } catch {}
   }
@@ -252,7 +253,12 @@
       return false;
     }
     const previous = track.points.find((point) => point.frame === frame) || null;
-    pushUndo(card, side, { trackId: track.id, frame, previous: previous ? { ...previous } : null });
+    pushUndo(card, side, {
+      trackId: track.id,
+      frame,
+      previous: previous ? { ...previous } : null,
+      previousStartFrame: track.startFrame,
+    });
     const point = { frame, x: uiState.preview.x, y: uiState.preview.y };
     track.points = track.points.filter((entry) => entry.frame !== frame);
     track.points.push(point);
@@ -266,17 +272,37 @@
     return true;
   }
 
+  function selectedPointTarget(card, side) {
+    const panel = card.querySelector(`[data-annotation-panel][data-annotation-side="${side}"]`);
+    const trackId = panel?.dataset?.annotationSelectedTrackId || '';
+    const frame = Number(panel?.dataset?.annotationSelectedFrame);
+    if (!trackId || !Number.isInteger(frame) || frame < 0) return null;
+    const annotations = annotationsFor(card, side);
+    const track = annotations?.tracks?.find((entry) => entry.id === trackId) || null;
+    const point = track?.points?.find((entry) => entry.frame === frame) || null;
+    return track && point ? { track, point, frame } : null;
+  }
+
+  function clearSelectedPoint(card, side) {
+    const panel = card.querySelector(`[data-annotation-panel][data-annotation-side="${side}"]`);
+    if (!panel) return;
+    delete panel.dataset.annotationSelectedTrackId;
+    delete panel.dataset.annotationSelectedFrame;
+  }
+
   function deleteCurrentPoint(card, side) {
-    const track = activeTrack(card, side);
+    const selected = selectedPointTarget(card, side);
+    const track = selected?.track || activeTrack(card, side);
+    const frame = selected?.frame ?? currentFrame(card, side);
     if (!track) return;
-    const frame = currentFrame(card, side);
-    const previous = track.points.find((point) => point.frame === frame) || null;
+    const previous = selected?.point || track.points.find((point) => point.frame === frame) || null;
     if (!previous) {
       setStatus(card, side, `第 ${frame + 1} 幀沒有目前圖層的標註點。`);
       return;
     }
     pushUndo(card, side, { trackId: track.id, frame, previous: { ...previous } });
     track.points = track.points.filter((point) => point.frame !== frame);
+    clearSelectedPoint(card, side);
     saveSoon();
     setStatus(card, side, `已刪除第 ${frame + 1} 幀的標註點。`);
     refreshPanel(card, side);
@@ -295,6 +321,9 @@
     track.points = track.points.filter((point) => point.frame !== operation.frame);
     if (operation.previous) track.points.push({ ...operation.previous });
     track.points.sort((a, b) => a.frame - b.frame);
+    if (Object.prototype.hasOwnProperty.call(operation, 'previousStartFrame')) {
+      track.startFrame = operation.previousStartFrame;
+    }
     saveSoon();
     setStatus(card, side, '已復原上一個標註點操作。');
     refreshPanel(card, side);
@@ -569,6 +598,15 @@
     return Boolean(target?.matches?.('input, textarea, select, [contenteditable="true"]') || target?.closest?.('input, textarea, select, [contenteditable="true"]'));
   }
 
+  function pointShortcutEditingTarget(target) {
+    const element = target?.closest?.('textarea, input, [contenteditable="true"]');
+    if (!element) return false;
+    if (element.matches?.('textarea, [contenteditable="true"]') || element.isContentEditable) return true;
+    if (!element.matches?.('input')) return false;
+    const type = String(element.type || 'text').toLowerCase();
+    return ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(type);
+  }
+
   function handleAnnotationKeydown(event) {
     const context = activeContext();
     if (!context) return;
@@ -578,20 +616,22 @@
       exitEditing(context.card, context.side);
       return;
     }
-    if (editableTarget(event.target)) return;
     if (event.code === 'Space') {
+      if (editableTarget(event.target)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       void commitPreview(context.card, context.side);
       return;
     }
     if (event.key === 'Delete') {
+      if (pointShortcutEditingTarget(event.target)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       deleteCurrentPoint(context.card, context.side);
       return;
     }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+      if (pointShortcutEditingTarget(event.target)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       undoPoint(context.card, context.side);

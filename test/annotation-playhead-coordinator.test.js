@@ -7,11 +7,13 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const playhead = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotation-playhead.js'), 'utf8');
+const annotations = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotations.js'), 'utf8');
 const coordinator = fs.readFileSync(path.join(__dirname, '..', 'src', 'annotation-editor-coordinator.js'), 'utf8');
 const index = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.html'), 'utf8');
 
-test('unified annotation runtimes compile and load around the base editor in the intended order', () => {
+test('annotation playhead, base editor, and boundary adapter compile in load order', () => {
   assert.doesNotThrow(() => new vm.Script(playhead));
+  assert.doesNotThrow(() => new vm.Script(annotations));
   assert.doesNotThrow(() => new vm.Script(coordinator));
   const rendererIndex = index.indexOf('./renderer.js');
   const playheadIndex = index.indexOf('./annotation-playhead.js');
@@ -30,42 +32,22 @@ test('annotation navigation uses the main player timeline rather than an indepen
   assert.doesNotMatch(playhead, /seekFramePlayerSideIndex/u);
 });
 
-test('Delete prefers an explicitly selected point and otherwise uses the canonical current frame', () => {
-  assert.match(coordinator, /annotationSelectedTrackId/u);
-  assert.match(coordinator, /annotationSelectedFrame/u);
-  assert.match(coordinator, /const selected = selectedPointTarget\(fresh\)/u);
-  assert.match(coordinator, /selected \|\| currentPointTarget\(fresh\)/u);
-  assert.match(coordinator, /playhead\.currentFrame\(fresh\.card, fresh\.side\)/u);
-  assert.match(coordinator, /target\.track\.points = target\.track\.points\.filter/u);
-  assert.match(coordinator, /event\.key === 'Delete' \|\| event\.code === 'Delete' \|\| event\.key === 'Del'/u);
+test('base editor owns the one registration auto-step onto the canonical playhead', () => {
+  assert.match(annotations, /async function advanceAfterCommit/u);
+  assert.match(annotations, /playhead\.seekFrame\(card, side, target, \{ status: true \}\)/u);
+  assert.doesNotMatch(annotations, /seekFramePlayerSideIndex\(card, side, target/u);
+  assert.doesNotMatch(coordinator, /scheduleRegistrationSync/u);
+  assert.doesNotMatch(coordinator, /waitForLegacyNavigation/u);
+  assert.doesNotMatch(coordinator, /已在第 \$\{originFrame/u);
 });
 
-test('coordinator Delete has its own one-step undo without stealing unrelated Ctrl+Z operations', () => {
-  assert.match(coordinator, /deleteUndoByContext/u);
-  assert.match(coordinator, /undoCoordinatorDelete\(context\)/u);
-  assert.match(coordinator, /track\.points\.push\(\{ \.\.\.operation\.point \}\)/u);
-  assert.match(coordinator, /if \(!undoCoordinatorDelete\(context\)\) return/u);
-});
-
-test('annotation keyboard shortcuts are window-capture authoritative and A D use the canonical playhead', () => {
-  assert.match(coordinator, /window\.addEventListener\('keydown', handleAnnotationShortcut, true\)/u);
-  assert.match(coordinator, /event\.code === 'KeyA'/u);
-  assert.match(coordinator, /event\.code === 'KeyD'/u);
-  assert.match(coordinator, /void stepByConfiguredFrames\(context, event\.code === 'KeyA' \? -1 : 1\)/u);
-  assert.match(coordinator, /playhead\.seekFrame\(fresh\.card, fresh\.side, requested/u);
-  assert.match(coordinator, /stopImmediatePropagation\(\)/u);
-});
-
-test('timeline ranges and point selectors do not disable Delete or A D shortcuts', () => {
-  assert.match(coordinator, /function typingTarget\(target\)/u);
-  assert.match(coordinator, /\['text', 'search', 'email', 'url', 'tel', 'password'\]\.includes\(type\)/u);
-  assert.doesNotMatch(coordinator, /select, \[contenteditable/u);
-  assert.doesNotMatch(coordinator, /\['range'/u);
-});
-
-test('active annotation context tolerates panel repaint without relying only on a CSS class', () => {
-  assert.match(coordinator, /entry\.classList\?\.contains\('button-primary'\)/u);
-  assert.match(coordinator, /entry\.textContent\?\.trim\(\) === '結束標註'/u);
+test('coordinator no longer owns keyboard, point deletion, undo, or registration events', () => {
+  assert.doesNotMatch(coordinator, /deleteUndo/u);
+  assert.doesNotMatch(coordinator, /undoCoordinatorDelete/u);
+  assert.doesNotMatch(coordinator, /selectedPointTarget/u);
+  assert.doesNotMatch(coordinator, /KeyA|KeyD/u);
+  assert.doesNotMatch(coordinator, /addEventListener\('keydown'/u);
+  assert.doesNotMatch(coordinator, /addEventListener\('click'/u);
 });
 
 test('annotation start and end inputs are one-based in UI while staying zero-based in stored data', () => {
@@ -74,11 +56,5 @@ test('annotation start and end inputs are one-based in UI while staying zero-bas
   assert.match(coordinator, /String\(oneBased - 1\)/u);
   assert.match(coordinator, /data-annotation-track-start/u);
   assert.match(coordinator, /data-annotation-track-end/u);
-});
-
-test('legacy registration auto-advance is reconciled back onto the canonical playhead', () => {
-  assert.match(coordinator, /waitForLegacyNavigation/u);
-  assert.match(coordinator, /已在第 \$\{originFrame \+ 1\} 幀標記/u);
-  assert.match(coordinator, /originFrame \+ projectStepFrames\(\)/u);
-  assert.match(coordinator, /playhead\.seekFrame\(fresh\.card, fresh\.side, target/u);
+  assert.match(coordinator, /window\.addEventListener\('change', handleBoundaryChangeCapture, true\)/u);
 });

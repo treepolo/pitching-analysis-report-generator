@@ -7,7 +7,6 @@
 
   let shortcutTarget = null;
   let editingTarget = null;
-  const deleteUndo = new Map();
 
   function contextKey(blockId, side) {
     return `${blockId || ''}:${side || ''}`;
@@ -40,28 +39,6 @@
     return { card, side: shortcutTarget.side, panel };
   }
 
-  function configFor(context) {
-    try {
-      const block = typeof blockForEditorCard === 'function' ? blockForEditorCard(context.card).block : null;
-      if (!block) return null;
-      if (context.side === 'single') return block;
-      return block[context.side] && typeof block[context.side] === 'object' ? block[context.side] : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function tracksFor(context) {
-    const config = configFor(context);
-    return Array.isArray(config?.annotations?.tracks) ? config.annotations.tracks : [];
-  }
-
-  function activeTrack(context) {
-    const tracks = tracksFor(context);
-    const selectedId = context.panel.querySelector('[data-annotation-active-track]')?.value || '';
-    return tracks.find((track) => track?.id === selectedId) || tracks[0] || null;
-  }
-
   function projectStepFrames() {
     const raw = state?.activeProject?.exportSettings?.annotationStepFrames;
     return model.normalizeStepFrames(raw, 1);
@@ -76,84 +53,12 @@
     return ['text', 'search', 'email', 'url', 'tel', 'password'].includes(type);
   }
 
-  function deleteEditingTarget(target) {
-    const element = target?.closest?.('textarea, input, [contenteditable="true"]');
-    if (!element) return false;
-    if (element.matches?.('textarea, [contenteditable="true"]') || element.isContentEditable) return true;
-    if (!element.matches?.('input')) return false;
-    const type = String(element.type || 'text').toLowerCase();
-    return ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(type);
-  }
-
   function setStatus(context, message) {
     const freshPanel = context.card.querySelector(
       `[data-annotation-panel][data-annotation-side="${context.side}"]`,
     );
     const status = freshPanel?.querySelector?.('[data-annotation-status]');
     if (status) status.textContent = message;
-  }
-
-  function clearSelectedPoint(context) {
-    const freshPanel = context.card.querySelector(
-      `[data-annotation-panel][data-annotation-side="${context.side}"]`,
-    );
-    if (!freshPanel) return;
-    delete freshPanel.dataset.annotationSelectedTrackId;
-    delete freshPanel.dataset.annotationSelectedFrame;
-  }
-
-  function selectedPointTarget(context) {
-    const freshPanel = context.card.querySelector(
-      `[data-annotation-panel][data-annotation-side="${context.side}"]`,
-    );
-    const trackId = freshPanel?.dataset?.annotationSelectedTrackId || '';
-    const frameText = freshPanel?.dataset?.annotationSelectedFrame;
-    if (!trackId || frameText === undefined) return null;
-    const frame = Number(frameText);
-    if (!Number.isInteger(frame) || frame < 0) return null;
-    const track = tracksFor(context).find((entry) => entry?.id === trackId) || null;
-    const point = track?.points?.find((entry) => entry?.frame === frame) || null;
-    return track && point ? { track, point, frame } : null;
-  }
-
-  function currentPointTarget(context) {
-    const track = activeTrack(context);
-    const frame = playhead.currentFrame(context.card, context.side);
-    const point = track?.points?.find((entry) => entry?.frame === frame) || null;
-    return { track, point, frame };
-  }
-
-  function deletePoint(context) {
-    const target = selectedPointTarget(context) || currentPointTarget(context);
-    if (!target.track || !target.point) {
-      setStatus(context, `第 ${target.frame + 1} 幀沒有目前圖層可刪除的標註點。`);
-      return false;
-    }
-    const key = contextKey(context.card.dataset.blockId, context.side);
-    deleteUndo.set(key, { trackId: target.track.id, point: { ...target.point } });
-    target.track.points = target.track.points.filter((point) => point.frame !== target.frame);
-    clearSelectedPoint(context);
-    if (typeof scheduleSave === 'function') scheduleSave();
-    setStatus(context, `已刪除第 ${target.frame + 1} 幀的標註點。Ctrl+Z 可復原。`);
-    return true;
-  }
-
-  function undoDelete(context) {
-    const key = contextKey(context.card.dataset.blockId, context.side);
-    const operation = deleteUndo.get(key);
-    if (!operation) return false;
-    const track = tracksFor(context).find((entry) => entry?.id === operation.trackId) || null;
-    if (!track) {
-      deleteUndo.delete(key);
-      return false;
-    }
-    track.points = track.points.filter((point) => point.frame !== operation.point.frame);
-    track.points.push({ ...operation.point });
-    track.points.sort((left, right) => left.frame - right.frame);
-    deleteUndo.delete(key);
-    if (typeof scheduleSave === 'function') scheduleSave();
-    setStatus(context, `已復原第 ${operation.point.frame + 1} 幀的標註點。`);
-    return true;
   }
 
   async function stepByN(context, direction) {
@@ -211,7 +116,6 @@
       return;
     }
     editingTarget = { blockId: context.blockId, side: context.side };
-    deleteUndo.delete(key);
     queueToggleDomSync();
   }
 
@@ -231,22 +135,6 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       void stepByN(context, event.code === 'KeyA' ? -1 : 1);
-      return;
-    }
-
-    const isDelete = event.key === 'Delete' || event.code === 'Delete' || event.key === 'Del';
-    if (plain && isDelete) {
-      if (deleteEditingTarget(event.target)) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      deletePoint(context);
-      return;
-    }
-
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
-      if (deleteEditingTarget(event.target) || !undoDelete(context)) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
     }
   }
 

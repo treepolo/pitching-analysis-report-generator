@@ -21,11 +21,22 @@ test('loads point navigation after annotation editor', () => {
   assert.ok(pointIndex > annotationIndex);
 });
 
-test('point selector lists frame-only annotation points and seeks on the canonical playhead', () => {
+test('point selector seeks through the canonical playhead', () => {
   assert.match(source, /data-annotation-point-select/u);
   assert.match(source, /第 \$\{frame \+ 1\} 幀/u);
   assert.match(source, /playhead\.seekFrame\(context\.card, context\.side, frame, \{ status: true \}\)/u);
   assert.doesNotMatch(source, /seekFramePlayerSideIndex/u);
+});
+
+test('visual point hit testing and highlights use the presented side frame', () => {
+  const currentStart = source.indexOf('function currentFrame(');
+  const modeStart = source.indexOf('function annotationModeActive(', currentStart);
+  assert.ok(currentStart >= 0 && modeStart > currentStart);
+  const current = source.slice(currentStart, modeStart);
+  assert.match(current, /sideFrameIndexFromVideo\(card, side\)/u);
+  assert.match(current, /video\?\.currentTime/u);
+  assert.doesNotMatch(current, /playhead\.currentFrame/u);
+  assert.match(source, /const frame = currentFrame\(context\.card, context\.side\)/u);
 });
 
 test('visible annotation points are selected by right-click instead of primary click', () => {
@@ -36,7 +47,7 @@ test('visible annotation points are selected by right-click instead of primary c
   assert.match(source, /void selectPoint\(context, hit\.track, hit\.point\.frame\)/u);
 });
 
-test('point selection exposes selected track and frame for authoritative Delete handling', () => {
+test('point selection exposes selected track and frame to the base editor without mutating points itself', () => {
   assert.match(source, /annotationSelectedTrackId/u);
   assert.match(source, /annotationSelectedFrame/u);
   assert.match(source, /surface\.focus/u);
