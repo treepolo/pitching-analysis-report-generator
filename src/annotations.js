@@ -610,21 +610,23 @@
   }
 
   function handleAnnotationKeydown(event) {
-    const context = activeContext();
-    if (!context) return;
+    const editingContext = activeContext();
     if (event.key === 'Escape') {
+      if (!editingContext) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      exitEditing(context.card, context.side);
+      exitEditing(editingContext.card, editingContext.side);
       return;
     }
     if (event.code === 'Space') {
-      if (editableTarget(event.target)) return;
+      if (!editingContext || editableTarget(event.target)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      void commitPreview(context.card, context.side);
+      void commitPreview(editingContext.card, editingContext.side);
       return;
     }
+    const context = cardAndSideFromTarget(event.target) || editingContext;
+    if (!context) return;
     if (event.key === 'Delete') {
       if (pointShortcutEditingTarget(event.target)) return;
       event.preventDefault();

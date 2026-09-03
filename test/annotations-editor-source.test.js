@@ -45,9 +45,11 @@ test('registration auto-step uses the canonical shared playhead exactly once', (
   assert.doesNotMatch(advance, /seekFramePlayerSideIndex/u);
 });
 
-test('Delete and Ctrl Z keep point shortcuts active outside text-editing inputs', () => {
+test('Delete and Ctrl Z use the focused annotation side without requiring registration mode', () => {
   assert.match(source, /function pointShortcutEditingTarget\(target\)/u);
   assert.match(source, /'number'\]\.includes\(type\)/u);
+  assert.match(source, /const editingContext = activeContext\(\)/u);
+  assert.match(source, /const context = cardAndSideFromTarget\(event\.target\) \|\| editingContext/u);
   assert.match(source, /event\.key === 'Delete'/u);
   assert.match(source, /event\.key\.toLowerCase\(\) === 'z'/u);
   assert.doesNotMatch(source, /\['range'/u);
