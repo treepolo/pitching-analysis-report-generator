@@ -514,7 +514,9 @@
       return;
     }
     if (action.dataset.annotationAction === 'delete-track') {
-      const track = activeTrack(card, side);
+      const track = annotations.tracks.find((entry) => entry.id === uiState.activeTrackId)
+        || annotations.tracks[0]
+        || null;
       if (!track) return;
       if (!window.confirm(`刪除「${track.name}」圖層與其中 ${track.points.length} 個標註點？`)) return;
       annotations.tracks = annotations.tracks.filter((entry) => entry.id !== track.id);

@@ -1932,9 +1932,9 @@ function waitForPresentedVideoFrame(video, targetTime = null, tolerance = 0.05, 
       if (done) return;
       const mediaTime = Number(metadata?.mediaTime);
       const currentTime = Number(video.currentTime);
-      const atTarget = targetTime === null
+      const atTarget = !video.seeking && (targetTime === null
         || (Number.isFinite(mediaTime) && Math.abs(mediaTime - targetTime) <= tolerance)
-        || (!video.seeking && Number.isFinite(currentTime) && Math.abs(currentTime - targetTime) <= tolerance);
+        || (Number.isFinite(currentTime) && Math.abs(currentTime - targetTime) <= tolerance));
       if (atTarget) {
         finish(true);
         return;
@@ -1961,7 +1961,8 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
     const readyAtTarget = () => !video.seeking
       && video.readyState >= 1
       && Math.abs((Number(video.currentTime) || 0) - targetTime) <= tolerance;
-    const settledAtTarget = () => video.readyState >= 2
+    const settledAtTarget = () => !video.seeking
+      && video.readyState >= 2
       && Number.isFinite(Number(video.currentTime))
       && Math.abs((Number(video.currentTime) || 0) - targetTime) <= Math.max(tolerance * 4, 0.25);
     const finish = async (success) => {
@@ -1983,7 +1984,7 @@ function seekVideoExact(video, targetTime, serial, runtime, tolerance = 0.05) {
         return;
       }
       if (typeof video.requestVideoFrameCallback !== 'function') {
-        void finish(readyAtTarget() || settledAtTarget());
+        if (!video.seeking) void finish(readyAtTarget() || settledAtTarget());
         return;
       }
       if (waitingForFrame) return;
