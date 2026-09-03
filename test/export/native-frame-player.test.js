@@ -42,6 +42,16 @@ test('shared rate changes keep the current playback mode instead of rebuilding i
   assert.doesNotMatch(runtime, /state\.operationSerial \+= 1; state\.rate = nextRate/u);
 });
 
+test('canonical native player owns cross-block playback arbitration', () => {
+  assert.match(runtime, /const stopOtherNativeFramePlayers = \(activeBlock\)/u);
+  assert.match(runtime, /const actions = block\.__nativeFramePlayerActions;\s*if \(typeof actions\?\.stop === 'function'\) actions\.stop\(\)/u);
+  assert.match(runtime, /stopOtherNativeFramePlayers\(sharedBlockForSide\);\s*const rate = clampRate\(runtime\.rate\)/u);
+  assert.match(runtime, /stopOtherNativeFramePlayers\(block\);\s*if \(actions\.some/u);
+  assert.match(runtime, /block\.__nativeFramePlayerActions = \{[\s\S]*stop: \(message\) => stop\(message\)/u);
+  assert.doesNotMatch(runtime, /toggle\.click\(\)/u);
+  assert.doesNotMatch(runtime, /getAttribute\('aria-pressed'\).*claim/u);
+});
+
 test('report renderer consumes the canonical native player without a post-render player patch', () => {
   assert.doesNotMatch(reportRendererSource, /native-frame-player-fixes/u);
   assert.doesNotMatch(reportRendererSource, /patchNativeFramePlayerHtml/u);

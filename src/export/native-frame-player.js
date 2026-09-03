@@ -50,6 +50,14 @@ function renderNativeFramePlayerScript() {
     const nativePlayerBlockFor = (item) => item?.matches?.('[data-native-frame-player-block]')
       ? item
       : item?.closest?.('[data-native-frame-player-block]');
+    const stopOtherNativeFramePlayers = (activeBlock) => {
+      if (!activeBlock) return;
+      document.querySelectorAll('[data-native-frame-player-block]').forEach((block) => {
+        if (block === activeBlock) return;
+        const actions = block.__nativeFramePlayerActions;
+        if (typeof actions?.stop === 'function') actions.stop();
+      });
+    };
     const selectNativeFramePlayer = (item) => {
       const selectedBlock = nativePlayerBlockFor(item);
       document.querySelectorAll('[data-native-frame-player-block]').forEach((block) => {
@@ -491,6 +499,7 @@ function renderNativeFramePlayerScript() {
           || (!fromRateTransition && runtime.lifecycle === 'loading') || runtime.exactSeek !== null
           || (runtime.rateTransition && !fromRateTransition)) { setStatus('影片正在準備，請稍候。', 'pending'); return; }
         if (runtime.index >= count - 1) { const ready = await seekExact(segmentStartIndex(), false); if (operation !== runtime.operationSerial || !ready || runtime.index >= count - 1) return; }
+        stopOtherNativeFramePlayers(sharedBlockForSide);
         const rate = clampRate(runtime.rate);
         if (!nativeRate(rate)) { if (operation === runtime.operationSerial) startManual(); return; }
         cancelManual();
@@ -919,6 +928,7 @@ function renderNativeFramePlayerScript() {
         if (state.playing) { stop('已暫停。'); return; }
         const map = mapping(); if (map.count <= 0) return;
         if (state.index >= map.count - 1) { const ready = await seekControl(0, false); if (!ready && map.count > 1) return; }
+        stopOtherNativeFramePlayers(block);
         if (actions.some((action) => action.supportsNativeRate?.(state.rate) === false)) { startSharedManual(); return; }
         const operation = state.operationSerial; state.playing = true; update(); setStatus('播放中。', 'loaded');
         await Promise.all(actions.map((action) => action.play()));
@@ -981,7 +991,11 @@ function renderNativeFramePlayerScript() {
           else { state.index = Math.max(0, state.count - 1); state.playing = false; actions.forEach((action) => action.stop()); setStatus('已到達最後一幀。', 'loaded'); update(); }
         });
       });
-      block.__nativeFramePlayerActions = { step: (direction) => { void seekControl(state.index + direction); }, toggle: () => { void togglePlayback(); } };
+      block.__nativeFramePlayerActions = {
+        step: (direction) => { void seekControl(state.index + direction); },
+        toggle: () => { void togglePlayback(); },
+        stop: (message) => stop(message),
+      };
       block.addEventListener('pointerdown', () => selectNativeFramePlayer(block));
       update();
     });
