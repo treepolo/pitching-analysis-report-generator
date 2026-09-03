@@ -61,6 +61,17 @@ test('Delete and Ctrl Z use the focused annotation side without requiring regist
   assert.doesNotMatch(source, /\['range'/u);
 });
 
+test('base editor owns one-based boundary UI while persisting zero-based frames', () => {
+  assert.match(source, /function boundaryFrameForDisplay\(value\)[\s\S]*?String\(value \+ 1\)/u);
+  assert.match(source, /function boundaryFrameFromInput\(value\)[\s\S]*?Math\.max\(1, Math\.round\(parsed\)\) - 1/u);
+  const startInput = source.split('\n').find((line) => line.includes('data-annotation-track-start')) || '';
+  const endInput = source.split('\n').find((line) => line.includes('data-annotation-track-end')) || '';
+  assert.ok(startInput.includes('min="1"'));
+  assert.ok(endInput.includes('min="1"'));
+  assert.match(source, /track\.startFrame = boundaryFrameFromInput\(target\.value\)/u);
+  assert.match(source, /track\.endFrame = boundaryFrameFromInput\(target\.value\)/u);
+});
+
 test('editor supports layers and point and line toggles', () => {
   assert.match(source, /data-annotation-show-points/u);
   assert.match(source, /data-annotation-show-lines/u);

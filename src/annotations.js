@@ -369,6 +369,18 @@
       .replaceAll("'", '&#39;');
   }
 
+  function boundaryFrameForDisplay(value) {
+    return Number.isInteger(value) && value >= 0 ? String(value + 1) : '';
+  }
+
+  function boundaryFrameFromInput(value) {
+    const raw = String(value ?? '').trim();
+    if (raw === '') return null;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return null;
+    return model.normalizeOptionalFrame(Math.max(1, Math.round(parsed)) - 1);
+  }
+
   function renderPanel(card, side) {
     const annotations = annotationsFor(card, side);
     const uiState = stateFor(card, side);
@@ -378,8 +390,8 @@
       <div class="annotation-track-settings">
         <label>名稱 <input type="text" maxlength="80" data-annotation-track-name value="${escapeAnnotationHtml(track.name)}"></label>
         <label>顏色 <input type="color" data-annotation-track-color value="${escapeAnnotationHtml(track.color)}"></label>
-        <label>開始幀 <input type="number" min="0" step="1" data-annotation-track-start value="${track.startFrame ?? ''}" placeholder="第一個點"></label>
-        <label>結束幀 <input type="number" min="0" step="1" data-annotation-track-end value="${track.endFrame ?? ''}" placeholder="不限"></label>
+        <label>開始幀 <input type="number" min="1" step="1" data-annotation-track-start value="${boundaryFrameForDisplay(track.startFrame)}" placeholder="第一個點"></label>
+        <label>結束幀 <input type="number" min="1" step="1" data-annotation-track-end value="${boundaryFrameForDisplay(track.endFrame)}" placeholder="不限"></label>
         <button type="button" class="button button-quiet" data-annotation-action="delete-track">刪除圖層</button>
       </div>` : '<p class="annotation-empty">尚無標註圖層。</p>';
     return `
@@ -504,10 +516,10 @@
       if (target.matches('[data-annotation-track-name]')) track.name = (target.value.trim() || track.name).slice(0, 80);
       else if (target.matches('[data-annotation-track-color]')) track.color = /^#[0-9a-f]{6}$/iu.test(target.value) ? target.value.toLowerCase() : track.color;
       else if (target.matches('[data-annotation-track-start]')) {
-        track.startFrame = model.normalizeOptionalFrame(target.value);
+        track.startFrame = boundaryFrameFromInput(target.value);
         if (track.startFrame !== null && track.endFrame !== null && track.endFrame < track.startFrame) track.endFrame = track.startFrame;
       } else if (target.matches('[data-annotation-track-end]')) {
-        track.endFrame = model.normalizeOptionalFrame(target.value);
+        track.endFrame = boundaryFrameFromInput(target.value);
         if (track.startFrame !== null && track.endFrame !== null && track.endFrame < track.startFrame) track.endFrame = track.startFrame;
       } else return;
     }
