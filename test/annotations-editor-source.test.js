@@ -14,9 +14,15 @@ test('editor annotation mode owns Space and uses frame-only point records', () =
   assert.doesNotMatch(source, /point\s*=\s*\{[^}]*time:/u);
 });
 
-test('annotation step is one arbitrary persisted project setting', () => {
-  assert.match(source, /exportSettings\.annotationStepFrames/u);
-  assert.match(source, /type = 'number'/u);
+test('base editor reads the persisted annotation step without rendering a duplicate global control', () => {
+  const stepStart = source.indexOf('function projectStepFrames()');
+  const nextFunction = source.indexOf('function newTrackId()', stepStart);
+  assert.ok(stepStart >= 0 && nextFunction > stepStart);
+  const stepSource = source.slice(stepStart, nextFunction);
+  assert.match(stepSource, /annotationStepFrames/u);
+  assert.match(stepSource, /normalizeStepFrames/u);
+  assert.doesNotMatch(source, /annotation-step-frames/u);
+  assert.doesNotMatch(source, /function persistStepFrames\(|function ensureStepControl\(|function syncStepControl\(/u);
 });
 
 test('base editor is the single point mutation and undo owner', () => {

@@ -7,8 +7,6 @@
   const PALETTE = ['#e53935', '#1e88e5', '#43a047', '#f9a825', '#8e24aa', '#00acc1', '#fb8c00', '#6d4c41'];
   const editorState = new Map();
   let activeEditorKey = null;
-  let lastProjectId = null;
-  let stepInput = null;
 
   function editorKey(card, side) {
     return `${card?.dataset?.blockId || ''}:${side}`;
@@ -61,50 +59,6 @@
   function projectStepFrames() {
     const raw = state?.activeProject?.exportSettings?.annotationStepFrames;
     return model.normalizeStepFrames(raw, 1);
-  }
-
-  function persistStepFrames(value) {
-    if (!state?.activeProject) return;
-    const step = model.normalizeStepFrames(value, 1);
-    if (!state.activeProject.exportSettings || typeof state.activeProject.exportSettings !== 'object') {
-      state.activeProject.exportSettings = {};
-    }
-    state.activeProject.exportSettings.annotationStepFrames = step;
-    if (stepInput && document.activeElement !== stepInput) stepInput.value = String(step);
-    saveSoon();
-  }
-
-  function ensureStepControl() {
-    if (stepInput?.isConnected) return;
-    const group = document.querySelector('.command-block-group');
-    if (!group) return;
-    const label = document.createElement('label');
-    label.className = 'compact-control annotation-step-control';
-    label.htmlFor = 'annotation-step-frames';
-    label.textContent = '標註步進';
-    stepInput = document.createElement('input');
-    stepInput.id = 'annotation-step-frames';
-    stepInput.type = 'number';
-    stepInput.min = '1';
-    stepInput.max = '10000';
-    stepInput.step = '1';
-    stepInput.value = String(projectStepFrames());
-    stepInput.setAttribute('aria-label', '每次標註後自動前進幀數');
-    stepInput.addEventListener('change', () => persistStepFrames(stepInput.value));
-    label.append(stepInput, document.createTextNode(' 幀'));
-    group.append(label);
-  }
-
-  function syncStepControl() {
-    ensureStepControl();
-    const projectId = state?.activeProject?.id || null;
-    if (projectId !== lastProjectId) {
-      lastProjectId = projectId;
-      if (stepInput) {
-        stepInput.disabled = !projectId;
-        stepInput.value = String(projectStepFrames());
-      }
-    }
   }
 
   function newTrackId() {
@@ -652,7 +606,6 @@
   if (canvas) new MutationObserver(ensureAllUi).observe(canvas, { childList: true, subtree: true });
 
   function animationLoop() {
-    syncStepControl();
     ensureAllUi();
     document.querySelectorAll('[data-inline-video-block][data-frame-player]').forEach((card) => {
       sidesForCard(card).forEach((side) => drawSide(card, side));
