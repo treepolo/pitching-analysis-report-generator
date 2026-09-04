@@ -46,11 +46,12 @@ test('portable reports use native video assets and contain no packaged frame-cac
 });
 
 test('legacy export frame-cache plumbing is absent while the generator frame-cache bridge remains live', async () => {
-  const [rendererBase, exporter, appBridge, main] = await Promise.all([
+  const [rendererBase, exporter, appBridge, main, layoutValidator] = await Promise.all([
     fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-renderer-base.js'), 'utf8'),
     fs.readFile(path.join(repositoryRoot, 'src', 'export', 'exporter.js'), 'utf8'),
     fs.readFile(path.join(repositoryRoot, 'src', 'export', 'app-bridge.js'), 'utf8'),
     fs.readFile(path.join(repositoryRoot, 'src', 'main.js'), 'utf8'),
+    fs.readFile(path.join(repositoryRoot, 'src', 'export', 'layout-validator.js'), 'utf8'),
   ]);
 
   for (const retired of [
@@ -74,6 +75,7 @@ test('legacy export frame-cache plumbing is absent while the generator frame-cac
   assert.doesNotMatch(main, /\breadExportFrameCaches\b/u);
   assert.doesNotMatch(main, /\bcollectReferencedVideoAssetIds\b/u);
   assert.doesNotMatch(main, /\brandomUUID\b/u);
+  assert.doesNotMatch(layoutValidator, /FRAME_INDEX_ATTRIBUTE_PATTERN|data-frame-index|Portable frame index/u);
 
   for (const channel of [
     'frame-cache:prepare',

@@ -11,7 +11,6 @@ const {
 } = require('./asset-paths');
 
 const HTML_ATTRIBUTE_PATTERN = /\b(src|poster|href)\s*=\s*(["'])(.*?)\2/giu;
-const FRAME_INDEX_ATTRIBUTE_PATTERN = /\bdata-frame-index\s*=\s*(["'])(.*?)\1/giu;
 
 function decodeHtmlAttribute(value) {
   return value
@@ -40,27 +39,6 @@ function extractHtmlAssetReferences(html) {
       throw new ExportValidationError(`HTML asset path is not valid URI encoding: ${value}`, { cause: error });
     }
     references.push({ attribute, value, relativePath: normalizeRelativeAssetPath(decoded) });
-  }
-  let frameMatch;
-  while ((frameMatch = FRAME_INDEX_ATTRIBUTE_PATTERN.exec(html)) !== null) {
-    let frames;
-    try {
-      frames = JSON.parse(decodeHtmlAttribute(frameMatch[2]));
-    } catch (error) {
-      throw new ExportValidationError('Portable frame index is not valid JSON', { cause: error });
-    }
-    if (!Array.isArray(frames)) throw new ExportValidationError('Portable frame index must be an array');
-    frames.forEach((frame, index) => {
-      if (!frame || typeof frame !== 'object' || typeof frame.relativePath !== 'string') {
-        throw new ExportValidationError(`Portable frame index entry ${index} is invalid`);
-      }
-      const decoded = decodeHtmlAttribute(frame.relativePath);
-      references.push({
-        attribute: 'data-frame-index',
-        value: decoded,
-        relativePath: normalizeRelativeAssetPath(decoded),
-      });
-    });
   }
   if (/<script\b[^>]*\bsrc\s*=/iu.test(html) || /<link\b[^>]*\bhref\s*=/iu.test(html)) {
     throw new ExportValidationError('Self-contained report must not load external runtime resources');
