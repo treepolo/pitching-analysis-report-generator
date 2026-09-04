@@ -22,12 +22,14 @@ test('main registers the v1 frame-cache channels and resolves sources from proje
   }
   assert.match(main, /normalizeFrameCacheRequest/u);
   assert.match(main, /resolveFrameCacheAsset/u);
+  assert.match(main, /projectStore\.readProject\(request\.projectId\)/u);
+  assert.match(main, /projectStore\.resolveMediaAssetSource\(request\.projectId, request\.assetId\)/u);
   assert.match(main, /sourceReference: resolved\.sourceReference/u);
   assert.match(main, /frameCacheOperations = new Map/u);
   assert.match(main, /new AbortController\(\)/u);
   assert.match(main, /operation\.controller\.abort\(\)/u);
   assert.match(main, /data:image\/png;base64/u);
-  assert.match(main, /collectReferencedVideoAssetIds/u);
+  assert.doesNotMatch(main, /collectReferencedVideoAssetIds/u);
   assert.doesNotMatch(main, /const frameCaches = await readExportFrameCaches/u);
   assert.doesNotMatch(main, /frameCaches,\s*outputDirectory/u);
   assert.match(main, /frameDirectoryRelativePath/u);
