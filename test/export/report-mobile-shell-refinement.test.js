@@ -52,7 +52,7 @@ test('mobile zoom lock blocks pinch-style gestures only in phone layout', () => 
   assert.doesNotThrow(() => new vm.Script(body));
 });
 
-test('mobile shell refinement injects once and renderer no longer installs desk styling', async () => {
+test('mobile shell refinement injects once and renderer excludes retired desk and floating styling', async () => {
   const source = '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>';
   const once = injectReportMobileShellRefinement(source);
   const twice = injectReportMobileShellRefinement(once);
@@ -63,10 +63,11 @@ test('mobile shell refinement injects once and renderer no longer installs desk 
   assert.match(renderer, /require\('\.\/report-mobile-shell-refinement'\)/u);
   assert.doesNotMatch(renderer, /report-desk-surface-refinement/u);
   assert.doesNotMatch(renderer, /injectReportDeskSurfaceRefinement/u);
-  const floatingIndex = renderer.indexOf('html = injectReportFloatingUiRefinement(html);');
+  assert.doesNotMatch(renderer, /report-floating-ui-refinement|injectReportFloatingUiRefinement/u);
   const mobileIndex = renderer.indexOf('html = injectReportMobileShellRefinement(html);');
   const titleIndex = renderer.indexOf('html = injectReportTitleAlignmentRefinement(html);');
-  assert.ok(floatingIndex >= 0);
-  assert.ok(mobileIndex > floatingIndex);
+  const spotlightIndex = renderer.indexOf('html = injectReportEntrySpotlight(html);');
+  assert.ok(mobileIndex >= 0);
   assert.ok(titleIndex > mobileIndex);
+  assert.ok(spotlightIndex > titleIndex);
 });
