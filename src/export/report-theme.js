@@ -20,7 +20,7 @@ html { min-height: 100%; background: #f2f2f2; }
 body, body * { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 body { min-width: 0; min-height: 100vh; margin: 0; overflow-x: hidden; background: #f2f2f2; color: var(--reader-text); font: 13px/1.5 Tahoma, "Segoe UI", "Microsoft JhengHei", sans-serif; }
 button, input, select { font-family: Tahoma, "Segoe UI", "Microsoft JhengHei", sans-serif; font-size: 11px; }
-main { width: min(calc(100% - 16px), 1100px); min-width: 0; margin: 8px auto 28px; padding: 0 8px 12px; border: 1px solid #e6e6e6; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+main { width: min(calc(100% - 16px), 1100px); min-width: 0; margin: 8px auto 28px; padding: 0 8px 12px; border: 1px solid #e6e6e6; border-radius: 3px; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
 .report-header { position: relative; min-height: 54px; margin: 0 -8px 8px; padding: 10px 12px; border-bottom: 1px solid #e6e6e6; background: #fff; box-shadow: none; color: #242424; }
 .report-header::before { display: none; }
 .eyebrow { margin: 0 0 2px; color: #6b6b6b; font-size: 10px; font-weight: 600; letter-spacing: normal; text-shadow: none; text-transform: none; }
@@ -38,13 +38,13 @@ h4 { margin: 8px 0 4px; padding-bottom: 2px; border-bottom: 1px solid #e6e6e6; c
 figcaption { margin-top: 3px; color: #6b6b6b; font-size: 11px; }
 .comparison-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 
-.portable-player { position: relative; width: 100%; min-width: 0; padding: 18px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.portable-player { position: relative; width: 100%; min-width: 0; padding: 18px 14px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .portable-player::before, .portable-player::after { content: ""; position: absolute; right: 14px; left: 14px; height: 1px; background: #d7d7d7; pointer-events: none; }
 .portable-player::before { top: 0; }
 .portable-player::after { bottom: 0; }
 .portable-player-header, .portable-player-side-heading, .portable-player-actions { display: flex; align-items: center; gap: 6px; }
 .portable-player-header { margin: 0 0 13px; padding: 0; border: 0; }
-.portable-player-header h3 { margin: 0; overflow-wrap: anywhere; color: #303030; font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif; font-size: 17px; font-weight: 500; line-height: 1.4; letter-spacing: 0; }
+.portable-player-header h3 { margin: 0; overflow-wrap: anywhere; color: #303030; font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif; font-size: 17px; font-style: italic; font-weight: 700; line-height: 1.4; letter-spacing: 0; }
 .portable-player-header h3::after { content: ""; display: block; width: 48px; height: 3px; margin-top: 7px; border-radius: 999px; background: var(--reader-accent); }
 .portable-player-grid { display: grid; width: 100%; min-width: 0; gap: 14px; }
 .portable-player-grid-side-by-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
