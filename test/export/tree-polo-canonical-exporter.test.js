@@ -74,8 +74,9 @@ test('delivers folder, HTML and ZIP with one bundled canonical visual theme', as
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
   assert.equal((html.match(/<style\b/gu) || []).length, 1);
   assert.match(html, /data-report-style-bundle/u);
-  assert.match(html, /report-style-source:data-report-canonical-theme/u);
+  assert.match(html, /report-style-source:data-report-canonical-theme; role:canonical-visual/u);
   assert.match(html, /report-style-source:data-report-mobile-shell-refinement; role:functional-layout/u);
+  assert.match(html, /report-style-source:data-report-entry-spotlight-style; role:component-style/u);
   assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme|legacy-visual|final-visual/u);
   assert.match(html, /data-tree-polo-background="true"/u);
 

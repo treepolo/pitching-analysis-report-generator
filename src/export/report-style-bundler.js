@@ -5,19 +5,16 @@ const STYLESHEET_LINK_PATTERN = /<link\b(?=[^>]*\brel\s*=\s*(?:["']stylesheet["'
 const DATA_ATTRIBUTE_PATTERN = /\b(data-[a-z0-9:_-]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/giu;
 
 const STYLE_SOURCE_ROLES = Object.freeze({
-  'data-annotation-reader-style': 'functional-layout',
+  'data-report-canonical-theme': 'canonical-visual',
+  'data-annotation-reader-style': 'component-style',
   'data-annotation-navigation-style': 'functional-layout',
-  'data-report-help-style': 'mixed-functional-visual',
+  'data-report-help-style': 'functional-layout',
   'data-report-layout-refinement': 'functional-layout',
   'data-report-floating-ui-refinement': 'functional-layout',
   'data-report-mobile-shell-refinement': 'functional-layout',
   'data-report-title-alignment-refinement': 'functional-layout',
-  'data-report-player-selection-refinement': 'visual-only',
-  'data-report-entry-spotlight-style': 'mixed-functional-visual',
+  'data-report-entry-spotlight-style': 'component-style',
   'data-report-fixed-header-style': 'functional-layout',
-  'data-medium-reader-detail-refinement': 'mixed-functional-visual',
-  'data-tree-polo-brand-theme': 'legacy-visual',
-  'data-tree-polo-refined-theme': 'final-visual',
 });
 
 function styleDataMarkers(attributes) {
@@ -34,9 +31,7 @@ function styleSourceLabel(attributes, index) {
 }
 
 function styleSourceRole(label) {
-  if (STYLE_SOURCE_ROLES[label]) return STYLE_SOURCE_ROLES[label];
-  if (label.startsWith('inline-style-')) return 'legacy-base-mixed';
-  return 'unclassified';
+  return STYLE_SOURCE_ROLES[label] || 'unclassified';
 }
 
 function bundledStyleBlock(styles) {

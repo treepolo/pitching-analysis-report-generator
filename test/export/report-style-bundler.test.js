@@ -8,23 +8,23 @@ const {
   styleSourceRole,
 } = require('../../src/export/report-style-bundler');
 
-test('bundles inline report styles into one stylesheet without reordering CSS', () => {
+test('bundles canonical and functional inline report styles without reordering CSS', () => {
   const source = `<!doctype html><html><head>
-<style>.base{display:block}</style>
+<style data-report-canonical-theme>.theme{background:white}</style>
 <meta charset="utf-8">
 <style data-report-mobile-shell-refinement>.mobile{width:100%}</style>
-<style data-tree-polo-refined-theme>.final{background:white}</style>
+<style data-report-entry-spotlight-style>.spotlight{opacity:.5}</style>
 </head><body></body></html>`;
 
   const output = bundleReportStyles(source);
   assert.equal((output.match(/<style\b/gu) || []).length, 1);
   assert.match(output, /data-report-style-bundle/u);
   assert.match(output, /data-report-style-source-count="3"/u);
-  assert.match(output, /report-style-source:inline-style-1; role:legacy-base-mixed/u);
+  assert.match(output, /report-style-source:data-report-canonical-theme; role:canonical-visual/u);
   assert.match(output, /report-style-source:data-report-mobile-shell-refinement; role:functional-layout/u);
-  assert.match(output, /report-style-source:data-tree-polo-refined-theme; role:final-visual/u);
-  assert.ok(output.indexOf('.base{display:block}') < output.indexOf('.mobile{width:100%}'));
-  assert.ok(output.indexOf('.mobile{width:100%}') < output.indexOf('.final{background:white}'));
+  assert.match(output, /report-style-source:data-report-entry-spotlight-style; role:component-style/u);
+  assert.ok(output.indexOf('.theme{background:white}') < output.indexOf('.mobile{width:100%}'));
+  assert.ok(output.indexOf('.mobile{width:100%}') < output.indexOf('.spotlight{opacity:.5}'));
 });
 
 test('does not rebundle an already bundled document', () => {
@@ -42,11 +42,17 @@ test('leaves style tags with semantic attributes untouched', () => {
   assert.equal(bundleReportStyles(source), source);
 });
 
-test('classifies current style layers for later dead-override pruning', () => {
+test('classifies only current canonical, functional and component style owners', () => {
+  assert.equal(styleSourceRole('data-report-canonical-theme'), 'canonical-visual');
   assert.equal(styleSourceRole('data-report-layout-refinement'), 'functional-layout');
-  assert.equal(styleSourceRole('data-report-player-selection-refinement'), 'visual-only');
-  assert.equal(styleSourceRole('data-tree-polo-brand-theme'), 'legacy-visual');
-  assert.equal(styleSourceRole('data-tree-polo-refined-theme'), 'final-visual');
+  assert.equal(styleSourceRole('data-report-help-style'), 'functional-layout');
+  assert.equal(styleSourceRole('data-annotation-reader-style'), 'component-style');
+  assert.equal(styleSourceRole('data-report-entry-spotlight-style'), 'component-style');
+  assert.equal(styleSourceRole('inline-style-1'), 'unclassified');
   assert.equal(styleSourceRole('data-unknown-style'), 'unclassified');
-  assert.equal(Object.hasOwn(STYLE_SOURCE_ROLES, 'data-xp7-range-theme'), false);
+  assert.deepEqual(new Set(Object.values(STYLE_SOURCE_ROLES)), new Set([
+    'canonical-visual',
+    'functional-layout',
+    'component-style',
+  ]));
 });
