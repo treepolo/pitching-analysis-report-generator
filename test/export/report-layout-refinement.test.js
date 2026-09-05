@@ -11,27 +11,25 @@ const {
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
 
-test('report title is bold while the smaller byline remains subordinate', () => {
+test('layout refinement no longer owns report or help visual skin', () => {
   const css = reportLayoutRefinementCss();
-  assert.match(css, /tree-polo-brand-copy h1 \{\s*font-weight: 700 !important/u);
-  assert.match(css, /tree-polo-signature \{\s*font-weight: 500 !important/u);
+  assert.doesNotMatch(css, /tree-polo-brand-copy h1|tree-polo-signature/u);
+  assert.doesNotMatch(css, /\.report-help-header(?:\s|\{|h2|p)/u);
+  assert.doesNotMatch(css, /background:\s|box-shadow:\s|border:\s/u);
 });
 
-test('annotation controls lose their outer sub-panel frame and stay compact', () => {
+test('annotation controls keep compact geometry for report and help clone', () => {
   const css = reportLayoutRefinementCss();
   assert.match(css, /body>main \.report-annotation-controls/u);
   assert.match(css, /\.report-help-live-preview \.report-annotation-controls/u);
   assert.match(css, /width: max-content !important/u);
   assert.match(css, /margin: \.18rem 0 \.12rem !important/u);
   assert.match(css, /padding: 0 !important/u);
-  assert.match(css, /border: 0 !important/u);
-  assert.match(css, /background: transparent !important/u);
-  assert.match(css, /box-shadow: none !important/u);
-  assert.match(css, /font-size: 10px !important/u);
   assert.match(css, /gap: \.18rem \.42rem !important/u);
+  assert.doesNotMatch(css, /\.report-annotation-controls[\s\S]{0,260}?(?:background|box-shadow|border:|font-size:)/u);
 });
 
-test('annotation navigation buttons and toggles use a lightweight player-scale size', () => {
+test('annotation navigation buttons and toggles retain player-scale geometry', () => {
   const css = reportLayoutRefinementCss();
   assert.match(css, /\.report-annotation-jump/u);
   assert.match(css, /min-height: 20px !important/u);
@@ -47,10 +45,7 @@ test('annotation navigation buttons and toggles use a lightweight player-scale s
 
 test('frame timeline consumes remaining width while frame labels shrink to content', () => {
   const css = reportLayoutRefinementCss();
-  assert.match(
-    css,
-    /grid-template-columns: 25px 25px max-content minmax\(0, 1fr\) max-content 25px !important/u,
-  );
+  assert.match(css, /grid-template-columns: 25px 25px max-content minmax\(0, 1fr\) max-content 25px !important/u);
   assert.match(css, /\[data-frame-current\]/u);
   assert.match(css, /\[data-frame-total\]/u);
   assert.match(css, /width: max-content !important/u);
@@ -73,35 +68,21 @@ test('mobile annotation points shrink without changing their position selectors'
   assert.doesNotMatch(css, /\.report-annotation-point[^}]*\b(?:cx|cy)\s*:/u);
 });
 
-test('mobile help typography is compact, especially the dialog title', () => {
-  const css = reportLayoutRefinementCss();
-  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.report-help-header h2 \{[\s\S]*?font-size: 15px !important/u);
-  assert.match(css, /\.report-help-header p \{[\s\S]*?font-size: 10px !important/u);
-  assert.match(css, /\.report-help-guide strong \{[\s\S]*?font-size: 11px !important/u);
-  assert.match(css, /\.report-help-guide p,[\s\S]*?font-size: 10px !important/u);
-  assert.match(css, /@media \(max-width: 420px\)[\s\S]*?\.report-help-header h2 \{[\s\S]*?font-size: 14px !important/u);
-});
-
-test('mobile layout replaces the old wrapping navigation with an explicit compact grid', () => {
+test('mobile layout uses explicit compact navigation and rate grids', () => {
   const css = reportLayoutRefinementCss();
   assert.match(css, /@media \(max-width: 700px\)/u);
   assert.match(css, /\.portable-frame-navigation \{[\s\S]*?display: grid !important/u);
-  assert.match(
-    css,
-    /grid-template-columns: 32px 32px max-content minmax\(0, 1fr\) max-content 32px !important/u,
-  );
+  assert.match(css, /grid-template-columns: 32px 32px max-content minmax\(0, 1fr\) max-content 32px !important/u);
   assert.match(css, /\.portable-frame-rate-row \{[\s\S]*?grid-template-columns: 4\.5rem minmax\(0, 1fr\) 32px !important/u);
   assert.match(css, /@media \(max-width: 420px\)/u);
-  assert.match(
-    css,
-    /grid-template-columns: 30px 30px max-content minmax\(0, 1fr\) max-content 30px !important/u,
-  );
+  assert.match(css, /grid-template-columns: 30px 30px max-content minmax\(0, 1fr\) max-content 30px !important/u);
 });
 
-test('layout refinement explicitly covers the help clone as well as report body', () => {
+test('layout refinement covers cloned player geometry without styling the help shell', () => {
   const css = reportLayoutRefinementCss();
-  const helpSelectors = css.match(/\.report-help-live-preview/g) || [];
-  assert.ok(helpSelectors.length >= 22);
+  const helpCloneSelectors = css.match(/\.report-help-live-preview/g) || [];
+  assert.ok(helpCloneSelectors.length >= 18);
+  assert.doesNotMatch(css, /\.report-help-(?:header|dialog|guide|note|shortcut|actions)/u);
 });
 
 test('layout refinement injects once before the closing head', () => {

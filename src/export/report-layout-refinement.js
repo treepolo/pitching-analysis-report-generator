@@ -2,18 +2,7 @@
 
 function reportLayoutRefinementCss() {
   return `<style data-report-layout-refinement>
-/* The report/person title is the primary identity. Keep the smaller byline
-   subordinate even though the main h1 text is now bold. */
-body>main header.tree-polo-report-header .tree-polo-brand-copy h1 {
-  font-weight: 700 !important;
-}
-body>main header.tree-polo-report-header .tree-polo-signature {
-  font-weight: 500 !important;
-}
-
-/* Annotation controls already live inside the player panel. Remove the extra
-   framed sub-panel and keep the row compact so it reads as a lightweight
-   auxiliary toolbar instead of a second player control deck. */
+/* Annotation controls own compact geometry only. Visual skin belongs to the canonical report theme. */
 body>main .report-annotation-controls,
 .report-help-live-preview .report-annotation-controls {
   width: max-content !important;
@@ -21,11 +10,7 @@ body>main .report-annotation-controls,
   min-height: 0 !important;
   margin: .18rem 0 .12rem !important;
   padding: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
   gap: .18rem .42rem !important;
-  font-size: 10px !important;
   line-height: 1.15 !important;
 }
 body>main .report-annotation-controls label,
@@ -49,7 +34,6 @@ body>main .report-annotation-jump,
   min-height: 20px !important;
   height: 20px !important;
   padding: 1px 6px !important;
-  font-size: 10px !important;
   line-height: 16px !important;
 }
 body>main .report-annotation-track-toggle,
@@ -62,10 +46,7 @@ body>main .report-annotation-swatch,
   height: 9px !important;
 }
 
-/* Let the current/total frame labels size to their text instead of reserving
-   5.5rem on both sides. The timeline receives every remaining pixel. The same
-   selectors cover single-video controls, comparison shared controls and the
-   cloned real-player preview used by the help dialog. */
+/* Frame-control geometry is shared by the report and the cloned help player. */
 body>main .portable-frame-controls,
 .report-help-live-preview .portable-frame-controls {
   grid-template-columns: 25px 25px max-content minmax(0, 1fr) max-content 25px !important;
@@ -87,9 +68,7 @@ body>main .portable-frame-navigation input[type="range"],
   min-width: 0 !important;
 }
 
-/* Routine play/pause status is redundant because the toggle button already
-   communicates playback state. Keep the status element available for errors,
-   but remove the normal extra line in single, comparison and help-clone UIs. */
+/* Routine status is redundant; retain the element for errors only. */
 body>main .portable-frame-player-status,
 .report-help-live-preview .portable-frame-player-status {
   display: none !important;
@@ -103,103 +82,12 @@ body>main .portable-frame-player-status[data-state="error"],
 }
 
 @media (max-width: 700px) {
-  /* The annotation overlay uses a fixed 5px SVG radius on desktop. Reduce only
-     the point geometry on narrow screens; cx/cy and video-rect positioning are
-     untouched, so annotation coordinates cannot drift. */
   body>main .report-annotation-point,
   .report-help-live-preview .report-annotation-point {
     r: 3.2px !important;
     stroke-width: .8 !important;
   }
 
-  /* Mobile help typography should read like a compact system dialog rather
-     than a desktop manual squeezed into a phone viewport. */
-  .report-help-header {
-    gap: 8px !important;
-    padding: 10px 11px 9px !important;
-  }
-  .report-help-header h2 {
-    margin-bottom: 3px !important;
-    padding: 3px 6px !important;
-    font-size: 15px !important;
-    line-height: 1.18 !important;
-  }
-  .report-help-header p {
-    font-size: 10px !important;
-    line-height: 1.35 !important;
-  }
-  .report-help-content {
-    padding: 10px !important;
-  }
-  .report-help-content h3 {
-    margin: .9rem 0 .42rem !important;
-    font-size: 12px !important;
-  }
-  .report-help-figure {
-    padding: 7px !important;
-  }
-  .report-help-figure figcaption {
-    margin-top: 6px !important;
-    font-size: 9.5px !important;
-    line-height: 1.4 !important;
-  }
-  .report-help-guide {
-    gap: 6px !important;
-  }
-  .report-help-guide li {
-    grid-template-columns: 22px minmax(0, 1fr) !important;
-    gap: 6px !important;
-    padding: 6px !important;
-  }
-  .report-help-number {
-    width: 20px !important;
-    height: 20px !important;
-    font-size: 10px !important;
-  }
-  .report-help-guide strong {
-    margin-bottom: 1px !important;
-    font-size: 11px !important;
-  }
-  .report-help-guide p,
-  .report-help-shortcut,
-  .report-help-note {
-    font-size: 10px !important;
-  }
-  .report-help-guide p {
-    line-height: 1.4 !important;
-  }
-  .report-help-shortcut {
-    padding: 6px !important;
-  }
-  .report-help-shortcut kbd {
-    min-width: 24px !important;
-    margin-right: 4px !important;
-    font-size: 9px !important;
-  }
-  .report-help-note {
-    padding: 7px 8px !important;
-    line-height: 1.42 !important;
-  }
-  .report-help-actions {
-    gap: 6px !important;
-    margin-top: 12px !important;
-    padding-top: 9px !important;
-  }
-  .report-help-actions span {
-    font-size: 9.5px !important;
-  }
-  .report-help-tutorial-copy {
-    padding: 9px !important;
-  }
-  .report-help-tutorial-copy strong {
-    font-size: 12px !important;
-  }
-  .report-help-tutorial-copy p,
-  .report-help-tutorial-step {
-    font-size: 10px !important;
-  }
-
-  /* Annotation toolbar: keep it compact but allow semantic groups to wrap. */
   body>main .report-annotation-controls,
   .report-help-live-preview .report-annotation-controls {
     display: flex !important;
@@ -220,13 +108,9 @@ body>main .portable-frame-player-status[data-state="error"],
     min-height: 24px !important;
     height: 24px !important;
     padding: 2px 6px !important;
-    font-size: 10px !important;
     line-height: 18px !important;
   }
 
-  /* Mobile player controls: do not inherit the old wrapping flex layout.
-     Navigation is one deliberate six-column row, with the timeline absorbing
-     the flexible middle width. */
   body>main .portable-frame-controls,
   .report-help-live-preview .portable-frame-controls {
     display: grid !important;
@@ -259,7 +143,6 @@ body>main .portable-frame-player-status[data-state="error"],
     width: max-content !important;
     min-width: 0 !important;
     padding-inline: 1px !important;
-    font-size: 10px !important;
   }
   body>main .portable-frame-navigation input[type="range"],
   .report-help-live-preview .portable-frame-navigation input[type="range"] {
@@ -268,7 +151,6 @@ body>main .portable-frame-player-status[data-state="error"],
     margin: 0 !important;
   }
 
-  /* Speed controls get their own compact row: numeric value | slider | reset. */
   body>main .portable-frame-rate-row,
   .report-help-live-preview .portable-frame-rate-row {
     display: grid !important;
@@ -307,18 +189,6 @@ body>main .portable-frame-player-status[data-state="error"],
     r: 2.6px !important;
     stroke-width: .65 !important;
   }
-  .report-help-header h2 {
-    font-size: 14px !important;
-  }
-  .report-help-header p {
-    font-size: 9.5px !important;
-  }
-  .report-help-content {
-    padding: 8px !important;
-  }
-  .report-help-content h3 {
-    font-size: 11.5px !important;
-  }
   body>main .portable-frame-navigation,
   .report-help-live-preview .portable-frame-navigation {
     grid-template-columns: 30px 30px max-content minmax(0, 1fr) max-content 30px !important;
@@ -330,12 +200,6 @@ body>main .portable-frame-player-status[data-state="error"],
   .report-help-live-preview .portable-frame-rate-row button {
     width: 30px !important;
     min-width: 30px !important;
-  }
-  body>main .portable-frame-navigation [data-frame-current],
-  body>main .portable-frame-navigation [data-frame-total],
-  .report-help-live-preview .portable-frame-navigation [data-frame-current],
-  .report-help-live-preview .portable-frame-navigation [data-frame-total] {
-    font-size: 9px !important;
   }
   body>main .portable-frame-rate-row,
   .report-help-live-preview .portable-frame-rate-row {

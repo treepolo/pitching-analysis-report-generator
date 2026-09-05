@@ -3,7 +3,7 @@
 function titleAlignmentCss() {
   return `<style data-report-title-alignment-refinement>
 /* Center the report title against the full title-bar width, not the residual
-   flex space beside the logo. The logo remains independently anchored left. */
+   flex space beside the logo. Visual typography belongs to report-theme.js. */
 body>main header.tree-polo-report-header .tree-polo-brand-copy {
   position: absolute !important;
   left: 50% !important;
@@ -23,22 +23,10 @@ body>main header.tree-polo-report-header .tree-polo-brand-copy h1 {
   text-overflow: ellipsis !important;
   text-align: center !important;
 }
-/* Keep the author signature subordinate to the primary report title, but large
-   enough to remain intentional beside the longer "投球分析報告" wording. */
-body>main header.tree-polo-report-header .tree-polo-signature {
-  font-size: .84em !important;
-  font-weight: 500 !important;
-  letter-spacing: .02em !important;
-  margin-left: .12em !important;
-  vertical-align: .08em !important;
-}
 
 @media (max-width: 700px) {
   body>main header.tree-polo-report-header .tree-polo-brand-copy {
     max-width: calc(100% - 136px) !important;
-  }
-  body>main header.tree-polo-report-header .tree-polo-signature {
-    font-size: .82em !important;
   }
 }
 

@@ -17,40 +17,37 @@ const HELP_ITEMS = Object.freeze([
 
 function helpCss() {
   return `<style data-report-help-style>
-.report-help-trigger{position:fixed;top:14px;right:16px;z-index:900;display:inline-flex;align-items:center;gap:.42rem;min-height:32px;padding:5px 10px 5px 7px;border:1px solid #718397;border-radius:3px;background:linear-gradient(#fff 0%,#eef5fb 45%,#c9dcec 52%,#e8f1f8 100%);box-shadow:inset 1px 1px 0 #fff,0 1px 3px rgba(0,0,0,.18);color:#172536;font:600 .82rem/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;cursor:pointer}
-.report-help-trigger:hover{border-color:#3f74a6;background:linear-gradient(#fff 0%,#f7fbff 42%,#b9d9f3 52%,#e9f5ff 100%)}
-.report-help-trigger:focus-visible,.report-help-close:focus-visible,.report-help-tutorial-button:focus-visible,.report-help-live-marker:focus-visible,.report-help-tutorial-panel button:focus-visible{outline:2px solid #2b70b3;outline-offset:2px}
-.report-help-icon{display:grid;place-items:center;width:18px;height:18px;border:1px solid #52779a;border-radius:50%;background:linear-gradient(#fff,#dcecf8);font:bold 12px/1 Georgia,serif;color:#214f79}
+/* Structural/interaction geometry only. Product skin and typography belong to report-theme.js. */
+.report-help-trigger{position:fixed;top:14px;right:16px;z-index:900;display:inline-flex;align-items:center;gap:.42rem;min-height:34px;padding:6px 13px;cursor:pointer}
+.report-help-icon{display:grid;place-items:center;width:18px;height:18px}
 .report-help-backdrop[hidden],.report-help-tutorial-panel[hidden]{display:none}
-.report-help-backdrop{position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center;padding:5vh 6vw;background:rgba(15,23,34,.34);backdrop-filter:blur(1px);overflow:auto}
-.report-help-dialog{position:relative;width:min(920px,88vw);max-height:84vh;overflow:auto;border:1px solid #7c8d9e;border-radius:5px;background:#f8fafc;box-shadow:0 18px 54px rgba(0,0,0,.34),inset 1px 1px 0 #fff;color:#17212b}
-.report-help-header{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:18px 20px 14px;border-bottom:1px solid #b6c1cb;background:linear-gradient(#fff,#edf3f8)}
-.report-help-header h2{margin:0 0 4px;font-size:1.25rem}.report-help-header p{margin:0;color:#586674;font-size:.84rem}
-.report-help-close{flex:0 0 auto;width:30px;height:28px;border:1px solid #8996a3;border-radius:3px;background:linear-gradient(#fff,#dce3e9);font:700 18px/1 sans-serif;color:#33414e;cursor:pointer}
-.report-help-content{padding:18px 20px 24px}.report-help-content h3{margin:1.4rem 0 .65rem;font-size:1rem}.report-help-content h3:first-child{margin-top:0}
-.report-help-figure{margin:0;padding:12px;border:1px solid #abb8c4;background:#e8edf2;box-shadow:inset 1px 1px 0 rgba(255,255,255,.9)}
-.report-help-live-preview{position:relative;overflow:hidden;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14)}
-.report-help-live-preview-empty{margin:0;padding:24px;text-align:center;color:#5a6874;background:#f5f7f9;border:1px dashed #9ca8b2}
+.report-help-backdrop{position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center;padding:5vh 6vw;overflow:auto}
+.report-help-dialog{position:relative;width:min(940px,88vw);max-height:84vh;overflow:auto}
+.report-help-header{position:relative;top:auto;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin:0;padding:24px 28px 18px}
+.report-help-header h2{margin:0}.report-help-header p{margin:7px 0 0}
+.report-help-close{flex:0 0 auto;width:36px;height:36px;padding:0;cursor:pointer}
+.report-help-content{padding:24px 28px 30px}.report-help-content h3{margin:30px 0 12px}.report-help-content h3:first-child{margin-top:0}
+.report-help-figure{margin:0;padding:14px;overflow:hidden}
+.report-help-live-preview{position:relative;overflow:hidden}
+.report-help-live-preview-empty{margin:0;padding:24px;text-align:center}
 .report-help-live-preview .report-video{margin:0!important;max-width:none!important;width:100%!important;pointer-events:none!important}
-.report-help-live-preview video{background:#000!important}
-.report-help-preview-marker{position:absolute;z-index:6;display:grid;place-items:center;width:22px;height:22px;border:2px solid #fff;border-radius:50%;background:#245f94;box-shadow:0 1px 5px rgba(0,0,0,.38);color:#fff;font:bold 11px/1 system-ui,sans-serif;transform:translate(-50%,-50%);pointer-events:none}
-.report-help-figure figcaption{margin-top:9px;color:#52606d;font-size:.78rem;line-height:1.45}
-.report-help-guide{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 14px;margin:0;padding:0;list-style:none}
-.report-help-guide li{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:start;padding:9px;border:1px solid #d2d9df;background:#fff}
-.report-help-number{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#245f94;color:#fff;font-weight:700;font-size:.78rem}
-.report-help-guide strong{display:block;margin-bottom:2px;font-size:.86rem}.report-help-guide p{margin:0;color:#4d5a66;font-size:.79rem;line-height:1.48}
-.report-help-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.report-help-shortcut{padding:9px;border:1px solid #cbd4dc;background:#fff;font-size:.78rem}.report-help-shortcut kbd{display:inline-block;min-width:29px;margin-right:5px;padding:2px 5px;border:1px solid #8996a3;border-bottom-width:2px;border-radius:3px;background:#f7f9fa;box-shadow:inset 0 1px 0 #fff;font:600 .76rem/1.2 system-ui,sans-serif;text-align:center}
-.report-help-note{margin:.7rem 0 0;padding:9px 11px;border-left:3px solid #527ea5;background:#eef5fb;color:#455463;font-size:.79rem;line-height:1.5}
-.report-help-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:18px;padding-top:14px;border-top:1px solid #cbd3da}.report-help-tutorial-button{min-height:31px;padding:5px 11px;border:1px solid #5c7790;border-radius:3px;background:linear-gradient(#fff,#dceaf5 48%,#bfd5e7 52%,#e9f3fa);color:#17334b;font:600 .8rem/1.2 system-ui,sans-serif;cursor:pointer}.report-help-actions span{color:#5b6874;font-size:.76rem}
-.report-help-live-marker{position:absolute;z-index:3800;display:grid;place-items:center;width:27px;height:27px;padding:0;border:2px solid #fff;border-radius:50%;background:#245f94;box-shadow:0 2px 7px rgba(0,0,0,.42);color:#fff;font:bold 12px/1 system-ui,sans-serif;cursor:pointer;transform:translate(-50%,-50%)}
-.report-help-live-marker.is-current{background:#b03d24;width:31px;height:31px}
-.report-help-live-target{outline:2px solid rgba(36,95,148,.68)!important;outline-offset:2px!important}.report-help-live-target.is-current{outline:3px solid #b03d24!important;outline-offset:3px!important}
-.report-help-tutorial-panel{position:fixed;right:16px;bottom:16px;z-index:3850;width:min(380px,calc(100vw - 32px));border:1px solid #718397;border-radius:5px;background:#f8fafc;box-shadow:0 8px 28px rgba(0,0,0,.32),inset 1px 1px 0 #fff;color:#172536;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-.report-help-tutorial-panel-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-bottom:1px solid #b9c5cf;background:linear-gradient(#fff,#e4edf4)}
-.report-help-tutorial-step{font-size:.75rem;color:#52616e;font-weight:700}.report-help-tutorial-stop{min-height:27px;padding:3px 9px;border:1px solid #8f5c50;border-radius:3px;background:linear-gradient(#fff,#f0d8d2);color:#713322;font:700 .76rem/1.2 system-ui,sans-serif;cursor:pointer}
-.report-help-tutorial-copy{padding:12px}.report-help-tutorial-copy strong{display:block;margin:0 0 5px;font-size:.98rem}.report-help-tutorial-copy p{margin:0;color:#475765;font-size:.82rem;line-height:1.5}
-.report-help-tutorial-controls{display:flex;flex-wrap:wrap;gap:7px;padding:0 12px 12px}.report-help-tutorial-controls button{min-height:29px;padding:4px 9px;border:1px solid #788997;border-radius:3px;background:linear-gradient(#fff,#dde7ee);color:#233746;font:600 .76rem/1.2 system-ui,sans-serif;cursor:pointer}.report-help-tutorial-controls button:disabled{opacity:.48;cursor:default}.report-help-tutorial-controls [data-report-help-tutorial-full]{margin-left:auto}
-@media(max-width:720px){.report-help-backdrop{padding:4vh 4vw}.report-help-dialog{width:92vw;max-height:86vh}.report-help-content{padding:14px}.report-help-guide{grid-template-columns:1fr}.report-help-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.report-help-trigger{top:8px;right:8px}.report-help-tutorial-panel{right:8px;bottom:8px;width:min(360px,calc(100vw - 16px))}}
+.report-help-preview-marker{position:absolute;z-index:6;display:grid;place-items:center;width:22px;height:22px;transform:translate(-50%,-50%);pointer-events:none}
+.report-help-figure figcaption{margin-top:10px}
+.report-help-guide{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin:0;padding:0;list-style:none}
+.report-help-guide li{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:start;padding:12px}
+.report-help-number{display:grid;place-items:center;width:24px;height:24px}
+.report-help-guide strong{display:block;margin-bottom:2px}.report-help-guide p{margin:0}
+.report-help-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.report-help-shortcut{padding:10px}.report-help-shortcut kbd{display:inline-block;min-width:29px;margin-right:5px;padding:2px 5px;text-align:center}
+.report-help-note{margin:.7rem 0 0;padding:11px 13px}
+.report-help-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:22px;padding-top:18px}.report-help-tutorial-button{min-height:34px;padding:6px 13px;cursor:pointer}
+.report-help-live-marker{position:absolute;z-index:3800;display:grid;place-items:center;width:27px;height:27px;padding:0;cursor:pointer;transform:translate(-50%,-50%)}
+.report-help-live-marker.is-current{width:31px;height:31px}
+.report-help-tutorial-panel{position:fixed;right:16px;bottom:16px;z-index:3850;width:min(380px,calc(100vw - 32px))}
+.report-help-tutorial-panel-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px}
+.report-help-tutorial-stop{min-height:34px;padding:6px 13px;cursor:pointer}
+.report-help-tutorial-copy{padding:12px}.report-help-tutorial-copy strong{display:block;margin:0 0 5px}.report-help-tutorial-copy p{margin:0}
+.report-help-tutorial-controls{display:flex;flex-wrap:wrap;gap:7px;padding:0 12px 12px}.report-help-tutorial-controls button{min-height:34px;padding:6px 13px;cursor:pointer}.report-help-tutorial-controls button:disabled{cursor:default}.report-help-tutorial-controls [data-report-help-tutorial-full]{margin-left:auto}
+@media(max-width:760px){.report-help-dialog{width:92vw}.report-help-header{padding:20px 18px 15px}.report-help-content{padding:18px}.report-help-guide{grid-template-columns:1fr}.report-help-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.report-help-tutorial-panel{right:8px;bottom:8px;width:min(360px,calc(100vw - 16px))}}
 @media print{.report-help-trigger,.report-help-backdrop,.report-help-tutorial-panel,.report-help-live-marker{display:none!important}.report-help-live-target{outline:none!important}}
 </style>`;
 }

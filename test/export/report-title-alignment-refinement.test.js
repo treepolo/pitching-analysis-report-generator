@@ -8,6 +8,7 @@ const {
   injectReportTitleAlignmentRefinement,
   titleAlignmentCss,
 } = require('../../src/export/report-title-alignment-refinement');
+const { renderReportTheme } = require('../../src/export/report-theme');
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
 
@@ -29,13 +30,14 @@ test('centered title protects the logo area and long names', () => {
   assert.match(css, /max-width: calc\(100% - 136px\) !important/u);
 });
 
-test('Tree Polo byline remains subordinate but is large enough for the longer visible title', () => {
-  const css = titleAlignmentCss();
-  assert.match(css, /\.tree-polo-signature \{[\s\S]*?font-size: \.84em !important/u);
-  assert.match(css, /font-weight: 500 !important/u);
-  assert.match(css, /font-size: \.82em !important/u);
-  assert.doesNotMatch(css, /font-size: \.80em !important/u);
-  assert.doesNotMatch(css, /font-size: \.78em !important/u);
+test('title alignment owns positioning only while canonical theme owns signature typography', () => {
+  const alignmentCss = titleAlignmentCss();
+  const themeCss = renderReportTheme();
+  assert.doesNotMatch(alignmentCss, /tree-polo-signature/u);
+  assert.doesNotMatch(alignmentCss, /font-size:|font-weight:|letter-spacing:/u);
+  assert.match(themeCss, /tree-polo-signature\{[^}]*font-size:\.84em!important[^}]*font-weight:500!important/u);
+  assert.match(themeCss, /tree-polo-signature\{[^}]*letter-spacing:\.02em!important[^}]*margin-left:\.12em!important/u);
+  assert.match(themeCss, /@media \(max-width: 700px\)[\s\S]*tree-polo-signature\{font-size:\.82em!important\}/u);
 });
 
 test('title alignment refinement injects once', () => {

@@ -44,6 +44,18 @@ test('canonical report theme owns selection and range affordances', () => {
   assert.match(css, /report-help-live-preview input\[data-frame-rate\]/u);
 });
 
+test('canonical report theme owns help, annotation and Tree Polo typography skin', () => {
+  const css = renderReportTheme();
+  assert.match(css, /\.report-help-dialog\{[^}]*border:1px solid #e6e6e6!important[^}]*background:#fff!important/u);
+  assert.match(css, /\.report-help-header h2\{[^}]*font-size:28px!important[^}]*font-weight:700!important/u);
+  assert.match(css, /\.report-help-guide p\{[^}]*font-size:13px!important/u);
+  assert.match(css, /\.report-help-live-preview \.portable-player-header h3\{[^}]*font-size:18px!important/u);
+  assert.match(css, /\.report-annotation-controls[^}]*font-size:10px!important/u);
+  assert.match(css, /\.report-annotation-track-toggle[^}]*background:#fff!important/u);
+  assert.match(css, /tree-polo-signature\{[^}]*font-size:\.84em!important[^}]*font-weight:500!important/u);
+  assert.match(css, /tree-polo-signature-tree,body>main \.tree-polo-signature-polo\{color:#1a8917!important/u);
+});
+
 test('renderer emits the canonical theme once and no retired visual owner', () => {
   const html = renderedHtml();
   assert.equal((html.match(/data-report-canonical-theme/g) || []).length, 1);

@@ -133,46 +133,63 @@ html body>main input[data-frame-rate][type="range"]:hover::-moz-range-thumb,html
 html body>main input[data-frame-rate][type="range"]:disabled::-moz-range-track,html body>main input[data-player-rate][type="range"]:disabled::-moz-range-track{background:#ececec!important}
 html body>main input[data-frame-rate][type="range"]:disabled::-moz-range-thumb,html body>main input[data-player-rate][type="range"]:disabled::-moz-range-thumb{background:#b3b3b3!important}
 
+/* Annotation skin; geometry stays in report-layout-refinement.js. */
+body>main .report-annotation-controls,.report-help-live-preview .report-annotation-controls{border:0!important;background:#fafafa!important;box-shadow:none!important;font-size:10px!important;color:#242424!important}
+body>main .report-annotation-jump,.report-help-live-preview .report-annotation-jump{font-size:10px!important}
+body>main .report-annotation-track-toggle,.report-help-live-preview .report-annotation-track-toggle{border-color:#e6e6e6!important;background:#fff!important;color:#242424!important}
+
 /* Tree Polo branding. Exporters provide markup/assets; this theme owns appearance. */
 body>main .tree-polo-report-header{display:flex;align-items:center;min-height:70px;margin:0 -8px 8px;padding:8px 12px 8px 76px;border-bottom:1px solid #e6e6e6;background:#fff;box-shadow:none;color:#242424}
 body>main .tree-polo-report-header::before,body>main .tree-polo-report-header::after{display:none!important}
 body>main .tree-polo-brand-logo{position:absolute;z-index:2;left:10px;top:8px;width:54px;height:54px;object-fit:cover;border:0;border-radius:3px;background:#000;box-shadow:none;filter:none}
 body>main .tree-polo-brand-copy{position:relative;z-index:2;min-width:0}
 body>main .tree-polo-report-header h1{font-family:Tahoma,"Segoe UI","Microsoft JhengHei","Microsoft YaHei",sans-serif!important;font-size:18px!important;font-weight:500!important;line-height:1.28!important;letter-spacing:.035em!important;color:#242424!important;text-shadow:none!important}
-body>main .tree-polo-signature{display:inline-block;color:#6b6b6b;font-size:.86em;font-weight:500;letter-spacing:.025em;margin-left:.08em;vertical-align:.035em}
+body>main .tree-polo-signature{display:inline-block!important;color:#6b6b6b!important;font-size:.84em!important;font-weight:500!important;letter-spacing:.02em!important;margin-left:.12em!important;vertical-align:.08em!important}
 body>main .tree-polo-signature-tree,body>main .tree-polo-signature-polo{color:#1a8917!important;font-weight:550;text-shadow:none!important}
 body[data-tree-polo-background="true"]{background:transparent;position:relative;isolation:isolate}
 body[data-tree-polo-background="true"]::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-color:#d8e8df;background-image:url("images/tree-polo-report-background.jpg");background-size:cover;background-position:center;background-repeat:no-repeat}
 
-/* Help skin, including the cloned real player. Functional geometry stays with the help component. */
+/* Help skin and typography. Structural geometry stays in report-help-runtime.js. */
+.report-help-trigger{border:1px solid #d0d0d0!important;border-radius:999px!important;background:#fff!important;box-shadow:none!important;color:#242424!important;font:600 .82rem/1.2 system-ui,-apple-system,"Segoe UI",sans-serif!important;text-shadow:none!important}
+.report-help-trigger:hover{border-color:#242424!important;background:#f2f2f2!important;color:#242424!important}
+.report-help-icon{border:0!important;border-radius:50%!important;background:#242424!important;box-shadow:none!important;color:#fff!important;font:bold 12px/1 Georgia,serif!important}
 .report-help-backdrop{background:rgba(0,0,0,.30)!important;backdrop-filter:blur(2px)!important}
 .report-help-dialog{border:1px solid #e6e6e6!important;border-radius:14px!important;background:#fff!important;box-shadow:0 20px 60px rgba(0,0,0,.18)!important;color:#242424!important}
-.report-help-header{border-color:#e6e6e6!important;background:#fff!important;box-shadow:none!important}
-.report-help-header h2{border:0!important;background:transparent!important;box-shadow:none!important;color:#242424!important;text-shadow:none!important}
-.report-help-header p,.report-help-figure figcaption,.report-help-guide p,.report-help-actions span,.report-help-tutorial-step,.report-help-tutorial-copy p{color:#6b6b6b!important}
-.report-help-content h3{color:#242424!important}
-.report-help-close{border-color:#e6e6e6!important;border-radius:50%!important;background:#fff!important;box-shadow:none!important;color:#242424!important}
+.report-help-header{border:0!important;border-bottom:1px solid #e6e6e6!important;border-radius:0!important;background:#fff!important;box-shadow:none!important}
+.report-help-header h2{padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;color:#242424!important;font-size:28px!important;font-weight:700!important;line-height:1.2!important;letter-spacing:-.015em!important;text-shadow:none!important}
+.report-help-header p{color:#6b6b6b!important;font-size:14px!important;line-height:1.5!important}
+.report-help-close{border:1px solid #e6e6e6!important;border-radius:50%!important;background:#fff!important;box-shadow:none!important;color:#242424!important;font:700 18px/1 sans-serif!important}
 .report-help-close:hover{border-color:#242424!important;background:#f2f2f2!important}
-.report-help-figure{border:1px solid #e6e6e6!important;border-radius:12px!important;background:#fafafa!important;box-shadow:none!important;overflow:hidden!important}
-.report-help-live-preview{border-radius:8px!important;background:#fff!important;box-shadow:none!important;overflow:hidden!important}
-.report-help-live-preview-empty{border-color:#d0d0d0!important;border-radius:8px!important;background:#fafafa!important;color:#6b6b6b!important}
-.report-help-guide li{border-color:#e6e6e6!important;border-radius:10px!important;background:#fff!important;box-shadow:none!important}
-.report-help-number,.report-help-preview-marker,.report-help-live-marker{background:#1a8917!important;box-shadow:none!important}
-.report-help-shortcut{border-color:#e6e6e6!important;border-radius:9px!important;background:#fff!important}.report-help-shortcut kbd{border-color:#d0d0d0!important;border-radius:5px!important;background:#f7f7f7!important;box-shadow:none!important;color:#242424!important}
-.report-help-note{border-left-color:#1a8917!important;border-radius:0 8px 8px 0!important;background:#f7f7f7!important;color:#525252!important}
-.report-help-actions{border-top-color:#e6e6e6!important}
-.report-help-tutorial-panel{border-color:#e6e6e6!important;border-radius:12px!important;background:#fff!important;box-shadow:0 12px 34px rgba(0,0,0,.16)!important;color:#242424!important}
-.report-help-tutorial-panel-header{border-bottom-color:#e6e6e6!important;background:#fff!important}
-.report-help-icon{border:0!important;background:#242424!important;box-shadow:none!important;color:#fff!important}
-:where(.report-help-trigger,.report-help-tutorial-button,.report-help-tutorial-controls button,.report-help-tutorial-stop){border-color:#d0d0d0!important;border-radius:999px!important;background:#fff!important;box-shadow:none!important;color:#242424!important;text-shadow:none!important}
-:where(.report-help-trigger,.report-help-tutorial-button,.report-help-tutorial-controls button,.report-help-tutorial-stop):hover:not(:disabled){border-color:#242424!important;background:#f2f2f2!important;color:#242424!important}
+.report-help-content h3{color:#242424!important;font-size:20px!important;font-weight:700!important;line-height:1.3!important}
+.report-help-figure{border:1px solid #e6e6e6!important;border-radius:12px!important;background:#fafafa!important;box-shadow:none!important}
+.report-help-live-preview{border-radius:8px!important;background:#fff!important;box-shadow:none!important}
+.report-help-live-preview video{background:#000!important}
+.report-help-live-preview-empty{border:1px dashed #d0d0d0!important;border-radius:8px!important;background:#fafafa!important;color:#6b6b6b!important}
+.report-help-preview-marker,.report-help-number,.report-help-live-marker{border-radius:50%!important;background:#1a8917!important;box-shadow:none!important;color:#fff!important}
+.report-help-preview-marker{border:2px solid #fff!important;font:bold 11px/1 system-ui,sans-serif!important}
+.report-help-live-marker{border:2px solid #fff!important;font:bold 12px/1 system-ui,sans-serif!important}
+.report-help-live-target{outline:2px solid rgba(26,137,23,.68)!important;outline-offset:2px!important}.report-help-live-target.is-current{outline:3px solid #156d12!important;outline-offset:3px!important}
+.report-help-figure figcaption{color:#6b6b6b!important;font-size:13px!important;line-height:1.5!important}
+.report-help-guide li{border:1px solid #e6e6e6!important;border-radius:10px!important;background:#fff!important;box-shadow:none!important}
+.report-help-number{font-size:.78rem!important;font-weight:700!important}
+.report-help-guide strong{color:#242424!important;font-size:14px!important}.report-help-guide p{color:#6b6b6b!important;font-size:13px!important;line-height:1.55!important}
+.report-help-shortcut{border:1px solid #e6e6e6!important;border-radius:9px!important;background:#fff!important;color:#242424!important;font-size:13px!important}.report-help-shortcut kbd{border:1px solid #d0d0d0!important;border-radius:5px!important;background:#f7f7f7!important;box-shadow:none!important;color:#242424!important;font:600 .76rem/1.2 system-ui,sans-serif!important}
+.report-help-note{border-left:3px solid #1a8917!important;border-radius:0 8px 8px 0!important;background:#f7f7f7!important;color:#525252!important;font-size:13px!important;line-height:1.55!important}
+.report-help-actions{border-top:1px solid #e6e6e6!important}.report-help-actions span{color:#6b6b6b!important;font-size:12px!important}
+.report-help-tutorial-button,.report-help-tutorial-stop,.report-help-tutorial-controls button{border:1px solid #d0d0d0!important;border-radius:999px!important;background:#fff!important;box-shadow:none!important;color:#242424!important;text-shadow:none!important}
+.report-help-tutorial-button{font:600 .8rem/1.2 system-ui,sans-serif!important}.report-help-tutorial-stop{font:700 .76rem/1.2 system-ui,sans-serif!important}.report-help-tutorial-controls button{font:600 .76rem/1.2 system-ui,sans-serif!important}
+.report-help-tutorial-button:hover,.report-help-tutorial-stop:hover,.report-help-tutorial-controls button:hover:not(:disabled){border-color:#242424!important;background:#f2f2f2!important;color:#242424!important}
 .report-help-tutorial-button,.report-help-tutorial-controls [data-report-help-tutorial-full]{border-color:#1a8917!important;background:#1a8917!important;color:#fff!important}
 .report-help-tutorial-button:hover,.report-help-tutorial-controls [data-report-help-tutorial-full]:hover{border-color:#156d12!important;background:#156d12!important;color:#fff!important}
+.report-help-tutorial-controls button:disabled{opacity:.48!important}
+.report-help-tutorial-panel{border:1px solid #e6e6e6!important;border-radius:12px!important;background:#fff!important;box-shadow:0 12px 34px rgba(0,0,0,.16)!important;color:#242424!important;font-family:system-ui,-apple-system,"Segoe UI",sans-serif!important}
+.report-help-tutorial-panel-header{border-bottom:1px solid #e6e6e6!important;background:#fff!important}
+.report-help-tutorial-step{color:#6b6b6b!important;font-size:.75rem!important;font-weight:700!important}.report-help-tutorial-copy strong{font-size:.98rem!important}.report-help-tutorial-copy p{color:#6b6b6b!important;font-size:.82rem!important;line-height:1.5!important}
 .report-help-trigger:focus-visible,.report-help-close:focus-visible,.report-help-tutorial-button:focus-visible,.report-help-live-marker:focus-visible,.report-help-tutorial-panel button:focus-visible{outline:2px solid #1a8917!important;outline-offset:2px!important}
 .report-help-live-preview .portable-player{border:1px solid #e6e6e6!important;border-radius:8px!important;background:#fafafa!important;box-shadow:none!important}
-.report-help-live-preview .portable-player-header{border-bottom-color:#e6e6e6!important}
-.report-help-live-preview .portable-player-header h3{color:#242424!important;font-weight:700!important}
-.report-help-live-preview .portable-player-side-heading h3{color:#242424!important;font-weight:650!important}
+.report-help-live-preview .portable-player-header{border-bottom:1px solid #e6e6e6!important}
+.report-help-live-preview .portable-player-header h3{color:#242424!important;font-size:18px!important;font-weight:700!important}
+.report-help-live-preview .portable-player-side-heading h3{color:#242424!important;font-size:15px!important;font-weight:650!important}
 .report-help-live-preview button{border-color:#d0d0d0!important;border-radius:999px!important;background:#fff!important;box-shadow:none!important;color:#242424!important;text-shadow:none!important}
 .report-help-live-preview button[data-frame-action="toggle"]{display:grid!important;place-items:center!important;padding:0!important;font-size:0!important;line-height:1!important;text-align:center!important}
 .report-help-live-preview button[data-frame-action="toggle"]::before{content:"";display:block;width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:8px solid #242424;transform:translateX(1px)}
@@ -200,12 +217,14 @@ body[data-tree-polo-background="true"]::before{content:"";position:fixed;inset:0
   body>main .tree-polo-report-header{min-height:62px;padding-left:66px}
   body>main .tree-polo-brand-logo{left:9px;top:8px;width:46px;height:46px}
   body>main .tree-polo-report-header h1{font-size:16px!important;letter-spacing:.025em!important}
-  body>main .tree-polo-signature{font-size:.84em}
+  body>main .tree-polo-signature{font-size:.82em!important}
+  body>main .portable-frame-navigation [data-frame-current],body>main .portable-frame-navigation [data-frame-total],.report-help-live-preview .portable-frame-navigation [data-frame-current],.report-help-live-preview .portable-frame-navigation [data-frame-total]{font-size:10px!important}
 }
 @media(max-width:760px){
   html body>main section.report-section+section.report-section::before,html body>main section.report-section>h2,html body>main section.report-section>.report-text,html body>main section.report-section>h4,html body>main section.report-section>.muted{width:calc(100% - 24px)!important}
   html body>main section.report-section>h2{font-size:23px!important}
   html body>main .portable-player-header h3{font-size:19px!important}
+  .report-help-header h2{font-size:24px!important}
 }
 @media (max-width: 480px) {
   body { font-size: 12px; }
@@ -215,6 +234,9 @@ body[data-tree-polo-background="true"]::before{content:"";position:fixed;inset:0
   .portable-player { padding: 6px; }
   .portable-frame-surface { min-height: 160px; }
   .portable-frame-navigation > button, .portable-frame-rate-row button, .portable-player-actions button { min-height: 30px; }
+}
+@media (max-width: 420px) {
+  body>main .portable-frame-navigation [data-frame-current],body>main .portable-frame-navigation [data-frame-total],.report-help-live-preview .portable-frame-navigation [data-frame-current],.report-help-live-preview .portable-frame-navigation [data-frame-total]{font-size:9px!important}
 }
 @media (forced-colors: active) {
   .report-header, h2 { background: Canvas; color: CanvasText; }
