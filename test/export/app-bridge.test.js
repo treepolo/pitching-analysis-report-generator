@@ -12,6 +12,7 @@ const {
   validatePickedExportDirectory,
 } = require('../../src/export/app-bridge');
 const { exportReport } = require('../../src/export/exporter');
+const { canonicalReportName } = require('../../src/export/tree-polo-package');
 
 let testRoot;
 
@@ -69,9 +70,12 @@ test('runs a video-only empty-label report through the export bridge', async () 
 
   assert.equal(completed.status, 'completed');
   assert.equal(completed.result.validation.valid, true);
-  assert.equal(completed.result.validation.assetCount, 1);
+  assert.equal(completed.result.validation.assetCount, 3);
   assert.equal(completed.result.zip.parity.valid, true);
-  assert.equal(await fs.stat(path.join(completed.result.folderPath, 'report.html')).then((stats) => stats.isFile()), true);
+  assert.equal(
+    await fs.stat(path.join(completed.result.folderPath, completed.result.reportFileName)).then((stats) => stats.isFile()),
+    true,
+  );
   assert.equal(await fs.stat(completed.result.zipPath).then((stats) => stats.isFile()), true);
 });
 
@@ -137,7 +141,6 @@ test('exports renderer-shaped text-only, video-only, and mixed snapshots through
     const started = await controller.start({
       projectRoot: testRoot,
       ...rendererRequest,
-      // Main adds these persisted snapshot fields after preload allowlisting.
       reportDocument: entry.document,
       assets: entry.assets,
     });
@@ -145,9 +148,12 @@ test('exports renderer-shaped text-only, video-only, and mixed snapshots through
     assert.equal(completed.status, 'completed', `${entry.name} export failed`);
     assert.equal(completed.result.validation.valid, true, `${entry.name} folder invalid`);
     assert.equal(completed.result.zip.parity.valid, true, `${entry.name} ZIP invalid`);
-    assert.equal(await fs.stat(path.join(completed.result.folderPath, 'report.html')).then((stats) => stats.isFile()), true);
+    assert.equal(
+      await fs.stat(path.join(completed.result.folderPath, completed.result.reportFileName)).then((stats) => stats.isFile()),
+      true,
+    );
     assert.equal(await fs.stat(completed.result.zipPath).then((stats) => stats.isFile()), true);
-    assert.equal(completed.result.manifest.assets.length, entry.name === 'text-only' ? 0 : 1);
+    assert.equal(completed.result.manifest.assets.length, entry.name === 'text-only' ? 2 : 3);
   }
 });
 
@@ -245,10 +251,13 @@ test('exports a pure text report to default-style folder and ZIP destinations', 
     const completed = await controller.wait(started.jobId);
     assert.equal(completed.status, 'completed', `${outputKind} text export failed`);
     assert.equal(completed.result.validation.valid, true);
-    assert.equal(completed.result.validation.assetCount, 0);
+    assert.equal(completed.result.validation.assetCount, 2);
     if (outputKind === 'folder') {
       assert.equal(completed.result.zipPath, null);
-      assert.equal(await fs.stat(path.join(completed.result.folderPath, 'report.html')).then((stats) => stats.isFile()), true);
+      assert.equal(
+        await fs.stat(path.join(completed.result.folderPath, completed.result.reportFileName)).then((stats) => stats.isFile()),
+        true,
+      );
     } else {
       assert.equal(await fs.stat(completed.result.zipPath).then((stats) => stats.isFile()), true);
     }
@@ -304,7 +313,7 @@ test('exports ZIP after folder without overwriting the folder and preserves ZIP-
     const folderCompleted = await folderController.wait(folderStarted.jobId);
     assert.equal(folderCompleted.status, 'completed', `${entry.name} folder export failed`);
     const folderPath = folderCompleted.result.folderPath;
-    const reportBeforeZip = await fs.readFile(path.join(folderPath, 'report.html'));
+    const reportBeforeZip = await fs.readFile(path.join(folderPath, folderCompleted.result.reportFileName));
 
     const zipController = new ExportJobController({ exporter: exportReport });
     const zipStarted = await zipController.start({
@@ -320,7 +329,10 @@ test('exports ZIP after folder without overwriting the folder and preserves ZIP-
     assert.equal(zipCompleted.status, 'completed', `${entry.name} ZIP-after-folder export failed`);
     assert.equal(zipCompleted.result.folderPath, null);
     assert.equal(await fs.stat(zipCompleted.result.zipPath).then((stats) => stats.isFile()), true);
-    assert.deepEqual(await fs.readFile(path.join(folderPath, 'report.html')), reportBeforeZip);
+    assert.deepEqual(
+      await fs.readFile(path.join(folderPath, folderCompleted.result.reportFileName)),
+      reportBeforeZip,
+    );
     const outputEntries = await fs.readdir(outputDirectory);
     assert.deepEqual(outputEntries.filter((name) => name.startsWith('.report-export-')), []);
   }
@@ -365,10 +377,11 @@ test('exports ZIP after folder without overwriting the folder and preserves ZIP-
     outputKind: 'zip',
   });
   const duplicateZipCompleted = await duplicateZipController.wait(duplicateZipStarted.jobId);
+  const duplicateName = `${canonicalReportName(cases[0].reportName)}-2`;
   assert.equal(duplicateZipCompleted.status, 'completed');
-  assert.equal(duplicateZipCompleted.result.safeName, 'Sequence text-2');
-  assert.equal(duplicateZipCompleted.result.manifest.report.safeName, 'Sequence text-2');
-  assert.match(duplicateZipCompleted.result.zipPath, /Sequence text-2_offline\.zip$/u);
+  assert.equal(duplicateZipCompleted.result.safeName, duplicateName);
+  assert.equal(duplicateZipCompleted.result.manifest.report.safeName, duplicateName);
+  assert.equal(path.basename(duplicateZipCompleted.result.zipPath), `${duplicateName}_offline.zip`);
   assert.equal(await fs.stat(zipFirstCompleted.result.zipPath).then((stats) => stats.isFile()), true);
 });
 
@@ -402,10 +415,11 @@ test('reruns folder, ZIP, and both exports with collision-free names without ove
     const firstZipPath = firstCompleted.result.zipPath;
     const second = await controller.start(requestBase);
     const secondCompleted = await controller.wait(second.jobId);
+    const secondName = `${canonicalReportName(entry.name)}-2`;
 
     assert.equal(secondCompleted.status, 'completed', `${entry.outputKind} rerun failed`);
-    assert.equal(secondCompleted.result.safeName, `${entry.name}-2`);
-    assert.equal(secondCompleted.result.manifest.report.safeName, `${entry.name}-2`);
+    assert.equal(secondCompleted.result.safeName, secondName);
+    assert.equal(secondCompleted.result.manifest.report.safeName, secondName);
     if (firstFolderPath) {
       assert.notEqual(secondCompleted.result.folderPath, firstFolderPath);
       assert.equal(await fs.stat(firstFolderPath).then((stats) => stats.isDirectory()), true);
@@ -447,6 +461,7 @@ test('reuses a deleted output name and serializes overlapping exports per destin
       reportName: `Delete and repeat ${outputKind}`,
       outputKind,
     };
+    const canonicalName = canonicalReportName(requestBase.reportName);
     const controller = new ExportJobController({ exporter: exportReport });
     const first = await controller.start(requestBase);
     const firstCompleted = await controller.wait(first.jobId);
@@ -455,7 +470,7 @@ test('reuses a deleted output name and serializes overlapping exports per destin
     const second = await controller.start(requestBase);
     const secondCompleted = await controller.wait(second.jobId);
     assert.equal(secondCompleted.status, 'completed', `${outputKind} retained-output repeat failed`);
-    assert.equal(secondCompleted.result.safeName, `${requestBase.reportName}-2`);
+    assert.equal(secondCompleted.result.safeName, `${canonicalName}-2`);
 
     for (const outputPath of [firstCompleted.result.folderPath, firstCompleted.result.zipPath]) {
       if (!outputPath) continue;
@@ -466,7 +481,7 @@ test('reuses a deleted output name and serializes overlapping exports per destin
     const third = await controller.start(requestBase);
     const thirdCompleted = await controller.wait(third.jobId);
     assert.equal(thirdCompleted.status, 'completed', `${outputKind} deleted-output repeat failed`);
-    assert.equal(thirdCompleted.result.safeName, requestBase.reportName);
+    assert.equal(thirdCompleted.result.safeName, canonicalName);
     if (thirdCompleted.result.folderPath) {
       assert.equal(await fs.stat(thirdCompleted.result.folderPath).then((stats) => stats.isDirectory()), true);
     }
@@ -489,6 +504,7 @@ test('reuses a deleted output name and serializes overlapping exports per destin
     reportName: 'Overlapping exports',
     outputKind: 'both',
   };
+  const canonicalName = canonicalReportName(requestBase.reportName);
   const controller = new ExportJobController({ exporter: exportReport });
   const started = await Promise.all([
     controller.start(requestBase),
@@ -498,7 +514,7 @@ test('reuses a deleted output name and serializes overlapping exports per destin
   assert.deepEqual(completed.map((job) => job.status), ['completed', 'completed']);
   assert.deepEqual(
     completed.map((job) => job.result.safeName).sort(),
-    ['Overlapping exports', 'Overlapping exports-2'],
+    [canonicalName, `${canonicalName}-2`].sort(),
   );
   for (const job of completed) {
     assert.equal(await fs.stat(job.result.folderPath).then((stats) => stats.isDirectory()), true);

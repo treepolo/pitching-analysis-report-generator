@@ -8,6 +8,11 @@ const test = require('node:test');
 const { createTestTemp } = require('../project-temp');
 const { ExportValidationError } = require('../../src/export/asset-paths');
 const { exportReport } = require('../../src/export/exporter');
+const {
+  BRAND_LOGO_ASSET_ID,
+  BRAND_SUFFIX,
+  REPORT_BACKGROUND_ASSET_ID,
+} = require('../../src/export/tree-polo-package');
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
 let testRoot;
@@ -38,6 +43,11 @@ function readZipEntries(buffer) {
     offset = dataStart + compressedSize;
   }
   return entries;
+}
+
+function assertCanonicalPackageAssets(manifest) {
+  assert.equal(manifest.assets.some((asset) => asset.id === REPORT_BACKGROUND_ASSET_ID), true);
+  assert.equal(manifest.assets.some((asset) => asset.id === BRAND_LOGO_ASSET_ID), true);
 }
 
 test('exports a self-contained folder and deterministic ZIP seam without leaking source paths', async () => {
@@ -84,20 +94,22 @@ test('exports a self-contained folder and deterministic ZIP seam without leaking
   });
 
   assert.match(result.safeName, /^[^<>:"/\\|?*]+$/u);
+  assert.equal(result.safeName.endsWith(BRAND_SUFFIX), true);
+  assert.equal(result.reportFileName, `${result.safeName}.html`);
   assert.equal(result.validation.valid, true);
-  assert.equal(result.validation.assetCount, 2);
+  assert.equal(result.validation.assetCount, 4);
   assert.equal(result.validation.fileUrlValidation.valid, true);
-  assert.equal(result.validation.fileUrlValidation.htmlFileName, 'report.html');
+  assert.equal(result.validation.fileUrlValidation.htmlFileName, result.reportFileName);
   assert.match(result.validation.fileUrlValidation.htmlFileUrl, /^file:\/\//u);
   assert.match(result.validation.fileUrlValidation.indexFileUrl, /^file:\/\//u);
   assert.equal(result.validation.manifestValidation.valid, true);
   assert.ok(result.zipPath);
   assert.equal(result.zip.parity.valid, true);
-  assert.equal(await fs.stat(path.join(result.folderPath, 'report.html')).then((stats) => stats.isFile()), true);
+  assert.equal(await fs.stat(path.join(result.folderPath, result.reportFileName)).then((stats) => stats.isFile()), true);
   assert.equal(await fs.stat(path.join(result.folderPath, 'videos')).then((stats) => stats.isDirectory()), true);
   assert.equal(await fs.stat(path.join(result.folderPath, 'images')).then((stats) => stats.isDirectory()), true);
 
-  const reportHtml = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
+  const reportHtml = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
   assert.match(reportHtml, /videos\/pitch-clip\.mp4/u);
   assert.match(reportHtml, /images\/release-frame\.png/u);
   assert.doesNotMatch(reportHtml, /unused\.mp4/u);
@@ -105,21 +117,22 @@ test('exports a self-contained folder and deterministic ZIP seam without leaking
   assert.doesNotMatch(manifestText, new RegExp(sourceVideo.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
   const manifest = JSON.parse(manifestText);
   assert.equal(manifest.validation.valid, true);
-  assert.equal(manifest.assets.length, 2);
-  assert.equal(manifest.files.some((file) => file.relativePath === 'report.html'), true);
+  assert.equal(manifest.assets.length, 4);
+  assert.equal(manifest.files.some((file) => file.relativePath === result.reportFileName), true);
   assert.equal(manifest.assets.some((asset) => asset.id === 'unused'), false);
+  assertCanonicalPackageAssets(manifest);
 
   const sourceVideoAfter = await fs.readFile(sourceVideo);
   assert.deepEqual(sourceVideoAfter, sourceVideoBefore);
 
   const zipBuffer = await fs.readFile(result.zipPath);
   const zipEntries = readZipEntries(zipBuffer);
-  assert.equal(zipEntries.has('report.html'), true);
+  assert.equal(zipEntries.has(result.reportFileName), true);
   assert.equal(zipEntries.has('export-manifest.json'), true);
   assert.equal(zipEntries.has('videos/pitch-clip.mp4'), true);
   assert.equal(zipEntries.has('images/release-frame.png'), true);
   assert.equal(zipEntries.has('videos/unused.mp4'), false);
-  assert.deepEqual(zipEntries.get('report.html'), Buffer.from(reportHtml));
+  assert.deepEqual(zipEntries.get(result.reportFileName), Buffer.from(reportHtml));
   assert.deepEqual(zipEntries.get('videos/pitch-clip.mp4'), sourceVideoBefore);
 });
 
@@ -159,12 +172,13 @@ test('exports a video-only document with empty report and section labels', async
   });
 
   assert.equal(result.validation.valid, true);
-  assert.equal(result.validation.assetCount, 1);
+  assert.equal(result.validation.assetCount, 3);
   assert.equal(result.zip.parity.valid, true);
-  const reportHtml = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
+  const reportHtml = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
   assert.match(reportHtml, /<video[^>]+src="videos\/video-only\.mp4"/u);
   assert.doesNotMatch(reportHtml, /No content/u);
   const zipEntries = readZipEntries(await fs.readFile(result.zipPath));
+  assert.equal(zipEntries.has(result.reportFileName), true);
   assert.equal(zipEntries.has('videos/video-only.mp4'), true);
   assert.equal(zipEntries.has('videos/unused.mp4'), false);
   assert.deepEqual(await fs.readFile(sourceVideo), sourceBefore);
@@ -207,7 +221,9 @@ test('ignores unused library descriptors, including invalid source paths', async
     ],
   });
 
-  assert.deepEqual(result.manifest.assets.map((asset) => asset.id), ['used']);
+  assert.equal(result.manifest.assets.some((asset) => asset.id === 'used'), true);
+  assert.equal(result.manifest.assets.some((asset) => asset.id === 'unused'), false);
+  assertCanonicalPackageAssets(result.manifest);
   assert.equal(await fs.stat(path.join(result.folderPath, 'videos', 'used.mp4')).then((stats) => stats.isFile()), true);
   await assert.rejects(fs.stat(path.join(result.folderPath, 'videos', 'private.mp4')), /ENOENT/u);
 });
