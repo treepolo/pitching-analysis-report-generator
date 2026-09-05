@@ -4,8 +4,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const { renderReportHtml } = require('../../src/export/report-renderer');
-const { applyTreePoloBrandHtml } = require('../../src/export/tree-polo-branded-exporter');
-const { refineHtml } = require('../../src/export/tree-polo-refined-exporter');
+const { applyTreePoloPackageHtml } = require('../../src/export/tree-polo-package');
 const { bundleReportStyles } = require('../../src/export/report-style-bundler');
 
 function reportDocument() {
@@ -42,11 +41,11 @@ function rendererHtml() {
 }
 
 function brandedCanonicalHtml() {
-  const branded = applyTreePoloBrandHtml(rendererHtml(), {
+  const packaged = applyTreePoloPackageHtml(rendererHtml(), {
     title: '王小明',
     logoRelativePath: 'images/tree-polo-logo.webp',
   });
-  return bundleReportStyles(refineHtml(branded));
+  return bundleReportStyles(packaged);
 }
 
 test('current report visual contract keeps readable text width and full-width media geometry', () => {

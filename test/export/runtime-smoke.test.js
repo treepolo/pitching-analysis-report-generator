@@ -72,7 +72,7 @@ function mediaSignature(runtimeResult) {
   }));
 }
 
-test('accepts text-only folder and ZIP extraction without empty media directories', async () => {
+test('accepts text-only folder and ZIP extraction without an empty video directory', async () => {
   const outputRoot = path.join(testRoot, 'text-only-output');
   const result = await exportReport({
     projectRoot: testRoot,
@@ -91,7 +91,7 @@ test('accepts text-only folder and ZIP extraction without empty media directorie
   });
 
   assert.equal(result.validation.valid, true);
-  assert.equal(result.manifest.assets.length, 0);
+  assert.equal(result.manifest.assets.length, 2);
   assert.equal(result.zip.parity.valid, true);
 
   const extractedPath = path.join(testRoot, 'text-only-extracted');
@@ -99,12 +99,16 @@ test('accepts text-only folder and ZIP extraction without empty media directorie
   const extractedLayout = await validateExportLayout(extractedPath, {
     assetManifest: result.manifest.assets,
     verifyManifest: true,
+    htmlFileName: result.reportFileName,
   });
   assert.equal(extractedLayout.valid, true);
   assert.equal(extractedLayout.manifestValidation.valid, true);
-  assert.equal(await fs.stat(path.join(extractedPath, 'report.html')).then((stats) => stats.isFile()), true);
+  assert.equal(
+    await fs.stat(path.join(extractedPath, result.reportFileName)).then((stats) => stats.isFile()),
+    true,
+  );
   assert.equal(await fs.stat(path.join(extractedPath, 'videos')).catch(() => null), null);
-  assert.equal(await fs.stat(path.join(extractedPath, 'images')).catch(() => null), null);
+  assert.equal(await fs.stat(path.join(extractedPath, 'images')).then((stats) => stats.isDirectory()), true);
 });
 
 async function assertRuntimeResult(t, result) {
@@ -137,7 +141,7 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
     assets: fixtureAssets(),
   });
 
-  const folderHtml = await fs.readFile(path.join(result.folderPath, 'report.html'), 'utf8');
+  const folderHtml = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
   assert.match(folderHtml, /data-segment-in="8"/u);
   assert.match(folderHtml, /data-segment-out="45"/u);
   assert.doesNotMatch(folderHtml, /data-playback-rate=/u);
@@ -165,6 +169,7 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
 
   const folderRuntime = await runLocalFileRuntimeSmoke({
     folderPath: result.folderPath,
+    reportFileName: result.reportFileName,
     expectedKinds: ['image', 'video'],
   });
   const folderRuntimeAvailable = await assertRuntimeResult(t, folderRuntime);
@@ -174,17 +179,19 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
   assert.equal(extracted.entries.length, result.zip.parity.fileCount);
   const zipParity = await validateZipParity(extractedPath, result.zipPath);
   assert.equal(zipParity.valid, true);
-  const extractedHtml = await fs.readFile(path.join(extractedPath, 'report.html'), 'utf8');
+  const extractedHtml = await fs.readFile(path.join(extractedPath, result.reportFileName), 'utf8');
   assert.equal(extractedHtml, folderHtml);
   const extractedLayout = await validateExportLayout(extractedPath, {
     assetManifest: result.manifest.assets,
     verifyManifest: true,
+    htmlFileName: result.reportFileName,
   });
   assert.equal(extractedLayout.valid, true);
   assert.equal(extractedLayout.manifestValidation.valid, true);
 
   const extractedRuntime = await runLocalFileRuntimeSmoke({
     folderPath: extractedPath,
+    reportFileName: result.reportFileName,
     expectedKinds: ['image', 'video'],
   });
   const extractedRuntimeAvailable = await assertRuntimeResult(t, extractedRuntime);
@@ -193,7 +200,7 @@ test('loads exported folder and extracted ZIP through Electron file:// with no e
   }
 
   const outputEntries = await fs.readdir(outputRoot);
-  assert.deepEqual(outputEntries.sort(), ['Runtime Smoke', 'Runtime Smoke_offline.zip'].sort());
+  assert.deepEqual(outputEntries.sort(), [result.safeName, path.basename(result.zipPath)].sort());
   assert.equal(outputEntries.some((entry) => entry.startsWith('.report-export-')), false);
 });
 
@@ -208,6 +215,7 @@ test('reports unavailable explicitly when an Electron executable is not availabl
   });
   const runtime = await runLocalFileRuntimeSmoke({
     folderPath: result.folderPath,
+    reportFileName: result.reportFileName,
     electronPath: path.join(testRoot, 'missing-electron.exe'),
     expectedKinds: ['image', 'video'],
   });
