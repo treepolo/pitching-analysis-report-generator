@@ -26,10 +26,14 @@ test('canonical report theme owns the final reader and editorial player skin', (
   const css = renderReportTheme();
   assert.match(css, /--reader-face: #fff/u);
   assert.match(css, /--reader-accent: #1a8917/u);
-  assert.match(css, /\.portable-player \{[^}]*padding: 0[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
+  assert.match(css, /\.portable-player \{[^}]*position: relative[^}]*padding: 18px 0[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
+  assert.match(css, /\.portable-player::before, \.portable-player::after \{[^}]*right: 14px[^}]*left: 14px[^}]*height: 1px[^}]*background: #d7d7d7/u);
+  assert.match(css, /\.portable-player::before \{[^}]*top: 0/u);
+  assert.match(css, /\.portable-player::after \{[^}]*bottom: 0/u);
   assert.match(css, /section\.report-section>h2[^}]*max-width:560px/u);
   assert.match(css, /\.portable-player-header \{[^}]*margin: 0 0 13px[^}]*padding: 0[^}]*border: 0/u);
   assert.match(css, /\.portable-player-header h3 \{[^}]*color: #303030[^}]*font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif[^}]*font-size: 17px[^}]*font-weight: 500/u);
+  assert.match(css, /\.portable-player-header h3::after \{[^}]*width: 48px[^}]*height: 3px[^}]*margin-top: 7px[^}]*background: var\(--reader-accent\)/u);
   assert.match(css, /\.portable-player-side-heading h3 \{[^}]*color: #6b6b6b[^}]*font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif[^}]*font-size: 13px[^}]*font-weight: 500/u);
   assert.match(css, /\.portable-player-grid \{[^}]*gap: 14px/u);
   assert.match(css, /\.portable-frame-surface \{[^}]*border: 0[^}]*border-radius: 0/u);

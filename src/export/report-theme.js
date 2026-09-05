@@ -38,10 +38,14 @@ h4 { margin: 8px 0 4px; padding-bottom: 2px; border-bottom: 1px solid #e6e6e6; c
 figcaption { margin-top: 3px; color: #6b6b6b; font-size: 11px; }
 .comparison-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 
-.portable-player { width: 100%; min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.portable-player { position: relative; width: 100%; min-width: 0; padding: 18px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.portable-player::before, .portable-player::after { content: ""; position: absolute; right: 14px; left: 14px; height: 1px; background: #d7d7d7; pointer-events: none; }
+.portable-player::before { top: 0; }
+.portable-player::after { bottom: 0; }
 .portable-player-header, .portable-player-side-heading, .portable-player-actions { display: flex; align-items: center; gap: 6px; }
 .portable-player-header { margin: 0 0 13px; padding: 0; border: 0; }
 .portable-player-header h3 { margin: 0; overflow-wrap: anywhere; color: #303030; font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif; font-size: 17px; font-weight: 500; line-height: 1.4; letter-spacing: 0; }
+.portable-player-header h3::after { content: ""; display: block; width: 48px; height: 3px; margin-top: 7px; border-radius: 999px; background: var(--reader-accent); }
 .portable-player-grid { display: grid; width: 100%; min-width: 0; gap: 14px; }
 .portable-player-grid-side-by-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .portable-player-grid-stacked { grid-template-columns: 1fr; }
