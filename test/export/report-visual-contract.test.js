@@ -69,14 +69,14 @@ test('current player visual contract keeps desktop and phone control geometry', 
   assert.match(html, /0 0 9px 2px rgba\(66,211,146,\.40\)/u);
 });
 
-test('current Tree Polo canonical surface keeps text branding, favicon and background without a header logo', () => {
+test('current Tree Polo canonical surface keeps text branding and background without a header logo resource', () => {
   const html = brandedCanonicalHtml();
 
   assert.equal((html.match(/<style\b/gu) || []).length, 1);
   assert.match(html, /data-report-style-bundle/u);
   assert.match(html, /data-report-canonical-theme/u);
   assert.doesNotMatch(html, /tree-polo-brand-logo|<img[^>]+tree-polo-logo/iu);
-  assert.match(html, /<link rel="icon" type="image\/webp" href="images\/tree-polo-logo\.webp">/u);
+  assert.doesNotMatch(html, /<link\b[^>]*\brel=["']icon["'][^>]*tree-polo-logo/iu);
   assert.match(html, /tree-polo-signature-tree/u);
   assert.match(html, /tree-polo-signature-polo/u);
   assert.match(html, /<body data-tree-polo-background="true">/u);
