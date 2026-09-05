@@ -100,17 +100,29 @@ test('tutorial mode targets real controls and provides persistent text guidance'
   assert.match(markup, /data-report-help-tutorial-stop>結束教學/u);
 });
 
-test('help runtime owns speed-slider marker geometry without a post-render refinement', async () => {
+test('tutorial markers stay outside real controls and use compact clickable badges', () => {
+  const css = helpCss();
+  const script = helpScript();
+  assert.match(css, /\.report-help-preview-marker\{[^}]*width:20px[^}]*height:20px/u);
+  assert.match(css, /\.report-help-live-marker\{[^}]*width:20px[^}]*height:20px[^}]*pointer-events:auto/u);
+  assert.match(css, /\.report-help-live-marker\.is-current\{width:24px;height:24px\}/u);
+  assert.match(script, /return \{ x: rect\.left \+ \(rect\.width \/ 2\), y: rect\.top - 12 \}/u);
+  assert.doesNotMatch(script, /return \{ x: rect\.right, y: rect\.top \}/u);
+});
+
+test('help runtime follows timeline and speed thumbs without a post-render refinement', async () => {
   const script = helpScript();
   assert.match(script, /function sliderMarkerPoint\(slider\)/u);
-  assert.match(script, /const thumbHalfWidth = 4/u);
+  assert.match(script, /const thumbHalfWidth = slider\.matches\?\.\('\[data-frame-timeline\]'\) \? 6 : 4/u);
+  assert.match(script, /guide\?\.number === 3/u);
+  assert.match(script, /const controls = target\?\.closest\?\.\('\[data-frame-controls\]'\)/u);
+  assert.match(script, /const timeline = controls\?\.querySelector\?\.\('\[data-frame-timeline\]'\)/u);
   assert.match(script, /guide\?\.number === 7/u);
   assert.match(script, /target\?\.matches\?\.\('\[data-frame-rate\]'\)/u);
-  assert.match(script, /const point = markerPoint\(target, guide\)/u);
-  assert.match(script, /point\.x - hostRect\.left/u);
-  assert.match(script, /window\.scrollX \+ point\.x/u);
-  assert.match(script, /document\.addEventListener\('input', refreshSliderMarker, true\)/u);
-  assert.match(script, /document\.addEventListener\('change', refreshSliderMarker, true\)/u);
+  assert.match(script, /document\.addEventListener\('input', refreshDynamicMarker, true\)/u);
+  assert.match(script, /document\.addEventListener\('change', refreshDynamicMarker, true\)/u);
+  assert.match(script, /document\.addEventListener\('timeupdate', refreshDynamicMarker, true\)/u);
+  assert.match(script, /document\.addEventListener\('seeked', refreshDynamicMarker, true\)/u);
   assert.doesNotMatch(script, /MutationObserver/u);
   const renderer = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-renderer.js'), 'utf8');
   assert.doesNotMatch(renderer, /report-help-marker-refinement|injectReportHelpMarkerRefinement/u);

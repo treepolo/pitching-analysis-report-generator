@@ -76,14 +76,14 @@ body>main button[data-frame-action="toggle"][aria-pressed="true"]::before,
 }
 body>main button[data-frame-action="previous"],
 body>main button[data-frame-action="next"],
-.report-help-live-preview button[data-frame-action="previous"],
-.report-help-live-preview button[data-frame-action="next"] {
+.report-help-live-preview .portable-frame-navigation>button[data-frame-action="previous"],
+.report-help-live-preview .portable-frame-navigation>button[data-frame-action="next"] {
   font-size: 0 !important;
 }
 body>main button[data-frame-action="previous"]::before,
 body>main button[data-frame-action="next"]::before,
-.report-help-live-preview button[data-frame-action="previous"]::before,
-.report-help-live-preview button[data-frame-action="next"]::before {
+.report-help-live-preview .portable-frame-navigation>button[data-frame-action="previous"]::before,
+.report-help-live-preview .portable-frame-navigation>button[data-frame-action="next"]::before {
   content: "";
   position: absolute;
   left: 50%;
@@ -95,11 +95,11 @@ body>main button[data-frame-action="next"]::before,
   transform-origin: 50% 50%;
 }
 body>main button[data-frame-action="previous"]::before,
-.report-help-live-preview button[data-frame-action="previous"]::before {
+.report-help-live-preview .portable-frame-navigation>button[data-frame-action="previous"]::before {
   transform: translate(-43%, -50%) rotate(135deg);
 }
 body>main button[data-frame-action="next"]::before,
-.report-help-live-preview button[data-frame-action="next"]::before {
+.report-help-live-preview .portable-frame-navigation>button[data-frame-action="next"]::before {
   transform: translate(-57%, -50%) rotate(-45deg);
 }
 body>main .portable-frame-navigation [data-frame-current],

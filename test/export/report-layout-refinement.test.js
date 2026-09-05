@@ -41,6 +41,16 @@ test('player glyph geometry centers toggle and frame-step affordances independen
   assert.match(css, /button\[data-frame-action="next"\]::before[\s\S]*?rotate\(-45deg\)/u);
 });
 
+test('help clone uses the same centered chevrons instead of the older font-arrow pseudo glyphs', () => {
+  const css = reportLayoutRefinementCss();
+  assert.match(css, /\.report-help-live-preview \.portable-frame-navigation>button\[data-frame-action="previous"\]::before/u);
+  assert.match(css, /\.report-help-live-preview \.portable-frame-navigation>button\[data-frame-action="next"\]::before/u);
+  assert.match(css, /content: "";[\s\S]*?border-width: 0 1\.5px 1\.5px 0/u);
+  assert.match(css, /\.portable-frame-navigation>button\[data-frame-action="previous"\]::before \{[\s\S]*?translate\(-43%, -50%\) rotate\(135deg\)/u);
+  assert.match(css, /\.portable-frame-navigation>button\[data-frame-action="next"\]::before \{[\s\S]*?translate\(-57%, -50%\) rotate\(-45deg\)/u);
+  assert.doesNotMatch(css, /content:\s*["'](?:←|→)["']/u);
+});
+
 test('annotation navigation buttons and toggles retain player-scale geometry', () => {
   const css = reportLayoutRefinementCss();
   assert.match(css, /\.report-annotation-jump/u);

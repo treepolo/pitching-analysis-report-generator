@@ -3,7 +3,7 @@
 const HELP_ITEMS = Object.freeze([
   ['1', '播放／暫停', '按 ▶ 開始播放，播放中會變成 ⏸；再次按下即可暫停。'],
   ['2', '上一幀', '往前精確移動 1 幀，適合逐幀檢查動作。'],
-  ['3', '目前幀／總幀數', '顯示現在停在哪一幀，以及影片可查看的總幀數。'],
+  ['3', '目前幀／總幀數', '顯示現在停在哪一幀，以及影片可查看的總幀數；教學標記會跟著播放進度上的目前位置移動。'],
   ['4', '播放進度拖桿', '拖曳到想看的位置；放開後會精確定位到該幀。'],
   ['5', '下一幀', '往後精確移動 1 幀。'],
   ['6', '播放速度數值', '可直接輸入倍率；支援從 1/64× 到 64×。'],
@@ -31,7 +31,7 @@ function helpCss() {
 .report-help-live-preview{position:relative;overflow:hidden}
 .report-help-live-preview-empty{margin:0;padding:24px;text-align:center}
 .report-help-live-preview .report-video{margin:0!important;max-width:none!important;width:100%!important;pointer-events:none!important}
-.report-help-preview-marker{position:absolute;z-index:6;display:grid;place-items:center;width:22px;height:22px;transform:translate(-50%,-50%);pointer-events:none}
+.report-help-preview-marker{position:absolute;z-index:6;display:grid;place-items:center;width:20px;height:20px;transform:translate(-50%,-50%);pointer-events:none}
 .report-help-figure figcaption{margin-top:10px}
 .report-help-guide{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin:0;padding:0;list-style:none}
 .report-help-guide li{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:start;padding:12px}
@@ -40,8 +40,8 @@ function helpCss() {
 .report-help-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.report-help-shortcut{padding:10px}.report-help-shortcut kbd{display:inline-block;min-width:29px;margin-right:5px;padding:2px 5px;text-align:center}
 .report-help-note{margin:.7rem 0 0;padding:11px 13px}
 .report-help-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:22px;padding-top:18px}.report-help-tutorial-button{min-height:34px;padding:6px 13px;cursor:pointer}
-.report-help-live-marker{position:absolute;z-index:3800;display:grid;place-items:center;width:27px;height:27px;padding:0;cursor:pointer;transform:translate(-50%,-50%)}
-.report-help-live-marker.is-current{width:31px;height:31px}
+.report-help-live-marker{position:absolute;z-index:3800;display:grid;place-items:center;width:20px;height:20px;padding:0;cursor:pointer;pointer-events:auto;transform:translate(-50%,-50%)}
+.report-help-live-marker.is-current{width:24px;height:24px}
 .report-help-tutorial-panel{position:fixed;right:16px;bottom:16px;z-index:3850;width:min(380px,calc(100vw - 32px))}
 .report-help-tutorial-panel-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px}
 .report-help-tutorial-stop{min-height:34px;padding:6px 13px;cursor:pointer}
@@ -179,19 +179,28 @@ function helpScript() {
     const max = Number.isFinite(maximum) && maximum > min ? maximum : min + 1;
     const current = Number.isFinite(value) ? value : min;
     const ratio = Math.max(0, Math.min(1, (current - min) / (max - min)));
-    const thumbHalfWidth = 4;
+    const thumbHalfWidth = slider.matches?.('[data-frame-timeline]') ? 6 : 4;
     const usableWidth = Math.max(0, rect.width - (thumbHalfWidth * 2));
     return {
       x: rect.left + thumbHalfWidth + (usableWidth * ratio),
-      y: rect.top - 9,
+      y: rect.top - 12,
     };
   }
 
   function markerPoint(target, guide) {
+    if (guide?.number === 3) {
+      const controls = target?.closest?.('[data-frame-controls]');
+      const timeline = controls?.querySelector?.('[data-frame-timeline]');
+      const point = sliderMarkerPoint(timeline);
+      if (point) return point;
+    }
     if (guide?.number === 7 && target?.matches?.('[data-frame-rate]')) return sliderMarkerPoint(target);
     const rect = target?.getBoundingClientRect?.();
     if (!rect || rect.width <= 0 || rect.height <= 0) return null;
-    return { x: rect.right, y: rect.top };
+    if (guide?.number === 4 && target?.matches?.('[data-frame-timeline]')) {
+      return { x: rect.right + 12, y: rect.top + (rect.height / 2) };
+    }
+    return { x: rect.left + (rect.width / 2), y: rect.top - 12 };
   }
 
   function stripCloneRuntime(clone) {
@@ -412,13 +421,15 @@ function helpScript() {
       stopTutorial();
     }
   }, true);
-  const refreshSliderMarker = (event) => {
-    if (!event.target?.matches?.('[data-frame-rate]')) return;
+  const refreshDynamicMarker = (event) => {
+    if (!event.target?.matches?.('[data-player-video], [data-frame-timeline], [data-frame-rate]')) return;
     queueMarkerRefresh();
     if (!backdrop.hidden) queuePreviewMarkers();
   };
-  document.addEventListener('input', refreshSliderMarker, true);
-  document.addEventListener('change', refreshSliderMarker, true);
+  document.addEventListener('input', refreshDynamicMarker, true);
+  document.addEventListener('change', refreshDynamicMarker, true);
+  document.addEventListener('timeupdate', refreshDynamicMarker, true);
+  document.addEventListener('seeked', refreshDynamicMarker, true);
   window.addEventListener('resize', () => {
     queueMarkerRefresh();
     if (!backdrop.hidden) queuePreviewMarkers();
