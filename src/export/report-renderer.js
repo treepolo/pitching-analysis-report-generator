@@ -11,7 +11,6 @@ const { injectReportTitleAlignmentRefinement } = require('./report-title-alignme
 const { injectReportEntrySpotlight } = require('./report-entry-spotlight');
 const { injectReportFixedHeaderRuntime } = require('./report-fixed-header-runtime');
 const { injectReportVisibleTitleRuntime } = require('./report-visible-title-runtime');
-const { injectReportHelpMarkerRefinement } = require('./report-help-marker-refinement');
 
 function renderReportHtml(reportDocument, options = {}) {
   const portable = base.toPortableReportDocument(reportDocument);
@@ -26,7 +25,6 @@ function renderReportHtml(reportDocument, options = {}) {
   html = injectReportEntrySpotlight(html);
   html = injectReportFixedHeaderRuntime(html);
   html = injectReportVisibleTitleRuntime(html);
-  html = injectReportHelpMarkerRefinement(html);
   return html;
 }
 

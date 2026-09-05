@@ -167,6 +167,32 @@ function helpScript() {
     }) || null;
   }
 
+  function sliderMarkerPoint(slider) {
+    if (!slider) return null;
+    const rect = slider.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const minimum = Number(slider.min);
+    const maximum = Number(slider.max);
+    const value = Number(slider.value);
+    const min = Number.isFinite(minimum) ? minimum : 0;
+    const max = Number.isFinite(maximum) && maximum > min ? maximum : min + 1;
+    const current = Number.isFinite(value) ? value : min;
+    const ratio = Math.max(0, Math.min(1, (current - min) / (max - min)));
+    const thumbHalfWidth = 4;
+    const usableWidth = Math.max(0, rect.width - (thumbHalfWidth * 2));
+    return {
+      x: rect.left + thumbHalfWidth + (usableWidth * ratio),
+      y: rect.top - 9,
+    };
+  }
+
+  function markerPoint(target, guide) {
+    if (guide?.number === 7 && target?.matches?.('[data-frame-rate]')) return sliderMarkerPoint(target);
+    const rect = target?.getBoundingClientRect?.();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    return { x: rect.right, y: rect.top };
+  }
+
   function stripCloneRuntime(clone) {
     clone.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'));
     clone.querySelectorAll('video').forEach((video) => {
@@ -199,12 +225,13 @@ function helpScript() {
     for (const guide of guides) {
       const target = markerTarget(clone, guide);
       if (!target) continue;
-      const rect = target.getBoundingClientRect();
+      const point = markerPoint(target, guide);
+      if (!point) continue;
       const badge = document.createElement('span');
       badge.className = 'report-help-preview-marker';
       badge.textContent = String(guide.number);
-      badge.style.left = (rect.right - hostRect.left) + 'px';
-      badge.style.top = (rect.top - hostRect.top) + 'px';
+      badge.style.left = (point.x - hostRect.left) + 'px';
+      badge.style.top = (point.y - hostRect.top) + 'px';
       previewHost.append(badge);
     }
   }
@@ -289,15 +316,16 @@ function helpScript() {
       const guide = guides[index];
       const target = markerTarget(player, guide);
       if (!target) continue;
-      const rect = target.getBoundingClientRect();
+      const point = markerPoint(target, guide);
+      if (!point) continue;
       const marker = document.createElement('button');
       marker.type = 'button';
       marker.className = 'report-help-live-marker' + (index === activeGuideIndex ? ' is-current' : '');
       marker.textContent = String(guide.number);
       marker.title = guide.title;
       marker.setAttribute('aria-label', guide.title + '：顯示文字說明');
-      marker.style.left = (window.scrollX + rect.right) + 'px';
-      marker.style.top = (window.scrollY + rect.top) + 'px';
+      marker.style.left = (window.scrollX + point.x) + 'px';
+      marker.style.top = (window.scrollY + point.y) + 'px';
       marker.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -383,6 +411,13 @@ function helpScript() {
       stopTutorial();
     }
   }, true);
+  const refreshSliderMarker = (event) => {
+    if (!event.target?.matches?.('[data-frame-rate]')) return;
+    queueMarkerRefresh();
+    if (!backdrop.hidden) queuePreviewMarkers();
+  };
+  document.addEventListener('input', refreshSliderMarker, true);
+  document.addEventListener('change', refreshSliderMarker, true);
   window.addEventListener('resize', () => {
     queueMarkerRefresh();
     if (!backdrop.hidden) queuePreviewMarkers();
