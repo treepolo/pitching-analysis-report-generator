@@ -9,7 +9,6 @@ const { injectReportMobileShellRefinement } = require('./report-mobile-shell-ref
 const { injectReportTitleAlignmentRefinement } = require('./report-title-alignment-refinement');
 const { injectReportEntrySpotlight } = require('./report-entry-spotlight');
 const { injectReportFixedHeaderRuntime } = require('./report-fixed-header-runtime');
-const { injectReportVisibleTitleRuntime } = require('./report-visible-title-runtime');
 
 function renderReportHtml(reportDocument, options = {}) {
   const portable = base.toPortableReportDocument(reportDocument);
@@ -22,7 +21,6 @@ function renderReportHtml(reportDocument, options = {}) {
   html = injectReportTitleAlignmentRefinement(html);
   html = injectReportEntrySpotlight(html);
   html = injectReportFixedHeaderRuntime(html);
-  html = injectReportVisibleTitleRuntime(html);
   return html;
 }
 

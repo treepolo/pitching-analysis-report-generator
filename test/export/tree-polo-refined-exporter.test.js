@@ -37,10 +37,10 @@ test('shortens every legacy brand suffix without changing the report name', () =
 });
 
 test('brand signature transform supplies semantic spans without visual styling', () => {
-  const html = stylizeBrandSignature('<h1>王小明報告by小樹Polo</h1>');
+  const html = stylizeBrandSignature('<h1>王小明投球分析報告by小樹Polo</h1>');
   assert.equal(
     html,
-    '<h1>王小明報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹</span><span class="tree-polo-signature-polo">Polo</span></span></h1>',
+    '<h1>王小明投球分析報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹</span><span class="tree-polo-signature-polo">Polo</span></span></h1>',
   );
   assert.doesNotMatch(html, /style=/u);
 });
@@ -54,13 +54,13 @@ test('background context is a body data flag rather than a visual override', () 
   assert.doesNotMatch(twice, /<style|--tree-polo-logo/u);
 });
 
-test('refineHtml changes content and data context without appending a theme', () => {
+test('refineHtml shortens only the document title while preserving the long visible report title', () => {
   const source = `<html><head><title>王小明${LEGACY_BRAND_SUFFIX}</title><style data-report-canonical-theme>body{color:#242424}</style></head><body><main><header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo" src="images/tree-polo-logo.webp"><div class="tree-polo-brand-copy"><h1>王小明${LEGACY_BRAND_SUFFIX}</h1></div></header></main><button class="report-help-trigger">使用教學</button></body></html>`;
   const html = refineHtml(source);
   assert.match(html, new RegExp(`<title>王小明${BRAND_SUFFIX}<\\/title>`, 'u'));
-  assert.match(html, /<h1>王小明報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹<\/span><span class="tree-polo-signature-polo">Polo<\/span><\/span><\/h1>/u);
+  assert.match(html, /<h1>王小明投球分析報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹<\/span><span class="tree-polo-signature-polo">Polo<\/span><\/span><\/h1>/u);
   assert.match(html, /<body data-tree-polo-background="true">/u);
-  assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
+  assert.doesNotMatch(html, /data-report-visible-title-runtime/u);
   assert.doesNotMatch(html, /data-tree-polo-refined-theme|data-tree-polo-brand-theme|--tree-polo-logo/u);
   assert.equal((html.match(/<style\b/gu) || []).length, 1);
   assert.match(html, /data-report-canonical-theme/u);
@@ -97,11 +97,12 @@ test('refined exporter keeps naming and ZIP parity while canonical theme owns ap
   assert.equal(result.zip.parity.valid, true);
 
   const html = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
-  assert.match(html, new RegExp(`王小明${BRAND_SUFFIX}`, 'u'));
-  assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
+  assert.match(html, new RegExp(`<title>王小明${BRAND_SUFFIX}<\\/title>`, 'u'));
+  assert.match(html, /<h1>王小明投球分析報告<span class="tree-polo-signature">/u);
   assert.match(html, /tree-polo-signature/u);
   assert.match(html, /data-tree-polo-background="true"/u);
   assert.match(html, /data-report-canonical-theme/u);
+  assert.doesNotMatch(html, /data-report-visible-title-runtime/u);
   assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme|--tree-polo-logo/u);
 
   const manifest = JSON.parse(await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8'));

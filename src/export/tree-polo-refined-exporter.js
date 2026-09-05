@@ -33,6 +33,12 @@ function shortenBrandSuffix(value) {
     : text;
 }
 
+function shortenDocumentTitle(html) {
+  return String(html).replace(/<title>([\s\S]*?)<\/title>/iu, (match, title) => (
+    `<title>${shortenBrandSuffix(title)}</title>`
+  ));
+}
+
 function stylizeBrandSignature(html) {
   return String(html).replace(
     /(<h1>[^<]*?報告)by小樹Polo(<\/h1>)/u,
@@ -59,7 +65,7 @@ function enableTreePoloBackground(html) {
 }
 
 function refineHtml(html) {
-  let output = shortenBrandSuffix(String(html));
+  let output = shortenDocumentTitle(String(html));
   output = stylizeBrandSignature(output);
   output = enableTreePoloBackground(output);
   output = removeRedundantHelpCopy(output);
