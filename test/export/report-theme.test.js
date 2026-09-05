@@ -27,7 +27,7 @@ test('canonical report theme owns the final reader and editorial player skin', (
   assert.match(css, /--reader-face: #fff/u);
   assert.match(css, /--reader-accent: #1a8917/u);
   assert.match(css, /main \{[^}]*border: 1px solid #e6e6e6[^}]*border-radius: 3px[^}]*background: #fff/u);
-  assert.match(css, /\.portable-player \{[^}]*position: relative[^}]*padding: 18px 22px[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
+  assert.match(css, /\.portable-player \{[^}]*position: relative[^}]*margin: 0 0 14px[^}]*padding: 18px 22px[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
   assert.match(css, /\.portable-player::before, \.portable-player::after \{[^}]*right: 14px[^}]*left: 14px[^}]*height: 1px[^}]*background: #d7d7d7/u);
   assert.match(css, /\.portable-player::before \{[^}]*top: 0/u);
   assert.match(css, /\.portable-player::after \{[^}]*bottom: 0/u);

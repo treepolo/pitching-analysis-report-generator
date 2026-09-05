@@ -38,7 +38,7 @@ h4 { margin: 8px 0 4px; padding-bottom: 2px; border-bottom: 1px solid #e6e6e6; c
 figcaption { margin-top: 3px; color: #6b6b6b; font-size: 11px; }
 .comparison-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 
-.portable-player { position: relative; width: 100%; min-width: 0; padding: 18px 22px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.portable-player { position: relative; width: 100%; min-width: 0; margin: 0 0 14px; padding: 18px 22px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .portable-player::before, .portable-player::after { content: ""; position: absolute; right: 14px; left: 14px; height: 1px; background: #d7d7d7; pointer-events: none; }
 .portable-player::before { top: 0; }
 .portable-player::after { bottom: 0; }
