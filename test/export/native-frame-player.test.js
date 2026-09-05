@@ -37,6 +37,20 @@ test('single-player replay completes its rewind before claiming the playback ope
   assert.match(playSource, /const operation = runtime\.operationSerial;\s*stopOtherNativeFramePlayers\(sharedBlockForSide\)/u);
 });
 
+test('single-player owns one native play request while video.play is pending', () => {
+  const playStart = runtime.indexOf('const play = async ({ fromRateTransition = false } = {}) => {');
+  const toggleStart = runtime.indexOf('const togglePlayback = () => {', playStart);
+  assert.ok(playStart >= 0 && toggleStart > playStart);
+  const playSource = runtime.slice(playStart, toggleStart);
+  assert.match(runtime, /playOperation: null/u);
+  assert.match(runtime, /runtime\.playOperation !== null/u);
+  assert.match(playSource, /\|\| runtime\.playOperation !== null/u);
+  assert.match(playSource, /const operation = runtime\.operationSerial;[\s\S]*runtime\.playOperation = operation;\s*updateControls\(\);[\s\S]*await video\.play\(\)/u);
+  assert.match(playSource, /finally \{\s*if \(runtime\.playOperation === operation\) \{\s*runtime\.playOperation = null;\s*updateControls\(\);\s*\}\s*\}/u);
+  assert.match(runtime, /runtime\.operationSerial \+= 1;\s*runtime\.playOperation = null;/u);
+  assert.match(runtime, /const operation = \+\+runtime\.operationSerial;\s*runtime\.playOperation = null;/u);
+});
+
 test('single-player rate changes keep the current playback mode and switch only when required', () => {
   assert.match(runtime, /if \(!supported\) \{\s*runtime\.rateTransition = false;\s*if \(!wasManual\) startManual\(\)/u);
   assert.match(runtime, /if \(!wasManual\) \{\s*runtime\.rateTransition = false;\s*runtime\.playing = true/u);

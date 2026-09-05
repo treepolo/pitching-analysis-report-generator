@@ -104,6 +104,7 @@ function renderNativeFramePlayerScript() {
         index: 0,
         rate: RATE_DEFAULT,
         playing: false,
+        playOperation: null,
         manual: false,
         manualTime: null,
         manualTimestamp: null,
@@ -187,7 +188,8 @@ function renderNativeFramePlayerScript() {
           || runtime.lifecycle === 'loading'
           || runtime.lifecycle === 'error'
           || !runtime.firstFrameReady
-          || runtime.exactSeek !== null;
+          || runtime.exactSeek !== null
+          || runtime.playOperation !== null;
         const playbackPending = pending || runtime.rateTransition;
         runtime.index = clamp(runtime.index, 0, maximum);
         if (timeline) {
@@ -351,6 +353,7 @@ function renderNativeFramePlayerScript() {
         const previousIndex = runtime.index;
         const serial = ++runtime.seekSerial;
         const operation = ++runtime.operationSerial;
+        runtime.playOperation = null;
         runtime.index = target;
         runtime.playing = false;
         runtime.exactSeek = serial;
@@ -408,6 +411,7 @@ function renderNativeFramePlayerScript() {
       };
       const stop = (message = null) => {
         runtime.operationSerial += 1;
+        runtime.playOperation = null;
         runtime.playing = false;
         runtime.rateTransition = false;
         cancelManual();
@@ -496,15 +500,37 @@ function renderNativeFramePlayerScript() {
         if (count <= 0 || !runtime.loaded || !runtime.firstFrameReady
           || runtime.lifecycle === 'idle' || runtime.lifecycle === 'loading' || runtime.lifecycle === 'error'
           || (!fromRateTransition && runtime.lifecycle === 'loading') || runtime.exactSeek !== null
+          || runtime.playOperation !== null
           || (runtime.rateTransition && !fromRateTransition)) { setStatus('影片正在準備，請稍候。', 'pending'); return; }
         if (runtime.index >= count - 1) { const ready = await seekExact(segmentStartIndex(), false); if (!ready || runtime.index >= count - 1) return; }
         const operation = runtime.operationSerial;
         stopOtherNativeFramePlayers(sharedBlockForSide);
         const rate = clampRate(runtime.rate);
-        if (!nativeRate(rate)) { if (operation === runtime.operationSerial) startManual(); return; }
+        runtime.playOperation = operation;
+        updateControls();
+        if (!nativeRate(rate)) { if (runtime.playOperation === operation) runtime.playOperation = null; if (operation === runtime.operationSerial) startManual(); return; }
         cancelManual();
-        try { await video.play(); if (operation !== runtime.operationSerial || !side.isConnected) return; runtime.playing = true; runtime.lifecycle = 'playing'; setStatus('播放中。', 'loaded'); updateControls(); }
-        catch (error) { if (operation !== runtime.operationSerial || !side.isConnected) return; const message = String(error?.message || error || '').toLowerCase(); if (message.includes('playbackrate') || message.includes('playback rate') || message.includes('supported playback range')) { startManual(); return; } runtime.playing = false; runtime.lifecycle = 'error'; setStatus('播放失敗：' + (error?.message || '請重試。'), 'error'); updateControls(); }
+        try {
+          await video.play();
+          if (operation !== runtime.operationSerial || !side.isConnected) return;
+          runtime.playing = true;
+          runtime.lifecycle = 'playing';
+          setStatus('播放中。', 'loaded');
+          updateControls();
+        } catch (error) {
+          if (operation !== runtime.operationSerial || !side.isConnected) return;
+          const message = String(error?.message || error || '').toLowerCase();
+          if (message.includes('playbackrate') || message.includes('playback rate') || message.includes('supported playback range')) { startManual(); return; }
+          runtime.playing = false;
+          runtime.lifecycle = 'error';
+          setStatus('播放失敗：' + (error?.message || '請重試。'), 'error');
+          updateControls();
+        } finally {
+          if (runtime.playOperation === operation) {
+            runtime.playOperation = null;
+            updateControls();
+          }
+        }
       };
       const togglePlayback = () => {
         if (runtime.playing) stop('已暫停。');
