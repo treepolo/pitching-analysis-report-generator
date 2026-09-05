@@ -42,7 +42,7 @@ test('renders escaped text, inline styles, and relative media paths into self-co
     ],
   });
 
-  assert.match(html, /<style>/u);
+  assert.match(html, /<style data-report-canonical-theme>/u);
   assert.match(html, /&lt;Pitching &amp; Review&gt;/u);
   assert.match(html, /Safe &lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; text/u);
   assert.match(html, /src="videos\/pitch%20clip\.mp4"/u);
