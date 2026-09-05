@@ -8,11 +8,9 @@ const { injectReportLayoutRefinement } = require('./report-layout-refinement');
 const { injectReportFloatingUiRefinement } = require('./report-floating-ui-refinement');
 const { injectReportMobileShellRefinement } = require('./report-mobile-shell-refinement');
 const { injectReportTitleAlignmentRefinement } = require('./report-title-alignment-refinement');
-const { injectReportPlayerSelectionRefinement } = require('./report-player-selection-refinement');
 const { injectReportEntrySpotlight } = require('./report-entry-spotlight');
 const { injectReportFixedHeaderRuntime } = require('./report-fixed-header-runtime');
 const { injectReportVisibleTitleRuntime } = require('./report-visible-title-runtime');
-const { injectMediumReaderDetailRefinement } = require('./medium-reader-detail-refinement');
 const { injectReportHelpMarkerRefinement } = require('./report-help-marker-refinement');
 
 function renderReportHtml(reportDocument, options = {}) {
@@ -25,11 +23,9 @@ function renderReportHtml(reportDocument, options = {}) {
   html = injectReportFloatingUiRefinement(html);
   html = injectReportMobileShellRefinement(html);
   html = injectReportTitleAlignmentRefinement(html);
-  html = injectReportPlayerSelectionRefinement(html);
   html = injectReportEntrySpotlight(html);
   html = injectReportFixedHeaderRuntime(html);
   html = injectReportVisibleTitleRuntime(html);
-  html = injectMediumReaderDetailRefinement(html);
   html = injectReportHelpMarkerRefinement(html);
   return html;
 }

@@ -6,7 +6,7 @@ const {
 const { toReportDocument } = require('../report-contract');
 const { sanitizeRichTextHtml } = require('../rich-text');
 const { renderNativeFramePlayerScript } = require('./native-frame-player');
-const { renderXp7ReaderTheme } = require('./xp7-reader-theme');
+const { renderReportTheme } = require('./report-theme');
 const PLAYBACK_RATE_MIN = 1 / 64;
 const PLAYBACK_RATE_MAX = 64;
 const PLAYBACK_RATE_DEFAULT = 1;
@@ -332,7 +332,7 @@ function renderBlock(block, byId) {
   return `${label ? `<h4>${escapeHtml(label)}</h4>` : ''}${renderText(safeBlock)}`;
 }
 function renderStyles() {
-  return renderXp7ReaderTheme();
+  return renderReportTheme();
 }
 function renderPlayerScript({ includeNative = true } = {}) {
   const body = includeNative ? renderNativeFramePlayerScript() : '';
@@ -375,7 +375,7 @@ function renderReportHtml(
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="report-schema-version" content="${escapeHtml(safeReportDocument.schemaVersion ?? 1)}">
     <title>${escapeHtml(title)}</title>
-    <style>${renderStyles()}</style>
+    <style data-report-canonical-theme>${renderStyles()}</style>
   </head>
   <body>
     <main>
