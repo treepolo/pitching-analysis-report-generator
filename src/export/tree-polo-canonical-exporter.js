@@ -4,13 +4,18 @@ const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { ExportValidationError } = require('./asset-paths');
-const { bundleReportStyles } = require('./report-style-bundler');
-const { exportReport: exportRefinedReport } = require('./tree-polo-refined-exporter');
+const baseExporter = require('./exporter');
 const { validateExportLayout } = require('./layout-validator');
+const { bundleReportStyles } = require('./report-style-bundler');
+const {
+  BRAND_SUFFIX,
+  LEGACY_BRAND_SUFFIX,
+  applyTreePoloPackageHtml,
+  canonicalReportName,
+  createTreePoloPackageAssets,
+} = require('./tree-polo-package');
 const { createZipArchive, validateZipParity } = require('./zip-archive');
 
-const LEGACY_BRAND_SUFFIX = '投球分析報告by小樹Polo';
-const BRAND_SUFFIX = '報告by小樹Polo';
 const outputLocks = new Map();
 
 function sha256(buffer) {
@@ -105,23 +110,24 @@ async function rewriteManifest(folderPath, manifest) {
   );
 }
 
-async function retargetStagedExport(stagedResult, safeName) {
+async function retargetStagedExport(stagedResult, safeName, { title, logoRelativePath }) {
   const folderPath = stagedResult.folderPath;
   if (!folderPath) throw new Error('Canonical Tree Polo delivery requires a staged folder');
 
-  const oldHtmlFileName = stagedResult.reportFileName || `${stagedResult.safeName}.html`;
+  const oldHtmlFileName = stagedResult.reportFileName || 'report.html';
   const htmlFileName = `${safeName}.html`;
-  if (oldHtmlFileName !== htmlFileName) {
-    await fs.rename(
-      path.join(folderPath, oldHtmlFileName),
-      path.join(folderPath, htmlFileName),
-    );
-  }
-
+  const oldHtmlPath = path.join(folderPath, oldHtmlFileName);
   const htmlPath = path.join(folderPath, htmlFileName);
-  const sourceHtml = await fs.readFile(htmlPath, 'utf8');
-  const html = bundleReportStyles(sourceHtml);
-  if (html !== sourceHtml) await fs.writeFile(htmlPath, html, 'utf8');
+  const sourceHtml = await fs.readFile(oldHtmlPath, 'utf8');
+  const packagedHtml = applyTreePoloPackageHtml(sourceHtml, { title, logoRelativePath });
+  const html = bundleReportStyles(packagedHtml);
+
+  if (oldHtmlFileName === htmlFileName) {
+    await fs.writeFile(htmlPath, html, 'utf8');
+  } else {
+    await fs.writeFile(htmlPath, html, { encoding: 'utf8', flag: 'wx' });
+    await fs.rm(oldHtmlPath, { force: true });
+  }
 
   const manifest = JSON.parse(await fs.readFile(path.join(folderPath, 'export-manifest.json'), 'utf8'));
   if (manifest.report && typeof manifest.report === 'object') manifest.report.safeName = safeName;
@@ -187,6 +193,8 @@ async function exportReport(options = {}) {
   if (!path.isAbsolute(options.outputDirectory)) {
     throw new ExportValidationError('Export outputDirectory must be an absolute safe path');
   }
+  const sourceAssets = options.assets ?? [];
+  if (!Array.isArray(sourceAssets)) throw new ExportValidationError('Export assets must be an array');
 
   const outputRoot = path.resolve(options.outputDirectory);
   await assertNoSymbolicLinkAncestors(outputRoot, 'Export outputDirectory');
@@ -195,14 +203,18 @@ async function exportReport(options = {}) {
 
   try {
     throwIfAborted(options.signal);
-    stagedResult = await exportRefinedReport({
+    const treePoloPackage = await createTreePoloPackageAssets(sourceAssets);
+    const reportName = canonicalReportName(options.reportName ?? options.reportDocument?.title);
+    stagedResult = await baseExporter.exportReport({
       ...options,
+      reportName,
+      assets: [...sourceAssets, ...treePoloPackage.assets],
       outputDirectory: internalOutputRoot,
       outputKind: 'folder',
       createZip: false,
       zipPath: undefined,
     });
-    if (!stagedResult.folderPath) throw new Error('Refined Tree Polo export did not produce a staged folder');
+    if (!stagedResult.folderPath) throw new Error('Tree Polo base export did not produce a staged folder');
     if (!stagedResult.safeName.endsWith(BRAND_SUFFIX)) {
       throw new Error(`Unexpected Tree Polo export name: ${stagedResult.safeName}`);
     }
@@ -211,7 +223,10 @@ async function exportReport(options = {}) {
       throwIfAborted(options.signal);
       await fs.mkdir(outputRoot, { recursive: true });
       const targets = await resolveCanonicalTargets(outputRoot, stagedResult.safeName, { needsFolder, needsZip });
-      const staged = await retargetStagedExport(stagedResult, targets.safeName);
+      const staged = await retargetStagedExport(stagedResult, targets.safeName, {
+        title: options.reportDocument?.title ?? options.reportName,
+        logoRelativePath: treePoloPackage.logoRelativePath,
+      });
       let folderCreated = false;
       let zipCreated = false;
       let zip = null;
