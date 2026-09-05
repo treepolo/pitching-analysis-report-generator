@@ -82,13 +82,14 @@ test('spotlight markup and runtime are injected exactly once', () => {
   assert.ok(once.indexOf('data-report-entry-spotlight') < once.indexOf('<main>report</main>'));
 });
 
-test('renderer injects spotlight after help and floating UI refinements', async () => {
+test('renderer injects spotlight after help and title alignment without a floating-header layer', async () => {
   const source = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-renderer.js'), 'utf8');
   assert.match(source, /require\('\.\/report-entry-spotlight'\)/u);
+  assert.doesNotMatch(source, /report-floating-ui-refinement|injectReportFloatingUiRefinement/u);
   const helpIndex = source.indexOf('html = injectReportHelpHtml(html);');
-  const floatingIndex = source.indexOf('html = injectReportFloatingUiRefinement(html);');
+  const titleIndex = source.indexOf('html = injectReportTitleAlignmentRefinement(html);');
   const spotlightIndex = source.indexOf('html = injectReportEntrySpotlight(html);');
   assert.ok(helpIndex >= 0);
-  assert.ok(floatingIndex > helpIndex);
-  assert.ok(spotlightIndex > floatingIndex);
+  assert.ok(titleIndex > helpIndex);
+  assert.ok(spotlightIndex > titleIndex);
 });

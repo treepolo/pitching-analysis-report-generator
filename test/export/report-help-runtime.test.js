@@ -22,8 +22,10 @@ test('report help runtime compiles as browser JavaScript', () => {
   assert.doesNotThrow(() => new vm.Script(script));
 });
 
-test('help component owns inset dialog geometry without owning product skin', () => {
+test('help component owns inset dialog and floating-trigger geometry without owning product skin', () => {
   const css = helpCss();
+  assert.match(css, /\.report-help-trigger\{[^}]*position:fixed[^}]*top:auto[^}]*right:16px[^}]*bottom:16px/u);
+  assert.match(css, /@media\(max-width:720px\)\{\.report-help-trigger\{[^}]*right:8px[^}]*bottom:8px/u);
   assert.match(css, /\.report-help-backdrop\{[^}]*padding:5vh 6vw/u);
   assert.match(css, /\.report-help-dialog\{[^}]*width:min\(940px,88vw\)[^}]*max-height:84vh/u);
   assert.match(css, /\.report-help-header\{[^}]*position:relative[^}]*padding:24px 28px 18px/u);

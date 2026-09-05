@@ -18,7 +18,7 @@ const HELP_ITEMS = Object.freeze([
 function helpCss() {
   return `<style data-report-help-style>
 /* Structural/interaction geometry only. Product skin and typography belong to report-theme.js. */
-.report-help-trigger{position:fixed;top:14px;right:16px;z-index:900;display:inline-flex;align-items:center;gap:.42rem;min-height:34px;padding:6px 13px;cursor:pointer}
+.report-help-trigger{position:fixed;top:auto;right:16px;bottom:16px;z-index:900;display:inline-flex;align-items:center;gap:.42rem;min-height:34px;padding:6px 13px;cursor:pointer}
 .report-help-icon{display:grid;place-items:center;width:18px;height:18px}
 .report-help-backdrop[hidden],.report-help-tutorial-panel[hidden]{display:none}
 .report-help-backdrop{position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center;padding:5vh 6vw;overflow:auto}
@@ -48,6 +48,7 @@ function helpCss() {
 .report-help-tutorial-copy{padding:12px}.report-help-tutorial-copy strong{display:block;margin:0 0 5px}.report-help-tutorial-copy p{margin:0}
 .report-help-tutorial-controls{display:flex;flex-wrap:wrap;gap:7px;padding:0 12px 12px}.report-help-tutorial-controls button{min-height:34px;padding:6px 13px;cursor:pointer}.report-help-tutorial-controls button:disabled{cursor:default}.report-help-tutorial-controls [data-report-help-tutorial-full]{margin-left:auto}
 @media(max-width:760px){.report-help-dialog{width:92vw}.report-help-header{padding:20px 18px 15px}.report-help-content{padding:18px}.report-help-guide{grid-template-columns:1fr}.report-help-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.report-help-tutorial-panel{right:8px;bottom:8px;width:min(360px,calc(100vw - 16px))}}
+@media(max-width:720px){.report-help-trigger{top:auto;right:8px;bottom:8px}}
 @media print{.report-help-trigger,.report-help-backdrop,.report-help-tutorial-panel,.report-help-live-marker{display:none!important}.report-help-live-target{outline:none!important}}
 </style>`;
 }

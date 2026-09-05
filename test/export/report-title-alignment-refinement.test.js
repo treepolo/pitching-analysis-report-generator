@@ -47,13 +47,14 @@ test('title alignment refinement injects once', () => {
   assert.equal((twice.match(/data-report-title-alignment-refinement/g) || []).length, 1);
 });
 
-test('renderer applies title alignment after floating layout and before entry spotlight', async () => {
+test('renderer applies title alignment after mobile shell and before entry spotlight', async () => {
   const source = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-renderer.js'), 'utf8');
   assert.match(source, /require\('\.\/report-title-alignment-refinement'\)/u);
-  const floatingIndex = source.indexOf('html = injectReportFloatingUiRefinement(html);');
+  assert.doesNotMatch(source, /report-floating-ui-refinement|injectReportFloatingUiRefinement/u);
+  const mobileIndex = source.indexOf('html = injectReportMobileShellRefinement(html);');
   const titleIndex = source.indexOf('html = injectReportTitleAlignmentRefinement(html);');
   const spotlightIndex = source.indexOf('html = injectReportEntrySpotlight(html);');
-  assert.ok(floatingIndex >= 0);
-  assert.ok(titleIndex > floatingIndex);
+  assert.ok(mobileIndex >= 0);
+  assert.ok(titleIndex > mobileIndex);
   assert.ok(spotlightIndex > titleIndex);
 });
