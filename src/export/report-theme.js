@@ -71,10 +71,10 @@ figcaption { margin-top: 3px; color: #6b6b6b; font-size: 11px; }
 .portable-frame-rate-row input[type="range"] { flex: 1 1 auto; min-width: 0; padding: 0; margin: 0; }
 .portable-frame-loop, .portable-player-loop { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: 3px; color: #6b6b6b; font-size: 10px; }
 .portable-frame-shared-controls { grid-column: 1 / -1; width: 100%; }
-.portable-frame-controls button, .portable-player-rate-row button, .portable-frame-rate-row button, .portable-player-actions button { min-height: 23px; padding: 3px 8px; border: 1px solid #d0d0d0; border-radius: 999px; background: #fff; box-shadow: none; color: #242424; cursor: pointer; font-weight: normal; text-shadow: none; }
-.portable-frame-controls button:hover:not(:disabled), .portable-player-rate-row button:hover:not(:disabled), .portable-frame-rate-row button:hover:not(:disabled), .portable-player-actions button:hover:not(:disabled) { border-color: #242424; background: #f2f2f2; color: #242424; }
-.portable-frame-controls button:active:not(:disabled), .portable-player-rate-row button:active:not(:disabled), .portable-frame-rate-row button:active:not(:disabled), .portable-player-actions button:active:not(:disabled) { background: #eaeaea; box-shadow: none; }
-.portable-frame-controls button:disabled, .portable-player-rate-row button:disabled, .portable-frame-rate-row button:disabled { border-color: #e6e6e6; background: #f2f2f2; box-shadow: none; color: #b3b3b3; cursor: not-allowed; opacity: 1; }
+.portable-frame-controls button, .portable-player-rate-row button, .portable-frame-rate-row button, .portable-player-actions button, body>main .report-annotation-controls button { min-height: 23px; padding: 3px 8px; border: 1px solid #d0d0d0; border-radius: 999px; background: #fff; box-shadow: none; color: #242424; cursor: pointer; font-weight: normal; text-shadow: none; }
+.portable-frame-controls button:hover:not(:disabled), .portable-player-rate-row button:hover:not(:disabled), .portable-frame-rate-row button:hover:not(:disabled), .portable-player-actions button:hover:not(:disabled), body>main .report-annotation-controls button:hover:not(:disabled) { border-color: #242424; background: #f2f2f2; color: #242424; }
+.portable-frame-controls button:active:not(:disabled), .portable-player-rate-row button:active:not(:disabled), .portable-frame-rate-row button:active:not(:disabled), .portable-player-actions button:active:not(:disabled), body>main .report-annotation-controls button:active:not(:disabled) { background: #eaeaea; box-shadow: none; }
+.portable-frame-controls button:disabled, .portable-player-rate-row button:disabled, .portable-frame-rate-row button:disabled, body>main .report-annotation-controls button:disabled { border-color: #e6e6e6; background: #f2f2f2; box-shadow: none; color: #b3b3b3; cursor: not-allowed; opacity: 1; }
 .portable-frame-controls button:focus-visible, .portable-player-actions button:focus-visible, input:focus-visible { outline: 2px solid #1a8917; outline-offset: 2px; }
 .portable-frame-controls output, .portable-player-side-controls output { color: #6b6b6b; font: 10px Consolas, "Courier New", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: center; }
 .portable-frame-player-status { grid-column: 1 / -1; min-height: 1rem; margin: 0; overflow: hidden; color: #6b6b6b; font-size: .75rem; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; }
@@ -88,7 +88,7 @@ figcaption { margin-top: 3px; color: #6b6b6b; font-size: 11px; }
 .portable-player-rate-input, .portable-player-rate-row input[type="number"] { flex: 0 0 5.5rem; width: 5.5rem; }
 .portable-frame-rate-row input[type="number"] { flex: 0 0 4.5rem; width: 4.5rem; }
 .portable-frame-rate-row input[type="number"], .portable-player-rate-row input[type="number"] { min-height: 23px; padding: 3px 5px; border: 1px solid #d0d0d0; border-radius: 4px; background: #fff; color: #242424; box-shadow: none; }
-.portable-player-rate-reset, .portable-frame-rate-row button { flex: 0 0 25px; width: 25px; height: 23px; padding: 0 !important; font-size: 13px; line-height: 1; }
+.portable-player-rate-reset, .portable-frame-rate-row button { flex: 0 0 25px; width: 25px; height: 23px; padding: 0 !important; border-radius: 0 !important; font-size: 13px; line-height: 1; }
 .portable-player-actions { margin-top: 6px; }
 input[type="range"] { min-height: 18px; accent-color: var(--reader-accent); }
 input[type="checkbox"] { accent-color: var(--reader-accent); }
@@ -134,7 +134,8 @@ html body>main input[data-frame-rate][type="range"]:disabled::-moz-range-track,h
 html body>main input[data-frame-rate][type="range"]:disabled::-moz-range-thumb,html body>main input[data-player-rate][type="range"]:disabled::-moz-range-thumb{background:#b3b3b3!important}
 
 /* Annotation skin; geometry stays in report-layout-refinement.js. */
-body>main .report-annotation-controls,.report-help-live-preview .report-annotation-controls{border:0!important;background:#fafafa!important;box-shadow:none!important;font-size:10px!important;color:#242424!important}
+body>main .report-annotation-controls{border:0!important;background:transparent!important;box-shadow:none!important;font-size:10px!important;color:#242424!important}
+.report-help-live-preview .report-annotation-controls{border:0!important;background:#fafafa!important;box-shadow:none!important;font-size:10px!important;color:#242424!important}
 body>main .report-annotation-jump,.report-help-live-preview .report-annotation-jump{font-size:10px!important}
 body>main .report-annotation-track-toggle,.report-help-live-preview .report-annotation-track-toggle{border-color:#e6e6e6!important;background:#fff!important;color:#242424!important}
 
@@ -143,7 +144,7 @@ body>main .tree-polo-report-header{display:flex;align-items:center;min-height:70
 body>main .tree-polo-report-header::before,body>main .tree-polo-report-header::after{display:none!important}
 body>main .tree-polo-brand-logo{position:absolute;z-index:2;left:10px;top:8px;width:54px;height:54px;object-fit:cover;border:0;border-radius:3px;background:#000;box-shadow:none;filter:none}
 body>main .tree-polo-brand-copy{position:relative;z-index:2;min-width:0}
-body>main .tree-polo-report-header h1{font-family:Tahoma,"Segoe UI","Microsoft JhengHei","Microsoft YaHei",sans-serif!important;font-size:18px!important;font-weight:500!important;line-height:1.28!important;letter-spacing:.035em!important;color:#242424!important;text-shadow:none!important}
+body>main .tree-polo-report-header h1{font-family:Tahoma,"Segoe UI","Microsoft JhengHei","Microsoft YaHei",sans-serif!important;font-size:18px!important;font-weight:700!important;line-height:1.28!important;letter-spacing:.035em!important;color:#242424!important;text-shadow:none!important}
 body>main .tree-polo-signature{display:inline-block!important;color:#6b6b6b!important;font-size:.84em!important;font-weight:500!important;letter-spacing:.02em!important;margin-left:.12em!important;vertical-align:.08em!important}
 body>main .tree-polo-signature-tree,body>main .tree-polo-signature-polo{color:#1a8917!important;font-weight:550;text-shadow:none!important}
 body[data-tree-polo-background="true"]{background:transparent;position:relative;isolation:isolate}
