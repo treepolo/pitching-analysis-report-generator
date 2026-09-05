@@ -42,7 +42,7 @@
 8. 使用者開 Preview；系統使用同一 report model/renderer 顯示 desktop/narrow/mobile viewport。
 9. 使用者修改 issue 或 block；autosave 顯示已保存狀態，並保存 media references、播放設定與 export settings。
 10. 使用者關閉並重開 project；Projects list 顯示更新時間/未完成 job，重開後內容與引用仍在。
-11. 使用者選「輸出資料夾」或「輸出 ZIP/完整交付包」；系統逐 phase 回報、驗證相對路徑/檔案，再顯示結果位置。正式成品主檔為 `report.html`。
+11. 使用者選「輸出資料夾」或「輸出 ZIP/完整交付包」；系統逐 phase 回報、驗證相對路徑/檔案，再顯示結果位置。正式成品主檔為 `<safe-report-name>.html`，目前對外名稱固定追加 `報告by小樹Polo`。
 
 ### Result
 
@@ -66,7 +66,7 @@ Projects 可列出、搜尋/篩選（若實作）、開啟、rename、duplicate�
 
 ## 6. Preview/export flow
 
-`Preview` → `viewport switcher` → `互動驗證` → `Export action` → `job phases`（檢查媒體、必要時正規化、建立 referenced assets、產生 `report.html`、相對路徑／manifest 驗證、ZIP、完成）→ `folder/zip result`。Export failure 必須指出 phase、可重試與 source 是否安全。
+`Preview` → `viewport switcher` → `互動驗證` → `Export action` → `job phases`（檢查媒體、必要時正規化、決定最終 safe name 與必要品牌資產、建立 referenced assets、一次產生最終 `<safe-report-name>.html`、相對路徑／manifest 驗證、ZIP、完成）→ `folder/zip result`。Export failure 必須指出 phase、可重試與 source 是否安全。
 
 ## 7. Error and recovery flow
 

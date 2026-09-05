@@ -7,10 +7,10 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 - The canonical report is a long-form document made of many ordered text blocks and many independent video blocks. Text-editor features are limited to the content needs of those text blocks; video players are inserted as blocks.
 - Each video block independently selects one file or a file pair, supports single/dual mode, and owns its playback segment, in/out range, titles, and playback settings. The layout selector appears only for dual mode.
 - Each dual-video side owns its source settings and can be operated independently; the current generator/export runtime also retains a limited shared timeline, sync-point mapping, and common-loop compatibility behavior. The former anchor/binding/relative-offset workflow is not a product contract and must not be expanded without an explicit data/UX decision.
-- Export produces `report.html` plus copies of only the media assets referenced by video blocks. Unused Media Library assets are excluded, originals remain untouched, and folder/ZIP outputs are self-contained and offline-capable.
+- Export produces `<safe-report-name>.html` plus copies of only the media assets referenced by video blocks and required Tree Polo package assets. Unused Media Library assets are excluded, originals remain untouched, and folder/ZIP outputs are self-contained and offline-capable.
 - This scope decision defines the canonical product direction. Requirement status must still follow actual implementation and evidence rather than being inferred from this text.
 
-目前狀態：持續實作與驗證中。Desktop architecture 已由使用者於 2026-08-14 核准；GitHub remote 已建立並持續推送 checkpoint。Repository 目前實際 visibility 為 **Public**，與本文件較早記錄的「使用者希望 Private」不一致；若 Private 仍是目標，這是待使用者處理的 repository-setting mismatch，不得以文件文字假裝已完成。需求 ID 是本專案的穩定 contract；任何實作、測試、驗收與狀態更新都必須回寫 `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md`。
+目前狀態：持續實作與驗證中。Desktop architecture 已由使用者於 2026-08-14 核准；GitHub remote 已建立並持續推送 checkpoint。2026-09-06 export pipeline 已收斂為單一 `src/export/exporter.js` orchestration owner；R7～R9 已完成局部真人 regression validation。Repository 目前實際 visibility 為 **Public**，這是目前使用者已接受的遠端協作狀態。需求 ID 是本專案的穩定 contract；任何實作、測試、驗收與狀態更新都必須回寫 `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md`。
 
 ## 1. 產品目的與成功條件
 
@@ -52,18 +52,18 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 | SYNC-003 | 未來同步語意需由新產品設計明確定義。 | 新方案通過後再建立驗收。 | DEFERRED |
 | SYNC-004 | 目前雙影片 runtime 可透過 shared timeline 對兩側播放、seek、逐幀與 loop 做映射；這是既有相容行為，不等同於舊式 drift-correction 產品契約。 | 共同控制與兩側映射可運作；不得新增 anchor/binding/offset workflow。 | IN_PROGRESS |
 | SYNC-005 | 未來若支援 frame/time fallback，需另建能力與精度契約。 | 新需求與 fixture/真人 evidence 分開記錄。 | DEFERRED |
-| PREVIEW-001 | preview 與 export 共用 renderer/data contract，避免 editor/export 分歧。 | 同一 fixture 的 preview/export structural comparison。 | NOT_STARTED |
+| PREVIEW-001 | preview 與 export 共用 renderer/data contract，避免 editor/export 分歧。 | 同一 fixture 的 preview/export structural comparison。 | IN_PROGRESS |
 | PREVIEW-002 | preview 可檢查 desktop、narrow desktop、mobile width。 | Scenario F 的 layout/controls evidence。 | NOT_STARTED |
-| EXPORT-001 | 可輸出包含 `report.html` 與實際被引用的 `videos/`、`images/` 資產的 self-contained folder。 | `file://` 直接開啟且相對路徑通過驗證。 | NOT_STARTED |
-| EXPORT-002 | 可將同一 folder 壓成可移動的 ZIP；解壓到任意資料夾仍可用。 | Scenario B 完整離線驗收。 | NOT_STARTED |
-| EXPORT-003 | 「完整交付包」同時產生 folder 與 offline ZIP，並回報結果位置。 | 產物樹與檔案 checksum/數量可檢查。 | NOT_STARTED |
-| OFFLINE-001 | 輸出報告不依賴 internet、CDN、server API、database、Service Worker 或 runtime fetch 取得必要資料。 | 斷網後以 `file://` 開啟 desktop browser。 | NOT_STARTED |
+| EXPORT-001 | 可輸出包含 `<safe-report-name>.html`、實際被引用的 `videos/`／圖片與必要 Tree Polo package assets 的 self-contained folder。 | `file://` 直接開啟且相對路徑通過驗證。 | IN_PROGRESS |
+| EXPORT-002 | 可將同一 folder 壓成可移動的 ZIP；解壓到任意資料夾仍可用。 | Scenario B 完整離線驗收。 | IN_PROGRESS |
+| EXPORT-003 | 「完整交付包」同時產生 folder 與 offline ZIP，並回報結果位置。 | 產物樹與檔案 checksum/數量可檢查。 | IN_PROGRESS |
+| OFFLINE-001 | 輸出報告不依賴 internet、CDN、server API、database、Service Worker 或 runtime fetch 取得必要資料。 | 斷網後以 `file://` 開啟 desktop browser。 | IN_PROGRESS |
 | OFFLINE-002 | offline support boundary 明確標記 desktop 正式支援、mobile local-file 風險。 | 文件與 UI capability statement 一致。 | NOT_STARTED |
 | RESP-001 | 報告與產生器在 desktop wide、narrow、iPhone、Android viewport 無 overlap/水平爆版。 | Scenario F visual evidence。 | NOT_STARTED |
 | RESP-002 | responsive 不刪除正式功能；比較 controls、playback、frame controls 在窄螢幕可觸控。 | mobile reachability map 與 touch test。 | NOT_STARTED |
 | PERSIST-001 | autosave/explicit save 保存內容、media references、playback settings、export settings，以及既有雙影片 sync/commonSegment 相容資料。 | 關閉/重開後資料一致；舊 anchor/binding/offset 欄位被清除。 | IN_PROGRESS |
 | PERSIST-002 | crash/reload recovery 可辨識未完成變更或 job，且不破壞 source project。 | recovery fixture 與 evidence。 | NOT_STARTED |
-| PERSIST-003 | export 是 source project 的讀取衍生流程，不改壞原始資料。 | export 前後 canonical model hash/semantic comparison。 | NOT_STARTED |
+| PERSIST-003 | export 是 source project 的讀取衍生流程，不改壞原始資料。 | export 前後 canonical model hash/semantic comparison。 | IN_PROGRESS |
 | ASYNC-001 | import/inspection/normalization/transcode/ZIP/export 依實際耗時建模為 short async 或 persisted long job。 | phase、processed/total、success/skipped/failed 可觀察。 | NOT_STARTED |
 | ASYNC-002 | long job 支援 cancel、retry、error detail、結果位置與 reload recovery；禁止假百分比。 | Scenario E/G 含取消與重試。 | NOT_STARTED |
 | SEC-001 | 私人影片、專案資料、generated reports、ZIP 不進 Git、不自動上傳第三方、不建立無必要 telemetry。 | secret/sensitive scan 與 log review。 | NOT_STARTED |
@@ -71,12 +71,12 @@ This decision supersedes the earlier fixed-form/editor UI configuration. The old
 | FS-001 | PROJECT_ROOT 下集中管理 `.worktrees`、`.backups`、`.tmp`；不散落 source copy。 | filesystem policy review。 | NOT_STARTED |
 | FS-002 | 正式 application data storage 由 Architecture policy 明確記錄在 project boundary 內。 | 實作後驗證 project data 僅落在 `PROJECT_ROOT/projects/`。 | NOT_STARTED |
 | GIT-001 | 使用 local Git 與 `origin` 保存可追溯 checkpoint；目前分支／遠端狀態以實際 repository evidence 為準，不依賴已刪除的舊 orchestrator/integrator 文件。 | branch/head/remote evidence 可查；治理文件無死引用。 | IN_PROGRESS |
-| GIT-002 | GitHub repo `treepolo/pitching-analysis-report-generator` 已建立；目前實際 visibility 為 Public。若使用者仍要求 Private，需明確調整 repository setting。 | repository metadata 與使用者最終 visibility 決策一致。 | AWAITING_USER_SETUP |
+| GIT-002 | GitHub repo `treepolo/pitching-analysis-report-generator` 已建立；目前實際 visibility 為 Public。 | repository metadata 與使用者最終 visibility 決策一致。 | IN_PROGRESS |
 | GIT-003 | checkpoint／push 不得捏造 evidence；禁止 force push，且 source media、generated report、ZIP、credential 等敏感產物不得進 Git。 | commit/remote evidence 與 sensitive scan 可查。 | IN_PROGRESS |
 | QA-001 | Scenario A–G 覆蓋完整流程、offline、重複 asset、不同 FPS、VFR、responsive、error recovery。 | `ACCEPTANCE_TESTS.md` 的 exit criteria。 | NOT_STARTED |
-| QA-002 | unit/integration/E2E/visual/真人驗收 evidence 分層；fixture 不冒充真人；無 evidence 不可 VERIFIED。 | `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md` audit。 | NOT_STARTED |
+| QA-002 | unit/integration/E2E/visual/真人驗收 evidence 分層；fixture 不冒充真人；無 evidence 不可 VERIFIED。 | `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md` audit。 | IN_PROGRESS |
 | EDIT-004 | Canonical editor is a block-based long-form canvas; the former fixed-form workflow is not a product mode. | many text/video blocks, reorder, reopen, and focused text editing evidence | NOT_STARTED |
-| EXPORT-004 | Export includes only assets referenced by video blocks and copies them without mutating originals. | referenced-set, unused-asset exclusion, folder/ZIP parity evidence | NOT_STARTED |
+| EXPORT-004 | Export includes only assets referenced by video blocks and copies them without mutating originals. | referenced-set, unused-asset exclusion, folder/ZIP parity evidence | IN_PROGRESS |
 
 ## 5. Deferred / not in scope
 

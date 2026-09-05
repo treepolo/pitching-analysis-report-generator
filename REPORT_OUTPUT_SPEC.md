@@ -8,7 +8,7 @@
 - Originals remain untouched. Output copies live under the self-contained export tree with portable relative paths; the same referenced set and content must be used for folder and ZIP variants.
 - A missing/invalid referenced asset blocks export. An unused asset is not included and is not a reason to fail an otherwise valid report.
 
-目前狀態：匯出 folder／ZIP、portable HTML renderer、相對路徑驗證、manifest/checksum 與 native-video portable runtime 已有實作及自動化測試；真實媒體、完整 desktop `file://`、responsive 與真人驗收仍需各自建立相稱 evidence。最新完成度以 `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md` 為準，本文件本身不把任何 requirement 升為 `VERIFIED`。
+目前狀態：匯出 folder／ZIP、portable HTML renderer、相對路徑驗證、manifest/checksum 與 native-video portable runtime 已有實作及自動化測試。2026-09-06 export pipeline 已收斂為單一 `src/export/exporter.js` orchestration owner；`tree-polo-package.js` 只負責 naming、semantic branding 與必要品牌資產。真實媒體、完整 desktop `file://`、responsive 與真人驗收仍需各自建立相稱 evidence。最新完成度以 `PROJECT_STATE.md` 與 `ACCEPTANCE_TESTS.md` 為準，本文件本身不把任何 requirement 升為 `VERIFIED`。
 
 ## 1. Renderer contract
 
@@ -17,6 +17,7 @@
 - 空 optional field 不渲染；空 section/block 不產生誤導性 placeholder。
 - text content 必須經安全序列化／escaping；輸出不可執行使用者輸入的 script。
 - asset references 在 render 前解析為 export-local relative paths；missing/invalid reference 是 export blocker。
+- product visual theme 由 canonical report theme owner 提供；Tree Polo package helper 不另持有平行 visual theme。
 
 ## 2. Output forms
 
@@ -25,7 +26,7 @@
 - 對外輸出名稱以報告名稱為基礎，固定追加 `報告by小樹Polo`。
 - 若原始報告名為 `王小明`，則 folder 為 `王小明報告by小樹Polo`，主 HTML 為 `王小明報告by小樹Polo.html`。
 - Windows／portable filename 不安全字元仍必須經既有 safe-name 規則清理；撞名時沿用既有不覆寫策略追加序號。
-- 報告左上標頭顯示同一品牌名稱，並使用隨輸出封裝的 Tree Polo logo；logo 與所有報告資產必須可離線讀取。
+- 報告左上標頭顯示完整 `投球分析報告by小樹Polo` 語意標題，並使用隨輸出封裝的 Tree Polo logo；document title／folder／HTML／ZIP 使用短版 `報告by小樹Polo` naming。logo 與所有報告資產必須可離線讀取。
 - Tree Polo 品牌識別必須存在，但本文件**不固定**報告的主色、教學入口顏色、漸層、陰影、圓角、材質、擬物／扁平程度或年代風格。這些屬於可替換的 visual direction；只有在使用者另以明確、較新的決策提升為 contract 時才具有硬性約束。
 - 視覺改版不得破壞文字可讀性、焦點可見性、狀態辨識、控制項可達性、responsive 或 preview/export 一致性。
 
@@ -38,7 +39,7 @@
     ├─ videos/
     └─ images/
 
-`images/` 只在存在實際圖片／poster／品牌 logo 資產時需要；不得為其他不存在的媒體建立假資產。可依需求增加其他 self-contained static assets，但不得把必要資料留在 generator runtime、database、server API 或 CDN。
+`images/` 只在存在實際圖片／poster／品牌 logo／品牌背景資產時需要；不得為其他不存在的媒體建立假資產。可依需求增加其他 self-contained static assets，但不得把必要資料留在 generator runtime、database、server API 或 CDN。
 
 ### ZIP
 
@@ -78,15 +79,15 @@ Online static report 正式支援 desktop modern browsers、iPhone/iPad Safari�
 1. snapshot source project
 2. validate project/blocks/media/segments/loops
 3. inspect or prepare normalized media when required
-4. stage referenced videos/images
-5. render portable HTML
-6. apply final brand name/theme/logo and final HTML filename
-7. validate relative paths, asset set and manifest/checksums
+4. derive referenced media set, final safe name, and required Tree Polo package assets
+5. stage referenced media and required package assets once
+6. render portable HTML, apply Tree Polo semantic packaging, bundle canonical styles, and write the final `<safe-report-name>.html` once
+7. build and validate manifest/checksums and relative paths
 8. create ZIP when requested
 9. validate folder/ZIP parity when ZIP exists
 10. complete job and show result locations
 
-每一 phase 都要有可理解的 state；failure 必須標示 phase、source 是否安全、可否 retry。
+同一次產品匯出只有一個 orchestration lifecycle；不得再以 branded/refined/canonical exporter wrapper 逐層重複 staging、HTML rewrite、manifest rewrite、validation 或 delivery。每一 phase 都要有可理解的 state；failure 必須標示 phase、source 是否安全、可否 retry。
 
 ## 5. Source safety and determinism
 
@@ -99,8 +100,9 @@ Online static report 正式支援 desktop modern browsers、iPhone/iPad Safari�
 
 - [ ] manifest 所指定的主 HTML 存在且可讀
 - [ ] folder 與主 HTML 都使用同一 `<safe-report-name>`
-- [ ] 主名稱固定含 `報告by小樹Polo`，不再使用舊的 `投球分析報告by小樹Polo`
-- [ ] Tree Polo logo 存在且使用 export-local relative path
+- [ ] 對外主名稱固定含 `報告by小樹Polo`，不以舊長 suffix 作為 folder／HTML／ZIP naming
+- [ ] visible report header 仍保留完整 `投球分析報告by小樹Polo` 語意
+- [ ] Tree Polo logo 與必要品牌背景存在且使用 export-local relative path
 - [ ] videos/images 目錄與實際 references 一致
 - [ ] 沒有 missing asset、broken relative path 或 external runtime dependency
 - [ ] safe filename 不穿越目錄、不含不安全字元
@@ -110,7 +112,7 @@ Online static report 正式支援 desktop modern browsers、iPhone/iPad Safari�
 
 ## 7. Current evidence boundary
 
-目前已有 folder／ZIP exporter、referenced-only asset staging、manifest/checksum、ZIP parity、network-isolation validator、native-video report runtime 與相關 automated tests。最近一次完整測試結果見 `PROJECT_STATE.md`。仍不可僅憑這些自動化測試宣稱真實媒體、完整 `file://`、跨裝置 responsive 或真人 acceptance 已 `VERIFIED`。
+目前已有 sole folder／ZIP exporter、referenced-only asset staging、required Tree Polo package assets、manifest/checksum、ZIP parity、network-isolation validator、native-video report runtime 與相關 automated tests；R7～R9 亦有使用者局部真人 regression validation。最近一次完整測試結果見 `PROJECT_STATE.md`。仍不可僅憑這些自動化測試或局部 regression 驗收宣稱真實媒體、完整 `file://`、跨裝置 responsive 或完整 Scenario A～H 已 `VERIFIED`。
 
 ## Native-video export contract（adopted 2026-08-23）
 

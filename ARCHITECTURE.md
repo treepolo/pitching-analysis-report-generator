@@ -16,7 +16,7 @@ The product architecture treats the block-based long-form editor as canonical an
 
 Each downstream owner must consume the upstream canonical contract; no owner may reintroduce fixed-form UI or infer export inclusion from the whole Media Library.
 
-目前狀態：**Desktop architecture APPROVED BY USER（2026-08-14）**，且 desktop shell、project-root persistence、block editor/player、media adapters 與 folder/ZIP export 已有 implementation。Shell/framework、native media strategy 與 packaging 仍是可替換的 technical decision；完整真實媒體、recovery、responsive 與真人驗收狀態以 `PROJECT_STATE.md`／`ACCEPTANCE_TESTS.md` 為準，不因架構文字或程式存在而視為 VERIFIED。
+目前狀態：**Desktop architecture APPROVED BY USER（2026-08-14）**，且 desktop shell、project-root persistence、block editor/player、media adapters 與 folder/ZIP export 已有 implementation。2026-09-06 export architecture 已收斂為單一 `src/export/exporter.js` orchestration owner；Tree Polo naming/semantic branding/required assets 由 pure `tree-polo-package.js` helper 提供，舊 branded/refined/canonical exporter wrapper 與 `main-entry.js` monkey-patch 已移除。Shell/framework、native media strategy 與 packaging primitives 仍是可替換的 technical decision；完整真實媒體、recovery、responsive 與真人驗收狀態以 `PROJECT_STATE.md`／`ACCEPTANCE_TESTS.md` 為準，不因架構文字或程式存在而視為 VERIFIED。
 
 ## 1. Product drivers
 
@@ -93,9 +93,10 @@ Each downstream owner must consume the upstream canonical contract; no owner may
 
 依目前 user job，採 **Desktop application shell + portable web renderer**：
 
-- shell 負責 project filesystem、media pipeline、FFmpeg/native adapter、job persistence、folder/ZIP export。
+- shell 負責 project filesystem、media pipeline、FFmpeg/native adapter、job persistence 與 export job bridge。
 - web layer 負責 editor、preview、player UI 與可重用 report renderer。
-- exported report 不依賴 desktop shell；正式成品主檔為 `report.html`，並遵守 `REPORT_OUTPUT_SPEC.md` 的 file:// contract。
+- `src/export/exporter.js` 是唯一產品匯出 orchestration owner；`tree-polo-package.js` 只提供命名、semantic branding 與必要品牌資產，`report-renderer`、`report-style-bundler`、`layout-validator`、`zip-archive` 分別維持其單一責任。
+- exported report 不依賴 desktop shell；正式成品主檔為 `<safe-report-name>.html`，目前名稱固定追加 `報告by小樹Polo`，並遵守 `REPORT_OUTPUT_SPEC.md` 的 file:// contract。
 - application data、internal temporary/cache 與 generated artifacts 必須遵守 `PROJECT_STATE.md`、`DATA_MODEL.md`、`MEDIA_PIPELINE.md` 與 export path policy 定義的安全邊界。
 
 這是使用者已確認的高層方向。實作仍不得加入帳號、雲端 database 或超出 scope 的服務。既有 implementation 應持續維持 shell 與 portable report runtime 的邊界；不得為求方便把 source media、generated report 或 ZIP 放進 Git。
