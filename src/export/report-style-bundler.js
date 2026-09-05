@@ -10,7 +10,6 @@ const STYLE_SOURCE_ROLES = Object.freeze({
   'data-annotation-navigation-style': 'functional-layout',
   'data-report-help-style': 'functional-layout',
   'data-report-layout-refinement': 'functional-layout',
-  'data-report-floating-ui-refinement': 'functional-layout',
   'data-report-mobile-shell-refinement': 'functional-layout',
   'data-report-title-alignment-refinement': 'functional-layout',
   'data-report-entry-spotlight-style': 'component-style',

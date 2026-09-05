@@ -70,6 +70,8 @@ test('rendered annotated report contains all requested reader enhancements toget
   assert.match(html, /結束教學/u);
   assert.match(html, /在報告中顯示教學標記/u);
   assert.match(html, /cloneNode\(true\)/u);
+  assert.match(html, /data-report-fixed-header-runtime/u);
+  assert.doesNotMatch(html, /data-report-help-marker-refinement|data-report-floating-ui-refinement|data-report-visible-title-runtime/u);
   assert.doesNotMatch(html, /report-help-demo-screen/u);
 });
 

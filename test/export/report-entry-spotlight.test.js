@@ -57,8 +57,10 @@ test('entry spotlight blocks one outside click and then dismisses', () => {
 
 test('clicking help dismisses spotlight without swallowing the help click', () => {
   const script = spotlightScript();
-  assert.match(script, /helpTrigger\.addEventListener\('click', \(\) => \{\s*dismiss\(\);\s*\}, true\)/u);
-  assert.doesNotMatch(script, /helpTrigger\.addEventListener[\s\S]*?stopImmediatePropagation/u);
+  const listener = script.match(/helpTrigger\.addEventListener\('click', \(\) => \{([\s\S]*?)\}, true\);/u)?.[1];
+  assert.ok(listener);
+  assert.match(listener, /dismiss\(\)/u);
+  assert.doesNotMatch(listener, /preventDefault|stopPropagation|stopImmediatePropagation/u);
 });
 
 test('playback shortcuts are blocked until the spotlight is dismissed', () => {

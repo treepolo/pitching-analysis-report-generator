@@ -48,6 +48,7 @@ test('classifies only current canonical, functional and component style owners',
   assert.equal(styleSourceRole('data-report-help-style'), 'functional-layout');
   assert.equal(styleSourceRole('data-annotation-reader-style'), 'component-style');
   assert.equal(styleSourceRole('data-report-entry-spotlight-style'), 'component-style');
+  assert.equal(styleSourceRole('data-report-floating-ui-refinement'), 'unclassified');
   assert.equal(styleSourceRole('inline-style-1'), 'unclassified');
   assert.equal(styleSourceRole('data-unknown-style'), 'unclassified');
   assert.deepEqual(new Set(Object.values(STYLE_SOURCE_ROLES)), new Set([
