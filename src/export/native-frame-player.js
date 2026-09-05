@@ -492,13 +492,13 @@ function renderNativeFramePlayerScript() {
         return true;
       };
       const play = async ({ fromRateTransition = false } = {}) => {
-        const operation = runtime.operationSerial;
         const count = frameCount();
         if (count <= 0 || !runtime.loaded || !runtime.firstFrameReady
           || runtime.lifecycle === 'idle' || runtime.lifecycle === 'loading' || runtime.lifecycle === 'error'
           || (!fromRateTransition && runtime.lifecycle === 'loading') || runtime.exactSeek !== null
           || (runtime.rateTransition && !fromRateTransition)) { setStatus('影片正在準備，請稍候。', 'pending'); return; }
-        if (runtime.index >= count - 1) { const ready = await seekExact(segmentStartIndex(), false); if (operation !== runtime.operationSerial || !ready || runtime.index >= count - 1) return; }
+        if (runtime.index >= count - 1) { const ready = await seekExact(segmentStartIndex(), false); if (!ready || runtime.index >= count - 1) return; }
+        const operation = runtime.operationSerial;
         stopOtherNativeFramePlayers(sharedBlockForSide);
         const rate = clampRate(runtime.rate);
         if (!nativeRate(rate)) { if (operation === runtime.operationSerial) startManual(); return; }

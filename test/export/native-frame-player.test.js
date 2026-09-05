@@ -23,6 +23,20 @@ test('single-player extended clock presents discrete target frames instead of se
   assert.match(runtime, /video\.currentTime = frameTime\(targetFrame\)/u);
 });
 
+test('single-player replay completes its rewind before claiming the playback operation', () => {
+  const playStart = runtime.indexOf('const play = async ({ fromRateTransition = false } = {}) => {');
+  const toggleStart = runtime.indexOf('const togglePlayback = () => {', playStart);
+  assert.ok(playStart >= 0 && toggleStart > playStart);
+  const playSource = runtime.slice(playStart, toggleStart);
+  const rewindIndex = playSource.indexOf('if (runtime.index >= count - 1)');
+  const operationIndex = playSource.indexOf('const operation = runtime.operationSerial;');
+  assert.ok(rewindIndex >= 0);
+  assert.ok(operationIndex > rewindIndex);
+  assert.match(playSource, /const ready = await seekExact\(segmentStartIndex\(\), false\); if \(!ready \|\| runtime\.index >= count - 1\) return;/u);
+  assert.doesNotMatch(playSource, /operation !== runtime\.operationSerial \|\| !ready/u);
+  assert.match(playSource, /const operation = runtime\.operationSerial;\s*stopOtherNativeFramePlayers\(sharedBlockForSide\)/u);
+});
+
 test('single-player rate changes keep the current playback mode and switch only when required', () => {
   assert.match(runtime, /if \(!supported\) \{\s*runtime\.rateTransition = false;\s*if \(!wasManual\) startManual\(\)/u);
   assert.match(runtime, /if \(!wasManual\) \{\s*runtime\.rateTransition = false;\s*runtime\.playing = true/u);
