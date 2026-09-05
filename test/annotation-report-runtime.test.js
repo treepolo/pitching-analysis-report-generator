@@ -46,3 +46,20 @@ test('injects a self-contained reader overlay runtime only when annotations exis
   assert.ok(script);
   assert.doesNotThrow(() => new vm.Script(script));
 });
+
+test('reader mounts annotation controls into the canonical player controls instead of above the video', () => {
+  const html = injectAnnotationReportHtml('<html><head></head><body></body></html>', {
+    sections: [{ blocks: [{
+      type: 'singleVideo',
+      mediaAssetId: 'video-a',
+      annotations: { tracks: [{ id: 'a', name: 'A', points: [{ frame: 1, x: .1, y: .2 }] }] },
+    }] }],
+  });
+  assert.match(html, /controls\.dataset\.annotationControlsFor = sideName/u);
+  assert.match(html, /sideName === 'single'/u);
+  assert.match(html, /side\.querySelector\('\[data-frame-controls\]'\)/u);
+  assert.match(html, /player\?\.querySelector\('\[data-frame-shared-controls\]'\)/u);
+  assert.match(html, /controlRegion\.append\(controls\)/u);
+  assert.doesNotMatch(html, /heading\.after\(controls\)|side\.prepend\(controls\)/u);
+  assert.doesNotMatch(html, /border:1px solid #aab3bc|background:#f3f5f7/u);
+});

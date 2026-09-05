@@ -51,6 +51,14 @@ test('reader exposes explicit previous and next annotation-frame buttons', () =>
   assert.match(source, /nextFrame === null/u);
 });
 
+test('annotation navigation follows controls relocated into the player control region', () => {
+  const source = navigationScript(records);
+  assert.match(source, /data-annotation-controls-for/u);
+  assert.match(source, /entry\.side\.querySelector\(controlSelector\) \|\| entry\.player\.querySelector\(controlSelector\)/u);
+  assert.match(source, /controls\.addEventListener\('pointerdown', \(\) => \{ activeEntry = entry; \}\)/u);
+  assert.match(source, /controls\.prepend\(nav\)/u);
+});
+
 test('A and D move strictly to the nearest previous or next annotation frame', () => {
   const source = navigationScript(records);
   assert.match(source, /event\.code === 'KeyA'/u);

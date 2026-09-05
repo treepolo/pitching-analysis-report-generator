@@ -2,14 +2,16 @@
 
 function reportLayoutRefinementCss() {
   return `<style data-report-layout-refinement>
-/* Annotation controls own compact geometry only. Visual skin belongs to the canonical report theme. */
+/* Annotation controls share the player control region. Visual skin belongs to the canonical report theme. */
 body>main .report-annotation-controls,
 .report-help-live-preview .report-annotation-controls {
-  width: max-content !important;
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
   max-width: 100% !important;
   min-height: 0 !important;
-  margin: .18rem 0 .12rem !important;
-  padding: 0 !important;
+  margin: .18rem 0 0 !important;
+  padding: .35rem 0 0 !important;
+  border-top: 1px solid #e6e6e6 !important;
   gap: .18rem .42rem !important;
   line-height: 1.15 !important;
 }
@@ -166,7 +168,8 @@ body>main .portable-frame-player-status[data-state="error"],
     flex-wrap: wrap !important;
     align-items: center !important;
     width: 100% !important;
-    margin: .12rem 0 .1rem !important;
+    margin: .12rem 0 0 !important;
+    padding-top: .32rem !important;
     gap: 4px 7px !important;
   }
   body>main .report-annotation-navigation,

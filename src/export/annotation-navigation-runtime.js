@@ -184,8 +184,10 @@ function navigationScript(records) {
   }
 
   function addNavigation(entry) {
-    const controls = entry.side.querySelector('.report-annotation-controls');
+    const controlSelector = '.report-annotation-controls[data-annotation-controls-for="' + entry.sideName + '"]';
+    const controls = entry.side.querySelector(controlSelector) || entry.player.querySelector(controlSelector);
     if (!controls || controls.querySelector('[data-annotation-frame-navigation]')) return;
+    controls.addEventListener('pointerdown', () => { activeEntry = entry; });
     const nav = document.createElement('span');
     nav.className = 'report-annotation-navigation';
     nav.dataset.annotationFrameNavigation = '';

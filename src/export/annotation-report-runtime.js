@@ -55,9 +55,9 @@ function annotationReaderCss() {
   .report-annotation-overlay { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; z-index:4; }
   .report-annotation-line { fill:none; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
   .report-annotation-point { stroke:#fff; stroke-width:1.25; vector-effect:non-scaling-stroke; }
-  .report-annotation-controls { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem .6rem; margin:.35rem 0 .25rem; padding:.3rem .4rem; border:1px solid #aab3bc; background:#f3f5f7; font-size:.78rem; }
+  .report-annotation-controls { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem .6rem; font-size:.78rem; }
   .report-annotation-controls label { display:inline-flex; align-items:center; gap:.22rem; }
-  .report-annotation-track-toggle { padding:.08rem .3rem; border:1px solid #c6ccd2; background:#fff; }
+  .report-annotation-track-toggle { padding:.08rem .3rem; }
   .report-annotation-swatch { display:inline-block; width:.7rem; height:.7rem; border:1px solid #6e7780; }
 </style>`;
 }
@@ -133,7 +133,9 @@ function annotationReaderScript(records) {
 
   function addControls(side, annotations) {
     const controls = document.createElement('div');
+    const sideName = side.dataset.playerSide || 'single';
     controls.className = 'report-annotation-controls';
+    controls.dataset.annotationControlsFor = sideName;
     controls.setAttribute('aria-label', '標註顯示控制');
 
     const pointLabel = document.createElement('label');
@@ -166,9 +168,12 @@ function annotationReaderScript(records) {
       controls.append(label);
     });
 
-    const heading = side.querySelector('.portable-player-side-heading');
-    if (heading) heading.after(controls);
-    else side.prepend(controls);
+    const player = side.closest('[data-native-frame-player-block]');
+    const controlRegion = sideName === 'single'
+      ? side.querySelector('[data-frame-controls]')
+      : player?.querySelector('[data-frame-shared-controls]');
+    if (controlRegion) controlRegion.append(controls);
+    else side.append(controls);
   }
 
   const mounted = [];

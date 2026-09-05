@@ -18,15 +18,17 @@ test('layout refinement no longer owns report or help visual skin', () => {
   assert.doesNotMatch(css, /background:\s|box-shadow:\s/u);
 });
 
-test('annotation controls keep compact geometry for report and help clone', () => {
+test('annotation controls share the player control region with one separator and no box', () => {
   const css = reportLayoutRefinementCss();
   assert.match(css, /body>main \.report-annotation-controls/u);
   assert.match(css, /\.report-help-live-preview \.report-annotation-controls/u);
-  assert.match(css, /width: max-content !important/u);
-  assert.match(css, /margin: \.18rem 0 \.12rem !important/u);
-  assert.match(css, /padding: 0 !important/u);
+  assert.match(css, /grid-column: 1 \/ -1 !important/u);
+  assert.match(css, /width: 100% !important/u);
+  assert.match(css, /margin: \.18rem 0 0 !important/u);
+  assert.match(css, /padding: \.35rem 0 0 !important/u);
+  assert.match(css, /border-top: 1px solid #e6e6e6 !important/u);
   assert.match(css, /gap: \.18rem \.42rem !important/u);
-  assert.doesNotMatch(css, /\.report-annotation-controls[\s\S]{0,260}?(?:background|box-shadow|font-size:)/u);
+  assert.doesNotMatch(css, /\.report-annotation-controls[\s\S]{0,320}?(?:background|box-shadow|border-left|border-right|border-bottom)/u);
 });
 
 test('player glyph geometry centers toggle and frame-step affordances independently of font baselines', () => {
