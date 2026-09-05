@@ -2,15 +2,14 @@
 
 function titleAlignmentCss() {
   return `<style data-report-title-alignment-refinement>
-/* Center the report title against the full title-bar width, not the residual
-   flex space beside the logo. Visual typography belongs to report-theme.js. */
+/* Center the report title against the full title-bar width. Visual typography belongs to report-theme.js. */
 body>main header.tree-polo-report-header .tree-polo-brand-copy {
   position: absolute !important;
   left: 50% !important;
   top: 50% !important;
   z-index: 3 !important;
   width: max-content !important;
-  max-width: calc(100% - 170px) !important;
+  max-width: calc(100% - 32px) !important;
   transform: translate(-50%, -50%) !important;
   text-align: center !important;
   pointer-events: none !important;
@@ -26,7 +25,7 @@ body>main header.tree-polo-report-header .tree-polo-brand-copy h1 {
 
 @media (max-width: 700px) {
   body>main header.tree-polo-report-header .tree-polo-brand-copy {
-    max-width: calc(100% - 136px) !important;
+    max-width: calc(100% - 24px) !important;
   }
 }
 

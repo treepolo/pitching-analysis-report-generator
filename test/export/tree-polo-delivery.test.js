@@ -72,7 +72,8 @@ test('delivers folder, HTML and ZIP with the canonical Tree Polo package contrac
   const html = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
   assert.match(html, new RegExp(`<title>王小明${BRAND_SUFFIX}<\\/title>`, 'u'));
   assert.match(html, /<h1>王小明投球分析報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹<\/span><span class="tree-polo-signature-polo">Polo<\/span><\/span><\/h1>/u);
-  assert.match(html, /src="images\/tree-polo-logo\.webp"/u);
+  assert.doesNotMatch(html, /tree-polo-brand-logo|<img[^>]+tree-polo-logo/iu);
+  assert.match(html, /<link rel="icon" type="image\/webp" href="images\/tree-polo-logo\.webp">/u);
   assert.match(html, /data-tree-polo-background="true"/u);
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
   assert.equal((html.match(/<style\b/gu) || []).length, 1);

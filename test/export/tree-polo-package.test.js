@@ -28,7 +28,7 @@ test('Tree Polo naming preserves the long visible title and short delivery suffi
   assert.ok(canonicalReportName('王'.repeat(200)).length <= 80);
 });
 
-test('Tree Polo HTML transform owns semantics without adding a visual theme', () => {
+test('Tree Polo HTML transform keeps text branding and uses the logo only as document icon', () => {
   const source = '<html><head><title>王小明</title><style data-report-canonical-theme>body{color:#242424}</style></head><body><main><header class="report-header"><p class="eyebrow">Pitching analysis report</p><h1>王小明</h1></header></main><p>以下圖解直接使用這份報告中的實際播放器介面。</p><h3>實際播放器圖解</h3></body></html>';
   const html = applyTreePoloPackageHtml(source, {
     title: '王小明',
@@ -36,7 +36,8 @@ test('Tree Polo HTML transform owns semantics without adding a visual theme', ()
   });
   assert.match(html, new RegExp(`<title>王小明${BRAND_SUFFIX}<\\/title>`, 'u'));
   assert.match(html, /class="report-header tree-polo-report-header"/u);
-  assert.match(html, /src="images\/tree-polo-logo\.webp"/u);
+  assert.doesNotMatch(html, /tree-polo-brand-logo|<img[^>]+tree-polo-logo/iu);
+  assert.match(html, /<link rel="icon" type="image\/webp" href="images\/tree-polo-logo\.webp">/u);
   assert.match(html, /<h1>王小明投球分析報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹<\/span><span class="tree-polo-signature-polo">Polo<\/span><\/span><\/h1>/u);
   assert.match(html, /<body data-tree-polo-background="true">/u);
   assert.doesNotMatch(html, /Pitching analysis report|以下圖解直接使用|<h3>實際播放器圖解<\/h3>/u);

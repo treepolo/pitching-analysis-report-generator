@@ -21,13 +21,13 @@ test('report title copy is centered against the full title bar', () => {
   assert.match(css, /text-align: center !important/u);
 });
 
-test('centered title protects the logo area and long names', () => {
+test('centered title uses the full no-logo header width and protects long names', () => {
   const css = titleAlignmentCss();
-  assert.match(css, /max-width: calc\(100% - 170px\) !important/u);
+  assert.match(css, /max-width: calc\(100% - 32px\) !important/u);
   assert.match(css, /white-space: nowrap !important/u);
   assert.match(css, /text-overflow: ellipsis !important/u);
   assert.match(css, /@media \(max-width: 700px\)/u);
-  assert.match(css, /max-width: calc\(100% - 136px\) !important/u);
+  assert.match(css, /max-width: calc\(100% - 24px\) !important/u);
 });
 
 test('title alignment owns positioning only while canonical theme owns signature typography', () => {

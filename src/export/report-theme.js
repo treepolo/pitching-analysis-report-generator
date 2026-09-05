@@ -139,10 +139,9 @@ body>main .report-annotation-controls{border:0!important;background:transparent!
 body>main .report-annotation-jump,.report-help-live-preview .report-annotation-jump{font-size:10px!important}
 body>main .report-annotation-track-toggle,.report-help-live-preview .report-annotation-track-toggle{border-color:#e6e6e6!important;background:#fff!important;color:#242424!important}
 
-/* Tree Polo branding. Exporters provide markup/assets; this theme owns appearance. */
-body>main .tree-polo-report-header{display:flex;align-items:center;min-height:70px;margin:0 -8px 8px;padding:8px 12px 8px 76px;border-bottom:1px solid #e6e6e6;background:#fff;box-shadow:none;color:#242424}
+/* Tree Polo branding. Package helper provides semantic title/icon/background assets; this theme owns appearance. */
+body>main .tree-polo-report-header{display:flex;align-items:center;min-height:54px;margin:0 -8px 8px;padding:10px 12px;border-bottom:1px solid #e6e6e6;background:#fff;box-shadow:none;color:#242424}
 body>main .tree-polo-report-header::before,body>main .tree-polo-report-header::after{display:none!important}
-body>main .tree-polo-brand-logo{position:absolute;z-index:2;left:10px;top:8px;width:54px;height:54px;object-fit:cover;border:0;border-radius:3px;background:#000;box-shadow:none;filter:none}
 body>main .tree-polo-brand-copy{position:relative;z-index:2;min-width:0}
 body>main .tree-polo-report-header h1{font-family:Tahoma,"Segoe UI","Microsoft JhengHei","Microsoft YaHei",sans-serif!important;font-size:18px!important;font-weight:700!important;line-height:1.28!important;letter-spacing:.035em!important;color:#242424!important;text-shadow:none!important}
 body>main .tree-polo-signature{display:inline-block!important;color:#6b6b6b!important;font-size:.84em!important;font-weight:500!important;letter-spacing:.02em!important;margin-left:.12em!important;vertical-align:.08em!important}
@@ -215,8 +214,7 @@ body[data-tree-polo-background="true"]::before{content:"";position:fixed;inset:0
   .comparison-media, .portable-player-grid-side-by-side { grid-template-columns: 1fr; }
   .portable-player-grid-side-by-side > .portable-player-side + .portable-player-side, .portable-player-grid-side-by-side > .portable-player + .portable-player { margin-top: 4px; padding-top: 8px; padding-left: 2px; border-top: 1px solid #e6e6e6; border-left: 0; }
   .portable-player-side-controls { grid-template-columns: minmax(0, 1fr) max-content; }
-  body>main .tree-polo-report-header{min-height:62px;padding-left:66px}
-  body>main .tree-polo-brand-logo{left:9px;top:8px;width:46px;height:46px}
+  body>main .tree-polo-report-header{min-height:54px;padding:10px 12px}
   body>main .tree-polo-report-header h1{font-size:16px!important;letter-spacing:.025em!important}
   body>main .tree-polo-signature{font-size:.82em!important}
   body>main .portable-frame-navigation [data-frame-current],body>main .portable-frame-navigation [data-frame-total],.report-help-live-preview .portable-frame-navigation [data-frame-current],.report-help-live-preview .portable-frame-navigation [data-frame-total]{font-size:10px!important}

@@ -60,16 +60,24 @@ function canonicalReportName(value) {
   return shortenBrandSuffix(brandedReportName(value));
 }
 
-function brandHeader(title, logoRelativePath) {
-  return `<header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo" src="${escapeHtml(logoRelativePath)}" alt="小樹Polo"><div class="tree-polo-brand-copy"><h1>${escapeHtml(brandedDisplayTitle(title))}</h1></div></header>`;
+function brandHeader(title) {
+  return `<header class="report-header tree-polo-report-header"><div class="tree-polo-brand-copy"><h1>${escapeHtml(brandedDisplayTitle(title))}</h1></div></header>`;
 }
 
-function applyTreePoloBrandHtml(html, { title, logoRelativePath }) {
+function ensureBrandIcon(html, logoRelativePath) {
+  const source = String(html);
+  if (typeof logoRelativePath !== 'string' || logoRelativePath.trim() === '') return source;
+  if (/<link\b[^>]*\brel=["']icon["']/iu.test(source)) return source;
+  const icon = `<link rel="icon" type="${BRAND_LOGO_MEDIA_TYPE}" href="${escapeHtml(logoRelativePath)}">`;
+  return source.includes('</head>') ? source.replace('</head>', `${icon}</head>`) : `${icon}${source}`;
+}
+
+function applyTreePoloBrandHtml(html, { title, logoRelativePath } = {}) {
   let output = String(html);
   const brandedTitle = escapeHtml(brandedDisplayTitle(title));
   output = output.replace(/<title>[\s\S]*?<\/title>/iu, `<title>${brandedTitle}</title>`);
-  output = output.replace(/<header class="report-header">[\s\S]*?<\/header>/iu, brandHeader(title, logoRelativePath));
-  return output;
+  output = output.replace(/<header class="report-header">[\s\S]*?<\/header>/iu, brandHeader(title));
+  return ensureBrandIcon(output, logoRelativePath);
 }
 
 function shortenDocumentTitle(html) {
@@ -103,7 +111,7 @@ function enableTreePoloBackground(html) {
   });
 }
 
-function applyTreePoloPackageHtml(html, { title, logoRelativePath }) {
+function applyTreePoloPackageHtml(html, { title, logoRelativePath } = {}) {
   let output = applyTreePoloBrandHtml(html, { title, logoRelativePath });
   output = shortenDocumentTitle(output);
   output = stylizeBrandSignature(output);
