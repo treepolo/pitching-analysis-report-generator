@@ -40,7 +40,7 @@ function reportDocument(title = '王小明') {
   };
 }
 
-test('delivers folder, HTML and ZIP with one bundled canonical visual theme', async () => {
+test('delivers folder, HTML and ZIP with the canonical Tree Polo package contract', async () => {
   const projectRoot = path.join(testRoot, 'project');
   const outputDirectory = path.join(testRoot, 'output');
   await fs.mkdir(projectRoot, { recursive: true });
@@ -70,7 +70,10 @@ test('delivers folder, HTML and ZIP with one bundled canonical visual theme', as
   await assert.rejects(fs.stat(path.join(outputDirectory, legacyName)), { code: 'ENOENT' });
 
   const html = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
-  assert.match(html, new RegExp(`王小明${BRAND_SUFFIX}`, 'u'));
+  assert.match(html, new RegExp(`<title>王小明${BRAND_SUFFIX}<\\/title>`, 'u'));
+  assert.match(html, /<h1>王小明投球分析報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹<\/span><span class="tree-polo-signature-polo">Polo<\/span><\/span><\/h1>/u);
+  assert.match(html, /src="images\/tree-polo-logo\.webp"/u);
+  assert.match(html, /data-tree-polo-background="true"/u);
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
   assert.equal((html.match(/<style\b/gu) || []).length, 1);
   assert.match(html, /data-report-style-bundle/u);
@@ -78,19 +81,25 @@ test('delivers folder, HTML and ZIP with one bundled canonical visual theme', as
   assert.match(html, /report-style-source:data-report-mobile-shell-refinement; role:functional-layout/u);
   assert.match(html, /report-style-source:data-report-entry-spotlight-style; role:component-style/u);
   assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme|legacy-visual|final-visual/u);
-  assert.match(html, /data-tree-polo-background="true"/u);
 
   const manifest = JSON.parse(await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8'));
   assert.equal(manifest.report.safeName, canonicalName);
+  assert.equal(manifest.validation.valid, true);
   const htmlFile = manifest.files.find((file) => file.relativePath === `${canonicalName}.html`);
   assert.ok(htmlFile);
   const htmlBuffer = Buffer.from(html, 'utf8');
   assert.equal(htmlFile.byteLength, htmlBuffer.length);
   assert.equal(htmlFile.sha256, sha256(htmlBuffer));
+  assert.equal(manifest.files.some((file) => file.relativePath === 'images/tree-polo-logo.webp'), true);
+  assert.equal(manifest.files.some((file) => file.relativePath === 'images/tree-polo-report-background.jpg'), true);
+  assert.equal(manifest.assets.some((asset) => asset.relativePath === 'images/tree-polo-logo.webp'), true);
+  assert.equal(manifest.assets.some((asset) => asset.relativePath === 'images/tree-polo-report-background.jpg'), true);
 
   const zipEntries = await readZipArchive(result.zipPath);
   assert.equal(zipEntries.has(`${canonicalName}.html`), true);
   assert.equal(zipEntries.has('export-manifest.json'), true);
+  assert.equal(zipEntries.has('images/tree-polo-logo.webp'), true);
+  assert.equal(zipEntries.has('images/tree-polo-report-background.jpg'), true);
 });
 
 test('keeps collision suffixes on the canonical name without exposing a legacy-name folder', async () => {
@@ -115,4 +124,76 @@ test('keeps collision suffixes on the canonical name without exposing a legacy-n
   assert.equal(result.reportFileName, `${canonicalName}-2.html`);
   const outputEntries = await fs.readdir(outputDirectory);
   assert.equal(outputEntries.some((entry) => entry.includes(LEGACY_BRAND_SUFFIX)), false);
+});
+
+test('keeps only referenced media and produces deterministic canonical HTML and manifest content', async () => {
+  const projectRoot = path.join(testRoot, 'media-project');
+  const firstOutput = path.join(testRoot, 'media-output-a');
+  const secondOutput = path.join(testRoot, 'media-output-b');
+  await fs.mkdir(projectRoot, { recursive: true });
+
+  const document = {
+    schemaVersion: 1,
+    title: '王小明',
+    sections: [{
+      id: 'media',
+      title: '影片',
+      blocks: [{
+        type: 'singleVideo',
+        mediaAssetId: 'used-video',
+        label: '使用影片',
+      }],
+    }],
+  };
+  const assets = [
+    {
+      id: 'used-video',
+      kind: 'video',
+      data: Buffer.from('used-video-fixture'),
+      displayName: 'used.mp4',
+    },
+    {
+      id: 'unused-video',
+      kind: 'video',
+      data: Buffer.from('unused-video-fixture'),
+      displayName: 'unused.mp4',
+    },
+  ];
+  const options = {
+    projectRoot,
+    outputKind: 'both',
+    reportName: '王小明',
+    reportDocument: document,
+    assets,
+  };
+
+  const first = await exportReport({ ...options, outputDirectory: firstOutput });
+  const second = await exportReport({ ...options, outputDirectory: secondOutput });
+
+  assert.equal(first.safeName, `王小明${BRAND_SUFFIX}`);
+  assert.equal(second.safeName, first.safeName);
+  assert.equal(first.validation.valid, true);
+  assert.equal(first.zip.parity.valid, true);
+
+  const firstHtml = await fs.readFile(path.join(first.folderPath, first.reportFileName), 'utf8');
+  const secondHtml = await fs.readFile(path.join(second.folderPath, second.reportFileName), 'utf8');
+  assert.equal(secondHtml, firstHtml);
+  assert.match(firstHtml, /videos\/used\.mp4/u);
+  assert.doesNotMatch(firstHtml, /unused\.mp4/u);
+
+  const firstManifestText = await fs.readFile(path.join(first.folderPath, 'export-manifest.json'), 'utf8');
+  const secondManifestText = await fs.readFile(path.join(second.folderPath, 'export-manifest.json'), 'utf8');
+  assert.equal(secondManifestText, firstManifestText);
+  const manifest = JSON.parse(firstManifestText);
+  assert.equal(manifest.assets.some((asset) => asset.id === 'used-video'), true);
+  assert.equal(manifest.assets.some((asset) => asset.id === 'unused-video'), false);
+  assert.equal(manifest.files.some((file) => file.relativePath === 'videos/used.mp4'), true);
+  assert.equal(manifest.files.some((file) => file.relativePath === 'videos/unused.mp4'), false);
+
+  const zipEntries = await readZipArchive(first.zipPath);
+  assert.equal(zipEntries.has(first.reportFileName), true);
+  assert.equal(zipEntries.has('videos/used.mp4'), true);
+  assert.equal(zipEntries.has('videos/unused.mp4'), false);
+  assert.equal(zipEntries.has('images/tree-polo-logo.webp'), true);
+  assert.equal(zipEntries.has('images/tree-polo-report-background.jpg'), true);
 });
