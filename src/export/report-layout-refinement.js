@@ -52,6 +52,54 @@ body>main .portable-frame-controls,
   grid-template-columns: 25px 25px max-content minmax(0, 1fr) max-content 25px !important;
   column-gap: 4px !important;
 }
+body>main .portable-frame-navigation > button,
+.report-help-live-preview .portable-frame-navigation > button {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+}
+body>main button[data-frame-action="toggle"]::before,
+.report-help-live-preview button[data-frame-action="toggle"]::before {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-44%, -50%) !important;
+}
+body>main button[data-frame-action="toggle"][aria-pressed="true"]::before,
+.report-help-live-preview button[data-frame-action="toggle"][aria-pressed="true"]::before {
+  transform: translate(-50%, -50%) !important;
+}
+body>main button[data-frame-action="previous"],
+body>main button[data-frame-action="next"],
+.report-help-live-preview button[data-frame-action="previous"],
+.report-help-live-preview button[data-frame-action="next"] {
+  font-size: 0 !important;
+}
+body>main button[data-frame-action="previous"]::before,
+body>main button[data-frame-action="next"]::before,
+.report-help-live-preview button[data-frame-action="previous"]::before,
+.report-help-live-preview button[data-frame-action="next"]::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform-origin: 50% 50%;
+}
+body>main button[data-frame-action="previous"]::before,
+.report-help-live-preview button[data-frame-action="previous"]::before {
+  transform: translate(-43%, -50%) rotate(135deg);
+}
+body>main button[data-frame-action="next"]::before,
+.report-help-live-preview button[data-frame-action="next"]::before {
+  transform: translate(-57%, -50%) rotate(-45deg);
+}
 body>main .portable-frame-navigation [data-frame-current],
 body>main .portable-frame-navigation [data-frame-total],
 .report-help-live-preview .portable-frame-navigation [data-frame-current],
@@ -66,6 +114,30 @@ body>main .portable-frame-navigation input[type="range"],
 .report-help-live-preview .portable-frame-navigation input[type="range"] {
   width: 100% !important;
   min-width: 0 !important;
+}
+body>main .portable-frame-rate-row,
+.report-help-live-preview .portable-frame-rate-row {
+  display: grid !important;
+  grid-template-columns: 4.5rem minmax(0, 1fr) 4.5rem !important;
+  align-items: center !important;
+  gap: 4px !important;
+  width: 100% !important;
+}
+body>main .portable-frame-rate-row input[type="number"],
+.report-help-live-preview .portable-frame-rate-row input[type="number"] {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+body>main .portable-frame-rate-row input[type="range"],
+.report-help-live-preview .portable-frame-rate-row input[type="range"] {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+body>main .portable-frame-rate-row button,
+.report-help-live-preview .portable-frame-rate-row button {
+  justify-self: end !important;
 }
 
 /* Routine status is redundant; retain the element for errors only. */
@@ -153,23 +225,7 @@ body>main .portable-frame-player-status[data-state="error"],
 
   body>main .portable-frame-rate-row,
   .report-help-live-preview .portable-frame-rate-row {
-    display: grid !important;
-    grid-template-columns: 4.5rem minmax(0, 1fr) 32px !important;
-    align-items: center !important;
-    gap: 4px !important;
-    width: 100% !important;
-  }
-  body>main .portable-frame-rate-row input[type="number"],
-  .report-help-live-preview .portable-frame-rate-row input[type="number"] {
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: none !important;
-  }
-  body>main .portable-frame-rate-row input[type="range"],
-  .report-help-live-preview .portable-frame-rate-row input[type="range"] {
-    width: 100% !important;
-    min-width: 0 !important;
-    margin: 0 !important;
+    grid-template-columns: 4.5rem minmax(0, 1fr) 4.5rem !important;
   }
   body>main .portable-frame-rate-row button,
   .report-help-live-preview .portable-frame-rate-row button {
@@ -203,7 +259,7 @@ body>main .portable-frame-player-status[data-state="error"],
   }
   body>main .portable-frame-rate-row,
   .report-help-live-preview .portable-frame-rate-row {
-    grid-template-columns: 4.2rem minmax(0, 1fr) 30px !important;
+    grid-template-columns: 4.2rem minmax(0, 1fr) 4.2rem !important;
     gap: 3px !important;
   }
 }
