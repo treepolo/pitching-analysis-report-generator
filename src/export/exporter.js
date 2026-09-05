@@ -16,8 +16,13 @@ const {
 } = require('./asset-paths');
 const { validateExportLayout } = require('./layout-validator');
 const { renderReportHtml, toPortableReportDocument } = require('./report-renderer');
+const { bundleReportStyles } = require('./report-style-bundler');
+const {
+  applyTreePoloPackageHtml,
+  canonicalReportName,
+  createTreePoloPackageAssets,
+} = require('./tree-polo-package');
 const { createZipArchive, validateZipParity } = require('./zip-archive');
-
 
 // Export target selection is collision-safe for completed outputs, but two
 // jobs can otherwise observe the same free target before either one commits it.
@@ -107,7 +112,6 @@ async function commitStagingDirectory(stagingPath, folderPath, { sameDestination
     throw error;
   }
 }
-
 
 function outputLockKey(outputRoot) {
   const resolved = path.resolve(outputRoot);
@@ -510,7 +514,7 @@ function exportManifest({
   safeName,
   stagedAssets,
   html,
-  reportFileName = 'report.html',
+  reportFileName,
   warnings = [],
 }) {
   return {
@@ -541,7 +545,6 @@ function exportManifest({
         byteLength: asset.byteLength,
         sha256: asset.sha256,
       })),
-
     ],
     ...(warnings.length > 0 ? { warnings: [...warnings] } : {}),
   };
@@ -571,15 +574,27 @@ async function exportReport({
   if (reportDocument === null || typeof reportDocument !== 'object' || Array.isArray(reportDocument)) {
     throw new ExportValidationError('Report document is required');
   }
+  if (!Array.isArray(assets)) throw new ExportValidationError('Export assets must be an array');
+
   const { lexicalRoot: projectRootLexical, realRoot: projectRootReal } = await resolveProjectRoots(projectRoot);
   const safeReportDocument = toPortableReportDocument(reportDocument);
-  const referencedAssetIds = new Set([
+  const sourceReferencedAssetIds = new Set([
     ...collectReferencedVideoAssetIds(safeReportDocument),
     ...assets
       .filter((asset) => asset && typeof asset === 'object' && asset.requiredForExport === true)
       .map((asset) => asset.id)
       .filter((id) => typeof id === 'string' && id.length > 0),
   ]);
+  const activeSourceAssets = assets.filter(
+    (asset) => asset && typeof asset === 'object' && sourceReferencedAssetIds.has(asset.id),
+  );
+  const treePoloPackage = await createTreePoloPackageAssets(activeSourceAssets);
+  const exportAssets = [...assets, ...treePoloPackage.assets];
+  const referencedAssetIds = new Set([
+    ...sourceReferencedAssetIds,
+    ...treePoloPackage.assets.map((asset) => asset.id),
+  ]);
+
   const outputRoot = path.resolve(outputDirectory);
   if (typeof outputDirectory !== 'string' || outputDirectory.trim() === '' || !path.isAbsolute(outputDirectory)) {
     throw new ExportValidationError('Export outputDirectory must be an absolute safe path');
@@ -594,15 +609,17 @@ async function exportReport({
   if (!outputAncestorStats.isDirectory()) {
     throw new ExportValidationError('Export outputDirectory parent must be a directory');
   }
+
   const shouldKeepFolder = outputKind !== 'zip';
   const shouldCreateZip = createZip === true || outputKind === 'zip' || outputKind === 'both';
+  const baseName = canonicalReportName(reportName ?? safeReportDocument.title);
   const runExport = () => withOutputLock(outputRoot, async () => {
     const outputTargets = await resolveOutputTargets({
-    outputRoot,
-    baseName: safeReportName(reportName ?? safeReportDocument.title),
-    shouldKeepFolder,
-    shouldCreateZip,
-    zipPath,
+      outputRoot,
+      baseName,
+      shouldKeepFolder,
+      shouldCreateZip,
+      zipPath,
     });
     const { safeName, folderPath, resolvedZipPath } = outputTargets;
 
@@ -622,110 +639,116 @@ async function exportReport({
         description: 'ZIP target directory',
       });
     }
+
     throwIfAborted(signal);
     const temporary = await createTemporaryRoot(projectRootLexical);
     const temporaryRoot = temporary.root;
     const stagingPath = path.join(temporaryRoot, safeName);
-    const reportFileName = 'report.html';
+    const reportFileName = `${safeName}.html`;
     const outputFolderPath = shouldKeepFolder ? folderPath : stagingPath;
     let moved = false;
     let zipCreatedPath = null;
     try {
-    throwIfAborted(signal);
-    await withExportFsRetry(
-      () => fs.mkdir(path.join(stagingPath, 'videos'), { recursive: true }),
-      'create-staging',
-    );
-    await withExportFsRetry(
-      () => fs.mkdir(path.join(stagingPath, 'images'), { recursive: true }),
-      'create-staging',
-    );
-    const preparedAssets = prepareAssetDescriptors(assets, { referencedAssetIds });
-    const stagedAssets = [];
-    const warnings = [];
-    for (const asset of preparedAssets) {
       throwIfAborted(signal);
-      const stagedAsset = await stageAsset(asset, stagingPath, {
-        projectRootLexical,
-        projectRootReal,
-      });
-      stagedAssets.push(stagedAsset);
-
-    }
-
-    throwIfAborted(signal);
-    const stagedManifest = rendererManifest(stagedAssets);
-    validateReferencedVideoAssetReferences(safeReportDocument, stagedManifest);
-    const html = renderReportHtml(safeReportDocument, { assetManifest: stagedManifest });
-    await withExportFsRetry(
-      () => fs.writeFile(path.join(stagingPath, reportFileName), html, 'utf8'),
-      'write-report',
-    );
-    const manifest = exportManifest({
-      reportDocument: safeReportDocument,
-      safeName,
-      stagedAssets,
-      html,
-      reportFileName,
-      warnings,
-    });
-    await writeJson(path.join(stagingPath, 'export-manifest.json'), manifest, 'write-manifest');
-
-    if (shouldKeepFolder) {
-      await commitStagingDirectory(stagingPath, folderPath, {
-        sameDestination: temporary.sameDestination,
-      });
-      moved = true;
-      const cleanupError = await cleanupExportPath(temporaryRoot);
-      if (cleanupError) warnings.push('匯出暫存檔清理稍後重試；輸出內容已完成。');
-    }
-
-    const validation = await validateExportLayout(outputFolderPath, {
-      assetManifest: stagedManifest,
-      html,
-      requireAllManifestAssetsUsed: false,
-      verifyManifest: true,
-      htmlFileName: reportFileName,
-    });
-    manifest.validation = {
-      valid: validation.valid,
-      assetCount: validation.assetCount,
-      referencedAssetCount: validation.referencedAssetCount,
-    };
-    await writeJson(path.join(outputFolderPath, 'export-manifest.json'), manifest, 'write-manifest');
-
-    let zip = null;
-    if (shouldCreateZip) {
-      throwIfAborted(signal);
-      zipCreatedPath = resolvedZipPath;
-      try {
-        zip = await withExportFsRetry(
-          () => createZipArchive(outputFolderPath, resolvedZipPath),
-          'create-zip',
-        );
-        zip.parity = await withExportFsRetry(
-          () => validateZipParity(outputFolderPath, resolvedZipPath),
-          'validate-zip',
-        );
-      } catch (error) {
-        throw annotateExportFsError(error, error?.exportPhase || 'create-zip');
+      await withExportFsRetry(
+        () => fs.mkdir(path.join(stagingPath, 'videos'), { recursive: true }),
+        'create-staging',
+      );
+      await withExportFsRetry(
+        () => fs.mkdir(path.join(stagingPath, 'images'), { recursive: true }),
+        'create-staging',
+      );
+      const preparedAssets = prepareAssetDescriptors(exportAssets, { referencedAssetIds });
+      const stagedAssets = [];
+      const warnings = [];
+      for (const asset of preparedAssets) {
+        throwIfAborted(signal);
+        const stagedAsset = await stageAsset(asset, stagingPath, {
+          projectRootLexical,
+          projectRootReal,
+        });
+        stagedAssets.push(stagedAsset);
       }
-    }
-    throwIfAborted(signal);
-    if (!shouldKeepFolder) {
-      const cleanupError = await cleanupExportPath(temporaryRoot);
-      if (cleanupError) warnings.push('匯出暫存檔清理稍後重試；輸出內容已完成。');
-    }
-    return {
-      folderPath: shouldKeepFolder ? folderPath : null,
-      zipPath: zip ? zip.zipPath : null,
-      safeName,
-      reportDocumentSha256: manifest.report.documentSha256,
-      manifest,
-      validation,
-      zip,
-      warnings,
-    };
+
+      throwIfAborted(signal);
+      const stagedManifest = rendererManifest(stagedAssets);
+      validateReferencedVideoAssetReferences(safeReportDocument, stagedManifest);
+      const renderedHtml = renderReportHtml(safeReportDocument, { assetManifest: stagedManifest });
+      const packagedHtml = applyTreePoloPackageHtml(renderedHtml, {
+        title: reportDocument?.title ?? reportName,
+        logoRelativePath: treePoloPackage.logoRelativePath,
+      });
+      const html = bundleReportStyles(packagedHtml);
+      await withExportFsRetry(
+        () => fs.writeFile(path.join(stagingPath, reportFileName), html, 'utf8'),
+        'write-report',
+      );
+      const manifest = exportManifest({
+        reportDocument: safeReportDocument,
+        safeName,
+        stagedAssets,
+        html,
+        reportFileName,
+        warnings,
+      });
+      await writeJson(path.join(stagingPath, 'export-manifest.json'), manifest, 'write-manifest');
+
+      if (shouldKeepFolder) {
+        await commitStagingDirectory(stagingPath, folderPath, {
+          sameDestination: temporary.sameDestination,
+        });
+        moved = true;
+        const cleanupError = await cleanupExportPath(temporaryRoot);
+        if (cleanupError) warnings.push('匯出暫存檔清理稍後重試；輸出內容已完成。');
+      }
+
+      const validation = await validateExportLayout(outputFolderPath, {
+        assetManifest: stagedManifest,
+        html,
+        requireAllManifestAssetsUsed: false,
+        verifyManifest: true,
+        htmlFileName: reportFileName,
+      });
+      manifest.validation = {
+        valid: validation.valid,
+        assetCount: validation.assetCount,
+        referencedAssetCount: validation.referencedAssetCount,
+      };
+      await writeJson(path.join(outputFolderPath, 'export-manifest.json'), manifest, 'write-manifest');
+
+      let zip = null;
+      if (shouldCreateZip) {
+        throwIfAborted(signal);
+        zipCreatedPath = resolvedZipPath;
+        try {
+          zip = await withExportFsRetry(
+            () => createZipArchive(outputFolderPath, resolvedZipPath),
+            'create-zip',
+          );
+          zip.parity = await withExportFsRetry(
+            () => validateZipParity(outputFolderPath, resolvedZipPath),
+            'validate-zip',
+          );
+        } catch (error) {
+          throw annotateExportFsError(error, error?.exportPhase || 'create-zip');
+        }
+      }
+      throwIfAborted(signal);
+      if (!shouldKeepFolder) {
+        const cleanupError = await cleanupExportPath(temporaryRoot);
+        if (cleanupError) warnings.push('匯出暫存檔清理稍後重試；輸出內容已完成。');
+      }
+      return {
+        folderPath: shouldKeepFolder ? folderPath : null,
+        zipPath: zip ? zip.zipPath : null,
+        safeName,
+        reportFileName,
+        reportDocumentSha256: manifest.report.documentSha256,
+        manifest,
+        validation,
+        zip,
+        warnings,
+      };
     } catch (error) {
       await cleanupExportPath(temporaryRoot);
       if (moved) await cleanupExportPath(folderPath);

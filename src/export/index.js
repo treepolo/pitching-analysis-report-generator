@@ -5,7 +5,6 @@ module.exports = {
   ...require('./asset-paths'),
   ...require('./exporter'),
   ...require('./tree-polo-package'),
-  ...require('./tree-polo-canonical-exporter'),
   ...require('./layout-validator'),
   ...require('./report-renderer'),
   ...require('./runtime-smoke'),

@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const test = require('node:test');
-const { exportReport } = require('../../src/export/tree-polo-canonical-exporter');
+const { exportReport } = require('../../src/export/exporter');
 const {
   REPORT_BACKGROUND_ASSET_ID,
   REPORT_BACKGROUND_MEDIA_TYPE,
@@ -39,7 +39,7 @@ test('canonical theme owns the fixed Tree Polo background treatment behind an ex
   assert.doesNotMatch(css, /data:image\/jpeg;base64/iu);
 });
 
-test('canonical export stages the original JPEG and activates it through data context in folder and ZIP', async () => {
+test('sole exporter stages the original JPEG and activates it through data context in folder and ZIP', async () => {
   const projectRoot = path.join(testRoot, 'project');
   const outputDirectory = path.join(testRoot, 'output');
   await fs.mkdir(projectRoot, { recursive: true });

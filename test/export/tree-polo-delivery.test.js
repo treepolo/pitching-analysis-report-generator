@@ -5,11 +5,11 @@ const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const test = require('node:test');
+const { exportReport } = require('../../src/export/exporter');
 const {
   BRAND_SUFFIX,
   LEGACY_BRAND_SUFFIX,
-  exportReport,
-} = require('../../src/export/tree-polo-canonical-exporter');
+} = require('../../src/export/tree-polo-package');
 const { readZipArchive } = require('../../src/export/zip-archive');
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
@@ -21,7 +21,7 @@ function sha256(buffer) {
 
 test.before(async () => {
   await fs.mkdir(path.join(repositoryRoot, '.tmp'), { recursive: true });
-  testRoot = await fs.mkdtemp(path.join(repositoryRoot, '.tmp', 'tree-polo-canonical-test-'));
+  testRoot = await fs.mkdtemp(path.join(repositoryRoot, '.tmp', 'tree-polo-delivery-test-'));
 });
 
 test.after(async () => {
@@ -196,4 +196,14 @@ test('keeps only referenced media and produces deterministic canonical HTML and 
   assert.equal(zipEntries.has('videos/unused.mp4'), false);
   assert.equal(zipEntries.has('images/tree-polo-logo.webp'), true);
   assert.equal(zipEntries.has('images/tree-polo-report-background.jpg'), true);
+});
+
+test('desktop package enters main directly and app bridge defaults to the sole exporter', async () => {
+  const packageJson = JSON.parse(await fs.readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
+  const appBridge = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'app-bridge.js'), 'utf8');
+  assert.equal(packageJson.main, 'src/main.js');
+  assert.match(appBridge, /const \{ exportReport \} = require\('\.\/exporter'\);/u);
+  assert.match(appBridge, /constructor\(\{ exporter = exportReport \} = \{\}\)/u);
+  await assert.rejects(fs.stat(path.join(repositoryRoot, 'src', 'main-entry.js')), { code: 'ENOENT' });
+  await assert.rejects(fs.stat(path.join(repositoryRoot, 'src', 'export', 'tree-polo-canonical-exporter.js')), { code: 'ENOENT' });
 });
