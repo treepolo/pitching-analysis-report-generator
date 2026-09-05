@@ -22,15 +22,19 @@ function renderedHtml() {
   });
 }
 
-test('canonical report theme owns the final reader and player skin', () => {
+test('canonical report theme owns the final reader and editorial player skin', () => {
   const css = renderReportTheme();
   assert.match(css, /--reader-face: #fff/u);
   assert.match(css, /--reader-accent: #1a8917/u);
-  assert.match(css, /\.portable-player \{[^}]*border: 1px solid #e6e6e6[^}]*border-radius: 8px[^}]*background: #fafafa/u);
+  assert.match(css, /\.portable-player \{[^}]*padding: 0[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
   assert.match(css, /section\.report-section>h2[^}]*max-width:560px/u);
-  assert.match(css, /\.portable-player-header \{[^}]*margin: 0 0 10px[^}]*padding: 0[^}]*border: 0/u);
-  assert.match(css, /\.portable-player-header h3 \{[^}]*overflow-wrap: anywhere[^}]*font-size: 18px[^}]*font-weight: 600/u);
-  assert.match(css, /\.portable-player-side-heading h3 \{[^}]*color: #555[^}]*font-size: 13px[^}]*font-weight: 600/u);
+  assert.match(css, /\.portable-player-header \{[^}]*margin: 0 0 13px[^}]*padding: 0[^}]*border: 0/u);
+  assert.match(css, /\.portable-player-header h3 \{[^}]*color: #303030[^}]*font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif[^}]*font-size: 17px[^}]*font-weight: 500/u);
+  assert.match(css, /\.portable-player-side-heading h3 \{[^}]*color: #6b6b6b[^}]*font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif[^}]*font-size: 13px[^}]*font-weight: 500/u);
+  assert.match(css, /\.portable-player-grid \{[^}]*gap: 14px/u);
+  assert.match(css, /\.portable-frame-surface \{[^}]*border: 0[^}]*border-radius: 0/u);
+  assert.match(css, /\.report-help-live-preview \.portable-player\{border:0!important;border-radius:0!important;background:transparent!important/u);
+  assert.doesNotMatch(css, /portable-player-grid-side-by-side[^\n]*border-left|portable-player-grid-stacked[^\n]*border-top/u);
   assert.doesNotMatch(css, /html body>main \.portable-player-header h3|report-help-live-preview \.portable-player-header h3/u);
   assert.doesNotMatch(css, /portable-frame-player-status|portable-frame-side-status/u);
   assert.doesNotMatch(css, /#ece9d8|#72b6ec|#1764aa 48%|XP to Windows 7/iu);

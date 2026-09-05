@@ -48,15 +48,19 @@ function brandedCanonicalHtml() {
   return bundleReportStyles(packaged);
 }
 
-test('current report visual contract keeps readable text width and restrained player heading hierarchy', () => {
+test('current report visual contract keeps readable text width and editorial player hierarchy', () => {
   const html = rendererHtml();
 
   assert.match(html, /section\.report-section>h2[^}]*max-width:560px/u);
   assert.match(html, /section\.report-section>\.report-text[^}]*max-width:560px/u);
   assert.match(html, /section\.report-section\{[^}]*border:0!important[^}]*background:transparent!important/u);
-  assert.match(html, /\.portable-player-header \{[^}]*margin: 0 0 10px[^}]*border: 0/u);
-  assert.match(html, /\.portable-player-header h3 \{[^}]*font-size: 18px[^}]*font-weight: 600/u);
-  assert.match(html, /\.portable-player-side-heading h3 \{[^}]*font-size: 13px[^}]*font-weight: 600/u);
+  assert.match(html, /\.portable-player \{[^}]*padding: 0[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
+  assert.match(html, /\.portable-player-header \{[^}]*margin: 0 0 13px[^}]*border: 0/u);
+  assert.match(html, /\.portable-player-header h3 \{[^}]*font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif[^}]*font-size: 17px[^}]*font-weight: 500/u);
+  assert.match(html, /\.portable-player-side-heading h3 \{[^}]*color: #6b6b6b[^}]*font-size: 13px[^}]*font-weight: 500/u);
+  assert.match(html, /\.portable-player-grid \{[^}]*gap: 14px/u);
+  assert.match(html, /\.portable-frame-surface \{[^}]*border: 0[^}]*border-radius: 0/u);
+  assert.doesNotMatch(html, /portable-player-grid-side-by-side[^\n]*border-left|portable-player-grid-stacked[^\n]*border-top/u);
 });
 
 test('current player visual contract keeps desktop and phone control geometry', () => {
