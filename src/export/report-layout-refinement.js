@@ -142,19 +142,6 @@ body>main .portable-frame-rate-row button,
   justify-self: end !important;
 }
 
-/* Routine status is redundant; retain the element for errors only. */
-body>main .portable-frame-player-status,
-.report-help-live-preview .portable-frame-player-status {
-  display: none !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-}
-body>main .portable-frame-player-status[data-state="error"],
-.report-help-live-preview .portable-frame-player-status[data-state="error"] {
-  display: block !important;
-  margin-top: 3px !important;
-}
-
 @media (max-width: 700px) {
   body>main .report-annotation-point,
   .report-help-live-preview .report-annotation-point {

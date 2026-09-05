@@ -28,7 +28,11 @@ test('canonical report theme owns the final reader and player skin', () => {
   assert.match(css, /--reader-accent: #1a8917/u);
   assert.match(css, /\.portable-player \{[^}]*border: 1px solid #e6e6e6[^}]*border-radius: 8px[^}]*background: #fafafa/u);
   assert.match(css, /section\.report-section>h2[^}]*max-width:560px/u);
-  assert.match(css, /\.portable-player-header h3\{[^}]*font-size:21px!important/u);
+  assert.match(css, /\.portable-player-header \{[^}]*margin: 0 0 10px[^}]*padding: 0[^}]*border: 0/u);
+  assert.match(css, /\.portable-player-header h3 \{[^}]*overflow-wrap: anywhere[^}]*font-size: 18px[^}]*font-weight: 600/u);
+  assert.match(css, /\.portable-player-side-heading h3 \{[^}]*color: #555[^}]*font-size: 13px[^}]*font-weight: 600/u);
+  assert.doesNotMatch(css, /html body>main \.portable-player-header h3|report-help-live-preview \.portable-player-header h3/u);
+  assert.doesNotMatch(css, /portable-frame-player-status|portable-frame-side-status/u);
   assert.doesNotMatch(css, /#ece9d8|#72b6ec|#1764aa 48%|XP to Windows 7/iu);
 });
 
@@ -49,7 +53,8 @@ test('canonical report theme owns help, annotation and Tree Polo typography skin
   assert.match(css, /\.report-help-dialog\{[^}]*border:1px solid #e6e6e6!important[^}]*background:#fff!important/u);
   assert.match(css, /\.report-help-header h2\{[^}]*font-size:28px!important[^}]*font-weight:700!important/u);
   assert.match(css, /\.report-help-guide p\{[^}]*font-size:13px!important/u);
-  assert.match(css, /\.report-help-live-preview \.portable-player-header h3\{[^}]*font-size:18px!important/u);
+  assert.doesNotMatch(css, /\.report-help-live-preview \.portable-player-header h3/u);
+  assert.doesNotMatch(css, /\.report-help-live-preview \.portable-player-side-heading h3/u);
   assert.match(css, /\.report-annotation-controls[^}]*font-size:10px!important/u);
   assert.match(css, /\.report-annotation-track-toggle[^}]*background:#fff!important/u);
   assert.match(css, /tree-polo-signature\{[^}]*font-size:\.84em!important[^}]*font-weight:500!important/u);

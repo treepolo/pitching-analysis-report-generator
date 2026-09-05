@@ -84,11 +84,9 @@ test('playback-rate slider has equal outer columns so 1x is centered in the play
   assert.match(css, /@media \(max-width: 420px\)[\s\S]*?grid-template-columns: 4\.2rem minmax\(0, 1fr\) 4\.2rem !important/u);
 });
 
-test('routine playback status line is hidden but errors remain visible', () => {
+test('layout refinement no longer owns playback status visibility', () => {
   const css = reportLayoutRefinementCss();
-  assert.match(css, /\.portable-frame-player-status \{[\s\S]*?display: none !important/u);
-  assert.match(css, /\.portable-frame-player-status\[data-state="error"\][\s\S]*?display: block !important/u);
-  assert.match(css, /\.report-help-live-preview \.portable-frame-player-status/u);
+  assert.doesNotMatch(css, /portable-frame-player-status|data-frame-player-status/u);
 });
 
 test('mobile annotation points shrink without changing their position selectors', () => {

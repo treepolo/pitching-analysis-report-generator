@@ -245,7 +245,6 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     + '</video>'
     + '<span data-frame-placeholder>正在載入第一幀…</span>'
     + '</div>'
-    + '<p class="portable-frame-side-status" data-frame-side-status role="status">正在載入影片…</p>'
     + (comparison ? '' : '<div class="portable-frame-controls" data-frame-controls role="group" aria-label="' + escapeHtml(sideLabel + '影格播放器控制') + '">'
     + '<div class="portable-frame-navigation">'
     + '<button type="button" class="portable-frame-toggle" data-frame-action="toggle" disabled aria-pressed="false" aria-label="播放" title="播放">▶</button>'
@@ -261,7 +260,6 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     + '<button type="button" data-frame-action="reset-rate" disabled aria-label="' + escapeHtml(sideLabel + '重置播放速度為 1 倍') + '" title="重置為 1 倍">↻</button>'
     + '</div>'
     + '<label class="portable-frame-loop"><input data-frame-loop type="checkbox"' + (settings.loop.enabled ? ' checked' : '') + '>循環</label>'
-    + '<span class="portable-frame-player-status" data-frame-player-status role="status" data-state="pending">正在載入影片…</span>'
     + '</div>')
     + '</div>';
 }
@@ -284,7 +282,6 @@ function renderNativeSharedControls(label, block) {
     + '<button type="button" data-frame-action="reset-rate" disabled aria-label="重置播放速度為 1 倍" title="重置為 1 倍">↻</button>'
     + '</div>'
     + '<label class="portable-frame-loop"><input data-frame-loop type="checkbox"' + (commonLoop ? ' checked' : '') + '>循環播放</label>'
-    + '<span class="portable-frame-player-status" data-frame-player-status role="status" data-state="pending">正在載入影片…</span>'
     + '</div>';
 }
 function renderPlayer(block, byId, comparison) {
