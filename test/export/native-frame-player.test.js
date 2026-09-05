@@ -37,11 +37,17 @@ test('single-player replay completes its rewind before claiming the playback ope
   assert.match(playSource, /const operation = runtime\.operationSerial;\s*stopOtherNativeFramePlayers\(sharedBlockForSide\)/u);
 });
 
-test('single-player owns one native play request while video.play is pending', () => {
+test('single-player owns one native play request while pending and keeps pause immediately cancellable', () => {
   const playStart = runtime.indexOf('const play = async ({ fromRateTransition = false } = {}) => {');
   const toggleStart = runtime.indexOf('const togglePlayback = () => {', playStart);
-  assert.ok(playStart >= 0 && toggleStart > playStart);
+  const applyRateStart = runtime.indexOf('const applyRate = (requested, { resume = true } = {}) => {', toggleStart);
+  const updateStart = runtime.indexOf('const updateControls = () => {');
+  const syncStart = runtime.indexOf('const syncProgress =', updateStart);
+  assert.ok(playStart >= 0 && toggleStart > playStart && applyRateStart > toggleStart);
+  assert.ok(updateStart >= 0 && syncStart > updateStart);
   const playSource = runtime.slice(playStart, toggleStart);
+  const toggleSource = runtime.slice(toggleStart, applyRateStart);
+  const updateSource = runtime.slice(updateStart, syncStart);
   assert.match(runtime, /playOperation: null/u);
   assert.match(runtime, /runtime\.playOperation !== null/u);
   assert.match(playSource, /\|\| runtime\.playOperation !== null/u);
@@ -49,6 +55,12 @@ test('single-player owns one native play request while video.play is pending', (
   assert.match(playSource, /finally \{\s*if \(runtime\.playOperation === operation\) \{\s*runtime\.playOperation = null;\s*updateControls\(\);\s*\}\s*\}/u);
   assert.match(runtime, /runtime\.operationSerial \+= 1;\s*runtime\.playOperation = null;/u);
   assert.match(runtime, /const operation = \+\+runtime\.operationSerial;\s*runtime\.playOperation = null;/u);
+  assert.match(updateSource, /const pending = unavailable \|\| runtime\.playOperation !== null/u);
+  assert.match(updateSource, /const togglePending = unavailable \|\| runtime\.rateTransition/u);
+  assert.match(updateSource, /const playbackIntentActive = runtime\.playing \|\| runtime\.playOperation !== null/u);
+  assert.match(updateSource, /toggle\.disabled = count <= 0 \|\| togglePending/u);
+  assert.doesNotMatch(updateSource, /toggle\.disabled = count <= 0 \|\| playbackPending/u);
+  assert.match(toggleSource, /if \(runtime\.playOperation !== null\) \{ stop\('已暫停。'\); return; \}/u);
 });
 
 test('single-player rate changes keep the current playback mode and switch only when required', () => {

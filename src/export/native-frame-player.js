@@ -183,14 +183,15 @@ function renderNativeFramePlayerScript() {
       const updateControls = () => {
         const count = frameCount();
         const maximum = Math.max(0, count - 1);
-        const pending = !runtime.loaded
+        const unavailable = !runtime.loaded
           || runtime.lifecycle === 'idle'
           || runtime.lifecycle === 'loading'
           || runtime.lifecycle === 'error'
           || !runtime.firstFrameReady
-          || runtime.exactSeek !== null
-          || runtime.playOperation !== null;
-        const playbackPending = pending || runtime.rateTransition;
+          || runtime.exactSeek !== null;
+        const pending = unavailable || runtime.playOperation !== null;
+        const togglePending = unavailable || runtime.rateTransition;
+        const playbackIntentActive = runtime.playing || runtime.playOperation !== null;
         runtime.index = clamp(runtime.index, 0, maximum);
         if (timeline) {
           timeline.max = String(maximum);
@@ -206,11 +207,11 @@ function renderNativeFramePlayerScript() {
         if (previous) previous.disabled = count <= 0 || pending || runtime.index <= 0;
         if (next) next.disabled = count <= 0 || pending || runtime.index >= maximum;
         if (toggle) {
-          toggle.disabled = count <= 0 || playbackPending;
-          toggle.textContent = runtime.playing ? '⏸' : '▶';
-          toggle.setAttribute('aria-pressed', runtime.playing ? 'true' : 'false');
-          toggle.setAttribute('aria-label', runtime.playing ? '暫停' : '播放');
-          toggle.title = runtime.playing ? '暫停' : '播放';
+          toggle.disabled = count <= 0 || togglePending;
+          toggle.textContent = playbackIntentActive ? '⏸' : '▶';
+          toggle.setAttribute('aria-pressed', playbackIntentActive ? 'true' : 'false');
+          toggle.setAttribute('aria-label', playbackIntentActive ? '暫停' : '播放');
+          toggle.title = playbackIntentActive ? '暫停' : '播放';
         }
         if (rateInput) rateInput.disabled = count <= 0 || pending;
         if (rateSlider) rateSlider.disabled = count <= 0 || pending;
@@ -533,6 +534,7 @@ function renderNativeFramePlayerScript() {
         }
       };
       const togglePlayback = () => {
+        if (runtime.playOperation !== null) { stop('已暫停。'); return; }
         if (runtime.playing) stop('已暫停。');
         else void play();
       };
