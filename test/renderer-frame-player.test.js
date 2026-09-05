@@ -131,7 +131,10 @@ test('keyboard stepping is one exact frame and playback uses video clock/rate', 
   assert.match(renderer, /manualPlaybackSerial/u);
   assert.match(renderer, /manualPlaybackSerial !== runtime\.manualPlaybackSerial/u);
   assert.match(renderer, /rateTransition/u);
-  assert.match(renderer, /wasPlaying && nativeRate/u);
+  assert.match(renderer, /const wasPlaying = mainPlaybackIsActive\(card, block, runtime, videos\)/u);
+  assert.match(renderer, /const nativeSupported = applyRequestedRate\(card, runtime, videos, normalizedRate\)/u);
+  assert.match(renderer, /if \(wasManual && !nativeSupported\)/u);
+  assert.match(renderer, /if \(!wasManual && nativeSupported\)/u);
   assert.match(renderer, /fromRateTransition = false/u);
   assert.match(renderer, /framePlayerSides\(block, card\)\.forEach\(\(sideName\)/u);
   assert.match(renderer, /nextTime = Math\.max\(nextTime, displayedTime\)/u);

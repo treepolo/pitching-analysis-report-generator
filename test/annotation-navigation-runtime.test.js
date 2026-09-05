@@ -45,7 +45,8 @@ test('reader exposes explicit previous and next annotation-frame buttons', () =>
   const source = navigationScript(records);
   assert.match(source, /← 上一標註幀/u);
   assert.match(source, /下一標註幀 →/u);
-  assert.match(source, /data-annotation-jump/u);
+  assert.match(source, /previous\.dataset\.annotationJump = 'previous'/u);
+  assert.match(source, /next\.dataset\.annotationJump = 'next'/u);
   assert.match(source, /previousFrame === null/u);
   assert.match(source, /nextFrame === null/u);
 });
