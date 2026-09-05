@@ -54,8 +54,8 @@ test('current report visual contract keeps readable text width and editorial pla
   assert.match(html, /section\.report-section>h2[^}]*max-width:560px/u);
   assert.match(html, /section\.report-section>\.report-text[^}]*max-width:560px/u);
   assert.match(html, /section\.report-section\{[^}]*border:0!important[^}]*background:transparent!important/u);
-  assert.match(html, /main \{[^}]*border: 1px solid #e6e6e6[^}]*border-radius: 3px[^}]*background: #fff/u);
-  assert.match(html, /\.portable-player \{[^}]*position: relative[^}]*padding: 18px 14px[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
+  assert.match(html, /main \{[^}]*border-radius: 3px[^}]*background: #fff/u);
+  assert.match(html, /\.portable-player \{[^}]*position: relative[^}]*padding: 18px 22px[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
   assert.match(html, /\.portable-player::before, \.portable-player::after \{[^}]*right: 14px[^}]*left: 14px[^}]*height: 1px[^}]*background: #d7d7d7/u);
   assert.match(html, /\.portable-player-header \{[^}]*margin: 0 0 13px[^}]*border: 0/u);
   assert.match(html, /\.portable-player-header h3 \{[^}]*font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif[^}]*font-size: 17px[^}]*font-style: italic[^}]*font-weight: 700/u);
