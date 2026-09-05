@@ -67,7 +67,7 @@ test('current player visual contract keeps desktop and phone control geometry', 
   assert.match(html, /grid-template-columns: 30px 30px max-content minmax\(0, 1fr\) max-content 30px !important/u);
   assert.match(html, /width:12px!important;height:12px/u);
   assert.match(html, /width:8px!important;height:16px/u);
-  assert.match(html, /0 0 9px 2px rgba\(66,211,146,\.40\) !important/u);
+  assert.match(html, /0 0 9px 2px rgba\(66,211,146,\.40\)/u);
 });
 
 test('current Tree Polo canonical surface keeps the final white reader, branding and background treatment', () => {
@@ -75,12 +75,15 @@ test('current Tree Polo canonical surface keeps the final white reader, branding
 
   assert.equal((html.match(/<style\b/gu) || []).length, 1);
   assert.match(html, /data-report-style-bundle/u);
+  assert.match(html, /data-report-canonical-theme/u);
   assert.match(html, /tree-polo-brand-logo/u);
   assert.match(html, /tree-polo-signature-tree/u);
   assert.match(html, /tree-polo-signature-polo/u);
-  assert.match(html, /body::before\{[^}]*tree-polo-report-background\.jpg/u);
-  assert.match(html, /body>main\{border-color:#e6e6e6!important;background:#fff!important/u);
-  assert.match(html, /tree-polo-report-header\{border-bottom-color:#e6e6e6!important;background:#fff!important/u);
+  assert.match(html, /<body data-tree-polo-background="true">/u);
+  assert.match(html, /body\[data-tree-polo-background="true"\]::before\{[^}]*tree-polo-report-background\.jpg/u);
+  assert.match(html, /main \{[^}]*background: #fff[^}]*box-shadow: 0 2px 12px/u);
+  assert.match(html, /tree-polo-report-header\{[^}]*border-bottom:1px solid #e6e6e6[^}]*background:#fff/u);
   assert.match(html, /tree-polo-report-header::before,body>main \.tree-polo-report-header::after\{display:none!important\}/u);
   assert.match(html, /tree-polo-signature-tree,body>main \.tree-polo-signature-polo\{color:#1a8917!important/u);
+  assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme|--tree-polo-logo/u);
 });

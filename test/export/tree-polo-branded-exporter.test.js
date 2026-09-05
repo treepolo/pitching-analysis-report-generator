@@ -7,7 +7,6 @@ const test = require('node:test');
 const {
   BRAND_SUFFIX,
   applyTreePoloBrandHtml,
-  brandThemeCss,
   brandedDisplayTitle,
   brandedReportName,
   exportReport,
@@ -36,31 +35,24 @@ test('brand naming appends the required suffix while preserving the 80-character
   assert.equal(brandedReportName(`王小明${BRAND_SUFFIX}`), `王小明${BRAND_SUFFIX}`);
 });
 
-test('brand theme is green but does not restyle the help shell', () => {
-  const css = brandThemeCss();
-  assert.match(css, /#188b5a/u);
-  assert.match(css, /\.report-help-live-preview/u);
-  assert.doesNotMatch(css, /\.report-help-trigger\{/u);
-  assert.doesNotMatch(css, /\.report-help-dialog\{/u);
-  assert.doesNotMatch(css, /\.report-help-guide\{/u);
-});
-
-test('brand HTML replaces the old two-line header and keeps help styling intact', () => {
-  const source = '<html><head><title>王小明</title><style data-report-help-style>.report-help-trigger{background:#245f94}</style></head><body><main><header class="report-header"><p class="eyebrow">Pitching analysis report</p><h1>王小明</h1></header></main></body></html>';
+test('brand HTML supplies structure and assets without appending a visual theme', () => {
+  const source = '<html><head><title>王小明</title><style data-report-canonical-theme>.report-help-trigger{background:#fff}</style></head><body><main><header class="report-header"><p class="eyebrow">Pitching analysis report</p><h1>王小明</h1></header></main></body></html>';
   const html = applyTreePoloBrandHtml(source, {
     title: '王小明',
     logoRelativePath: 'images/tree-polo-logo.webp',
   });
   assert.match(html, /<title>王小明投球分析報告by小樹Polo<\/title>/u);
+  assert.match(html, /class="report-header tree-polo-report-header"/u);
   assert.match(html, /class="tree-polo-brand-logo"/u);
   assert.match(html, /src="images\/tree-polo-logo\.webp"/u);
   assert.match(html, /<h1>王小明投球分析報告by小樹Polo<\/h1>/u);
   assert.doesNotMatch(html, /Pitching analysis report/u);
-  assert.match(html, /\.report-help-trigger\{background:#245f94\}/u);
-  assert.match(html, /data-tree-polo-brand-theme/u);
+  assert.equal((html.match(/<style\b/gu) || []).length, 1);
+  assert.match(html, /data-report-canonical-theme/u);
+  assert.doesNotMatch(html, /data-tree-polo-brand-theme/u);
 });
 
-test('desktop package routes Electron through the non-mutating branded entry', async () => {
+test('desktop package routes Electron through the canonical Tree Polo delivery entry', async () => {
   const packageJson = JSON.parse(await fs.readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
   const mainEntry = await fs.readFile(path.join(repositoryRoot, 'src', 'main-entry.js'), 'utf8');
   assert.equal(packageJson.main, 'src/main-entry.js');
@@ -69,7 +61,7 @@ test('desktop package routes Electron through the non-mutating branded entry', a
   assert.doesNotMatch(mainEntry, /exporterModule\.exportReport\s*=/u);
 });
 
-test('branded exporter renames folder and HTML, stages the logo, revalidates manifest and rebuilds ZIP', async () => {
+test('branded exporter renames folder and HTML, stages the logo, and preserves canonical visual ownership', async () => {
   const projectRoot = path.join(testRoot, 'project');
   const outputDirectory = path.join(testRoot, 'output');
   await fs.mkdir(projectRoot, { recursive: true });
@@ -101,9 +93,9 @@ test('branded exporter renames folder and HTML, stages the logo, revalidates man
   const html = await fs.readFile(htmlPath, 'utf8');
   assert.match(html, /王小明投球分析報告by小樹Polo/u);
   assert.match(html, /images\/tree-polo-logo\.webp/u);
-  assert.match(html, /data-tree-polo-brand-theme/u);
+  assert.match(html, /data-report-canonical-theme/u);
+  assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme/u);
   assert.match(html, /data-report-help-style/u);
-  assert.match(html, /#245f94/u);
   await assert.rejects(fs.stat(path.join(result.folderPath, 'report.html')), { code: 'ENOENT' });
 
   const logoPath = path.join(result.folderPath, 'images', 'tree-polo-logo.webp');

@@ -7,10 +7,9 @@ const test = require('node:test');
 const {
   BRAND_SUFFIX,
   LEGACY_BRAND_SUFFIX,
-  addLogoColorSource,
+  enableTreePoloBackground,
   exportReport,
   refineHtml,
-  refinedThemeCss,
   shortenBrandSuffix,
   stylizeBrandSignature,
 } = require('../../src/export/tree-polo-refined-exporter');
@@ -37,76 +36,38 @@ test('shortens every legacy brand suffix without changing the report name', () =
   assert.equal(shortenBrandSuffix('王小明'), '王小明');
 });
 
-test('refined theme preserves the prior title bar, keeps the black logo field and uses rectangular fusion', () => {
-  const css = refinedThemeCss();
-  assert.match(css, /min-height:70px/u);
-  assert.match(css, /padding:8px 12px 8px 76px/u);
-  assert.match(css, /#2aa56e 0%,#188b5b 42%,#10754b 48%,#09593a 100%/u);
-  assert.match(css, /tree-polo-report-header::before/u);
-  assert.match(css, /var\(--tree-polo-logo\)/u);
-  assert.match(css, /width:86px;height:64px/u);
-  assert.match(css, /border-radius:11px/u);
-  assert.doesNotMatch(css, /border-radius:50%/u);
-  assert.doesNotMatch(css, /mask-image:radial-gradient/u);
-  assert.match(css, /background:#000!important/u);
-  assert.match(css, /mix-blend-mode:normal!important/u);
-  assert.doesNotMatch(css, /mix-blend-mode:screen/u);
-});
-
-test('title typography is lighter, smaller and uses only a faint lower-edge shadow', () => {
-  const css = refinedThemeCss();
-  assert.match(css, /font-size:18px!important/u);
-  assert.match(css, /font-weight:500!important/u);
-  assert.match(css, /letter-spacing:\.035em!important/u);
-  assert.match(css, /text-shadow:0 1px 0 rgba\(0,39,25,\.24\)!important/u);
-  assert.doesNotMatch(css, /font-weight:700/u);
-});
-
-test('brand byline is smaller while 小樹 and Polo keep separate brand colors', () => {
+test('brand signature transform supplies semantic spans without visual styling', () => {
   const html = stylizeBrandSignature('<h1>王小明報告by小樹Polo</h1>');
   assert.equal(
     html,
     '<h1>王小明報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹</span><span class="tree-polo-signature-polo">Polo</span></span></h1>',
   );
-  const css = refinedThemeCss();
-  assert.match(css, /\.tree-polo-signature\{display:inline-block;font-size:\.86em/u);
-  assert.match(css, /\.tree-polo-signature-tree\{color:#42d392!important;font-weight:550/u);
-  assert.match(css, /\.tree-polo-signature-polo\{color:#b9ff68!important;font-weight:550/u);
+  assert.doesNotMatch(html, /style=/u);
 });
 
-test('help content is green, its h2 strip is explicitly green, and its header is not sticky', () => {
-  const css = refinedThemeCss();
-  assert.match(css, /\.report-help-dialog\{/u);
-  assert.match(css, /\.report-help-header\{position:relative!important;top:auto!important/u);
-  assert.match(css, /border:1px solid #668d78!important/u);
-  assert.match(css, /\.report-help-header h2\{/u);
-  assert.match(css, /background:linear-gradient\(180deg,#edf8f2 0%,#d7eee1 48%,#c2e2d0 100%\)!important/u);
-  assert.match(css, /\.report-help-number/u);
-  assert.doesNotMatch(css, /\.report-help-trigger\{/u);
-  assert.doesNotMatch(css, /\.report-help-close\{/u);
-  assert.doesNotMatch(css, /\.report-help-tutorial-button\{/u);
-  assert.doesNotMatch(css, /\.report-help-tutorial-stop\{/u);
-  assert.doesNotMatch(css, /\.report-help-tutorial-controls button\{/u);
+test('background context is a body data flag rather than a visual override', () => {
+  const source = '<html><head></head><body class="report"><main></main></body></html>';
+  const once = enableTreePoloBackground(source);
+  const twice = enableTreePoloBackground(once);
+  assert.match(once, /<body class="report" data-tree-polo-background="true">/u);
+  assert.equal((twice.match(/data-tree-polo-background/g) || []).length, 1);
+  assert.doesNotMatch(twice, /<style|--tree-polo-logo/u);
 });
 
-test('logo source is reused as the rectangular molten color field around the raised logo', () => {
-  const source = '<header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo" src="images/tree-polo-logo.webp" alt="小樹Polo"></header>';
-  const html = addLogoColorSource(source);
-  assert.match(html, /style="--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)"/u);
-});
-
-test('refineHtml shortens every visible title occurrence and styles the visible brand signature only', () => {
-  const source = `<html><head><title>王小明${LEGACY_BRAND_SUFFIX}</title></head><body><main><header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo" src="images/tree-polo-logo.webp"><div class="tree-polo-brand-copy"><h1>王小明${LEGACY_BRAND_SUFFIX}</h1></div></header></main><button class="report-help-trigger">使用教學</button></body></html>`;
+test('refineHtml changes content and data context without appending a theme', () => {
+  const source = `<html><head><title>王小明${LEGACY_BRAND_SUFFIX}</title><style data-report-canonical-theme>body{color:#242424}</style></head><body><main><header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo" src="images/tree-polo-logo.webp"><div class="tree-polo-brand-copy"><h1>王小明${LEGACY_BRAND_SUFFIX}</h1></div></header></main><button class="report-help-trigger">使用教學</button></body></html>`;
   const html = refineHtml(source);
   assert.match(html, new RegExp(`<title>王小明${BRAND_SUFFIX}<\\/title>`, 'u'));
   assert.match(html, /<h1>王小明報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹<\/span><span class="tree-polo-signature-polo">Polo<\/span><\/span><\/h1>/u);
+  assert.match(html, /<body data-tree-polo-background="true">/u);
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
-  assert.match(html, /data-tree-polo-refined-theme/u);
-  assert.match(html, /--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)/u);
+  assert.doesNotMatch(html, /data-tree-polo-refined-theme|data-tree-polo-brand-theme|--tree-polo-logo/u);
+  assert.equal((html.match(/<style\b/gu) || []).length, 1);
+  assert.match(html, /data-report-canonical-theme/u);
   assert.match(html, /report-help-trigger/u);
 });
 
-test('refined exporter uses the shorter folder and HTML suffix and rebuilds ZIP parity', async () => {
+test('refined exporter keeps naming and ZIP parity while canonical theme owns appearance', async () => {
   const projectRoot = path.join(testRoot, 'project');
   const outputDirectory = path.join(testRoot, 'output');
   await fs.mkdir(projectRoot, { recursive: true });
@@ -139,16 +100,9 @@ test('refined exporter uses the shorter folder and HTML suffix and rebuilds ZIP 
   assert.match(html, new RegExp(`王小明${BRAND_SUFFIX}`, 'u'));
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
   assert.match(html, /tree-polo-signature/u);
-  assert.match(html, /tree-polo-signature-tree/u);
-  assert.match(html, /tree-polo-signature-polo/u);
-  assert.match(html, /font-size:\.86em/u);
-  assert.match(html, /font-size:18px!important/u);
-  assert.match(html, /font-weight:500!important/u);
-  assert.match(html, /mix-blend-mode:normal!important/u);
-  assert.match(html, /background:#000!important/u);
-  assert.match(html, /--tree-polo-logo:url\('images\/tree-polo-logo\.webp'\)/u);
-  assert.match(html, /\.report-help-header h2\{/u);
-  assert.match(html, /position:relative!important;top:auto!important/u);
+  assert.match(html, /data-tree-polo-background="true"/u);
+  assert.match(html, /data-report-canonical-theme/u);
+  assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme|--tree-polo-logo/u);
 
   const manifest = JSON.parse(await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8'));
   assert.equal(manifest.report.safeName, result.safeName);

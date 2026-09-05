@@ -40,7 +40,7 @@ function reportDocument(title = '王小明') {
   };
 }
 
-test('delivers folder, HTML and ZIP with the canonical Tree Polo report name only', async () => {
+test('delivers folder, HTML and ZIP with one bundled canonical visual theme', async () => {
   const projectRoot = path.join(testRoot, 'project');
   const outputDirectory = path.join(testRoot, 'output');
   await fs.mkdir(projectRoot, { recursive: true });
@@ -74,9 +74,10 @@ test('delivers folder, HTML and ZIP with the canonical Tree Polo report name onl
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
   assert.equal((html.match(/<style\b/gu) || []).length, 1);
   assert.match(html, /data-report-style-bundle/u);
+  assert.match(html, /report-style-source:data-report-canonical-theme/u);
   assert.match(html, /report-style-source:data-report-mobile-shell-refinement; role:functional-layout/u);
-  assert.match(html, /report-style-source:data-tree-polo-brand-theme; role:legacy-visual/u);
-  assert.match(html, /report-style-source:data-tree-polo-refined-theme; role:final-visual/u);
+  assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme|legacy-visual|final-visual/u);
+  assert.match(html, /data-tree-polo-background="true"/u);
 
   const manifest = JSON.parse(await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8'));
   assert.equal(manifest.report.safeName, canonicalName);

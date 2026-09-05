@@ -11,8 +11,8 @@ const {
   REPORT_BACKGROUND_RELATIVE_PATH,
   REPORT_BACKGROUND_SOURCE_PATH,
   exportReport,
-  refinedThemeCss,
 } = require('../../src/export/tree-polo-refined-exporter');
+const { renderReportTheme } = require('../../src/export/report-theme');
 const { readZipArchive } = require('../../src/export/zip-archive');
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
@@ -27,20 +27,19 @@ test.after(async () => {
   if (testRoot) await fs.rm(testRoot, { recursive: true, force: true });
 });
 
-test('report background uses a fixed viewport layer so scrolling does not move or vertically crop the landscape photo', () => {
-  const css = refinedThemeCss();
-  assert.match(css, /body\{background:transparent!important;position:relative;isolation:isolate\}/u);
-  assert.match(css, /body::before\{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none/u);
+test('canonical theme owns the fixed Tree Polo background treatment behind an explicit data flag', () => {
+  const css = renderReportTheme();
+  assert.match(css, /body\[data-tree-polo-background="true"\]\{background:transparent;position:relative;isolation:isolate\}/u);
+  assert.match(css, /body\[data-tree-polo-background="true"\]::before\{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none/u);
   assert.match(css, /background-image:url\("images\/tree-polo-report-background\.jpg"\)/u);
   assert.match(css, /background-size:cover/u);
   assert.match(css, /background-position:center/u);
   assert.match(css, /background-repeat:no-repeat/u);
-  assert.doesNotMatch(css, /html,body\{[^}]*background-image/iu);
   assert.doesNotMatch(css, /background-attachment\s*:/iu);
   assert.doesNotMatch(css, /data:image\/jpeg;base64/iu);
 });
 
-test('refined export stages the original JPEG through the normal asset pipeline and includes it in folder, manifest and ZIP', async () => {
+test('refined export stages the original JPEG and activates it through data context in folder and ZIP', async () => {
   const projectRoot = path.join(testRoot, 'project');
   const outputDirectory = path.join(testRoot, 'output');
   await fs.mkdir(projectRoot, { recursive: true });
@@ -72,9 +71,10 @@ test('refined export stages the original JPEG through the normal asset pipeline 
   assert.deepEqual(exported, source);
 
   const html = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
-  assert.match(html, /body::before\{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none/u);
+  assert.match(html, /<body data-tree-polo-background="true">/u);
+  assert.match(html, /body\[data-tree-polo-background="true"\]::before\{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none/u);
   assert.match(html, /background-image:url\("images\/tree-polo-report-background\.jpg"\)/u);
-  assert.doesNotMatch(html, /html,body\{[^}]*background-image/iu);
+  assert.doesNotMatch(html, /data-tree-polo-refined-theme/u);
   assert.doesNotMatch(html, /data:image\/jpeg;base64/iu);
   assert.doesNotMatch(html, /background-attachment\s*:/iu);
 

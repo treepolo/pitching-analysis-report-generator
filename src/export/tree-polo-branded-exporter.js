@@ -47,45 +47,6 @@ function brandedReportName(value) {
   return `${stem}${BRAND_SUFFIX}`;
 }
 
-function brandThemeCss() {
-  return `<style data-tree-polo-brand-theme>
-html,body{background:#d8e8df}
-body>main,.report-help-live-preview{--reader-blue:#188b5a;--reader-blue-dark:#0d5f3d;--reader-input-line:#719985;--reader-muted:#4d6559;--reader-line:#8da296}
-body>main{border-color:#176344;background:#edf2ef;box-shadow:0 3px 10px rgba(16,78,53,.28)}
-body>main .report-header{position:relative;display:flex;align-items:center;min-height:70px;margin:0 -8px 8px;padding:8px 12px 8px 76px;border-bottom:1px solid #084a31;background:linear-gradient(180deg,#2aa56e 0%,#188b5b 42%,#10754b 48%,#09593a 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -2px 0 rgba(177,255,101,.28),0 1px 2px rgba(0,0,0,.28);color:#fff}
-body>main .report-header::before{display:none!important;content:none!important}
-body>main .tree-polo-brand-logo{position:absolute;left:10px;top:8px;width:54px;height:54px;object-fit:cover;border:1px solid rgba(190,255,112,.88);background:#000;box-shadow:0 1px 3px rgba(0,0,0,.42)}
-body>main .tree-polo-brand-copy{min-width:0}
-body>main .report-header h1{margin:0;color:#fff;font-size:20px;line-height:1.25;text-shadow:0 1px 1px #06452c;overflow-wrap:anywhere}
-body>main h2{border-bottom-color:#79ad91;background:linear-gradient(180deg,#effaf4 0%,#d8f0e3 48%,#c3e5d2 100%);color:#164d36}
-body>main h4{border-bottom-color:#cad7d0;color:#486256}
-body>main .report-section{border-color:#8da296}
-body>main .report-media img{border-color:#719985}
-body>main .portable-player,.report-help-live-preview .portable-player{border-color:#88a899;background:#f5f8f6}
-body>main .portable-player-header,.report-help-live-preview .portable-player-header{border-bottom-color:#b4c9be}
-body>main .portable-player-grid-side-by-side>.portable-player-side+.portable-player-side,.report-help-live-preview .portable-player-grid-side-by-side>.portable-player-side+.portable-player-side{border-left-color:#becdc5}
-body>main .portable-player-grid-stacked>.portable-player-side+.portable-player-side,.report-help-live-preview .portable-player-grid-stacked>.portable-player-side+.portable-player-side{border-top-color:#becdc5}
-body>main .portable-player[data-frame-selected="true"],.report-help-live-preview .portable-player[data-frame-selected="true"]{border-color:#188b5a;background:#edf8f2}
-body>main .portable-player-side-heading h3,.report-help-live-preview .portable-player-side-heading h3{color:#20533d}
-body>main .portable-frame-loop,body>main .portable-player-loop,body>main .portable-player-side-controls label,.report-help-live-preview .portable-frame-loop,.report-help-live-preview .portable-player-loop,.report-help-live-preview .portable-player-side-controls label{color:#365c49}
-body>main .portable-frame-rate-row input[type="number"],body>main .portable-player-rate-row input[type="number"],.report-help-live-preview .portable-frame-rate-row input[type="number"],.report-help-live-preview .portable-player-rate-row input[type="number"]{border-color:#719985}
-body>main .portable-frame-controls button:hover:not(:disabled),body>main .portable-player-rate-row button:hover:not(:disabled),body>main .portable-frame-rate-row button:hover:not(:disabled),body>main .portable-player-actions button:hover:not(:disabled),.report-help-live-preview .portable-frame-controls button:hover:not(:disabled),.report-help-live-preview .portable-player-rate-row button:hover:not(:disabled),.report-help-live-preview .portable-frame-rate-row button:hover:not(:disabled),.report-help-live-preview .portable-player-actions button:hover:not(:disabled){border-color:#2f8b61;background:linear-gradient(180deg,#fbfffd 0%,#eaf8f0 42%,#d7efe2 48%,#c6e7d5 100%);color:#174a33}
-body>main .portable-frame-controls button:active:not(:disabled),body>main .portable-player-rate-row button:active:not(:disabled),body>main .portable-frame-rate-row button:active:not(:disabled),body>main .portable-player-actions button:active:not(:disabled),.report-help-live-preview .portable-frame-controls button:active:not(:disabled),.report-help-live-preview .portable-player-rate-row button:active:not(:disabled),.report-help-live-preview .portable-frame-rate-row button:active:not(:disabled),.report-help-live-preview .portable-player-actions button:active:not(:disabled){border-color:#176344;background:#d9eee2}
-body>main input[type="checkbox"],.report-help-live-preview input[type="checkbox"]{accent-color:#188b5a}
-body>main input[type="range"],.report-help-live-preview input[type="range"]{accent-color:#188b5a}
-body>main input[type="range"]::-webkit-slider-runnable-track,.report-help-live-preview input[type="range"]::-webkit-slider-runnable-track{border-color:#728f80;background:linear-gradient(#dcebe3 0%,#f9fcfa 45%,#b8d6c5 52%,#d6e7de 100%)}
-body>main input[type="range"]::-webkit-slider-thumb,.report-help-live-preview input[type="range"]::-webkit-slider-thumb{border-color:#476c59;background:linear-gradient(90deg,#dcece3 0%,#fff 28%,#cde6d8 52%,#89bea2 74%,#d8ebe1 100%)}
-body>main input[type="range"]::-moz-range-track,.report-help-live-preview input[type="range"]::-moz-range-track{border-color:#728f80;background:linear-gradient(#dcebe3 0%,#f9fcfa 45%,#b8d6c5 52%,#d6e7de 100%)}
-body>main input[type="range"]::-moz-range-thumb,.report-help-live-preview input[type="range"]::-moz-range-thumb{border-color:#476c59;background:linear-gradient(90deg,#dcece3 0%,#fff 28%,#cde6d8 52%,#89bea2 74%,#d8ebe1 100%)}
-body>main .report-annotation-controls,.report-help-live-preview .report-annotation-controls{border-color:#94aa9e;background:#f0f7f3}
-body>main .report-annotation-track-toggle,.report-help-live-preview .report-annotation-track-toggle{border-color:#bdcec4;background:#fff}
-body>main .report-annotation-jump,.report-help-live-preview .report-annotation-jump{border-color:#6f8f7e;background:linear-gradient(#fff 0%,#eff8f3 45%,#cbe3d6 52%,#e6f1eb 100%);color:#183829}
-body>main .report-annotation-jump:hover:not(:disabled),.report-help-live-preview .report-annotation-jump:hover:not(:disabled){border-color:#31845b;background:linear-gradient(#fff 0%,#f7fdf9 42%,#bfe3cf 52%,#e8f6ee 100%)}
-body>main .report-annotation-jump:active:not(:disabled),.report-help-live-preview .report-annotation-jump:active:not(:disabled){background:linear-gradient(#aed3bf,#eef9f3)}
-@media(max-width:700px){body>main .report-header{min-height:62px;padding-left:66px}body>main .tree-polo-brand-logo{width:46px;height:46px}body>main .report-header h1{font-size:17px}}
-</style>`;
-}
-
 function brandHeader(title, logoRelativePath) {
   return `<header class="report-header tree-polo-report-header"><img class="tree-polo-brand-logo" src="${escapeHtml(logoRelativePath)}" alt="小樹Polo"><div class="tree-polo-brand-copy"><h1>${escapeHtml(brandedDisplayTitle(title))}</h1></div></header>`;
 }
@@ -95,8 +56,6 @@ function applyTreePoloBrandHtml(html, { title, logoRelativePath }) {
   const brandedTitle = escapeHtml(brandedDisplayTitle(title));
   output = output.replace(/<title>[\s\S]*?<\/title>/iu, `<title>${brandedTitle}</title>`);
   output = output.replace(/<header class="report-header">[\s\S]*?<\/header>/iu, brandHeader(title, logoRelativePath));
-  const css = brandThemeCss();
-  output = output.includes('</head>') ? output.replace('</head>', `${css}\n</head>`) : `${css}\n${output}`;
   return output;
 }
 
@@ -256,7 +215,6 @@ async function exportReport(options = {}) {
 module.exports = {
   BRAND_SUFFIX,
   applyTreePoloBrandHtml,
-  brandThemeCss,
   brandedDisplayTitle,
   brandedReportName,
   exportReport,
