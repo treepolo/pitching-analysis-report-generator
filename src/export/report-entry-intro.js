@@ -141,6 +141,7 @@ function introScript() {
     header.style.removeProperty('transform');
     header.style.removeProperty('will-change');
     header.style.removeProperty('margin-bottom');
+    header.style.removeProperty('border-bottom-width');
   };
 
   const unwrapReportBody = () => {
@@ -323,6 +324,7 @@ function introScript() {
     const headerMarginBottom = Math.max(0,numberPx(headerStyle.marginBottom));
 
     header.style.setProperty('margin-bottom','0px','important');
+    header.style.setProperty('border-bottom-width','.5px','important');
 
     reportBody = document.createElement('div');
     reportBody.dataset.reportEntryBody = 'true';
@@ -391,7 +393,7 @@ function introScript() {
       { transform: 'translateY(0px)' },
     ], {
       duration: ${HEADER_MOVE_DURATION_MS},
-      easing: 'cubic-bezier(.22,.72,.16,1)',
+      easing: 'linear',
       fill: 'forwards',
     });
     activeAnimations.push(headerAnimation);
@@ -401,7 +403,7 @@ function introScript() {
       { transform: 'translateY(0px)' },
     ], {
       duration: ${HEADER_MOVE_DURATION_MS},
-      easing: 'cubic-bezier(.22,.72,.16,1)',
+      easing: 'linear',
       fill: 'forwards',
     });
     activeAnimations.push(bodyPositionAnimation);
