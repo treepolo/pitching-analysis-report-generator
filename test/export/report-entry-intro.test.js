@@ -44,13 +44,11 @@ test('entry timing keeps a black lead-in, a final-size title-bar hold and a long
   assert.ok(REVEAL_DURATION_MS >= 1600);
 });
 
-test('title stage uses the real final title bar and hides only the signature before reveal', () => {
+test('title stage uses the real final title bar without content-specific entrance effects', () => {
   const css = introStyle();
   assert.match(css, /body\.report-entry-title-stage>main\{visibility:visible\}/u);
-  assert.match(css, /body\.report-entry-title-stage:not\(\.report-entry-report-reveal\)>main>:not\(header\)\{visibility:hidden\}/u);
-  assert.match(css, /body\.report-entry-title-stage:not\(\.report-entry-report-reveal\)>main \.tree-polo-signature\{[^}]*position:absolute!important[^}]*opacity:0!important/u);
-  assert.match(css, /body\.report-entry-report-reveal>main>:not\(header\)\{animation:report-entry-content-in/u);
-  assert.match(css, /@keyframes report-entry-content-in\{0%,16%\{opacity:0\}42%\{opacity:1\}/u);
+  assert.doesNotMatch(css, /report-entry-content-in/u);
+  assert.doesNotMatch(css, /report-entry-report-reveal>main>:not\(header\).*animation/u);
   assert.doesNotMatch(css, /report-entry-title-only|report-entry-title-bar/u);
   assert.doesNotMatch(css, /body\.report-entry-title-stage>main h1[^}]*transform/u);
 });
@@ -63,12 +61,12 @@ test('background remains black until the report starts expanding and phone pre-r
   assert.match(css, /@media\(max-width:700px\)[\s\S]*?report-entry-intro-active:not\(\.report-entry-report-reveal\)\[data-tree-polo-background="true"\]::before\{[^}]*background-image:none!important[^}]*background-color:#000!important[^}]*opacity:0!important/u);
 });
 
-test('phone entry positions the actual title bar without changing its final height or scale', () => {
+test('phone entry does not override title-bar geometry during the intro', () => {
   const css = introStyle();
-  assert.match(css, /@media\(max-width:700px\)[\s\S]*?body\.report-entry-intro-active>main header\.tree-polo-report-header[\s\S]*?position:absolute!important[\s\S]*?top:0!important[\s\S]*?width:100vw!important/u);
+  assert.doesNotMatch(css, /report-entry-intro-active>main header[^}]*position:absolute/u);
   assert.doesNotMatch(css, /report-entry-intro-active>main header[^}]*height:/u);
   assert.doesNotMatch(css, /report-entry-intro-active>main header[^}]*min-height:/u);
-  assert.doesNotMatch(css, /report-entry-intro-active>main header[^}]*transform:/u);
+  assert.doesNotMatch(css, /report-entry-intro-active>main header[^}]*width:/u);
 });
 
 test('entry intro markup starts with zero-width TREE and POLO spans so typing grows from screen center', () => {
@@ -90,30 +88,32 @@ test('entry runtime types the ident and starts the title stage only after ident 
   assert.match(source, new RegExp(`setTimeout\\(beginTitleStage,${IDENT_DURATION_MS}\\)`,'u'));
 });
 
-test('reveal moves only the title bar upward while the report surface pulls open downward', () => {
+test('reveal builds one temporary report body that unfolds from beneath the moving title bar', () => {
   const source = introScript().match(/<script data-report-entry-intro-runtime>\s*([\s\S]*?)\s*<\/script>/u)?.[1];
   assert.ok(source);
   assert.doesNotThrow(() => new vm.Script(source));
-  assert.match(source, /const mainRect = main\.getBoundingClientRect\(\)/u);
-  assert.match(source, /const headerRect = header\.getBoundingClientRect\(\)/u);
-  assert.match(source, /const finalTopInset = Math\.max\(0,headerRect\.top - mainRect\.top\)/u);
-  assert.match(source, /const initialTopInset = Math\.max\(0,finalTopInset \+ dy\)/u);
-  assert.match(source, /const initialBottomInset = Math\.max\(0,mainRect\.height - initialTopInset - headerRect\.height\)/u);
-  assert.match(source, /main\.style\.setProperty\('clip-path','inset\(' \+ initialTopInset \+ 'px 0 ' \+ initialBottomInset \+ 'px 0\)'\)/u);
+  assert.match(source, /reportBody = document\.createElement\('div'\)/u);
+  assert.match(source, /reportBody\.dataset\.reportEntryBody = 'true'/u);
+  assert.match(source, /contentNodes\.forEach\(\(node\) => reportBody\.append\(node\)\)/u);
+  assert.match(source, /node !== header && !node\.classList\?\.contains\('report-fixed-header-spacer'\)/u);
+  assert.match(source, /reportBody\.style\.height = '0px'/u);
+  assert.match(source, /reportBody\.style\.overflow = 'hidden'/u);
+  assert.match(source, /reportBody\.style\.transform = 'translateY\(' \+ dy \+ 'px\)'/u);
   assert.match(source, /header\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\)'\)/u);
-  assert.match(source, /const mainAnimation = main\.animate\(/u);
-  assert.match(source, /clipPath: 'inset\(0px 0 0px 0\)'/u);
   assert.match(source, /const headerAnimation = header\.animate\(/u);
+  assert.match(source, /const bodyAnimation = reportBody\.animate\(/u);
+  assert.match(source, /height: targetBodyHeight \+ 'px'/u);
   assert.match(source, /\{ transform: 'translateY\(0px\)', offset: 1 \}/u);
+  assert.match(source, /const unwrapReportBody = \(\) =>/u);
+  assert.match(source, /while \(reportBody\.firstChild\) main\.insertBefore\(reportBody\.firstChild,reportBody\)/u);
+  assert.doesNotMatch(source, /clipPath|clip-path/u);
   assert.doesNotMatch(source, /main\.style\.setProperty\('transform'/u);
-  assert.doesNotMatch(source, /transform: 'translateY\(' \+ dy \+ 'px'[^\n]*clipPath/u);
-  assert.match(source, /restoreHeader/u);
+  assert.doesNotMatch(source, /opacity:\s*0[^\n]*reportBody|reportBody[^\n]*opacity/u);
   assert.doesNotMatch(source, /desiredHeroFontSize|heroScale|titleAnimation|TITLE_SHRINK|TITLE_HERO/u);
-  assert.doesNotMatch(source, /main\.style\.setProperty\('height'|main\.style\.setProperty\('width'/u);
   assert.match(source, new RegExp(`setTimeout\\(beginReportReveal,${TITLE_BAR_HOLD_MS}\\)`,'u'));
 });
 
-test('by 小樹Polo is removed from layout before reveal and types in while the report expands', () => {
+test('by 小樹Polo types in while the report body unfolds', () => {
   const source = introScript();
   assert.match(source, /const signatureByNode = signature \? \[\.\.\.signature\.childNodes\]\.find\(\(node\) => node\.nodeType === 3\)/u);
   assert.match(source, /signatureByNode\.nodeValue = ''/u);
