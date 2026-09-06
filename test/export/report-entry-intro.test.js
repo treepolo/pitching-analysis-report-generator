@@ -10,7 +10,10 @@ const {
   TYPE_START_DELAY_MS,
   TYPE_INTERVAL_MS,
   IDENT_EXIT_MS,
-  TITLE_HOLD_MS,
+  TITLE_HERO_HOLD_MS,
+  TITLE_SHRINK_DURATION_MS,
+  TITLE_SETTLE_HOLD_MS,
+  TITLE_BAR_HOLD_MS,
   REVEAL_DURATION_MS,
   HELP_CUE_DURATION_MS,
   injectReportEntryIntro,
@@ -21,7 +24,7 @@ const {
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
 
-test('entry intro is a clean centered TREEPOLO typing ident with plain split colors', () => {
+test('entry intro keeps the clean centered TREEPOLO typing ident', () => {
   const css = introStyle();
   assert.match(css, /\.report-entry-intro\{[^}]*position:fixed[^}]*background:#000/u);
   assert.match(css, /\.tree-polo-ident-word\{[^}]*display:inline-flex[^}]*width:max-content[^}]*justify-content:center/u);
@@ -29,28 +32,39 @@ test('entry intro is a clean centered TREEPOLO typing ident with plain split col
   assert.match(css, /\.tree-polo-ident-tree\{color:#00a65a\}/u);
   assert.match(css, /\.tree-polo-ident-polo\{color:#f5f5f5\}/u);
   assert.doesNotMatch(css, /tree-polo-ident-char|tree-polo-ident-mark|tree-polo-ident-spectrum|tree-polo-ident-vignette/u);
-  assert.doesNotMatch(css, /text-shadow|filter:blur|linear-gradient|radial-gradient/u);
+  assert.doesNotMatch(css, /text-shadow|filter:blur/u);
   assert.match(css, /report-entry-intro-active \.report-help-trigger/u);
   assert.match(css, /visibility:hidden!important/u);
 });
 
-test('entry timing keeps a longer pure-black lead-in and a longer isolated title hold', () => {
+test('entry timing gives black lead-in, hero title, settle, title bar and reveal distinct holds', () => {
   assert.ok(TYPE_START_DELAY_MS >= 650);
   assert.ok(IDENT_DURATION_MS >= 2800);
   assert.ok(IDENT_EXIT_MS >= 220);
-  assert.ok(TITLE_HOLD_MS >= 1000);
+  assert.ok(TITLE_HERO_HOLD_MS >= 700);
+  assert.ok(TITLE_SHRINK_DURATION_MS >= 600);
+  assert.ok(TITLE_SETTLE_HOLD_MS >= 350);
+  assert.ok(TITLE_BAR_HOLD_MS >= 450);
   assert.ok(REVEAL_DURATION_MS >= 1600);
 });
 
-test('entry intro hides the report before title stage and fully retires the word before report reveal', () => {
+test('title-only stage has no frame or signature and title-bar stage restores both', () => {
   const css = introStyle();
-  assert.match(css, /body\.report-entry-intro-active>main\{visibility:hidden\}/u);
-  assert.match(css, /body\.report-entry-title-stage>main\{visibility:visible\}/u);
-  assert.match(css, /\.report-entry-intro\.is-ident-exit \.tree-polo-ident-word\{opacity:0\}/u);
-  assert.match(css, /\.report-entry-intro\.is-title-stage \.tree-polo-ident-word\{opacity:0\}/u);
+  assert.match(css, /body\.report-entry-title-only>main\{[^}]*background:transparent!important[^}]*border-color:transparent!important[^}]*box-shadow:none!important/u);
+  assert.match(css, /body\.report-entry-title-only>main header\.tree-polo-report-header[^}]*background:transparent!important/u);
+  assert.match(css, /body\.report-entry-title-only>main h1\{color:#f5f5f5!important\}/u);
+  assert.match(css, /body\.report-entry-title-only>main \.tree-polo-signature\{[^}]*position:absolute!important[^}]*opacity:0!important/u);
+  assert.match(css, /body\.report-entry-title-bar>main\{[^}]*background:#fff!important[^}]*border-color:#e6e6e6!important/u);
+  assert.match(css, /body\.report-entry-title-bar>main h1\{color:#242424!important\}/u);
+  assert.match(css, /body\.report-entry-title-stage:not\(\.report-entry-report-reveal\)>main>:not\(header\)\{visibility:hidden\}/u);
+});
+
+test('background remains black before reveal and mobile explicitly suppresses the image pre-reveal', () => {
+  const css = introStyle();
   assert.match(css, /report-entry-intro-active\[data-tree-polo-background="true"\]::before\{opacity:0\}/u);
   assert.match(css, /report-entry-report-reveal\[data-tree-polo-background="true"\]::before/u);
   assert.match(css, /@keyframes tree-polo-report-light-up/u);
+  assert.match(css, /@media\(max-width:700px\)[\s\S]*?report-entry-intro-active:not\(\.report-entry-report-reveal\)\[data-tree-polo-background="true"\]::before\{[^}]*background-image:none!important[^}]*background-color:#000!important[^}]*opacity:0!important/u);
 });
 
 test('entry intro markup starts with zero-width TREE and POLO spans so typing grows from screen center', () => {
@@ -61,7 +75,7 @@ test('entry intro markup starts with zero-width TREE and POLO spans so typing gr
   assert.doesNotMatch(markup, /tree-polo-ident-char|tree-polo-ident-mark|tree-polo-ident-spectrum|tree-polo-ident-vignette/u);
 });
 
-test('entry runtime types by changing centered span contents and separates ident exit from title stage', () => {
+test('entry runtime types the ident and starts the title stage only after ident exit', () => {
   const source = introScript();
   assert.match(source, /const text = 'TREEPOLO'\.slice\(0,typedCount\)/u);
   assert.match(source, /identTree\.textContent = text\.slice\(0,4\)/u);
@@ -70,44 +84,55 @@ test('entry runtime types by changing centered span contents and separates ident
   assert.match(source, new RegExp(`setTimeout\\(typeNextCharacter,${TYPE_INTERVAL_MS}\\)`,'u'));
   assert.match(source, new RegExp(`setTimeout\\(\\(\\) => overlay\\.classList\\.add\\('is-ident-exit'\\),${IDENT_DURATION_MS - IDENT_EXIT_MS}\\)`,'u'));
   assert.match(source, new RegExp(`setTimeout\\(beginTitleStage,${IDENT_DURATION_MS}\\)`,'u'));
-  assert.match(source, new RegExp(`setTimeout\\(beginReportReveal,${TITLE_HOLD_MS}\\)`,'u'));
 });
 
-test('entry runtime starts with an enlarged text-width title frame then expands to canonical report geometry', () => {
+test('title hero matches ident scale, shrinks alone, then reveals bar and expands the actual report', () => {
   const script = introScript();
   const source = script.match(/<script data-report-entry-intro-runtime>\s*([\s\S]*?)\s*<\/script>/u)?.[1];
   assert.ok(source);
   assert.doesNotThrow(() => new vm.Script(source));
   assert.match(source, /const title = header\?\.querySelector\('h1'\)/u);
+  assert.match(source, /const signature = title\?\.querySelector\('\.tree-polo-signature'\)/u);
+  assert.match(source, /Math\.min\(68,Math\.max\(38,viewportWidth \* \.12\)\)/u);
+  assert.match(source, /Math\.min\(104,Math\.max\(44,viewportWidth \* \.072\)\)/u);
   assert.match(source, /const targetWidth = Math\.max\(1,Math\.ceil\(naturalMainRect\.width\)\)/u);
   assert.match(source, /const targetHeight = Math\.max\(1,Math\.ceil\(naturalMainRect\.height\)\)/u);
-  assert.match(source, /title\?\.scrollWidth/u);
-  assert.match(source, /const frameWidth = Math\.max\(180,Math\.min\(targetWidth,titleWidth \+ framePadding\)\)/u);
-  assert.match(source, /const initialScale = Math\.min\(1\.34,scaleLimit\)/u);
-  assert.match(source, /main\.style\.setProperty\('width',frameWidth \+ 'px'\)/u);
+  assert.match(source, /const heroScale = Math\.max\(1,Math\.min\(requestedScale,widthSafeScale\)\)/u);
+  assert.match(source, /main\.style\.setProperty\('width',targetWidth \+ 'px'\)/u);
   assert.match(source, /main\.style\.setProperty\('height',collapsedHeight \+ 'px'\)/u);
-  assert.match(source, /main\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\) scale\(' \+ initialScale \+ '\)'\)/u);
-  assert.match(source, /main\.style\.setProperty\('overflow','hidden','important'\)/u);
-  assert.doesNotMatch(source, /setProperty\('height',[^\n]*'important'\)/u);
-  assert.doesNotMatch(source, /setProperty\('width',[^\n]*'important'\)/u);
-  assert.doesNotMatch(source, /setProperty\('transform',[^\n]*'important'\)/u);
+  assert.match(source, /main\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\)'\)/u);
+  assert.match(source, /title\.style\.setProperty\('transform','scale\(' \+ heroScale \+ '\)'\)/u);
+  assert.match(source, /const titleAnimation = title\.animate\(/u);
+  assert.match(source, /\{ transform: 'scale\(' \+ heroScale \+ '\)' \},\{ transform: 'scale\(1\)' \}/u);
+  assert.match(source, /body\.classList\.remove\('report-entry-title-only'\)/u);
+  assert.match(source, /body\.classList\.add\('report-entry-title-bar'\)/u);
+  assert.match(source, /const signatureAnimation = signature\.animate/u);
+  assert.match(source, new RegExp(`setTimeout\\(shrinkTitle,${TITLE_HERO_HOLD_MS}\\)`,'u'));
+  assert.match(source, new RegExp(`setTimeout\\(settleTitle,${TITLE_SHRINK_DURATION_MS}\\)`,'u'));
+  assert.match(source, new RegExp(`setTimeout\\(showTitleBar,${TITLE_SETTLE_HOLD_MS}\\)`,'u'));
+  assert.match(source, new RegExp(`setTimeout\\(beginReportReveal,${TITLE_BAR_HOLD_MS}\\)`,'u'));
+  assert.match(source, /body\.classList\.add\('report-entry-report-reveal'\)/u);
   assert.match(source, /const mainAnimation = main\.animate\(/u);
   assert.match(source, /height: targetHeight \+ 'px'/u);
-  assert.match(source, /width: targetWidth \+ 'px'/u);
-  assert.match(source, /transform: 'translateY\(0px\) scale\(1\)'/u);
-  assert.doesNotMatch(source, /clipPath|header\.animate\(|sections\.forEach/u);
+  assert.match(source, /transform: 'translateY\(0px\)'/u);
+  assert.doesNotMatch(source, /frameWidth|initialScale|clipPath|header\.animate\(|sections\.forEach/u);
+  assert.doesNotMatch(source, /main\.style\.setProperty\('transform',[^\n]*scale/u);
   assert.match(source, /treepolo:entry-start/u);
   assert.match(source, /treepolo:entry-complete/u);
 });
 
-test('post-entry help cue dims everything outside help and pulses a bright ring without extra cue markup', () => {
+test('post-entry help cue uses a darker wide radial falloff and a much smaller pulsing ring', () => {
   const css = introStyle();
   const source = introScript();
-  assert.match(css, /body\.report-entry-help-cue-active \.report-help-trigger\{[^}]*z-index:4100!important/u);
-  assert.match(css, /report-help-trigger::before\{[^}]*box-shadow:0 0 0 100vmax rgba\(0,0,0,\.52\)/u);
-  assert.match(css, /report-help-trigger::after\{[^}]*border:2px solid rgba\(178,255,213,\.96\)/u);
+  assert.match(css, /body\.report-entry-help-cue-active::after\{[^}]*radial-gradient\(circle max\(96px,16\.667vw\)/u);
+  assert.match(css, /rgba\(0,0,0,\.86\) 100%/u);
+  assert.match(css, /report-help-trigger::after\{[^}]*inset:-6px[^}]*border:2px solid rgba\(178,255,213,\.96\)/u);
+  assert.doesNotMatch(css, /report-help-trigger::before\{[^}]*100vmax/u);
   assert.match(css, /@keyframes report-entry-help-ring/u);
   assert.match(css, /25%,75%/u);
+  assert.match(source, /const rect = helpTrigger\.getBoundingClientRect\(\)/u);
+  assert.match(source, /--report-help-cue-x/u);
+  assert.match(source, /--report-help-cue-y/u);
   assert.match(source, /body\.classList\.add\('report-entry-help-cue-active'\)/u);
   assert.match(source, /document\.addEventListener\('pointerdown',helpCueDismissHandler,true\)/u);
   assert.match(source, /document\.addEventListener\('keydown',helpCueDismissHandler,true\)/u);
