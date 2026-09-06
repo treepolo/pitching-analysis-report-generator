@@ -94,7 +94,7 @@ input[type="range"] { min-height: 18px; accent-color: var(--reader-accent); }
 input[type="checkbox"] { accent-color: var(--reader-accent); }
 
 /* Readable text hierarchy with full-width media. */
-html body>main section.report-section{position:relative!important;margin:0 0 12px!important;padding:0 5px 22px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+html body>main section.report-section{position:relative!important;margin:0 0 12px!important;padding:8px 5px 22px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
 html body>main section.report-section+section.report-section{margin-top:16px!important;padding-top:30px!important}
 html body>main section.report-section+section.report-section::before{content:"";position:absolute;top:0;left:50%;width:calc(100% - 40px);max-width:560px;height:1px;background:#cfcfcf;transform:translateX(-50%)}
 html body>main section.report-section>h2{position:relative;width:calc(100% - 40px);max-width:560px;margin:0 auto 20px!important;padding:0 0 13px!important;border:0!important;background:transparent!important;box-shadow:none!important;color:#242424!important;font-size:26px!important;font-weight:700!important;line-height:1.22!important;letter-spacing:-.015em!important}
