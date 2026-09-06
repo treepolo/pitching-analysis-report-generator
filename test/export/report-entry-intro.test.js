@@ -83,8 +83,8 @@ test('entry intro markup starts with zero-width TREE and POLO spans so typing gr
 test('scrollbar stays visually hidden through entry and reveals only after user intent', () => {
   const css = introStyle();
   const source = introScript();
-  assert.match(css, /html\.report-scrollbar-pending\{scrollbar-color:transparent transparent\}/u);
-  assert.match(css, /html\.report-scrollbar-pending::-webkit-scrollbar-thumb\{[^}]*border-color:transparent!important[^}]*box-shadow:none!important/u);
+  assert.match(css, /html\.report-scrollbar-pending\{[^}]*scrollbar-width:none!important[^}]*-ms-overflow-style:none!important/u);
+  assert.match(css, /html\.report-scrollbar-pending::-webkit-scrollbar\{[^}]*width:0!important[^}]*height:0!important[^}]*display:none!important/u);
   assert.match(source, /const scrollbarIntentEvents = \['pointerdown','touchstart','wheel'\]/u);
   assert.match(source, /scrollbarInteractionSeen = true;[\s\S]*?if \(scrollbarMayReveal\) revealScrollbar\(\)/u);
   assert.match(source, /root\.classList\.remove\('report-scrollbar-pending'\)/u);
