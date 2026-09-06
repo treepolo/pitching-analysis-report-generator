@@ -14,7 +14,7 @@ const STYLE_SOURCE_ROLES = Object.freeze({
   'data-report-title-alignment-refinement': 'functional-layout',
   'data-report-entry-intro-style': 'component-style',
   'data-report-fixed-header-style': 'functional-layout',
-  'data-tree-polo-footer-style': 'component-style',
+  'data-report-promotion-footer-style': 'component-style',
 });
 
 function styleDataMarkers(attributes) {
