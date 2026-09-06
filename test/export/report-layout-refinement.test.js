@@ -18,7 +18,7 @@ test('layout refinement no longer owns report or help visual skin', () => {
   assert.doesNotMatch(css, /background:\s|box-shadow:\s/u);
 });
 
-test('annotation controls share the player control region with one separator and no box', () => {
+test('annotation controls share the player control region without owning divider skin', () => {
   const css = reportLayoutRefinementCss();
   assert.match(css, /body>main \.report-annotation-controls/u);
   assert.match(css, /\.report-help-live-preview \.report-annotation-controls/u);
@@ -26,8 +26,8 @@ test('annotation controls share the player control region with one separator and
   assert.match(css, /width: 100% !important/u);
   assert.match(css, /margin: \.18rem 0 0 !important/u);
   assert.match(css, /padding: \.35rem 0 0 !important/u);
-  assert.match(css, /border-top: 1px solid #e6e6e6 !important/u);
   assert.match(css, /gap: \.18rem \.42rem !important/u);
+  assert.doesNotMatch(css, /\.report-annotation-controls[\s\S]{0,320}?border-top/u);
   assert.doesNotMatch(css, /\.report-annotation-controls[\s\S]{0,320}?(?:background|box-shadow|border-left|border-right|border-bottom)/u);
 });
 

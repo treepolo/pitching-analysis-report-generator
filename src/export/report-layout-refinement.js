@@ -11,7 +11,6 @@ body>main .report-annotation-controls,
   min-height: 0 !important;
   margin: .18rem 0 0 !important;
   padding: .35rem 0 0 !important;
-  border-top: 1px solid #e6e6e6 !important;
   gap: .18rem .42rem !important;
   line-height: 1.15 !important;
 }

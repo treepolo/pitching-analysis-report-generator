@@ -38,8 +38,8 @@ h4 { margin: 8px 0 4px; padding-bottom: 2px; border-bottom: 1px solid #e6e6e6; c
 figcaption { margin-top: 3px; color: #6b6b6b; font-size: 11px; }
 .comparison-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 
-.portable-player { position: relative; width: 100%; min-width: 0; margin: 0 0 14px; padding: 18px 22px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-.portable-player::before, .portable-player::after { content: ""; position: absolute; right: 14px; left: 14px; height: 1px; background: #d7d7d7; pointer-events: none; }
+.portable-player { position: relative; width: calc(100% - 28px); min-width: 0; margin: 0 14px 14px; padding: 18px 8px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.portable-player::before, .portable-player::after { content: ""; position: absolute; right: 0; left: 0; height: 1px; background: var(--reader-line); pointer-events: none; }
 .portable-player::before { top: 0; }
 .portable-player::after { bottom: 0; }
 .portable-player-header, .portable-player-side-heading, .portable-player-actions { display: flex; align-items: center; gap: 6px; }
@@ -131,8 +131,8 @@ html body>main input[data-frame-rate][type="range"]:disabled::-moz-range-track,h
 html body>main input[data-frame-rate][type="range"]:disabled::-moz-range-thumb,html body>main input[data-player-rate][type="range"]:disabled::-moz-range-thumb{background:#b3b3b3!important}
 
 /* Annotation skin; geometry stays in report-layout-refinement.js. */
-body>main .report-annotation-controls{border:0!important;background:transparent!important;box-shadow:none!important;font-size:10px!important;color:#242424!important}
-.report-help-live-preview .report-annotation-controls{border:0!important;background:#fafafa!important;box-shadow:none!important;font-size:10px!important;color:#242424!important}
+body>main .report-annotation-controls{border:0!important;border-top:1px solid var(--reader-line)!important;background:transparent!important;box-shadow:none!important;font-size:10px!important;color:#242424!important}
+.report-help-live-preview .report-annotation-controls{border:0!important;border-top:1px solid var(--reader-line)!important;background:#fafafa!important;box-shadow:none!important;font-size:10px!important;color:#242424!important}
 body>main .report-annotation-jump,.report-help-live-preview .report-annotation-jump{font-size:10px!important}
 body>main .report-annotation-track-toggle,.report-help-live-preview .report-annotation-track-toggle{border-color:#e6e6e6!important;background:#fff!important;color:#242424!important}
 

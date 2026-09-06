@@ -55,8 +55,9 @@ test('current report visual contract keeps readable text width and editorial pla
   assert.match(html, /section\.report-section>\.report-text[^}]*max-width:560px/u);
   assert.match(html, /section\.report-section\{[^}]*border:0!important[^}]*background:transparent!important/u);
   assert.match(html, /main \{[^}]*border-radius: 3px[^}]*background: #fff/u);
-  assert.match(html, /\.portable-player \{[^}]*position: relative[^}]*margin: 0 0 14px[^}]*padding: 18px 22px[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
-  assert.match(html, /\.portable-player::before, \.portable-player::after \{[^}]*right: 14px[^}]*left: 14px[^}]*height: 1px[^}]*background: #d7d7d7/u);
+  assert.match(html, /\.portable-player \{[^}]*position: relative[^}]*width: calc\(100% - 28px\)[^}]*margin: 0 14px 14px[^}]*padding: 18px 8px[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
+  assert.match(html, /\.portable-player::before, \.portable-player::after \{[^}]*right: 0[^}]*left: 0[^}]*height: 1px[^}]*background: var\(--reader-line\)/u);
+  assert.match(html, /body>main \.report-annotation-controls\{[^}]*border-top:1px solid var\(--reader-line\)!important/u);
   assert.match(html, /\.portable-player-header \{[^}]*margin: 0 0 13px[^}]*border: 0/u);
   assert.match(html, /\.portable-player-header h3 \{[^}]*font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif[^}]*font-size: 17px[^}]*font-style: italic[^}]*font-weight: 700/u);
   assert.match(html, /\.portable-player-header h3::after \{[^}]*width: 48px[^}]*height: 3px[^}]*background: var\(--reader-accent\)/u);
