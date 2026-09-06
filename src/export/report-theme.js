@@ -21,7 +21,7 @@ body, body * { -webkit-user-select: text; user-select: text; -webkit-touch-callo
 body { min-width: 0; min-height: 100vh; margin: 0; overflow-x: hidden; background: #f2f2f2; color: var(--reader-text); font: 13px/1.5 Tahoma, "Segoe UI", "Microsoft JhengHei", sans-serif; }
 button, input, select { font-family: Tahoma, "Segoe UI", "Microsoft JhengHei", sans-serif; font-size: 11px; }
 main { width: min(calc(100% - 16px), 1100px); min-width: 0; margin: 8px auto 28px; padding: 0 8px 12px; border: 1px solid #e6e6e6; border-radius: 3px; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
-.report-header { position: relative; min-height: 54px; margin: 0 -8px 8px; padding: 10px 12px; border-bottom: 1px solid #e6e6e6; background: #fff; box-shadow: none; color: #242424; }
+.report-header { position: relative; min-height: 54px; margin: 0 -8px 0; padding: 10px 12px; border-bottom: 1px solid #e6e6e6; background: #fff; box-shadow: none; color: #242424; }
 .report-header::before { display: none; }
 .eyebrow { margin: 0 0 2px; color: #6b6b6b; font-size: 10px; font-weight: 600; letter-spacing: normal; text-shadow: none; text-transform: none; }
 h1, h2, h3, h4 { color: #242424; line-height: 1.2; letter-spacing: normal; }
@@ -94,7 +94,7 @@ input[type="range"] { min-height: 18px; accent-color: var(--reader-accent); }
 input[type="checkbox"] { accent-color: var(--reader-accent); }
 
 /* Readable text hierarchy with full-width media. */
-html body>main section.report-section{position:relative!important;margin:0 0 12px!important;padding:8px 5px 22px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+html body>main section.report-section{position:relative!important;margin:0 0 12px!important;padding:0 5px 22px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
 html body>main section.report-section+section.report-section{margin-top:16px!important;padding-top:30px!important}
 html body>main section.report-section+section.report-section::before{content:"";position:absolute;top:0;left:50%;width:calc(100% - 40px);max-width:560px;height:1px;background:#cfcfcf;transform:translateX(-50%)}
 html body>main section.report-section>h2{position:relative;width:calc(100% - 40px);max-width:560px;margin:0 auto 20px!important;padding:0 0 13px!important;border:0!important;background:transparent!important;box-shadow:none!important;color:#242424!important;font-size:26px!important;font-weight:700!important;line-height:1.22!important;letter-spacing:-.015em!important}
@@ -137,7 +137,7 @@ body>main .report-annotation-jump,.report-help-live-preview .report-annotation-j
 body>main .report-annotation-track-toggle,.report-help-live-preview .report-annotation-track-toggle{border-color:#e6e6e6!important;background:#fff!important;color:#242424!important}
 
 /* Tree Polo branding. Package helper provides semantic title/icon/background assets; this theme owns appearance. */
-body>main .tree-polo-report-header{display:flex;align-items:center;min-height:54px;margin:0 -8px 8px;padding:10px 12px;border-bottom:1px solid #e6e6e6;background:#fff;box-shadow:none;color:#242424}
+body>main .tree-polo-report-header{display:flex;align-items:center;min-height:54px;margin:0 -8px 0;padding:10px 12px;border-bottom:1px solid #e6e6e6;background:#fff;box-shadow:none;color:#242424}
 body>main .tree-polo-report-header::before,body>main .tree-polo-report-header::after{display:none!important}
 body>main .tree-polo-brand-copy{position:relative;z-index:2;min-width:0}
 body>main .tree-polo-report-header h1{font-family:Tahoma,"Segoe UI","Microsoft JhengHei","Microsoft YaHei",sans-serif!important;font-size:18px!important;font-weight:700!important;line-height:1.28!important;letter-spacing:.035em!important;color:#242424!important;text-shadow:none!important}
