@@ -13,9 +13,8 @@ const HELP_CUE_DURATION_MS = 6400;
 function introStyle() {
   return `<style data-report-entry-intro-style>
 html.report-entry-intro-lock,body.report-entry-intro-lock{overflow:hidden!important;overscroll-behavior:none!important}
-html.report-scrollbar-pending{scrollbar-color:transparent transparent}
-html.report-scrollbar-pending::-webkit-scrollbar,html.report-scrollbar-pending::-webkit-scrollbar-track,html.report-scrollbar-pending::-webkit-scrollbar-thumb,html.report-scrollbar-pending::-webkit-scrollbar-corner{background:transparent!important}
-html.report-scrollbar-pending::-webkit-scrollbar-thumb{border-color:transparent!important;box-shadow:none!important}
+html.report-scrollbar-pending{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html.report-scrollbar-pending::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}
 .report-help-trigger{transition:opacity .34s ease,visibility .34s ease!important}
 body.report-entry-intro-active .report-help-trigger{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
 body.report-entry-intro-active>main{visibility:hidden}
