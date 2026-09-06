@@ -113,6 +113,7 @@ function introScript() {
   let finished = false;
   let revealState = null;
   let reportBody = null;
+  let reportBodyInner = null;
   let typedCount = 0;
   let signatureTypedCount = 0;
   let signaturePrepared = false;
@@ -142,9 +143,11 @@ function introScript() {
 
   const unwrapReportBody = () => {
     if (!reportBody || !main) return;
-    while (reportBody.firstChild) main.insertBefore(reportBody.firstChild,reportBody);
+    const source = reportBodyInner || reportBody;
+    while (source.firstChild) main.insertBefore(source.firstChild,reportBody);
     reportBody.remove();
     reportBody = null;
+    reportBodyInner = null;
   };
 
   const restoreSignature = () => {
@@ -312,7 +315,10 @@ function introScript() {
 
     reportBody = document.createElement('div');
     reportBody.dataset.reportEntryBody = 'true';
-    contentNodes.forEach((node) => reportBody.append(node));
+    reportBodyInner = document.createElement('div');
+    reportBodyInner.dataset.reportEntryBodyInner = 'true';
+    contentNodes.forEach((node) => reportBodyInner.append(node));
+    reportBody.append(reportBodyInner);
     main.append(reportBody);
 
     const mainStyle = window.getComputedStyle(main);
@@ -327,16 +333,19 @@ function introScript() {
     reportBody.style.width = main.clientWidth + 'px';
     reportBody.style.marginLeft = (-mainPaddingLeft) + 'px';
     reportBody.style.marginTop = (-headerMarginBottom) + 'px';
-    reportBody.style.paddingTop = headerMarginBottom + 'px';
-    reportBody.style.paddingRight = mainPaddingRight + 'px';
-    reportBody.style.paddingBottom = mainPaddingBottom + 'px';
-    reportBody.style.paddingLeft = mainPaddingLeft + 'px';
     reportBody.style.background = '#fff';
+
+    reportBodyInner.style.boxSizing = 'border-box';
+    reportBodyInner.style.width = '100%';
+    reportBodyInner.style.paddingTop = headerMarginBottom + 'px';
+    reportBodyInner.style.paddingRight = mainPaddingRight + 'px';
+    reportBodyInner.style.paddingBottom = mainPaddingBottom + 'px';
+    reportBodyInner.style.paddingLeft = mainPaddingLeft + 'px';
 
     const headerRect = header.getBoundingClientRect();
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     const dy = (viewportHeight / 2) - (headerRect.top + headerRect.height / 2);
-    const targetBodyHeight = Math.max(1,Math.ceil(reportBody.getBoundingClientRect().height));
+    const targetBodyHeight = Math.max(1,Math.ceil(reportBodyInner.getBoundingClientRect().height));
 
     revealState = { dy, targetBodyHeight };
     main.style.setProperty('position','relative','important');
