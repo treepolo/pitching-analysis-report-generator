@@ -20,7 +20,7 @@ body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animat
 .report-entry-intro{position:fixed;inset:0;z-index:5000;overflow:hidden;background:#000;color:#fff;cursor:default;touch-action:none;user-select:none;-webkit-user-select:none}
 .report-entry-intro-stage{position:absolute;inset:0;display:grid;place-items:center;background:#000}
 .tree-polo-ident-word{display:inline-flex;width:max-content;align-items:baseline;justify-content:center;margin:0;font-family:Arial,Helvetica,"Segoe UI",sans-serif;font-size:clamp(44px,7.2vw,104px);font-weight:700;line-height:1;letter-spacing:.075em;white-space:nowrap;opacity:1;transition:opacity ${IDENT_EXIT_MS}ms linear}
-.tree-polo-ident-tree{color:#3fa66c}
+.tree-polo-ident-tree{color:#00a65a}
 .tree-polo-ident-polo{color:#f5f5f5}
 .report-entry-intro.is-ident-exit .tree-polo-ident-word{opacity:0}
 .report-entry-intro.is-title-stage .tree-polo-ident-word{opacity:0}
