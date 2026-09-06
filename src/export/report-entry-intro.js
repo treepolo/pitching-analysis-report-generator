@@ -4,13 +4,60 @@ const IDENT_DURATION_MS = 2900;
 const TYPE_START_DELAY_MS = 700;
 const TYPE_INTERVAL_MS = 115;
 const IDENT_EXIT_MS = 260;
-const TITLE_STAGE_GAP_MS = 40;
+const TITLE_STAGE_GAP_MS = 420;
 const TITLE_STAGE_FADE_MS = IDENT_EXIT_MS;
 const TITLE_BAR_HOLD_MS = 620;
 const SIGNATURE_TYPE_INTERVAL_MS = 88;
 const HEADER_MOVE_DURATION_MS = 1750;
+const HEADER_MOVE_HOLD_OFFSET = .06;
+const HEADER_MOVE_EASING = 'cubic-bezier(.22,.72,.16,1)';
+const BACKGROUND_REVEAL_TRAVEL_FRACTION = .9;
 const REVEAL_DURATION_MS = 2300;
 const HELP_CUE_DURATION_MS = 6400;
+
+function cubicBezierCoordinate(t, control1, control2) {
+  const inverse = 1 - t;
+  return (3 * inverse * inverse * t * control1)
+    + (3 * inverse * t * t * control2)
+    + (t * t * t);
+}
+
+function parseCubicBezier(easing) {
+  const match = String(easing).match(/^cubic-bezier\(([^,]+),([^,]+),([^,]+),([^\)]+)\)$/u);
+  if (!match) throw new Error(`Expected cubic-bezier easing, got: ${easing}`);
+  return match.slice(1).map(Number);
+}
+
+function cubicBezierProgressAt(timeFraction, easing) {
+  const [x1, y1, x2, y2] = parseCubicBezier(easing);
+  let low = 0;
+  let high = 1;
+  for (let iteration = 0; iteration < 40; iteration += 1) {
+    const parameter = (low + high) / 2;
+    if (cubicBezierCoordinate(parameter, x1, x2) < timeFraction) low = parameter;
+    else high = parameter;
+  }
+  return cubicBezierCoordinate((low + high) / 2, y1, y2);
+}
+
+function timeFractionForEasedProgress(targetProgress, easing) {
+  let low = 0;
+  let high = 1;
+  for (let iteration = 0; iteration < 40; iteration += 1) {
+    const timeFraction = (low + high) / 2;
+    if (cubicBezierProgressAt(timeFraction, easing) < targetProgress) low = timeFraction;
+    else high = timeFraction;
+  }
+  return (low + high) / 2;
+}
+
+const BACKGROUND_FADE_MS = Math.round(
+  HEADER_MOVE_DURATION_MS * timeFractionForEasedProgress(
+    HEADER_MOVE_HOLD_OFFSET
+      + ((1 - HEADER_MOVE_HOLD_OFFSET) * BACKGROUND_REVEAL_TRAVEL_FRACTION),
+    HEADER_MOVE_EASING,
+  ),
+);
 
 function introStyle() {
   return `<style data-report-entry-intro-style>
@@ -23,7 +70,7 @@ body.report-entry-intro-active>main{visibility:hidden}
 body.report-entry-title-stage>main{visibility:visible}
 body.report-entry-intro-active[data-tree-polo-background="true"]{background:#000!important}
 body.report-entry-intro-active[data-tree-polo-background="true"]::before{opacity:0}
-body.report-entry-title-stage[data-tree-polo-background="true"]::before{animation:tree-polo-title-background-in ${TITLE_STAGE_FADE_MS}ms linear both}
+body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animation:tree-polo-report-background-in ${BACKGROUND_FADE_MS}ms linear both}
 .report-entry-intro[hidden]{display:none!important}
 .report-entry-intro{position:fixed;inset:0;z-index:5000;overflow:hidden;background:#000;color:#fff;cursor:default;touch-action:none;user-select:none;-webkit-user-select:none}
 .report-entry-intro-stage{position:absolute;inset:0;display:grid;place-items:center;background:#000}
@@ -36,7 +83,7 @@ body.report-entry-title-stage[data-tree-polo-background="true"]::before{animatio
 body.report-entry-help-cue-active .report-help-trigger{z-index:4100!important;isolation:isolate}
 body.report-entry-help-cue-active::after{content:"";position:fixed;inset:0;z-index:4090;pointer-events:none;background:radial-gradient(circle max(160px,30vw) at var(--report-help-cue-x,calc(100vw - 56px)) var(--report-help-cue-y,calc(100vh - 40px)),rgba(0,0,0,0) 0%,rgba(0,0,0,0) 6%,rgba(0,0,0,.025) 16%,rgba(0,0,0,.07) 27%,rgba(0,0,0,.15) 39%,rgba(0,0,0,.27) 52%,rgba(0,0,0,.41) 65%,rgba(0,0,0,.56) 77%,rgba(0,0,0,.69) 87%,rgba(0,0,0,.79) 94%,rgba(0,0,0,.88) 100%);animation:report-entry-help-mask ${HELP_CUE_DURATION_MS}ms ease both}
 body.report-entry-help-cue-active .report-help-trigger::after{content:"";position:absolute;inset:-6px;z-index:1;border:2px solid rgba(178,255,213,.96);border-radius:999px;pointer-events:none;animation:report-entry-help-ring 2.4s ease-in-out infinite,report-entry-help-life ${HELP_CUE_DURATION_MS}ms linear both}
-@keyframes tree-polo-title-background-in{from{opacity:0}to{opacity:1}}
+@keyframes tree-polo-report-background-in{from{opacity:0}to{opacity:1}}
 @keyframes report-entry-help-mask{0%{opacity:0}7%{opacity:1}88%{opacity:1}100%{opacity:0}}
 @keyframes report-entry-help-ring{0%,50%,100%{border-color:rgba(178,255,213,.98);box-shadow:0 0 0 1px rgba(0,166,90,.72),0 0 18px rgba(0,166,90,.82)}25%,75%{border-color:rgba(178,255,213,.34);box-shadow:0 0 0 1px rgba(0,166,90,.16),0 0 5px rgba(0,166,90,.18)}}
 @keyframes report-entry-help-life{0%{opacity:0}7%{opacity:1}88%{opacity:1}100%{opacity:0}}
@@ -431,22 +478,22 @@ function introScript() {
     const { dy, sheetStartY, sheetEndY, targetBodyHeight } = revealState;
     const headerAnimation = header.animate([
       { transform: 'translateY(' + dy + 'px)', offset: 0 },
-      { transform: 'translateY(' + dy + 'px)', offset: .06 },
+      { transform: 'translateY(' + dy + 'px)', offset: ${HEADER_MOVE_HOLD_OFFSET} },
       { transform: 'translateY(0px)', offset: 1 },
     ], {
       duration: ${HEADER_MOVE_DURATION_MS},
-      easing: 'cubic-bezier(.22,.72,.16,1)',
+      easing: '${HEADER_MOVE_EASING}',
       fill: 'forwards',
     });
     activeAnimations.push(headerAnimation);
 
     const bodyPositionAnimation = reportBody.animate([
       { transform: 'translateY(' + dy + 'px)', offset: 0 },
-      { transform: 'translateY(' + dy + 'px)', offset: .06 },
+      { transform: 'translateY(' + dy + 'px)', offset: ${HEADER_MOVE_HOLD_OFFSET} },
       { transform: 'translateY(0px)', offset: 1 },
     ], {
       duration: ${HEADER_MOVE_DURATION_MS},
-      easing: 'cubic-bezier(.22,.72,.16,1)',
+      easing: '${HEADER_MOVE_EASING}',
       fill: 'forwards',
     });
     activeAnimations.push(bodyPositionAnimation);
@@ -544,6 +591,7 @@ module.exports = {
   TITLE_BAR_HOLD_MS,
   SIGNATURE_TYPE_INTERVAL_MS,
   HEADER_MOVE_DURATION_MS,
+  BACKGROUND_FADE_MS,
   REVEAL_DURATION_MS,
   HELP_CUE_DURATION_MS,
   injectReportEntryIntro,
