@@ -99,6 +99,6 @@ test('current Tree Polo canonical surface keeps header text branding, branded fo
   assert.match(html, /tree-polo-report-header::before,body>main \.tree-polo-report-header::after\{display:none!important\}/u);
   assert.match(html, /tree-polo-signature-tree,body>main \.tree-polo-signature-polo\{color:#1a8917!important/u);
   assert.match(html, /report-style-source:data-report-entry-intro-style; role:component-style/u);
-  assert.match(html, /report-style-source:data-tree-polo-footer-style; role:component-style/u);
+  assert.match(html, /report-style-source:data-report-promotion-footer-style; role:component-style/u);
   assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme|--tree-polo-logo/u);
 });
