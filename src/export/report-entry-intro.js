@@ -4,6 +4,8 @@ const IDENT_DURATION_MS = 2900;
 const TYPE_START_DELAY_MS = 700;
 const TYPE_INTERVAL_MS = 115;
 const IDENT_EXIT_MS = 260;
+const TITLE_STAGE_GAP_MS = 40;
+const TITLE_STAGE_FADE_MS = IDENT_EXIT_MS;
 const TITLE_BAR_HOLD_MS = 620;
 const SIGNATURE_TYPE_INTERVAL_MS = 88;
 const HEADER_MOVE_DURATION_MS = 1750;
@@ -19,11 +21,13 @@ html.report-scrollbar-pending::-webkit-scrollbar{width:0!important;height:0!impo
 body.report-entry-intro-active .report-help-trigger{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
 body.report-entry-intro-active>main{visibility:hidden}
 body.report-entry-title-stage>main{visibility:visible}
+body.report-entry-intro-active[data-tree-polo-background="true"]{background:#000!important}
 body.report-entry-intro-active[data-tree-polo-background="true"]::before{opacity:0}
-body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animation:tree-polo-report-light-up ${REVEAL_DURATION_MS}ms linear both}
+body.report-entry-title-stage[data-tree-polo-background="true"]::before{animation:tree-polo-title-background-in ${TITLE_STAGE_FADE_MS}ms linear both}
 .report-entry-intro[hidden]{display:none!important}
 .report-entry-intro{position:fixed;inset:0;z-index:5000;overflow:hidden;background:#000;color:#fff;cursor:default;touch-action:none;user-select:none;-webkit-user-select:none}
 .report-entry-intro-stage{position:absolute;inset:0;display:grid;place-items:center;background:#000}
+.report-entry-intro.is-title-stage,.report-entry-intro.is-title-stage .report-entry-intro-stage{background:transparent}
 .tree-polo-ident-word{display:inline-flex;width:max-content;align-items:baseline;justify-content:center;margin:0;font-family:Arial,Helvetica,"Segoe UI",sans-serif;font-size:clamp(44px,7.2vw,104px);font-weight:700;line-height:1;letter-spacing:.075em;white-space:nowrap;opacity:1;transition:opacity ${IDENT_EXIT_MS}ms linear}
 .tree-polo-ident-tree{color:#00a65a}
 .tree-polo-ident-polo{color:#f5f5f5}
@@ -32,7 +36,7 @@ body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animat
 body.report-entry-help-cue-active .report-help-trigger{z-index:4100!important;isolation:isolate}
 body.report-entry-help-cue-active::after{content:"";position:fixed;inset:0;z-index:4090;pointer-events:none;background:radial-gradient(circle max(160px,30vw) at var(--report-help-cue-x,calc(100vw - 56px)) var(--report-help-cue-y,calc(100vh - 40px)),rgba(0,0,0,0) 0%,rgba(0,0,0,0) 6%,rgba(0,0,0,.025) 16%,rgba(0,0,0,.07) 27%,rgba(0,0,0,.15) 39%,rgba(0,0,0,.27) 52%,rgba(0,0,0,.41) 65%,rgba(0,0,0,.56) 77%,rgba(0,0,0,.69) 87%,rgba(0,0,0,.79) 94%,rgba(0,0,0,.88) 100%);animation:report-entry-help-mask ${HELP_CUE_DURATION_MS}ms ease both}
 body.report-entry-help-cue-active .report-help-trigger::after{content:"";position:absolute;inset:-6px;z-index:1;border:2px solid rgba(178,255,213,.96);border-radius:999px;pointer-events:none;animation:report-entry-help-ring 2.4s ease-in-out infinite,report-entry-help-life ${HELP_CUE_DURATION_MS}ms linear both}
-@keyframes tree-polo-report-light-up{0%{opacity:0}35%{opacity:.42}100%{opacity:1}}
+@keyframes tree-polo-title-background-in{from{opacity:0}to{opacity:1}}
 @keyframes report-entry-help-mask{0%{opacity:0}7%{opacity:1}88%{opacity:1}100%{opacity:0}}
 @keyframes report-entry-help-ring{0%,50%,100%{border-color:rgba(178,255,213,.98);box-shadow:0 0 0 1px rgba(0,166,90,.72),0 0 18px rgba(0,166,90,.82)}25%,75%{border-color:rgba(178,255,213,.34);box-shadow:0 0 0 1px rgba(0,166,90,.16),0 0 5px rgba(0,166,90,.18)}}
 @keyframes report-entry-help-life{0%{opacity:0}7%{opacity:1}88%{opacity:1}100%{opacity:0}}
@@ -160,6 +164,7 @@ function introScript() {
     header.style.removeProperty('will-change');
     header.style.removeProperty('z-index');
     header.style.removeProperty('border-bottom-color');
+    header.style.removeProperty('opacity');
   };
 
   const unwrapReportBody = () => {
@@ -344,8 +349,8 @@ function introScript() {
     const phoneContentTop = isPhoneLayout
       ? Math.max(0,numberPx(window.getComputedStyle(contentNodes[0]).marginTop))
       : 0;
-    const headerRect = header.getBoundingClientRect();
-    const headerHeight = headerRect.height;
+    const initialHeaderRect = header.getBoundingClientRect();
+    const headerHeight = initialHeaderRect.height;
     const sheetStartY = isPhoneLayout ? -headerHeight : 0;
     const sheetEndY = isPhoneLayout ? 0 : headerHeight;
 
@@ -376,8 +381,6 @@ function introScript() {
     reportBodyInner.style.transform = 'translateY(' + sheetStartY + 'px)';
     reportBodyInner.style.willChange = 'transform';
 
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-    const dy = (viewportHeight / 2) - (headerRect.top + headerRect.height / 2);
     const contentHeight = Math.max(
       1,
       reportBodyInner.scrollHeight,
@@ -385,7 +388,6 @@ function introScript() {
     );
     const targetBodyHeight = Math.ceil(contentHeight + Math.max(0,sheetEndY));
 
-    revealState = { dy, sheetStartY, sheetEndY, targetBodyHeight };
     main.style.setProperty('position','relative','important');
     main.style.setProperty('z-index','5001','important');
     main.style.setProperty('isolation','isolate','important');
@@ -397,13 +399,23 @@ function introScript() {
 
     header.style.setProperty('z-index','2','important');
     header.style.setProperty('border-bottom-color','transparent','important');
-    header.style.setProperty('transform','translateY(' + dy + 'px)');
-    header.style.setProperty('will-change','transform');
+    header.style.setProperty('opacity','0');
+    header.style.setProperty('will-change','transform,opacity');
 
     reportBody.style.height = '0px';
     reportBody.style.overflow = 'hidden';
-    reportBody.style.transform = 'translateY(' + dy + 'px)';
     reportBody.style.willChange = 'height,transform';
+
+    const positionedHeaderRect = header.getBoundingClientRect();
+    const visualViewport = window.visualViewport;
+    const viewportCenterY = visualViewport
+      ? visualViewport.offsetTop + visualViewport.height / 2
+      : (document.documentElement.clientHeight || window.innerHeight || 0) / 2;
+    const dy = viewportCenterY - (positionedHeaderRect.top + positionedHeaderRect.height / 2);
+
+    revealState = { dy, sheetStartY, sheetEndY, targetBodyHeight };
+    header.style.setProperty('transform','translateY(' + dy + 'px)');
+    reportBody.style.transform = 'translateY(' + dy + 'px)';
     return true;
   };
 
@@ -459,17 +471,6 @@ function introScript() {
     });
     activeAnimations.push(sheetSlideAnimation);
 
-    const overlayAnimation = overlay.animate([
-      { opacity: 1, offset: 0 },
-      { opacity: 1, offset: .08 },
-      { opacity: 0, offset: 1 },
-    ], {
-      duration: ${REVEAL_DURATION_MS},
-      easing: 'linear',
-      fill: 'forwards',
-    });
-    activeAnimations.push(overlayAnimation);
-
     finishTimer = window.setTimeout(() => finishEntry(false),${REVEAL_DURATION_MS} + 80);
   };
 
@@ -482,13 +483,25 @@ function introScript() {
       return;
     }
     body.classList.add('report-entry-title-stage');
-    titleBarTimer = window.setTimeout(beginReportReveal,${TITLE_BAR_HOLD_MS});
+    const titleFadeAnimation = header.animate([
+      { opacity: 0 },
+      { opacity: 1 },
+    ], {
+      duration: ${TITLE_STAGE_FADE_MS},
+      easing: 'linear',
+      fill: 'forwards',
+    });
+    activeAnimations.push(titleFadeAnimation);
+    titleBarTimer = window.setTimeout(
+      beginReportReveal,
+      ${TITLE_STAGE_FADE_MS} + ${TITLE_BAR_HOLD_MS},
+    );
   };
 
   audioCleanup = playIntroSound();
   typeTimer = window.setTimeout(typeNextCharacter,${TYPE_START_DELAY_MS});
   identExitTimer = window.setTimeout(() => overlay.classList.add('is-ident-exit'),${IDENT_DURATION_MS - IDENT_EXIT_MS});
-  identTimer = window.setTimeout(beginTitleStage,${IDENT_DURATION_MS});
+  identTimer = window.setTimeout(beginTitleStage,${IDENT_DURATION_MS} + ${TITLE_STAGE_GAP_MS});
 })();
 </script>`;
 }
@@ -526,6 +539,8 @@ module.exports = {
   TYPE_START_DELAY_MS,
   TYPE_INTERVAL_MS,
   IDENT_EXIT_MS,
+  TITLE_STAGE_GAP_MS,
+  TITLE_STAGE_FADE_MS,
   TITLE_BAR_HOLD_MS,
   SIGNATURE_TYPE_INTERVAL_MS,
   HEADER_MOVE_DURATION_MS,
