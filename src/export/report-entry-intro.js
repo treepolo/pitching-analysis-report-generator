@@ -337,20 +337,24 @@ function introScript() {
     reportBody.style.width = main.clientWidth + 'px';
     reportBody.style.marginLeft = (-mainPaddingLeft) + 'px';
     reportBody.style.marginTop = (-headerHeight) + 'px';
-    reportBody.style.background = '#fff';
+    reportBody.style.background = 'transparent';
 
     reportBodyInner.style.boxSizing = 'border-box';
     reportBodyInner.style.width = '100%';
-    reportBodyInner.style.paddingTop = headerHeight + 'px';
+    reportBodyInner.style.paddingTop = '0px';
     reportBodyInner.style.paddingRight = mainPaddingRight + 'px';
     reportBodyInner.style.paddingBottom = mainPaddingBottom + 'px';
     reportBodyInner.style.paddingLeft = mainPaddingLeft + 'px';
+    reportBodyInner.style.background = '#fff';
+    reportBodyInner.style.transform = 'translateY(0px)';
+    reportBodyInner.style.willChange = 'transform';
 
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     const dy = (viewportHeight / 2) - (headerRect.top + headerRect.height / 2);
-    const targetBodyHeight = Math.max(1,Math.ceil(reportBodyInner.getBoundingClientRect().height));
+    const contentHeight = Math.max(1,Math.ceil(reportBodyInner.getBoundingClientRect().height));
+    const targetBodyHeight = Math.ceil(headerHeight + contentHeight);
 
-    revealState = { dy, targetBodyHeight };
+    revealState = { dy, headerHeight, targetBodyHeight };
     main.style.setProperty('position','relative','important');
     main.style.setProperty('z-index','5001','important');
     main.style.setProperty('isolation','isolate','important');
@@ -374,14 +378,14 @@ function introScript() {
 
   const beginReportReveal = () => {
     if (finished) return;
-    if (!revealState || !main || !header || !reportBody) {
+    if (!revealState || !main || !header || !reportBody || !reportBodyInner) {
       finishEntry(false);
       return;
     }
     body.classList.add('report-entry-report-reveal');
     signatureTypeTimer = window.setTimeout(typeNextSignatureCharacter,0);
 
-    const { dy, targetBodyHeight } = revealState;
+    const { dy, headerHeight, targetBodyHeight } = revealState;
     const headerAnimation = header.animate([
       { transform: 'translateY(' + dy + 'px)', offset: 0 },
       { transform: 'translateY(' + dy + 'px)', offset: .06 },
@@ -413,6 +417,16 @@ function introScript() {
       fill: 'forwards',
     });
     activeAnimations.push(bodyHeightAnimation);
+
+    const sheetSlideAnimation = reportBodyInner.animate([
+      { transform: 'translateY(0px)' },
+      { transform: 'translateY(' + headerHeight + 'px)' },
+    ], {
+      duration: ${REVEAL_DURATION_MS},
+      easing: 'linear',
+      fill: 'forwards',
+    });
+    activeAnimations.push(sheetSlideAnimation);
 
     const overlayAnimation = overlay.animate([
       { opacity: 1, offset: 0 },
