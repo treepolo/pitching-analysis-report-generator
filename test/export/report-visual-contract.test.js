@@ -53,7 +53,7 @@ test('current report visual contract keeps readable text width and editorial pla
 
   assert.match(html, /section\.report-section>h2[^}]*max-width:560px/u);
   assert.match(html, /section\.report-section>\.report-text[^}]*max-width:560px/u);
-  assert.match(html, /section\.report-section\{[^}]*border:0!important[^}]*background:transparent!important/u);
+  assert.match(html, /section\.report-section\{[^}]*padding:0 5px 22px!important[^}]*border:0!important[^}]*background:transparent!important/u);
   assert.match(html, /main \{[^}]*border-radius: 3px[^}]*background: #fff/u);
   assert.match(html, /\.portable-player \{[^}]*position: relative[^}]*width: calc\(100% - 28px\)[^}]*margin: 0 14px 14px[^}]*padding: 18px 8px[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
   assert.match(html, /\.portable-player::before, \.portable-player::after \{[^}]*right: 0[^}]*left: 0[^}]*height: 1px[^}]*background: var\(--reader-line\)/u);
@@ -95,7 +95,7 @@ test('current Tree Polo canonical surface keeps header text branding, branded fo
   assert.match(html, /<body data-tree-polo-background="true">/u);
   assert.match(html, /body\[data-tree-polo-background="true"\]::before\{[^}]*tree-polo-report-background\.jpg/u);
   assert.match(html, /main \{[^}]*background: #fff[^}]*box-shadow: 0 2px 12px/u);
-  assert.match(html, /tree-polo-report-header\{[^}]*min-height:54px[^}]*padding:10px 12px[^}]*background:#fff/u);
+  assert.match(html, /tree-polo-report-header\{[^}]*min-height:54px[^}]*margin:0 -8px 0[^}]*padding:10px 12px[^}]*background:#fff/u);
   assert.match(html, /tree-polo-report-header::before,body>main \.tree-polo-report-header::after\{display:none!important\}/u);
   assert.match(html, /tree-polo-signature-tree,body>main \.tree-polo-signature-polo\{color:#1a8917!important/u);
   assert.match(html, /report-style-source:data-report-entry-intro-style; role:component-style/u);
