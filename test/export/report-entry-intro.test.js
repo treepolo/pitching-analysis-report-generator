@@ -73,8 +73,11 @@ test('entry runtime collapses the actual report main to header height then expan
   assert.match(source, /main\.getBoundingClientRect\(\)/u);
   assert.match(source, /const targetHeight = Math\.max\(1,Math\.ceil\(mainRect\.height\)\)/u);
   assert.match(source, /const collapsedHeight = Math\.max\(1,Math\.min\(targetHeight,Math\.ceil\(headerRect\.bottom - mainRect\.top\)\)\)/u);
-  assert.match(source, /main\.style\.setProperty\('height',collapsedHeight \+ 'px','important'\)/u);
+  assert.match(source, /main\.style\.setProperty\('height',collapsedHeight \+ 'px'\)/u);
+  assert.match(source, /main\.style\.setProperty\('transform','translate\(' \+ dx \+ 'px,' \+ dy \+ 'px\)'\)/u);
   assert.match(source, /main\.style\.setProperty\('overflow','hidden','important'\)/u);
+  assert.doesNotMatch(source, /setProperty\('height',[\s\S]*?'important'\)/u);
+  assert.doesNotMatch(source, /setProperty\('transform',[\s\S]*?'important'\)/u);
   assert.match(source, /const mainAnimation = main\.animate\(/u);
   assert.match(source, /height: collapsedHeight \+ 'px'/u);
   assert.match(source, /height: targetHeight \+ 'px'/u);
