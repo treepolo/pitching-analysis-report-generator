@@ -53,7 +53,7 @@ test('current report visual contract keeps readable text width and editorial pla
 
   assert.match(html, /section\.report-section>h2[^}]*max-width:560px/u);
   assert.match(html, /section\.report-section>\.report-text[^}]*max-width:560px/u);
-  assert.match(html, /section\.report-section\{[^}]*padding:0 5px 22px!important[^}]*border:0!important[^}]*background:transparent!important/u);
+  assert.match(html, /section\.report-section\{[^}]*padding:8px 5px 22px!important[^}]*border:0!important[^}]*background:transparent!important/u);
   assert.match(html, /main \{[^}]*border-radius: 3px[^}]*background: #fff/u);
   assert.match(html, /\.portable-player \{[^}]*position: relative[^}]*width: calc\(100% - 28px\)[^}]*margin: 0 14px 14px[^}]*padding: 18px 8px[^}]*border: 0[^}]*border-radius: 0[^}]*background: transparent/u);
   assert.match(html, /\.portable-player::before, \.portable-player::after \{[^}]*right: 0[^}]*left: 0[^}]*height: 1px[^}]*background: var\(--reader-line\)/u);
