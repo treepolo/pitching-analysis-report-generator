@@ -21,9 +21,20 @@ test('promotion footer exposes clickable platform icon and brand name in one anc
   assert.match(markup, /<img class="tree-polo-footer-logo" src="images\/tree-polo-logo\.webp"/u);
 });
 
+test('closing footer precedes the social promotion block in real markup order', () => {
+  const markup = promotionFooterMarkup({ logoRelativePath: 'images/tree-polo-logo.webp' });
+  const footerIndex = markup.indexOf('data-tree-polo-footer');
+  const promotionIndex = markup.indexOf('data-tree-polo-promotion');
+  assert.ok(footerIndex >= 0);
+  assert.ok(promotionIndex > footerIndex);
+});
+
 test('promotion footer owns its component style and injects exactly once', () => {
-  assert.match(promotionFooterStyle(), /data-report-promotion-footer-style/u);
-  assert.match(promotionFooterStyle(), /\.tree-polo-promotion-link:hover/u);
+  const css = promotionFooterStyle();
+  assert.match(css, /data-report-promotion-footer-style/u);
+  assert.match(css, /\.tree-polo-footer\{margin:64px 20px 0/u);
+  assert.match(css, /\.tree-polo-promotion\{margin:0 20px/u);
+  assert.match(css, /\.tree-polo-promotion-link:hover/u);
   const source = '<html><head></head><body><main><p>report</p></main></body></html>';
   const once = injectReportPromotionFooter(source, { logoRelativePath: 'images/tree-polo-logo.webp' });
   const twice = injectReportPromotionFooter(once, { logoRelativePath: 'images/tree-polo-logo.webp' });
