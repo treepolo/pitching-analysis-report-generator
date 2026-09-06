@@ -80,6 +80,19 @@ test('entry intro markup starts with zero-width TREE and POLO spans so typing gr
   assert.doesNotMatch(markup, /tree-polo-ident-char|tree-polo-ident-mark|tree-polo-ident-spectrum|tree-polo-ident-vignette/u);
 });
 
+test('scrollbar stays visually hidden through entry and reveals only after user intent', () => {
+  const css = introStyle();
+  const source = introScript();
+  assert.match(css, /html\.report-scrollbar-pending\{scrollbar-color:transparent transparent\}/u);
+  assert.match(css, /html\.report-scrollbar-pending::-webkit-scrollbar-thumb\{[^}]*border-color:transparent!important[^}]*box-shadow:none!important/u);
+  assert.match(source, /const scrollbarIntentEvents = \['pointerdown','touchstart','wheel'\]/u);
+  assert.match(source, /scrollbarInteractionSeen = true;[\s\S]*?if \(scrollbarMayReveal\) revealScrollbar\(\)/u);
+  assert.match(source, /root\.classList\.remove\('report-scrollbar-pending'\)/u);
+  assert.match(source, /scrollbarMayReveal = true;\n    if \(scrollbarInteractionSeen\) revealScrollbar\(\)/u);
+  const html = injectReportEntryIntro('<html lang="zh-Hant"><head></head><body><main>report</main></body></html>');
+  assert.match(html, /<html lang="zh-Hant" class="report-scrollbar-pending">/u);
+});
+
 test('entry runtime types the ident and starts the title stage only after ident exit', () => {
   const source = introScript();
   assert.match(source, /const text = 'TREEPOLO'\.slice\(0,typedCount\)/u);
@@ -199,13 +212,14 @@ test('entry intro runtime keeps a restrained local intro sound without shimmer',
   assert.doesNotMatch(source, /shimmer/u);
 });
 
-test('entry intro injects style, markup, and runtime exactly once', () => {
+test('entry intro injects style, markup, runtime and pending scrollbar state exactly once', () => {
   const base = '<html><head></head><body><main>report</main></body></html>';
   const once = injectReportEntryIntro(base);
   const twice = injectReportEntryIntro(once);
   assert.equal((twice.match(/data-report-entry-intro-style/g) || []).length, 1);
   assert.equal((twice.match(/data-report-entry-intro-runtime/g) || []).length, 1);
   assert.equal((twice.match(/data-report-entry-intro aria-hidden/g) || []).length, 1);
+  assert.equal((twice.match(/<html[^>]*\breport-scrollbar-pending\b/gu) || []).length, 1);
 });
 
 test('renderer injects fixed header before the entry intro runtime', async () => {
