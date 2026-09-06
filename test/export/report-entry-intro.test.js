@@ -36,13 +36,13 @@ test('entry intro keeps the clean centered TREEPOLO typing ident', () => {
   assert.match(css, /visibility:hidden!important/u);
 });
 
-test('entry timing keeps a black lead-in, a brisk title travel and a deliberately slow body reveal', () => {
+test('entry timing keeps the older brisk title travel and slower linear page reveal', () => {
   assert.ok(TYPE_START_DELAY_MS >= 650);
   assert.ok(IDENT_DURATION_MS >= 2800);
   assert.ok(IDENT_EXIT_MS >= 220);
   assert.ok(TITLE_BAR_HOLD_MS >= 500);
   assert.ok(SIGNATURE_TYPE_INTERVAL_MS >= 60);
-  assert.ok(HEADER_MOVE_DURATION_MS >= 1500 && HEADER_MOVE_DURATION_MS <= 1900);
+  assert.equal(HEADER_MOVE_DURATION_MS, 1750);
   assert.ok(REVEAL_DURATION_MS >= 2800);
   assert.ok(REVEAL_DURATION_MS > HEADER_MOVE_DURATION_MS);
 });
@@ -91,7 +91,7 @@ test('entry runtime types the ident and starts the title stage only after ident 
   assert.match(source, new RegExp(`setTimeout\\(beginTitleStage,${IDENT_DURATION_MS}\\)`,'u'));
 });
 
-test('reveal geometrically pins the report surface to the title bar while body height opens linearly', () => {
+test('reveal starts the report surface behind the title bar and slides it out without seam hacks', () => {
   const source = introScript().match(/<script data-report-entry-intro-runtime>\s*([\s\S]*?)\s*<\/script>/u)?.[1];
   assert.ok(source);
   assert.doesNotThrow(() => new vm.Script(source));
@@ -102,27 +102,22 @@ test('reveal geometrically pins the report surface to the title bar while body h
   assert.match(source, /contentNodes\.forEach\(\(node\) => reportBodyInner\.append\(node\)\)/u);
   assert.match(source, /reportBody\.append\(reportBodyInner\)/u);
   assert.match(source, /node !== header && !node\.classList\?\.contains\('report-fixed-header-spacer'\)/u);
-  assert.match(source, /const headerMarginBottom = Math\.max\(0,numberPx\(headerStyle\.marginBottom\)\)/u);
-  assert.match(source, /header\.style\.setProperty\('margin-bottom','0px','important'\)/u);
-  assert.match(source, /header\.style\.setProperty\('border-bottom-width','\.5px','important'\)/u);
-  assert.match(source, /header\.style\.removeProperty\('margin-bottom'\)/u);
-  assert.match(source, /header\.style\.removeProperty\('border-bottom-width'\)/u);
-  assert.match(source, /const naturalHeaderRect = header\.getBoundingClientRect\(\)/u);
-  assert.match(source, /const naturalBodyRect = reportBody\.getBoundingClientRect\(\)/u);
-  assert.match(source, /const seamOffset = naturalHeaderRect\.bottom - naturalBodyRect\.top/u);
-  assert.match(source, /reportBody\.style\.marginTop = seamOffset \+ 'px'/u);
-  assert.match(source, /reportBodyInner\.style\.paddingTop = headerMarginBottom \+ 'px'/u);
-  assert.doesNotMatch(source, /marginTop = \(-headerMarginBottom\)/u);
+  assert.match(source, /const headerHeight = headerRect\.height/u);
+  assert.match(source, /reportBody\.style\.marginTop = \(-headerHeight\) \+ 'px'/u);
+  assert.match(source, /reportBodyInner\.style\.paddingTop = headerHeight \+ 'px'/u);
+  assert.match(source, /reportBody\.style\.zIndex = '1'/u);
+  assert.match(source, /header\.style\.setProperty\('z-index','2','important'\)/u);
+  assert.match(source, /header\.style\.setProperty\('border-bottom-color','transparent','important'\)/u);
+  assert.match(source, /header\.style\.removeProperty\('border-bottom-color'\)/u);
+  assert.doesNotMatch(source, /seamOffset|naturalBodyRect|border-bottom-width|margin-bottom','0px/u);
   assert.match(source, /reportBody\.style\.height = '0px'/u);
   assert.match(source, /reportBody\.style\.overflow = 'hidden'/u);
   assert.match(source, /reportBody\.style\.transform = 'translateY\(' \+ dy \+ 'px\)'/u);
   assert.match(source, /header\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\)'\)/u);
   assert.match(source, /const targetBodyHeight = Math\.max\(1,Math\.ceil\(reportBodyInner\.getBoundingClientRect\(\)\.height\)\)/u);
-  assert.match(source, new RegExp(`const headerAnimation = header\\.animate\\([\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
-  assert.match(source, new RegExp(`const bodyPositionAnimation = reportBody\\.animate\\([\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
+  assert.match(source, new RegExp(`const headerAnimation = header\\.animate\\([\\s\\S]*?offset: \\.06[\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
+  assert.match(source, new RegExp(`const bodyPositionAnimation = reportBody\\.animate\\([\\s\\S]*?offset: \\.06[\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
   assert.match(source, new RegExp(`const bodyHeightAnimation = reportBody\\.animate\\([\\s\\S]*?height: targetBodyHeight \\+ 'px'[\\s\\S]*?duration: ${REVEAL_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
-  assert.doesNotMatch(source, /offset: \.06/u);
-  assert.doesNotMatch(source, /cubic-bezier/u);
   assert.match(source, /const unwrapReportBody = \(\) =>/u);
   assert.match(source, /const source = reportBodyInner \|\| reportBody/u);
   assert.match(source, /while \(source\.firstChild\) main\.insertBefore\(source\.firstChild,reportBody\)/u);
