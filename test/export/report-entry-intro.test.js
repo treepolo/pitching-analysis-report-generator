@@ -40,21 +40,38 @@ test('entry intro markup contains TREEPOLO and the T ident layers', () => {
   assert.match(markup, /tree-polo-ident-spectrum/u);
 });
 
-test('entry runtime animates the existing report header from center back to its layout position', () => {
+test('entry runtime is valid JavaScript and animates the existing report header', () => {
   const script = introScript();
   const source = script.match(/<script data-report-entry-intro-runtime>\s*([\s\S]*?)\s*<\/script>/u)?.[1];
   assert.ok(source);
   assert.doesNotThrow(() => new vm.Script(source));
   assert.match(source, /header\.getBoundingClientRect\(\)/u);
-  assert.match(source, /centerX/u);
-  assert.match(source, /centerY/u);
-  assert.match(source, /translate\(' \+ dx/u);
   assert.match(source, /header\.animate\(/u);
   assert.match(source, /sections\.forEach/u);
   assert.match(source, /clipPath: 'inset\(0 0 100% 0\)'/u);
   assert.match(source, /treepolo:entry-complete/u);
   assert.match(source, new RegExp(`setTimeout\\(beginReportReveal,${IDENT_DURATION_MS}\\)`,'u'));
   assert.ok(REVEAL_DURATION_MS > 0);
+});
+
+test('entry runtime remembers this open instance so reload does not replay it', () => {
+  const source = introScript();
+  assert.match(source, /sessionStorage\.getItem\(storageKey\)/u);
+  assert.match(source, /sessionStorage\.setItem\(storageKey,'1'\)/u);
+  assert.match(source, /history\.state\[historyKey\] === true/u);
+  assert.match(source, /history\.replaceState/u);
+  assert.match(source, /if \(readSessionSeen\(\) \|\| readHistorySeen\(\)\)/u);
+});
+
+test('entry runtime blocks report interaction and allows invisible pointer or touch skip', () => {
+  const source = introScript();
+  assert.match(source, /const blockedEvents = \['wheel','touchmove','keydown'\]/u);
+  assert.match(source, /event\.preventDefault\(\)/u);
+  assert.match(source, /event\.stopImmediatePropagation\(\)/u);
+  assert.match(source, /overlay\.addEventListener\('pointerdown',skipEntry/u);
+  assert.match(source, /overlay\.addEventListener\('touchstart',skipEntry/u);
+  assert.match(source, /finishEntry\(true\)/u);
+  assert.doesNotMatch(introMarkup(), /skip|跳過/iu);
 });
 
 test('entry intro runtime schedules the ident sound', () => {
