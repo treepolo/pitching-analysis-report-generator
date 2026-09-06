@@ -76,7 +76,7 @@ test('delivers folder, HTML and ZIP with the canonical Tree Polo package contrac
   assert.match(html, /<img class="tree-polo-footer-logo" src="images\/tree-polo-logo\.webp"/u);
   assert.match(html, /data-tree-polo-promotion/u);
   assert.match(html, /data-tree-polo-footer/u);
-  assert.match(html, /希望我的洞察，能在你追求卓越的路上幫上忙。/u);
+  assert.match(html, /希望我的洞察，能在閣下追求卓越的路上幫/u);
   assert.match(html, /https:\/\/www\.instagram\.com\/treepolooo\//u);
   assert.match(html, /https:\/\/vocus\.cc\/user\/@treepolooo/u);
   assert.match(html, /https:\/\/www\.youtube\.com\/@treepolo/u);
