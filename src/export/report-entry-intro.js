@@ -6,6 +6,7 @@ const TYPE_INTERVAL_MS = 115;
 const IDENT_EXIT_MS = 260;
 const TITLE_BAR_HOLD_MS = 620;
 const SIGNATURE_TYPE_INTERVAL_MS = 88;
+const HEADER_MOVE_DURATION_MS = 1750;
 const REVEAL_DURATION_MS = 3000;
 const HELP_CUE_DURATION_MS = 6400;
 
@@ -345,6 +346,11 @@ function introScript() {
     reportBodyInner.style.paddingBottom = mainPaddingBottom + 'px';
     reportBodyInner.style.paddingLeft = mainPaddingLeft + 'px';
 
+    const naturalHeaderRect = header.getBoundingClientRect();
+    const naturalBodyRect = reportBody.getBoundingClientRect();
+    const seamOffset = naturalHeaderRect.bottom - naturalBodyRect.top;
+    reportBody.style.marginTop = seamOffset + 'px';
+
     const headerRect = header.getBoundingClientRect();
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     const dy = (viewportHeight / 2) - (headerRect.top + headerRect.height / 2);
@@ -384,27 +390,31 @@ function introScript() {
       { transform: 'translateY(' + dy + 'px)' },
       { transform: 'translateY(0px)' },
     ], {
-      duration: ${REVEAL_DURATION_MS},
-      easing: 'linear',
+      duration: ${HEADER_MOVE_DURATION_MS},
+      easing: 'cubic-bezier(.22,.72,.16,1)',
       fill: 'forwards',
     });
     activeAnimations.push(headerAnimation);
 
-    const bodyAnimation = reportBody.animate([
-      {
-        transform: 'translateY(' + dy + 'px)',
-        height: '0px',
-      },
-      {
-        transform: 'translateY(0px)',
-        height: targetBodyHeight + 'px',
-      },
+    const bodyPositionAnimation = reportBody.animate([
+      { transform: 'translateY(' + dy + 'px)' },
+      { transform: 'translateY(0px)' },
+    ], {
+      duration: ${HEADER_MOVE_DURATION_MS},
+      easing: 'cubic-bezier(.22,.72,.16,1)',
+      fill: 'forwards',
+    });
+    activeAnimations.push(bodyPositionAnimation);
+
+    const bodyHeightAnimation = reportBody.animate([
+      { height: '0px' },
+      { height: targetBodyHeight + 'px' },
     ], {
       duration: ${REVEAL_DURATION_MS},
       easing: 'linear',
       fill: 'forwards',
     });
-    activeAnimations.push(bodyAnimation);
+    activeAnimations.push(bodyHeightAnimation);
 
     const overlayAnimation = overlay.animate([
       { opacity: 1, offset: 0 },
@@ -464,6 +474,7 @@ module.exports = {
   IDENT_EXIT_MS,
   TITLE_BAR_HOLD_MS,
   SIGNATURE_TYPE_INTERVAL_MS,
+  HEADER_MOVE_DURATION_MS,
   REVEAL_DURATION_MS,
   HELP_CUE_DURATION_MS,
   injectReportEntryIntro,
