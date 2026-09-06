@@ -14,6 +14,17 @@ function mobileShellCss() {
     overflow-x: hidden !important;
   }
 
+  /* Phone reports never use the photographic desktop backdrop. Keep the
+     canonical mobile canvas black in every entry and post-entry state. */
+  html,
+  body[data-tree-polo-background="true"] {
+    background: #000 !important;
+  }
+  body[data-tree-polo-background="true"]::before {
+    background-color: #000 !important;
+    background-image: none !important;
+  }
+
   /* The phone report is edge-to-edge. Keep the report surface itself flush to
      the viewport so the real title bar keeps identical geometry during entry
      and after it becomes fixed. Reserve the fixed bar + visual gap on the
