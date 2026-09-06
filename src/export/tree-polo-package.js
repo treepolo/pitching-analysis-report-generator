@@ -151,7 +151,9 @@ function injectTreePoloPromotionFooter(html, options = {}) {
     const style = treePoloFooterStyle();
     output = output.includes('</head>') ? output.replace('</head>', `${style}\n</head>`) : `${style}\n${output}`;
   }
-  if (!output.includes('data-tree-polo-promotion') && !output.includes('data-tree-polo-footer')) {
+  const hasPromotion = /\bdata-tree-polo-promotion(?:\s|=|>)/u.test(output);
+  const hasFooter = /\bdata-tree-polo-footer(?:\s|=|>)/u.test(output);
+  if (!hasPromotion && !hasFooter) {
     const markup = treePoloPromotionFooterMarkup(options);
     output = output.includes('</main>') ? output.replace('</main>', `${markup}\n</main>`) : `${output}\n${markup}`;
   }
