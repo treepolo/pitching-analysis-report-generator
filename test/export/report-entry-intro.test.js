@@ -56,12 +56,12 @@ test('title stage uses the real final title bar without content-specific entranc
   assert.doesNotMatch(css, /body\.report-entry-title-stage>main h1[^}]*transform/u);
 });
 
-test('background remains black until the report starts expanding and then reveals linearly with it', () => {
+test('desktop background stays hidden until reveal while phone background ownership remains in the mobile shell', () => {
   const css = introStyle();
   assert.match(css, /report-entry-intro-active\[data-tree-polo-background="true"\]::before\{opacity:0\}/u);
   assert.match(css, new RegExp(`report-entry-report-reveal\\[data-tree-polo-background="true"\\]::before\\{animation:tree-polo-report-light-up ${REVEAL_DURATION_MS}ms linear both\\}`,'u'));
   assert.match(css, /@keyframes tree-polo-report-light-up/u);
-  assert.match(css, /@media\(max-width:700px\)[\s\S]*?report-entry-intro-active:not\(\.report-entry-report-reveal\)\[data-tree-polo-background="true"\]::before\{[^}]*background-image:none!important[^}]*background-color:#000!important[^}]*opacity:0!important/u);
+  assert.doesNotMatch(css, /background-image:none!important/u);
 });
 
 test('phone entry does not override title-bar geometry during the intro', () => {
@@ -91,10 +91,12 @@ test('entry runtime types the ident and starts the title stage only after ident 
   assert.match(source, new RegExp(`setTimeout\\(beginTitleStage,${IDENT_DURATION_MS}\\)`,'u'));
 });
 
-test('reveal slides the actual report sheet from behind the title bar instead of faking a seam', () => {
+test('reveal slides the report sheet from behind the title bar and resolves phone geometry to its fixed-header layout', () => {
   const source = introScript().match(/<script data-report-entry-intro-runtime>\s*([\s\S]*?)\s*<\/script>/u)?.[1];
   assert.ok(source);
   assert.doesNotThrow(() => new vm.Script(source));
+  assert.match(source, /const phoneQuery = window\.matchMedia\('\(max-width: 700px\)'\)/u);
+  assert.match(source, /const isPhoneLayout = phoneQuery\.matches/u);
   assert.match(source, /reportBody = document\.createElement\('div'\)/u);
   assert.match(source, /reportBody\.dataset\.reportEntryBody = 'true'/u);
   assert.match(source, /reportBodyInner = document\.createElement\('div'\)/u);
@@ -102,20 +104,25 @@ test('reveal slides the actual report sheet from behind the title bar instead of
   assert.match(source, /contentNodes\.forEach\(\(node\) => reportBodyInner\.append\(node\)\)/u);
   assert.match(source, /reportBody\.append\(reportBodyInner\)/u);
   assert.match(source, /node !== header && !node\.classList\?\.contains\('report-fixed-header-spacer'\)/u);
+  assert.match(source, /const phoneContentTop = isPhoneLayout[\s\S]*?window\.getComputedStyle\(contentNodes\[0\]\)\.marginTop/u);
   assert.match(source, /const headerHeight = headerRect\.height/u);
+  assert.match(source, /const sheetStartY = isPhoneLayout \? -headerHeight : 0/u);
+  assert.match(source, /const sheetEndY = isPhoneLayout \? 0 : headerHeight/u);
   assert.match(source, /reportBody\.style\.marginTop = \(-headerHeight\) \+ 'px'/u);
   assert.match(source, /reportBody\.style\.background = 'transparent'/u);
-  assert.match(source, /reportBodyInner\.style\.paddingTop = '0px'/u);
+  assert.match(source, /reportBodyInner\.style\.display = 'flow-root'/u);
+  assert.match(source, /reportBodyInner\.style\.paddingTop = phoneContentTop \+ 'px'/u);
   assert.match(source, /reportBodyInner\.style\.background = '#fff'/u);
-  assert.match(source, /reportBodyInner\.style\.transform = 'translateY\(0px\)'/u);
+  assert.match(source, /reportBodyInner\.style\.transform = 'translateY\(' \+ sheetStartY \+ 'px\)'/u);
   assert.match(source, /reportBody\.style\.zIndex = '1'/u);
   assert.match(source, /header\.style\.setProperty\('z-index','2','important'\)/u);
   assert.match(source, /header\.style\.setProperty\('border-bottom-color','transparent','important'\)/u);
   assert.match(source, /header\.style\.removeProperty\('border-bottom-color'\)/u);
   assert.doesNotMatch(source, /seamOffset|naturalBodyRect|border-bottom-width|margin-bottom','0px/u);
-  assert.match(source, /const contentHeight = Math\.max\(1,Math\.ceil\(reportBodyInner\.getBoundingClientRect\(\)\.height\)\)/u);
-  assert.match(source, /const targetBodyHeight = Math\.ceil\(headerHeight \+ contentHeight\)/u);
-  assert.match(source, /revealState = \{ dy, headerHeight, targetBodyHeight \}/u);
+  assert.match(source, /reportBodyInner\.scrollHeight/u);
+  assert.match(source, /Math\.ceil\(reportBodyInner\.getBoundingClientRect\(\)\.height\)/u);
+  assert.match(source, /const targetBodyHeight = Math\.ceil\(contentHeight \+ Math\.max\(0,sheetEndY\)\)/u);
+  assert.match(source, /revealState = \{ dy, sheetStartY, sheetEndY, targetBodyHeight \}/u);
   assert.match(source, /reportBody\.style\.height = '0px'/u);
   assert.match(source, /reportBody\.style\.overflow = 'hidden'/u);
   assert.match(source, /reportBody\.style\.transform = 'translateY\(' \+ dy \+ 'px\)'/u);
@@ -123,7 +130,7 @@ test('reveal slides the actual report sheet from behind the title bar instead of
   assert.match(source, new RegExp(`const headerAnimation = header\\.animate\\([\\s\\S]*?offset: \\.06[\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
   assert.match(source, new RegExp(`const bodyPositionAnimation = reportBody\\.animate\\([\\s\\S]*?offset: \\.06[\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
   assert.match(source, new RegExp(`const bodyHeightAnimation = reportBody\\.animate\\([\\s\\S]*?height: targetBodyHeight \\+ 'px'[\\s\\S]*?duration: ${REVEAL_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
-  assert.match(source, new RegExp(`const sheetSlideAnimation = reportBodyInner\\.animate\\([\\s\\S]*?translateY\\(' \\+ headerHeight \\+ 'px\\)[\\s\\S]*?duration: ${REVEAL_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
+  assert.match(source, new RegExp(`const sheetSlideAnimation = reportBodyInner\\.animate\\([\\s\\S]*?sheetStartY[\\s\\S]*?sheetEndY[\\s\\S]*?duration: ${REVEAL_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
   assert.match(source, /const unwrapReportBody = \(\) =>/u);
   assert.match(source, /const source = reportBodyInner \|\| reportBody/u);
   assert.match(source, /while \(source\.firstChild\) main\.insertBefore\(source\.firstChild,reportBody\)/u);
