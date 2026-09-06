@@ -10,7 +10,8 @@ const {
   normalizeRelativeAssetPath,
 } = require('./asset-paths');
 
-const HTML_ATTRIBUTE_PATTERN = /\b(src|poster|href)\s*=\s*(["'])(.*?)\2/giu;
+const HTML_ASSET_ATTRIBUTE_PATTERN = /\b(src|poster)\s*=\s*(["'])(.*?)\2/giu;
+const HTML_ANCHOR_HREF_PATTERN = /<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1/giu;
 
 function decodeHtmlAttribute(value) {
   return value
@@ -21,17 +22,28 @@ function decodeHtmlAttribute(value) {
     .replaceAll('&gt;', '>');
 }
 
+function validateNavigationHref(value) {
+  const decoded = decodeHtmlAttribute(String(value)).trim();
+  if (decoded.startsWith('#')) return;
+
+  let url;
+  try {
+    url = new URL(decoded);
+  } catch (error) {
+    throw new ExportValidationError(`Self-contained report has an invalid navigation href: ${value}`, { cause: error });
+  }
+  if (url.protocol !== 'https:') {
+    throw new ExportValidationError(`Self-contained report has an unsafe navigation href: ${value}`);
+  }
+}
+
 function extractHtmlAssetReferences(html) {
   if (typeof html !== 'string') throw new ExportValidationError('Rendered HTML must be a string');
   const references = [];
   let match;
-  while ((match = HTML_ATTRIBUTE_PATTERN.exec(html)) !== null) {
+  while ((match = HTML_ASSET_ATTRIBUTE_PATTERN.exec(html)) !== null) {
     const attribute = match[1].toLowerCase();
     const value = match[3];
-    if (attribute === 'href' && value.startsWith('#')) continue;
-    if (attribute === 'href') {
-      throw new ExportValidationError(`Self-contained report has a non-local href: ${value}`);
-    }
     let decoded;
     try {
       decoded = decodeURIComponent(value);
@@ -40,6 +52,11 @@ function extractHtmlAssetReferences(html) {
     }
     references.push({ attribute, value, relativePath: normalizeRelativeAssetPath(decoded) });
   }
+
+  while ((match = HTML_ANCHOR_HREF_PATTERN.exec(html)) !== null) {
+    validateNavigationHref(match[2]);
+  }
+
   if (/<script\b[^>]*\bsrc\s*=/iu.test(html) || /<link\b[^>]*\bhref\s*=/iu.test(html)) {
     throw new ExportValidationError('Self-contained report must not load external runtime resources');
   }
