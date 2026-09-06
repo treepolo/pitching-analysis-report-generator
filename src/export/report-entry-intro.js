@@ -207,11 +207,11 @@ function introScript() {
     main.style.setProperty('position','relative','important');
     main.style.setProperty('z-index','5001','important');
     main.style.setProperty('isolation','isolate','important');
-    main.style.setProperty('transform-origin','top center','important');
-    main.style.setProperty('transform','translate(' + dx + 'px,' + dy + 'px)','important');
-    main.style.setProperty('height',collapsedHeight + 'px','important');
+    main.style.setProperty('transform-origin','top center');
+    main.style.setProperty('transform','translate(' + dx + 'px,' + dy + 'px)');
+    main.style.setProperty('height',collapsedHeight + 'px');
     main.style.setProperty('overflow','hidden','important');
-    main.style.setProperty('will-change','transform,height','important');
+    main.style.setProperty('will-change','transform,height');
     main.style.setProperty('opacity','1','important');
     return true;
   };
