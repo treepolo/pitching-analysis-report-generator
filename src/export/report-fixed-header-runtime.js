@@ -21,11 +21,8 @@ body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
   display: block;
 }
 @media (max-width: 700px) {
-  /* Pin the phone title bar from the first painted frame. The runtime only
-     supplies the exact pixel width afterwards; mobile content spacing is
-     reserved by the shell CSS, not by a late spacer. */
-  body>main header.tree-polo-report-header,
-  body>main header.tree-polo-report-header[data-report-header-fixed="true"] {
+  body:not(.report-entry-intro-active)>main header.tree-polo-report-header,
+  body:not(.report-entry-intro-active)>main header.tree-polo-report-header[data-report-header-fixed="true"] {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -74,6 +71,7 @@ function fixedHeaderScript() {
   let anchorY = 0;
   let fixed = false;
   let printing = false;
+  let introSuspended = false;
   let rafId = 0;
   let wasMobile = mobileQuery.matches;
 
@@ -135,6 +133,10 @@ function fixedHeaderScript() {
   const update = () => {
     rafId = 0;
     if (printing) return;
+    if (introSuspended) {
+      setFixed(false);
+      return;
+    }
 
     const isMobile = mobileQuery.matches;
     if (isMobile !== wasMobile) {
@@ -143,8 +145,6 @@ function fixedHeaderScript() {
       readNaturalMetrics();
     }
 
-    /* Phone layout is fixed from the start. There is no initial top gap and no
-       later threshold transition that can nudge the bar upward by a few px. */
     if (isMobile) {
       if (!fixed) setFixed(true);
       applyFixedGeometry();
@@ -162,6 +162,22 @@ function fixedHeaderScript() {
   const scheduleUpdate = () => {
     if (rafId) return;
     rafId = window.requestAnimationFrame(update);
+  };
+
+  const suspendForIntro = () => {
+    introSuspended = true;
+    if (rafId) {
+      window.cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    setFixed(false);
+  };
+
+  const resumeAfterIntro = () => {
+    introSuspended = false;
+    wasMobile = mobileQuery.matches;
+    readNaturalMetrics();
+    scheduleUpdate();
   };
 
   const beforePrint = () => {
@@ -183,6 +199,8 @@ function fixedHeaderScript() {
   window.addEventListener('orientationchange', scheduleUpdate, { passive: true });
   window.addEventListener('beforeprint', beforePrint);
   window.addEventListener('afterprint', afterPrint);
+  window.addEventListener('treepolo:entry-start', suspendForIntro);
+  window.addEventListener('treepolo:entry-complete', resumeAfterIntro);
   mobileQuery.addEventListener?.('change', scheduleUpdate);
   window.visualViewport?.addEventListener('resize', scheduleUpdate, { passive: true });
 })();
