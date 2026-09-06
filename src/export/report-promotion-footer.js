@@ -1,7 +1,7 @@
 'use strict';
 
 const BRAND_LOGO_RELATIVE_PATH = 'images/tree-polo-logo.webp';
-const FOOTER_MESSAGE = '希望我的洞察，能在你追求卓越的路上幫上忙。';
+const FOOTER_MESSAGE = '希望我的洞察，能在閣下追求卓越的路上幫上忙。';
 const FOOTER_TAIL_CLUSTER_SIZE = 3;
 const SOCIAL_LINKS = Object.freeze([
   ['instagram', 'Instagram', 'https://www.instagram.com/treepolooo/'],
