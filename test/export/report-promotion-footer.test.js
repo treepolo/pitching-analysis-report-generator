@@ -17,13 +17,14 @@ test('promotion footer exposes clickable platform icon and brand name in one anc
     assert.match(markup, new RegExp(`tree-polo-promotion-name">${label}`, 'u'));
   }
   assert.match(markup, /target="_blank" rel="noopener noreferrer"/u);
-  assert.match(markup, /希望我的洞察，能在你追求卓越的路上幫<span class="tree-polo-footer-no-break-tail">上忙。<\/span>/u);
+  assert.match(markup, /希望我的洞察，能在閣下追求卓越的路上幫<span class="tree-polo-footer-no-break-tail">上忙。<\/span>/u);
   assert.match(markup, /<img class="tree-polo-footer-logo" src="images\/tree-polo-logo\.webp"/u);
 });
 
 test('footer closing sentence keeps its final three characters together without a forced line break', () => {
   const markup = promotionFooterMarkup();
   const css = promotionFooterStyle();
+  assert.match(markup, /希望我的洞察，能在閣下追求卓越的路上幫/u);
   assert.match(markup, /<span class="tree-polo-footer-no-break-tail">上忙。<\/span>/u);
   assert.doesNotMatch(markup, /<br\b/iu);
   assert.match(css, /\.tree-polo-footer-no-break-tail\{white-space:nowrap\}/u);
