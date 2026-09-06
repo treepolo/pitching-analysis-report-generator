@@ -49,6 +49,8 @@ test('title stage uses the real final title bar and hides only the signature bef
   assert.match(css, /body\.report-entry-title-stage>main\{visibility:visible\}/u);
   assert.match(css, /body\.report-entry-title-stage:not\(\.report-entry-report-reveal\)>main>:not\(header\)\{visibility:hidden\}/u);
   assert.match(css, /body\.report-entry-title-stage:not\(\.report-entry-report-reveal\)>main \.tree-polo-signature\{[^}]*position:absolute!important[^}]*opacity:0!important/u);
+  assert.match(css, /body\.report-entry-report-reveal>main>:not\(header\)\{animation:report-entry-content-in/u);
+  assert.match(css, /@keyframes report-entry-content-in\{0%,16%\{opacity:0\}42%\{opacity:1\}/u);
   assert.doesNotMatch(css, /report-entry-title-only|report-entry-title-bar/u);
   assert.doesNotMatch(css, /body\.report-entry-title-stage>main h1[^}]*transform/u);
 });
@@ -88,19 +90,24 @@ test('entry runtime types the ident and starts the title stage only after ident 
   assert.match(source, new RegExp(`setTimeout\\(beginTitleStage,${IDENT_DURATION_MS}\\)`,'u'));
 });
 
-test('title stage clips the actual final report to its real header then expands downward without resizing the bar', () => {
+test('reveal moves only the title bar upward while the report surface pulls open downward', () => {
   const source = introScript().match(/<script data-report-entry-intro-runtime>\s*([\s\S]*?)\s*<\/script>/u)?.[1];
   assert.ok(source);
   assert.doesNotThrow(() => new vm.Script(source));
   assert.match(source, /const mainRect = main\.getBoundingClientRect\(\)/u);
   assert.match(source, /const headerRect = header\.getBoundingClientRect\(\)/u);
-  assert.match(source, /const topInset = Math\.max\(0,Math\.ceil\(headerRect\.top - mainRect\.top\)\)/u);
-  assert.match(source, /const bottomInset = Math\.max\(0,Math\.ceil\(mainRect\.bottom - headerRect\.bottom\)\)/u);
-  assert.match(source, /main\.style\.setProperty\('clip-path','inset\(' \+ topInset \+ 'px 0 ' \+ bottomInset \+ 'px 0\)'\)/u);
-  assert.match(source, /main\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\)'\)/u);
+  assert.match(source, /const finalTopInset = Math\.max\(0,headerRect\.top - mainRect\.top\)/u);
+  assert.match(source, /const initialTopInset = Math\.max\(0,finalTopInset \+ dy\)/u);
+  assert.match(source, /const initialBottomInset = Math\.max\(0,mainRect\.height - initialTopInset - headerRect\.height\)/u);
+  assert.match(source, /main\.style\.setProperty\('clip-path','inset\(' \+ initialTopInset \+ 'px 0 ' \+ initialBottomInset \+ 'px 0\)'\)/u);
+  assert.match(source, /header\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\)'\)/u);
   assert.match(source, /const mainAnimation = main\.animate\(/u);
-  assert.match(source, /clipPath: 'inset\(' \+ topInset \+ 'px 0 0px 0\)'/u);
-  assert.match(source, /transform: 'translateY\(0px\)'/u);
+  assert.match(source, /clipPath: 'inset\(0px 0 0px 0\)'/u);
+  assert.match(source, /const headerAnimation = header\.animate\(/u);
+  assert.match(source, /\{ transform: 'translateY\(0px\)', offset: 1 \}/u);
+  assert.doesNotMatch(source, /main\.style\.setProperty\('transform'/u);
+  assert.doesNotMatch(source, /transform: 'translateY\(' \+ dy \+ 'px'[^\n]*clipPath/u);
+  assert.match(source, /restoreHeader/u);
   assert.doesNotMatch(source, /desiredHeroFontSize|heroScale|titleAnimation|TITLE_SHRINK|TITLE_HERO/u);
   assert.doesNotMatch(source, /main\.style\.setProperty\('height'|main\.style\.setProperty\('width'/u);
   assert.match(source, new RegExp(`setTimeout\\(beginReportReveal,${TITLE_BAR_HOLD_MS}\\)`,'u'));
