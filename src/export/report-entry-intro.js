@@ -13,6 +13,9 @@ const HELP_CUE_DURATION_MS = 6400;
 function introStyle() {
   return `<style data-report-entry-intro-style>
 html.report-entry-intro-lock,body.report-entry-intro-lock{overflow:hidden!important;overscroll-behavior:none!important}
+html.report-scrollbar-pending{scrollbar-color:transparent transparent}
+html.report-scrollbar-pending::-webkit-scrollbar,html.report-scrollbar-pending::-webkit-scrollbar-track,html.report-scrollbar-pending::-webkit-scrollbar-thumb,html.report-scrollbar-pending::-webkit-scrollbar-corner{background:transparent!important}
+html.report-scrollbar-pending::-webkit-scrollbar-thumb{border-color:transparent!important;box-shadow:none!important}
 .report-help-trigger{transition:opacity .34s ease,visibility .34s ease!important}
 body.report-entry-intro-active .report-help-trigger{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
 body.report-entry-intro-active>main{visibility:hidden}
@@ -81,6 +84,26 @@ function introScript() {
     try { history.replaceState(Object.assign({},history.state || {},{ [historyKey]: true }),document.title); } catch {}
   };
 
+  let scrollbarInteractionSeen = false;
+  let scrollbarMayReveal = false;
+  const scrollbarIntentEvents = ['pointerdown','touchstart','wheel'];
+  const removeScrollbarIntentListeners = () => {
+    scrollbarIntentEvents.forEach((type) => document.removeEventListener(type,recordScrollbarInteraction,true));
+  };
+  const revealScrollbar = () => {
+    root.classList.remove('report-scrollbar-pending');
+    removeScrollbarIntentListeners();
+  };
+  const recordScrollbarInteraction = () => {
+    scrollbarInteractionSeen = true;
+    if (scrollbarMayReveal) revealScrollbar();
+  };
+  scrollbarIntentEvents.forEach((type) => document.addEventListener(
+    type,
+    recordScrollbarInteraction,
+    { capture:true,passive:true },
+  ));
+
   const clearEntryClasses = () => body.classList.remove(
     'report-entry-intro-active',
     'report-entry-title-stage',
@@ -93,6 +116,8 @@ function introScript() {
     clearEntryClasses();
     body.classList.remove('report-entry-help-cue-active');
     root.classList.remove('report-entry-intro-lock');
+    scrollbarMayReveal = true;
+    if (scrollbarInteractionSeen) revealScrollbar();
     return;
   }
   markEntrySeen();
@@ -282,6 +307,8 @@ function introScript() {
     overlay.remove();
     root.classList.remove('report-entry-intro-lock');
     clearEntryClasses();
+    scrollbarMayReveal = true;
+    if (scrollbarInteractionSeen) revealScrollbar();
     window.dispatchEvent(new CustomEvent('treepolo:entry-complete',{ detail:{ skipped } }));
     startHelpCue();
   };
@@ -473,8 +500,19 @@ function introScript() {
 </script>`;
 }
 
+function ensureRootClass(html, className) {
+  return String(html).replace(/<html\b([^>]*)>/iu, (tag, attributes) => {
+    const classAttribute = attributes.match(/\bclass=(["'])(.*?)\1/iu);
+    if (!classAttribute) return `<html${attributes} class="${className}">`;
+    const classes = classAttribute[2].split(/\s+/u).filter(Boolean);
+    if (classes.includes(className)) return tag;
+    const replacement = `class=${classAttribute[1]}${classAttribute[2]} ${className}${classAttribute[1]}`;
+    return tag.replace(classAttribute[0],replacement);
+  });
+}
+
 function injectReportEntryIntro(html) {
-  let source = String(html);
+  let source = ensureRootClass(html,'report-scrollbar-pending');
   if (!source.includes('data-report-entry-intro-style')) {
     const style = introStyle();
     source = source.includes('</head>') ? source.replace('</head>', style + '\n</head>') : style + '\n' + source;
