@@ -1,11 +1,12 @@
 'use strict';
 
-const IDENT_DURATION_MS = 2050;
-const TYPE_START_DELAY_MS = 250;
+const IDENT_DURATION_MS = 2900;
+const TYPE_START_DELAY_MS = 700;
 const TYPE_INTERVAL_MS = 115;
-const IDENT_EXIT_MS = 220;
-const TITLE_HOLD_MS = 520;
-const REVEAL_DURATION_MS = 1650;
+const IDENT_EXIT_MS = 260;
+const TITLE_HOLD_MS = 1100;
+const REVEAL_DURATION_MS = 1750;
+const HELP_CUE_DURATION_MS = 6400;
 
 function introStyle() {
   return `<style data-report-entry-intro-style>
@@ -24,9 +25,15 @@ body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animat
 .tree-polo-ident-polo{color:#f5f5f5}
 .report-entry-intro.is-ident-exit .tree-polo-ident-word{opacity:0}
 .report-entry-intro.is-title-stage .tree-polo-ident-word{opacity:0}
+body.report-entry-help-cue-active .report-help-trigger{z-index:4100!important;isolation:isolate}
+body.report-entry-help-cue-active .report-help-trigger::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.52);animation:report-entry-help-mask ${HELP_CUE_DURATION_MS}ms ease both}
+body.report-entry-help-cue-active .report-help-trigger::after{content:"";position:absolute;inset:-6px;z-index:1;border:2px solid rgba(178,255,213,.96);border-radius:999px;pointer-events:none;animation:report-entry-help-ring 2.4s ease-in-out infinite,report-entry-help-life ${HELP_CUE_DURATION_MS}ms linear both}
 @keyframes tree-polo-report-light-up{0%{opacity:0}35%{opacity:.42}100%{opacity:1}}
+@keyframes report-entry-help-mask{0%{box-shadow:0 0 0 100vmax rgba(0,0,0,0)}7%{box-shadow:0 0 0 100vmax rgba(0,0,0,.52)}88%{box-shadow:0 0 0 100vmax rgba(0,0,0,.52)}100%{box-shadow:0 0 0 100vmax rgba(0,0,0,0)}}
+@keyframes report-entry-help-ring{0%,50%,100%{border-color:rgba(178,255,213,.98);box-shadow:0 0 0 1px rgba(0,166,90,.72),0 0 18px rgba(0,166,90,.82)}25%,75%{border-color:rgba(178,255,213,.34);box-shadow:0 0 0 1px rgba(0,166,90,.16),0 0 5px rgba(0,166,90,.18)}}
+@keyframes report-entry-help-life{0%{opacity:0}7%{opacity:1}88%{opacity:1}100%{opacity:0}}
 @media(max-width:700px){.tree-polo-ident-word{font-size:clamp(38px,12vw,68px);letter-spacing:.06em}}
-@media print{.report-entry-intro{display:none!important}}
+@media print{.report-entry-intro{display:none!important}body.report-entry-help-cue-active .report-help-trigger::before,body.report-entry-help-cue-active .report-help-trigger::after{display:none!important}}
 </style>`;
 }
 
@@ -47,6 +54,8 @@ function introScript() {
   const body = document.body;
   const main = document.querySelector('body>main');
   const header = main?.querySelector(':scope>header.tree-polo-report-header,:scope>header.report-header') || null;
+  const title = header?.querySelector('h1') || null;
+  const helpTrigger = document.querySelector('[data-report-help-open]');
   const identTree = overlay.querySelector('[data-tree-polo-ident-tree]');
   const identPolo = overlay.querySelector('[data-tree-polo-ident-polo]');
   const storageKey = 'treepolo-report-entry-seen:' + String(location.href).split('#')[0];
@@ -60,7 +69,7 @@ function introScript() {
 
   if (readSessionSeen() || readHistorySeen()) {
     overlay.remove();
-    body.classList.remove('report-entry-intro-active','report-entry-title-stage','report-entry-report-reveal','report-entry-intro-lock');
+    body.classList.remove('report-entry-intro-active','report-entry-title-stage','report-entry-report-reveal','report-entry-intro-lock','report-entry-help-cue-active');
     root.classList.remove('report-entry-intro-lock');
     return;
   }
@@ -75,6 +84,8 @@ function introScript() {
   let titleHoldTimer = 0;
   let finishTimer = 0;
   let suppressClickTimer = 0;
+  let helpCueTimer = 0;
+  let helpCueDismissHandler = null;
   let activeAnimations = [];
   let audioCleanup = () => {};
   let finished = false;
@@ -93,7 +104,7 @@ function introScript() {
   const restoreMain = () => {
     if (!main) return;
     [
-      'position','z-index','transform','transform-origin','height','overflow',
+      'position','z-index','transform','transform-origin','height','width','overflow',
       'will-change','opacity','isolation',
     ].forEach((property) => main.style.removeProperty(property));
   };
@@ -108,6 +119,27 @@ function introScript() {
     blockedEvents.forEach((type) => document.removeEventListener(type,preventInteraction,{ capture:true }));
     document.removeEventListener('pointerdown',skipEntry,true);
     document.removeEventListener('touchstart',skipEntry,true);
+  };
+
+  const stopHelpCue = () => {
+    if (helpCueTimer) window.clearTimeout(helpCueTimer);
+    helpCueTimer = 0;
+    body.classList.remove('report-entry-help-cue-active');
+    if (helpCueDismissHandler) {
+      document.removeEventListener('pointerdown',helpCueDismissHandler,true);
+      document.removeEventListener('keydown',helpCueDismissHandler,true);
+      helpCueDismissHandler = null;
+    }
+  };
+
+  const startHelpCue = () => {
+    if (!helpTrigger) return;
+    stopHelpCue();
+    body.classList.add('report-entry-help-cue-active');
+    helpCueDismissHandler = () => stopHelpCue();
+    document.addEventListener('pointerdown',helpCueDismissHandler,true);
+    document.addEventListener('keydown',helpCueDismissHandler,true);
+    helpCueTimer = window.setTimeout(stopHelpCue,${HELP_CUE_DURATION_MS});
   };
 
   const renderTypedWord = () => {
@@ -172,6 +204,7 @@ function introScript() {
     root.classList.remove('report-entry-intro-lock');
     body.classList.remove('report-entry-intro-lock','report-entry-intro-active','report-entry-title-stage','report-entry-report-reveal');
     window.dispatchEvent(new CustomEvent('treepolo:entry-complete',{ detail:{ skipped } }));
+    startHelpCue();
   };
 
   const swallowNextClick = (event) => {
@@ -194,25 +227,34 @@ function introScript() {
 
   const prepareCollapsedReport = () => {
     if (!main || !header) return false;
-    const mainRect = main.getBoundingClientRect();
-    const headerRect = header.getBoundingClientRect();
+    const naturalMainRect = main.getBoundingClientRect();
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-    const dx = viewportWidth / 2 - (headerRect.left + headerRect.width / 2);
-    const dy = viewportHeight / 2 - (headerRect.top + headerRect.height / 2);
-    const targetHeight = Math.max(1,Math.ceil(mainRect.height));
-    const collapsedHeight = Math.max(1,Math.min(targetHeight,Math.ceil(headerRect.bottom - mainRect.top)));
+    const targetWidth = Math.max(1,Math.ceil(naturalMainRect.width));
+    const targetHeight = Math.max(1,Math.ceil(naturalMainRect.height));
+    const titleWidth = Math.max(1,Math.ceil(title?.scrollWidth || title?.getBoundingClientRect?.().width || 1));
+    const framePadding = viewportWidth <= 700 ? 38 : 52;
+    const frameWidth = Math.max(180,Math.min(targetWidth,titleWidth + framePadding));
 
-    collapsedState = { dx, dy, collapsedHeight, targetHeight };
     main.style.setProperty('position','relative','important');
     main.style.setProperty('z-index','5001','important');
     main.style.setProperty('isolation','isolate','important');
-    main.style.setProperty('transform-origin','top center');
-    main.style.setProperty('transform','translate(' + dx + 'px,' + dy + 'px)');
-    main.style.setProperty('height',collapsedHeight + 'px');
+    main.style.setProperty('width',frameWidth + 'px');
     main.style.setProperty('overflow','hidden','important');
-    main.style.setProperty('will-change','transform,height');
     main.style.setProperty('opacity','1','important');
+
+    const frameMainRect = main.getBoundingClientRect();
+    const frameHeaderRect = header.getBoundingClientRect();
+    const collapsedHeight = Math.max(1,Math.ceil(frameHeaderRect.bottom - frameMainRect.top));
+    const scaleLimit = Math.max(1,(viewportWidth - 32) / Math.max(1,frameWidth));
+    const initialScale = Math.min(1.34,scaleLimit);
+    const dy = (viewportHeight / 2) - frameMainRect.top - ((collapsedHeight * initialScale) / 2);
+
+    collapsedState = { dy, collapsedHeight, frameWidth, initialScale, targetHeight, targetWidth };
+    main.style.setProperty('transform-origin','top center');
+    main.style.setProperty('transform','translateY(' + dy + 'px) scale(' + initialScale + ')');
+    main.style.setProperty('height',collapsedHeight + 'px');
+    main.style.setProperty('will-change','transform,height,width');
     return true;
   };
 
@@ -224,21 +266,24 @@ function introScript() {
     }
     body.classList.add('report-entry-report-reveal');
 
-    const { dx, dy, collapsedHeight, targetHeight } = collapsedState;
+    const { dy, collapsedHeight, frameWidth, initialScale, targetHeight, targetWidth } = collapsedState;
     const mainAnimation = main.animate([
       {
-        transform: 'translate(' + dx + 'px,' + dy + 'px)',
+        transform: 'translateY(' + dy + 'px) scale(' + initialScale + ')',
         height: collapsedHeight + 'px',
+        width: frameWidth + 'px',
         offset: 0,
       },
       {
-        transform: 'translate(' + dx + 'px,' + dy + 'px)',
+        transform: 'translateY(' + dy + 'px) scale(' + initialScale + ')',
         height: collapsedHeight + 'px',
+        width: frameWidth + 'px',
         offset: .08,
       },
       {
-        transform: 'translate(0px,0px)',
+        transform: 'translateY(0px) scale(1)',
         height: targetHeight + 'px',
+        width: targetWidth + 'px',
         offset: 1,
       },
     ], {
@@ -305,6 +350,7 @@ module.exports = {
   IDENT_EXIT_MS,
   TITLE_HOLD_MS,
   REVEAL_DURATION_MS,
+  HELP_CUE_DURATION_MS,
   injectReportEntryIntro,
   introMarkup,
   introScript,
