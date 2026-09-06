@@ -226,7 +226,7 @@ function injectReportEntryIntro(html) {
     const style = introStyle();
     source = source.includes('</head>') ? source.replace('</head>', style + '\n</head>') : style + '\n' + source;
   }
-  if (!source.includes('data-report-entry-intro')) {
+  if (!/\bdata-report-entry-intro(?:\s|=|>)/u.test(source)) {
     const markup = introMarkup();
     source = source.includes('<body>') ? source.replace('<body>', '<body>\n' + markup) : markup + '\n' + source;
   }
