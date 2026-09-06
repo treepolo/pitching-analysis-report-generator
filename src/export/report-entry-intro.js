@@ -74,14 +74,18 @@ function introScript() {
   const identTree = overlay.querySelector('[data-tree-polo-ident-tree]');
   const identPolo = overlay.querySelector('[data-tree-polo-ident-polo]');
   const phoneQuery = window.matchMedia('(max-width: 700px)');
-  const storageKey = 'treepolo-report-entry-seen:' + String(location.href).split('#')[0];
-  const historyKey = '__treePoloEntrySeen';
-  const readSessionSeen = () => { try { return sessionStorage.getItem(storageKey) === '1'; } catch { return false; } };
-  const readHistorySeen = () => { try { return history.state && history.state[historyKey] === true; } catch { return false; } };
-  const markEntrySeen = () => {
-    try { sessionStorage.setItem(storageKey,'1'); } catch {}
-    try { history.replaceState(Object.assign({},history.state || {},{ [historyKey]: true }),document.title); } catch {}
+  const helpCueStorageKey = 'treepolo-report-help-cue-seen:' + String(location.href).split('#')[0];
+  const claimHelpCue = () => {
+    if (!helpTrigger) return false;
+    try {
+      if (localStorage.getItem(helpCueStorageKey) === '1') return false;
+      localStorage.setItem(helpCueStorageKey,'1');
+      return true;
+    } catch {
+      return true;
+    }
   };
+  const shouldShowHelpCue = claimHelpCue();
 
   let scrollbarInteractionSeen = false;
   let scrollbarMayReveal = false;
@@ -110,16 +114,6 @@ function introScript() {
     'report-entry-intro-lock',
   );
 
-  if (readSessionSeen() || readHistorySeen()) {
-    overlay.remove();
-    clearEntryClasses();
-    body.classList.remove('report-entry-help-cue-active');
-    root.classList.remove('report-entry-intro-lock');
-    scrollbarMayReveal = true;
-    if (scrollbarInteractionSeen) revealScrollbar();
-    return;
-  }
-  markEntrySeen();
   root.classList.add('report-entry-intro-lock');
   body.classList.add('report-entry-intro-lock','report-entry-intro-active');
   window.dispatchEvent(new CustomEvent('treepolo:entry-start'));
@@ -309,7 +303,7 @@ function introScript() {
     scrollbarMayReveal = true;
     if (scrollbarInteractionSeen) revealScrollbar();
     window.dispatchEvent(new CustomEvent('treepolo:entry-complete',{ detail:{ skipped } }));
-    startHelpCue();
+    if (shouldShowHelpCue) startHelpCue();
   };
 
   const swallowNextClick = (event) => {
