@@ -72,15 +72,17 @@ test('fixed header runtime injects once', () => {
   assert.equal((twice.match(/data-report-fixed-header-runtime/g) || []).length, 1);
 });
 
-test('renderer installs hard-fixed header runtime after title alignment and spotlight without a visible-title patch', async () => {
+test('renderer installs hard-fixed header runtime after title alignment and before entry intro without a visible-title patch', async () => {
   const source = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-renderer.js'), 'utf8');
   assert.match(source, /require\('\.\/report-fixed-header-runtime'\)/u);
+  assert.match(source, /require\('\.\/report-entry-intro'\)/u);
+  assert.doesNotMatch(source, /report-entry-spotlight|injectReportEntrySpotlight/u);
   assert.doesNotMatch(source, /report-visible-title-runtime|injectReportVisibleTitleRuntime/u);
   const titleAlignmentIndex = source.indexOf('html = injectReportTitleAlignmentRefinement(html);');
-  const spotlightIndex = source.indexOf('html = injectReportEntrySpotlight(html);');
   const fixedIndex = source.indexOf('html = injectReportFixedHeaderRuntime(html);');
+  const introIndex = source.indexOf('html = injectReportEntryIntro(html);');
   assert.ok(titleAlignmentIndex >= 0);
-  assert.ok(spotlightIndex > titleAlignmentIndex);
-  assert.ok(fixedIndex > spotlightIndex);
+  assert.ok(fixedIndex > titleAlignmentIndex);
+  assert.ok(introIndex > fixedIndex);
   assert.doesNotMatch(source, /injectReportPlayerSelectionRefinement/u);
 });
