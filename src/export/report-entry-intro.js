@@ -6,7 +6,7 @@ const TYPE_INTERVAL_MS = 115;
 const IDENT_EXIT_MS = 260;
 const TITLE_BAR_HOLD_MS = 620;
 const SIGNATURE_TYPE_INTERVAL_MS = 88;
-const REVEAL_DURATION_MS = 1750;
+const REVEAL_DURATION_MS = 3000;
 const HELP_CUE_DURATION_MS = 6400;
 
 function introStyle() {
@@ -17,7 +17,7 @@ body.report-entry-intro-active .report-help-trigger{opacity:0!important;visibili
 body.report-entry-intro-active>main{visibility:hidden}
 body.report-entry-title-stage>main{visibility:visible}
 body.report-entry-intro-active[data-tree-polo-background="true"]::before{opacity:0}
-body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animation:tree-polo-report-light-up 1.2s cubic-bezier(.2,.72,.2,1) both}
+body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animation:tree-polo-report-light-up ${REVEAL_DURATION_MS}ms linear both}
 .report-entry-intro[hidden]{display:none!important}
 .report-entry-intro{position:fixed;inset:0;z-index:5000;overflow:hidden;background:#000;color:#fff;cursor:default;touch-action:none;user-select:none;-webkit-user-select:none}
 .report-entry-intro-stage{position:absolute;inset:0;display:grid;place-items:center;background:#000}
@@ -139,6 +139,7 @@ function introScript() {
     if (!header) return;
     header.style.removeProperty('transform');
     header.style.removeProperty('will-change');
+    header.style.removeProperty('margin-bottom');
   };
 
   const unwrapReportBody = () => {
@@ -313,6 +314,15 @@ function introScript() {
     ));
     if (contentNodes.length === 0) return false;
 
+    const mainStyle = window.getComputedStyle(main);
+    const headerStyle = window.getComputedStyle(header);
+    const mainPaddingLeft = numberPx(mainStyle.paddingLeft);
+    const mainPaddingRight = numberPx(mainStyle.paddingRight);
+    const mainPaddingBottom = numberPx(mainStyle.paddingBottom);
+    const headerMarginBottom = Math.max(0,numberPx(headerStyle.marginBottom));
+
+    header.style.setProperty('margin-bottom','0px','important');
+
     reportBody = document.createElement('div');
     reportBody.dataset.reportEntryBody = 'true';
     reportBodyInner = document.createElement('div');
@@ -321,18 +331,11 @@ function introScript() {
     reportBody.append(reportBodyInner);
     main.append(reportBody);
 
-    const mainStyle = window.getComputedStyle(main);
-    const headerStyle = window.getComputedStyle(header);
-    const mainPaddingLeft = numberPx(mainStyle.paddingLeft);
-    const mainPaddingRight = numberPx(mainStyle.paddingRight);
-    const mainPaddingBottom = numberPx(mainStyle.paddingBottom);
-    const headerMarginBottom = Math.max(0,numberPx(headerStyle.marginBottom));
-
     reportBody.style.boxSizing = 'border-box';
     reportBody.style.position = 'relative';
     reportBody.style.width = main.clientWidth + 'px';
     reportBody.style.marginLeft = (-mainPaddingLeft) + 'px';
-    reportBody.style.marginTop = (-headerMarginBottom) + 'px';
+    reportBody.style.marginTop = '0px';
     reportBody.style.background = '#fff';
 
     reportBodyInner.style.boxSizing = 'border-box';
@@ -378,12 +381,11 @@ function introScript() {
 
     const { dy, targetBodyHeight } = revealState;
     const headerAnimation = header.animate([
-      { transform: 'translateY(' + dy + 'px)', offset: 0 },
-      { transform: 'translateY(' + dy + 'px)', offset: .06 },
-      { transform: 'translateY(0px)', offset: 1 },
+      { transform: 'translateY(' + dy + 'px)' },
+      { transform: 'translateY(0px)' },
     ], {
       duration: ${REVEAL_DURATION_MS},
-      easing: 'cubic-bezier(.22,.72,.16,1)',
+      easing: 'linear',
       fill: 'forwards',
     });
     activeAnimations.push(headerAnimation);
@@ -392,21 +394,14 @@ function introScript() {
       {
         transform: 'translateY(' + dy + 'px)',
         height: '0px',
-        offset: 0,
-      },
-      {
-        transform: 'translateY(' + dy + 'px)',
-        height: '0px',
-        offset: .06,
       },
       {
         transform: 'translateY(0px)',
         height: targetBodyHeight + 'px',
-        offset: 1,
       },
     ], {
       duration: ${REVEAL_DURATION_MS},
-      easing: 'cubic-bezier(.22,.72,.16,1)',
+      easing: 'linear',
       fill: 'forwards',
     });
     activeAnimations.push(bodyAnimation);
@@ -417,7 +412,7 @@ function introScript() {
       { opacity: 0, offset: 1 },
     ], {
       duration: ${REVEAL_DURATION_MS},
-      easing: 'cubic-bezier(.22,.61,.36,1)',
+      easing: 'linear',
       fill: 'forwards',
     });
     activeAnimations.push(overlayAnimation);
