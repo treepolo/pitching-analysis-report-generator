@@ -91,7 +91,7 @@ test('current Tree Polo canonical surface keeps header text branding, branded fo
   assert.match(html, /tree-polo-signature-polo/u);
   assert.match(html, /data-tree-polo-promotion/u);
   assert.match(html, /data-tree-polo-footer/u);
-  assert.match(html, /希望我的洞察，能在你追求卓越的路上幫上忙。/u);
+  assert.match(html, /希望我的洞察，能在閣下追求卓越的路上幫/u);
   assert.match(html, /<body data-tree-polo-background="true">/u);
   assert.match(html, /body\[data-tree-polo-background="true"\]::before\{[^}]*tree-polo-report-background\.jpg/u);
   assert.match(html, /main \{[^}]*background: #fff[^}]*box-shadow: 0 2px 12px/u);
