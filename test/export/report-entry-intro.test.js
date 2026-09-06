@@ -10,6 +10,8 @@ const {
   TYPE_START_DELAY_MS,
   TYPE_INTERVAL_MS,
   IDENT_EXIT_MS,
+  TITLE_STAGE_GAP_MS,
+  TITLE_STAGE_FADE_MS,
   TITLE_BAR_HOLD_MS,
   SIGNATURE_TYPE_INTERVAL_MS,
   HEADER_MOVE_DURATION_MS,
@@ -36,10 +38,12 @@ test('entry intro keeps the clean centered TREEPOLO typing ident', () => {
   assert.match(css, /visibility:hidden!important/u);
 });
 
-test('entry timing keeps the older brisk title travel and a quicker linear page reveal', () => {
+test('entry timing keeps mirrored ident and title fades plus the established reveal pacing', () => {
   assert.ok(TYPE_START_DELAY_MS >= 650);
   assert.ok(IDENT_DURATION_MS >= 2800);
   assert.ok(IDENT_EXIT_MS >= 220);
+  assert.equal(TITLE_STAGE_FADE_MS, IDENT_EXIT_MS);
+  assert.ok(TITLE_STAGE_GAP_MS > 0 && TITLE_STAGE_GAP_MS <= 100);
   assert.ok(TITLE_BAR_HOLD_MS >= 500);
   assert.ok(SIGNATURE_TYPE_INTERVAL_MS >= 60);
   assert.equal(HEADER_MOVE_DURATION_MS, 1750);
@@ -56,12 +60,17 @@ test('title stage uses the real final title bar without content-specific entranc
   assert.doesNotMatch(css, /body\.report-entry-title-stage>main h1[^}]*transform/u);
 });
 
-test('desktop background stays hidden until reveal while phone background ownership remains in the mobile shell', () => {
+test('title and canonical backdrop fade in only after TREEPOLO has fully faded out', () => {
   const css = introStyle();
-  assert.match(css, /report-entry-intro-active\[data-tree-polo-background="true"\]::before\{opacity:0\}/u);
-  assert.match(css, new RegExp(`report-entry-report-reveal\\[data-tree-polo-background="true"\\]::before\\{animation:tree-polo-report-light-up ${REVEAL_DURATION_MS}ms linear both\\}`,'u'));
-  assert.match(css, /@keyframes tree-polo-report-light-up/u);
-  assert.doesNotMatch(css, /background-image:none!important/u);
+  const source = introScript();
+  assert.match(css, /body\.report-entry-intro-active\[data-tree-polo-background="true"\]\{background:#000!important\}/u);
+  assert.match(css, /body\.report-entry-intro-active\[data-tree-polo-background="true"\]::before\{opacity:0\}/u);
+  assert.match(css, new RegExp(`body\\.report-entry-title-stage\\[data-tree-polo-background="true"\\]::before\\{animation:tree-polo-title-background-in ${TITLE_STAGE_FADE_MS}ms linear both\\}`,'u'));
+  assert.match(css, /@keyframes tree-polo-title-background-in\{from\{opacity:0\}to\{opacity:1\}\}/u);
+  assert.match(css, /\.report-entry-intro\.is-title-stage,\.report-entry-intro\.is-title-stage \.report-entry-intro-stage\{background:transparent\}/u);
+  assert.doesNotMatch(css, /tree-polo-report-light-up|report-entry-report-reveal\[data-tree-polo-background/u);
+  assert.match(source, new RegExp(`const titleFadeAnimation = header\\.animate\\([\\s\\S]*?opacity: 0[\\s\\S]*?opacity: 1[\\s\\S]*?duration: ${TITLE_STAGE_FADE_MS}[\\s\\S]*?easing: 'linear'`,'u'));
+  assert.doesNotMatch(source, /overlayAnimation/u);
 });
 
 test('phone entry does not override title-bar geometry during the intro', () => {
@@ -93,7 +102,7 @@ test('scrollbar stays visually hidden through entry and reveals only after user 
   assert.match(html, /<html lang="zh-Hant" class="report-scrollbar-pending">/u);
 });
 
-test('entry runtime types the ident and starts the title stage only after ident exit', () => {
+test('entry runtime types the ident and starts the title stage only after ident exit and a short black beat', () => {
   const source = introScript();
   assert.match(source, /const text = 'TREEPOLO'\.slice\(0,typedCount\)/u);
   assert.match(source, /identTree\.textContent = text\.slice\(0,4\)/u);
@@ -101,10 +110,10 @@ test('entry runtime types the ident and starts the title stage only after ident 
   assert.match(source, new RegExp(`setTimeout\\(typeNextCharacter,${TYPE_START_DELAY_MS}\\)`,'u'));
   assert.match(source, new RegExp(`setTimeout\\(typeNextCharacter,${TYPE_INTERVAL_MS}\\)`,'u'));
   assert.match(source, new RegExp(`setTimeout\\(\\(\\) => overlay\\.classList\\.add\\('is-ident-exit'\\),${IDENT_DURATION_MS - IDENT_EXIT_MS}\\)`,'u'));
-  assert.match(source, new RegExp(`setTimeout\\(beginTitleStage,${IDENT_DURATION_MS}\\)`,'u'));
+  assert.match(source, new RegExp(`setTimeout\\(beginTitleStage,${IDENT_DURATION_MS} \\+ ${TITLE_STAGE_GAP_MS}\\)`,'u'));
 });
 
-test('reveal slides the report sheet from behind the title bar and resolves phone geometry to its fixed-header layout', () => {
+test('reveal slides the report sheet from a truly viewport-centered title bar and resolves phone geometry to its fixed-header layout', () => {
   const source = introScript().match(/<script data-report-entry-intro-runtime>\s*([\s\S]*?)\s*<\/script>/u)?.[1];
   assert.ok(source);
   assert.doesNotThrow(() => new vm.Script(source));
@@ -118,7 +127,8 @@ test('reveal slides the report sheet from behind the title bar and resolves phon
   assert.match(source, /reportBody\.append\(reportBodyInner\)/u);
   assert.match(source, /node !== header && !node\.classList\?\.contains\('report-fixed-header-spacer'\)/u);
   assert.match(source, /const phoneContentTop = isPhoneLayout[\s\S]*?window\.getComputedStyle\(contentNodes\[0\]\)\.marginTop/u);
-  assert.match(source, /const headerHeight = headerRect\.height/u);
+  assert.match(source, /const initialHeaderRect = header\.getBoundingClientRect\(\)/u);
+  assert.match(source, /const headerHeight = initialHeaderRect\.height/u);
   assert.match(source, /const sheetStartY = isPhoneLayout \? -headerHeight : 0/u);
   assert.match(source, /const sheetEndY = isPhoneLayout \? 0 : headerHeight/u);
   assert.match(source, /reportBody\.style\.marginTop = \(-headerHeight\) \+ 'px'/u);
@@ -130,11 +140,17 @@ test('reveal slides the report sheet from behind the title bar and resolves phon
   assert.match(source, /reportBody\.style\.zIndex = '1'/u);
   assert.match(source, /header\.style\.setProperty\('z-index','2','important'\)/u);
   assert.match(source, /header\.style\.setProperty\('border-bottom-color','transparent','important'\)/u);
+  assert.match(source, /header\.style\.setProperty\('opacity','0'\)/u);
   assert.match(source, /header\.style\.removeProperty\('border-bottom-color'\)/u);
+  assert.match(source, /header\.style\.removeProperty\('opacity'\)/u);
   assert.doesNotMatch(source, /seamOffset|naturalBodyRect|border-bottom-width|margin-bottom','0px/u);
   assert.match(source, /reportBodyInner\.scrollHeight/u);
   assert.match(source, /Math\.ceil\(reportBodyInner\.getBoundingClientRect\(\)\.height\)/u);
   assert.match(source, /const targetBodyHeight = Math\.ceil\(contentHeight \+ Math\.max\(0,sheetEndY\)\)/u);
+  assert.match(source, /const positionedHeaderRect = header\.getBoundingClientRect\(\)/u);
+  assert.match(source, /const visualViewport = window\.visualViewport/u);
+  assert.match(source, /visualViewport\.offsetTop \+ visualViewport\.height \/ 2/u);
+  assert.match(source, /const dy = viewportCenterY - \(positionedHeaderRect\.top \+ positionedHeaderRect\.height \/ 2\)/u);
   assert.match(source, /revealState = \{ dy, sheetStartY, sheetEndY, targetBodyHeight \}/u);
   assert.match(source, /reportBody\.style\.height = '0px'/u);
   assert.match(source, /reportBody\.style\.overflow = 'hidden'/u);
@@ -151,7 +167,7 @@ test('reveal slides the report sheet from behind the title bar and resolves phon
   assert.doesNotMatch(source, /main\.style\.setProperty\('transform'/u);
   assert.doesNotMatch(source, /opacity:\s*0[^\n]*reportBody|reportBody[^\n]*opacity/u);
   assert.doesNotMatch(source, /desiredHeroFontSize|heroScale|titleAnimation|TITLE_SHRINK|TITLE_HERO/u);
-  assert.match(source, new RegExp(`setTimeout\\(beginReportReveal,${TITLE_BAR_HOLD_MS}\\)`,'u'));
+  assert.match(source, new RegExp(`titleBarTimer = window\\.setTimeout\\([\\s\\S]*?beginReportReveal,[\\s\\S]*?${TITLE_STAGE_FADE_MS} \\+ ${TITLE_BAR_HOLD_MS}`,'u'));
 });
 
 test('by 小樹Polo types in while the report body unfolds', () => {
@@ -189,7 +205,7 @@ test('entry runtime replays on every load without session or history gating', ()
   assert.doesNotMatch(source, /sessionStorage|history\.state|history\.replaceState|treePoloEntrySeen|readSessionSeen|readHistorySeen|markEntrySeen/u);
   assert.match(source, /root\.classList\.add\('report-entry-intro-lock'\)/u);
   assert.match(source, new RegExp(`typeTimer = window\\.setTimeout\\(typeNextCharacter,${TYPE_START_DELAY_MS}\\)`,'u'));
-  assert.match(source, new RegExp(`identTimer = window\\.setTimeout\\(beginTitleStage,${IDENT_DURATION_MS}\\)`,'u'));
+  assert.match(source, new RegExp(`identTimer = window\\.setTimeout\\(beginTitleStage,${IDENT_DURATION_MS} \\+ ${TITLE_STAGE_GAP_MS}\\)`,'u'));
 });
 
 test('help cue is claimed once per report URL with persistent local storage', () => {
