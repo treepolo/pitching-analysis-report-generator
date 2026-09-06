@@ -14,7 +14,7 @@ test('bundles canonical, functional and component inline report styles without r
 <meta charset="utf-8">
 <style data-report-mobile-shell-refinement>.mobile{width:100%}</style>
 <style data-report-entry-intro-style>.intro{opacity:.5}</style>
-<style data-tree-polo-footer-style>.footer{padding:1rem}</style>
+<style data-report-promotion-footer-style>.footer{padding:1rem}</style>
 </head><body></body></html>`;
 
   const output = bundleReportStyles(source);
@@ -24,7 +24,7 @@ test('bundles canonical, functional and component inline report styles without r
   assert.match(output, /report-style-source:data-report-canonical-theme; role:canonical-visual/u);
   assert.match(output, /report-style-source:data-report-mobile-shell-refinement; role:functional-layout/u);
   assert.match(output, /report-style-source:data-report-entry-intro-style; role:component-style/u);
-  assert.match(output, /report-style-source:data-tree-polo-footer-style; role:component-style/u);
+  assert.match(output, /report-style-source:data-report-promotion-footer-style; role:component-style/u);
   assert.ok(output.indexOf('.theme{background:white}') < output.indexOf('.mobile{width:100%}'));
   assert.ok(output.indexOf('.mobile{width:100%}') < output.indexOf('.intro{opacity:.5}'));
   assert.ok(output.indexOf('.intro{opacity:.5}') < output.indexOf('.footer{padding:1rem}'));
@@ -51,7 +51,8 @@ test('classifies only current canonical, functional and component style owners',
   assert.equal(styleSourceRole('data-report-help-style'), 'functional-layout');
   assert.equal(styleSourceRole('data-annotation-reader-style'), 'component-style');
   assert.equal(styleSourceRole('data-report-entry-intro-style'), 'component-style');
-  assert.equal(styleSourceRole('data-tree-polo-footer-style'), 'component-style');
+  assert.equal(styleSourceRole('data-report-promotion-footer-style'), 'component-style');
+  assert.equal(styleSourceRole('data-tree-polo-footer-style'), 'unclassified');
   assert.equal(styleSourceRole('data-report-entry-spotlight-style'), 'unclassified');
   assert.equal(styleSourceRole('data-report-floating-ui-refinement'), 'unclassified');
   assert.equal(styleSourceRole('inline-style-1'), 'unclassified');
