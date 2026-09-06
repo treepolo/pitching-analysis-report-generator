@@ -140,8 +140,8 @@ function introScript() {
     if (!header) return;
     header.style.removeProperty('transform');
     header.style.removeProperty('will-change');
-    header.style.removeProperty('margin-bottom');
-    header.style.removeProperty('border-bottom-width');
+    header.style.removeProperty('z-index');
+    header.style.removeProperty('border-bottom-color');
   };
 
   const unwrapReportBody = () => {
@@ -317,14 +317,11 @@ function introScript() {
     if (contentNodes.length === 0) return false;
 
     const mainStyle = window.getComputedStyle(main);
-    const headerStyle = window.getComputedStyle(header);
     const mainPaddingLeft = numberPx(mainStyle.paddingLeft);
     const mainPaddingRight = numberPx(mainStyle.paddingRight);
     const mainPaddingBottom = numberPx(mainStyle.paddingBottom);
-    const headerMarginBottom = Math.max(0,numberPx(headerStyle.marginBottom));
-
-    header.style.setProperty('margin-bottom','0px','important');
-    header.style.setProperty('border-bottom-width','.5px','important');
+    const headerRect = header.getBoundingClientRect();
+    const headerHeight = headerRect.height;
 
     reportBody = document.createElement('div');
     reportBody.dataset.reportEntryBody = 'true';
@@ -336,24 +333,19 @@ function introScript() {
 
     reportBody.style.boxSizing = 'border-box';
     reportBody.style.position = 'relative';
+    reportBody.style.zIndex = '1';
     reportBody.style.width = main.clientWidth + 'px';
     reportBody.style.marginLeft = (-mainPaddingLeft) + 'px';
-    reportBody.style.marginTop = '0px';
+    reportBody.style.marginTop = (-headerHeight) + 'px';
     reportBody.style.background = '#fff';
 
     reportBodyInner.style.boxSizing = 'border-box';
     reportBodyInner.style.width = '100%';
-    reportBodyInner.style.paddingTop = headerMarginBottom + 'px';
+    reportBodyInner.style.paddingTop = headerHeight + 'px';
     reportBodyInner.style.paddingRight = mainPaddingRight + 'px';
     reportBodyInner.style.paddingBottom = mainPaddingBottom + 'px';
     reportBodyInner.style.paddingLeft = mainPaddingLeft + 'px';
 
-    const naturalHeaderRect = header.getBoundingClientRect();
-    const naturalBodyRect = reportBody.getBoundingClientRect();
-    const seamOffset = naturalHeaderRect.bottom - naturalBodyRect.top;
-    reportBody.style.marginTop = seamOffset + 'px';
-
-    const headerRect = header.getBoundingClientRect();
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     const dy = (viewportHeight / 2) - (headerRect.top + headerRect.height / 2);
     const targetBodyHeight = Math.max(1,Math.ceil(reportBodyInner.getBoundingClientRect().height));
@@ -368,6 +360,8 @@ function introScript() {
     main.style.setProperty('padding-bottom','0px','important');
     main.style.setProperty('opacity','1','important');
 
+    header.style.setProperty('z-index','2','important');
+    header.style.setProperty('border-bottom-color','transparent','important');
     header.style.setProperty('transform','translateY(' + dy + 'px)');
     header.style.setProperty('will-change','transform');
 
@@ -389,21 +383,23 @@ function introScript() {
 
     const { dy, targetBodyHeight } = revealState;
     const headerAnimation = header.animate([
-      { transform: 'translateY(' + dy + 'px)' },
-      { transform: 'translateY(0px)' },
+      { transform: 'translateY(' + dy + 'px)', offset: 0 },
+      { transform: 'translateY(' + dy + 'px)', offset: .06 },
+      { transform: 'translateY(0px)', offset: 1 },
     ], {
       duration: ${HEADER_MOVE_DURATION_MS},
-      easing: 'linear',
+      easing: 'cubic-bezier(.22,.72,.16,1)',
       fill: 'forwards',
     });
     activeAnimations.push(headerAnimation);
 
     const bodyPositionAnimation = reportBody.animate([
-      { transform: 'translateY(' + dy + 'px)' },
-      { transform: 'translateY(0px)' },
+      { transform: 'translateY(' + dy + 'px)', offset: 0 },
+      { transform: 'translateY(' + dy + 'px)', offset: .06 },
+      { transform: 'translateY(0px)', offset: 1 },
     ], {
       duration: ${HEADER_MOVE_DURATION_MS},
-      easing: 'linear',
+      easing: 'cubic-bezier(.22,.72,.16,1)',
       fill: 'forwards',
     });
     activeAnimations.push(bodyPositionAnimation);
