@@ -88,7 +88,7 @@ test('delivers folder, HTML and ZIP with the canonical Tree Polo package contrac
   assert.match(html, /report-style-source:data-report-canonical-theme; role:canonical-visual/u);
   assert.match(html, /report-style-source:data-report-mobile-shell-refinement; role:functional-layout/u);
   assert.match(html, /report-style-source:data-report-entry-intro-style; role:component-style/u);
-  assert.match(html, /report-style-source:data-tree-polo-footer-style; role:component-style/u);
+  assert.match(html, /report-style-source:data-report-promotion-footer-style; role:component-style/u);
   assert.doesNotMatch(html, /report-style-source:data-report-entry-spotlight-style/u);
   assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme|legacy-visual|final-visual/u);
 
