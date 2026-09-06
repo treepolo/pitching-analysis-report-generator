@@ -1,7 +1,10 @@
 'use strict';
 
-const IDENT_DURATION_MS = 2200;
-const TITLE_HOLD_MS = 560;
+const IDENT_DURATION_MS = 2050;
+const TYPE_START_DELAY_MS = 250;
+const TYPE_INTERVAL_MS = 115;
+const IDENT_EXIT_MS = 220;
+const TITLE_HOLD_MS = 520;
 const REVEAL_DURATION_MS = 1650;
 
 function introStyle() {
@@ -16,12 +19,11 @@ body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animat
 .report-entry-intro[hidden]{display:none!important}
 .report-entry-intro{position:fixed;inset:0;z-index:5000;overflow:hidden;background:#000;color:#fff;cursor:default;touch-action:none;user-select:none;-webkit-user-select:none}
 .report-entry-intro-stage{position:absolute;inset:0;display:grid;place-items:center;background:#000}
-.tree-polo-ident-word{display:inline-flex;align-items:baseline;margin:0;font-family:Arial,Helvetica,"Segoe UI",sans-serif;font-size:clamp(44px,7.2vw,104px);font-weight:700;line-height:1;letter-spacing:.075em;white-space:nowrap}
-.tree-polo-ident-char{display:inline-block;opacity:0;animation:tree-polo-type-char 1ms linear forwards;animation-delay:var(--type-delay)}
-.tree-polo-ident-tree{color:#49b675}
-.tree-polo-ident-polo{color:#f4f4f4}
-.report-entry-intro.is-title-stage .tree-polo-ident-word{opacity:0;transition:opacity .16s linear}
-@keyframes tree-polo-type-char{to{opacity:1}}
+.tree-polo-ident-word{display:inline-flex;width:max-content;align-items:baseline;justify-content:center;margin:0;font-family:Arial,Helvetica,"Segoe UI",sans-serif;font-size:clamp(44px,7.2vw,104px);font-weight:700;line-height:1;letter-spacing:.075em;white-space:nowrap;opacity:1;transition:opacity ${IDENT_EXIT_MS}ms linear}
+.tree-polo-ident-tree{color:#3fa66c}
+.tree-polo-ident-polo{color:#f5f5f5}
+.report-entry-intro.is-ident-exit .tree-polo-ident-word{opacity:0}
+.report-entry-intro.is-title-stage .tree-polo-ident-word{opacity:0}
 @keyframes tree-polo-report-light-up{0%{opacity:0}35%{opacity:.42}100%{opacity:1}}
 @media(max-width:700px){.tree-polo-ident-word{font-size:clamp(38px,12vw,68px);letter-spacing:.06em}}
 @media print{.report-entry-intro{display:none!important}}
@@ -29,22 +31,9 @@ body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animat
 }
 
 function introMarkup() {
-  const characters = [
-    ['T', 'tree', 0.18],
-    ['R', 'tree', 0.31],
-    ['E', 'tree', 0.44],
-    ['E', 'tree', 0.57],
-    ['P', 'polo', 0.70],
-    ['O', 'polo', 0.83],
-    ['L', 'polo', 0.96],
-    ['O', 'polo', 1.09],
-  ];
-  const word = characters
-    .map(([character, group, delay]) => `<span class="tree-polo-ident-char tree-polo-ident-${group}" style="--type-delay:${delay}s">${character}</span>`)
-    .join('');
   return `<div class="report-entry-intro" data-report-entry-intro aria-hidden="true">
   <div class="report-entry-intro-stage">
-    <p class="tree-polo-ident-word" aria-label="TREEPOLO">${word}</p>
+    <p class="tree-polo-ident-word" aria-label="TREEPOLO"><span class="tree-polo-ident-tree" data-tree-polo-ident-tree></span><span class="tree-polo-ident-polo" data-tree-polo-ident-polo></span></p>
   </div>
 </div>`;
 }
@@ -58,6 +47,8 @@ function introScript() {
   const body = document.body;
   const main = document.querySelector('body>main');
   const header = main?.querySelector(':scope>header.tree-polo-report-header,:scope>header.report-header') || null;
+  const identTree = overlay.querySelector('[data-tree-polo-ident-tree]');
+  const identPolo = overlay.querySelector('[data-tree-polo-ident-polo]');
   const storageKey = 'treepolo-report-entry-seen:' + String(location.href).split('#')[0];
   const historyKey = '__treePoloEntrySeen';
   const readSessionSeen = () => { try { return sessionStorage.getItem(storageKey) === '1'; } catch { return false; } };
@@ -76,7 +67,10 @@ function introScript() {
   markEntrySeen();
   root.classList.add('report-entry-intro-lock');
   body.classList.add('report-entry-intro-lock','report-entry-intro-active');
+  window.dispatchEvent(new CustomEvent('treepolo:entry-start'));
 
+  let typeTimer = 0;
+  let identExitTimer = 0;
   let identTimer = 0;
   let titleHoldTimer = 0;
   let finishTimer = 0;
@@ -85,6 +79,7 @@ function introScript() {
   let audioCleanup = () => {};
   let finished = false;
   let collapsedState = null;
+  let typedCount = 0;
 
   const preventInteraction = (event) => {
     if (finished) return;
@@ -98,7 +93,7 @@ function introScript() {
   const restoreMain = () => {
     if (!main) return;
     [
-      'position','z-index','transform','transform-origin','clip-path',
+      'position','z-index','transform','transform-origin','height','overflow',
       'will-change','opacity','isolation',
     ].forEach((property) => main.style.removeProperty(property));
   };
@@ -115,6 +110,19 @@ function introScript() {
     document.removeEventListener('touchstart',skipEntry,true);
   };
 
+  const renderTypedWord = () => {
+    const text = 'TREEPOLO'.slice(0,typedCount);
+    if (identTree) identTree.textContent = text.slice(0,4);
+    if (identPolo) identPolo.textContent = text.slice(4);
+  };
+
+  const typeNextCharacter = () => {
+    if (finished || typedCount >= 8) return;
+    typedCount += 1;
+    renderTypedWord();
+    if (typedCount < 8) typeTimer = window.setTimeout(typeNextCharacter,${TYPE_INTERVAL_MS});
+  };
+
   const playIntroSound = () => {
     const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextCtor) return () => {};
@@ -123,8 +131,8 @@ function introScript() {
     const start = context.currentTime + 0.03;
     const master = context.createGain();
     master.gain.setValueAtTime(0.0001,start);
-    master.gain.exponentialRampToValueAtTime(0.3,start + 0.02);
-    master.gain.exponentialRampToValueAtTime(0.0001,start + 1.72);
+    master.gain.exponentialRampToValueAtTime(0.24,start + 0.02);
+    master.gain.exponentialRampToValueAtTime(0.0001,start + 1.5);
     master.connect(context.destination);
 
     const strike = (time,frequency,decay,level) => {
@@ -141,8 +149,8 @@ function introScript() {
       oscillator.stop(time + decay + .03);
     };
 
-    strike(start + 1.08,132,.38,.42);
-    strike(start + 1.25,88,.72,.72);
+    strike(start + .94,132,.34,.34);
+    strike(start + 1.08,88,.62,.58);
     if (context.state === 'suspended') context.resume().catch(() => {});
     return () => { try { context.close().catch(() => {}); } catch {} };
   };
@@ -150,6 +158,8 @@ function introScript() {
   const finishEntry = (skipped = false) => {
     if (finished) return;
     finished = true;
+    if (typeTimer) window.clearTimeout(typeTimer);
+    if (identExitTimer) window.clearTimeout(identExitTimer);
     if (identTimer) window.clearTimeout(identTimer);
     if (titleHoldTimer) window.clearTimeout(titleHoldTimer);
     if (finishTimer) window.clearTimeout(finishTimer);
@@ -190,17 +200,18 @@ function introScript() {
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     const dx = viewportWidth / 2 - (headerRect.left + headerRect.width / 2);
     const dy = viewportHeight / 2 - (headerRect.top + headerRect.height / 2);
-    const visibleHeight = Math.max(1, Math.min(mainRect.height, headerRect.bottom - mainRect.top));
-    const clippedBottom = Math.max(0, mainRect.height - visibleHeight);
+    const targetHeight = Math.max(1,Math.ceil(mainRect.height));
+    const collapsedHeight = Math.max(1,Math.min(targetHeight,Math.ceil(headerRect.bottom - mainRect.top)));
 
-    collapsedState = { dx, dy, clippedBottom };
+    collapsedState = { dx, dy, collapsedHeight, targetHeight };
     main.style.setProperty('position','relative','important');
     main.style.setProperty('z-index','5001','important');
     main.style.setProperty('isolation','isolate','important');
     main.style.setProperty('transform-origin','top center','important');
     main.style.setProperty('transform','translate(' + dx + 'px,' + dy + 'px)','important');
-    main.style.setProperty('clip-path','inset(0 0 ' + clippedBottom + 'px 0)','important');
-    main.style.setProperty('will-change','transform,clip-path','important');
+    main.style.setProperty('height',collapsedHeight + 'px','important');
+    main.style.setProperty('overflow','hidden','important');
+    main.style.setProperty('will-change','transform,height','important');
     main.style.setProperty('opacity','1','important');
     return true;
   };
@@ -213,21 +224,21 @@ function introScript() {
     }
     body.classList.add('report-entry-report-reveal');
 
-    const { dx, dy, clippedBottom } = collapsedState;
+    const { dx, dy, collapsedHeight, targetHeight } = collapsedState;
     const mainAnimation = main.animate([
       {
         transform: 'translate(' + dx + 'px,' + dy + 'px)',
-        clipPath: 'inset(0 0 ' + clippedBottom + 'px 0)',
+        height: collapsedHeight + 'px',
         offset: 0,
       },
       {
         transform: 'translate(' + dx + 'px,' + dy + 'px)',
-        clipPath: 'inset(0 0 ' + clippedBottom + 'px 0)',
+        height: collapsedHeight + 'px',
         offset: .08,
       },
       {
         transform: 'translate(0px,0px)',
-        clipPath: 'inset(0 0 0px 0)',
+        height: targetHeight + 'px',
         offset: 1,
       },
     ], {
@@ -239,7 +250,7 @@ function introScript() {
 
     const overlayAnimation = overlay.animate([
       { opacity: 1, offset: 0 },
-      { opacity: 1, offset: .34 },
+      { opacity: 1, offset: .18 },
       { opacity: 0, offset: 1 },
     ], {
       duration: ${REVEAL_DURATION_MS},
@@ -263,6 +274,8 @@ function introScript() {
   };
 
   audioCleanup = playIntroSound();
+  typeTimer = window.setTimeout(typeNextCharacter,${TYPE_START_DELAY_MS});
+  identExitTimer = window.setTimeout(() => overlay.classList.add('is-ident-exit'),${IDENT_DURATION_MS - IDENT_EXIT_MS});
   identTimer = window.setTimeout(beginTitleStage,${IDENT_DURATION_MS});
 })();
 </script>`;
@@ -287,6 +300,9 @@ function injectReportEntryIntro(html) {
 
 module.exports = {
   IDENT_DURATION_MS,
+  TYPE_START_DELAY_MS,
+  TYPE_INTERVAL_MS,
+  IDENT_EXIT_MS,
   TITLE_HOLD_MS,
   REVEAL_DURATION_MS,
   injectReportEntryIntro,
