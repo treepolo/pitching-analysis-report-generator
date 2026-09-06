@@ -41,7 +41,7 @@ test('Tree Polo HTML transform composes branded title, background and promotion 
   assert.match(html, /data-report-promotion-footer-style/u);
   assert.match(html, /data-tree-polo-promotion/u);
   assert.match(html, /data-tree-polo-footer/u);
-  assert.match(html, /希望我的洞察，能在你追求卓越的路上幫上忙。/u);
+  assert.match(html, /希望我的洞察，能在閣下追求卓越的路上幫/u);
   assert.match(html, /<img class="tree-polo-footer-logo" src="images\/tree-polo-logo\.webp"/u);
   assert.doesNotMatch(html, /tree-polo-brand-logo/u);
   assert.doesNotMatch(html, /<link\b[^>]*\brel=["']icon["'][^>]*tree-polo-logo/iu);
