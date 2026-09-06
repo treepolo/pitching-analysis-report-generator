@@ -7,7 +7,6 @@ const { injectReportHelpHtml } = require('./report-help-runtime');
 const { injectReportLayoutRefinement } = require('./report-layout-refinement');
 const { injectReportMobileShellRefinement } = require('./report-mobile-shell-refinement');
 const { injectReportTitleAlignmentRefinement } = require('./report-title-alignment-refinement');
-const { injectReportEntrySpotlight } = require('./report-entry-spotlight');
 const { injectReportFixedHeaderRuntime } = require('./report-fixed-header-runtime');
 
 function renderReportHtml(reportDocument, options = {}) {
@@ -19,7 +18,6 @@ function renderReportHtml(reportDocument, options = {}) {
   html = injectReportLayoutRefinement(html);
   html = injectReportMobileShellRefinement(html);
   html = injectReportTitleAlignmentRefinement(html);
-  html = injectReportEntrySpotlight(html);
   html = injectReportFixedHeaderRuntime(html);
   return html;
 }
