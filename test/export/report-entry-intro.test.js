@@ -184,13 +184,22 @@ test('post-entry help cue has a larger smooth falloff with only a small fully tr
   assert.match(source, new RegExp(`setTimeout\\(stopHelpCue,${HELP_CUE_DURATION_MS}\\)`,'u'));
 });
 
-test('entry runtime remembers this open instance so reload does not replay it', () => {
+test('entry runtime replays on every load without session or history gating', () => {
   const source = introScript();
-  assert.match(source, /sessionStorage\.getItem\(storageKey\)/u);
-  assert.match(source, /sessionStorage\.setItem\(storageKey,'1'\)/u);
-  assert.match(source, /history\.state\[historyKey\] === true/u);
-  assert.match(source, /history\.replaceState/u);
-  assert.match(source, /if \(readSessionSeen\(\) \|\| readHistorySeen\(\)\)/u);
+  assert.doesNotMatch(source, /sessionStorage|history\.state|history\.replaceState|treePoloEntrySeen|readSessionSeen|readHistorySeen|markEntrySeen/u);
+  assert.match(source, /root\.classList\.add\('report-entry-intro-lock'\)/u);
+  assert.match(source, new RegExp(`typeTimer = window\\.setTimeout\\(typeNextCharacter,${TYPE_START_DELAY_MS}\\)`,'u'));
+  assert.match(source, new RegExp(`identTimer = window\\.setTimeout\\(beginTitleStage,${IDENT_DURATION_MS}\\)`,'u'));
+});
+
+test('help cue is claimed once per report URL with persistent local storage', () => {
+  const source = introScript();
+  assert.match(source, /const helpCueStorageKey = 'treepolo-report-help-cue-seen:' \+ String\(location\.href\)\.split\('#'\)\[0\]/u);
+  assert.match(source, /localStorage\.getItem\(helpCueStorageKey\) === '1'/u);
+  assert.match(source, /localStorage\.setItem\(helpCueStorageKey,'1'\)/u);
+  assert.match(source, /const shouldShowHelpCue = claimHelpCue\(\)/u);
+  assert.match(source, /if \(shouldShowHelpCue\) startHelpCue\(\)/u);
+  assert.ok(source.indexOf('const shouldShowHelpCue = claimHelpCue();') < source.indexOf("root.classList.add('report-entry-intro-lock')"));
 });
 
 test('entry runtime blocks report interaction and allows invisible pointer or touch skip anywhere', () => {
