@@ -12,6 +12,7 @@ const {
   IDENT_EXIT_MS,
   TITLE_HOLD_MS,
   REVEAL_DURATION_MS,
+  HELP_CUE_DURATION_MS,
   injectReportEntryIntro,
   introMarkup,
   introScript,
@@ -31,6 +32,14 @@ test('entry intro is a clean centered TREEPOLO typing ident with plain split col
   assert.doesNotMatch(css, /text-shadow|filter:blur|linear-gradient|radial-gradient/u);
   assert.match(css, /report-entry-intro-active \.report-help-trigger/u);
   assert.match(css, /visibility:hidden!important/u);
+});
+
+test('entry timing keeps a longer pure-black lead-in and a longer isolated title hold', () => {
+  assert.ok(TYPE_START_DELAY_MS >= 650);
+  assert.ok(IDENT_DURATION_MS >= 2800);
+  assert.ok(IDENT_EXIT_MS >= 220);
+  assert.ok(TITLE_HOLD_MS >= 1000);
+  assert.ok(REVEAL_DURATION_MS >= 1600);
 });
 
 test('entry intro hides the report before title stage and fully retires the word before report reveal', () => {
@@ -61,31 +70,50 @@ test('entry runtime types by changing centered span contents and separates ident
   assert.match(source, new RegExp(`setTimeout\\(typeNextCharacter,${TYPE_INTERVAL_MS}\\)`,'u'));
   assert.match(source, new RegExp(`setTimeout\\(\\(\\) => overlay\\.classList\\.add\\('is-ident-exit'\\),${IDENT_DURATION_MS - IDENT_EXIT_MS}\\)`,'u'));
   assert.match(source, new RegExp(`setTimeout\\(beginTitleStage,${IDENT_DURATION_MS}\\)`,'u'));
+  assert.match(source, new RegExp(`setTimeout\\(beginReportReveal,${TITLE_HOLD_MS}\\)`,'u'));
 });
 
-test('entry runtime collapses the actual report main to header height then expands its real height', () => {
+test('entry runtime starts with an enlarged text-width title frame then expands to canonical report geometry', () => {
   const script = introScript();
   const source = script.match(/<script data-report-entry-intro-runtime>\s*([\s\S]*?)\s*<\/script>/u)?.[1];
   assert.ok(source);
   assert.doesNotThrow(() => new vm.Script(source));
-  assert.match(source, /const main = document\.querySelector\('body>main'\)/u);
-  assert.match(source, /header\.getBoundingClientRect\(\)/u);
-  assert.match(source, /main\.getBoundingClientRect\(\)/u);
-  assert.match(source, /const targetHeight = Math\.max\(1,Math\.ceil\(mainRect\.height\)\)/u);
-  assert.match(source, /const collapsedHeight = Math\.max\(1,Math\.min\(targetHeight,Math\.ceil\(headerRect\.bottom - mainRect\.top\)\)\)/u);
+  assert.match(source, /const title = header\?\.querySelector\('h1'\)/u);
+  assert.match(source, /const targetWidth = Math\.max\(1,Math\.ceil\(naturalMainRect\.width\)\)/u);
+  assert.match(source, /const targetHeight = Math\.max\(1,Math\.ceil\(naturalMainRect\.height\)\)/u);
+  assert.match(source, /title\?\.scrollWidth/u);
+  assert.match(source, /const frameWidth = Math\.max\(180,Math\.min\(targetWidth,titleWidth \+ framePadding\)\)/u);
+  assert.match(source, /const initialScale = Math\.min\(1\.34,scaleLimit\)/u);
+  assert.match(source, /main\.style\.setProperty\('width',frameWidth \+ 'px'\)/u);
   assert.match(source, /main\.style\.setProperty\('height',collapsedHeight \+ 'px'\)/u);
-  assert.match(source, /main\.style\.setProperty\('transform','translate\(' \+ dx \+ 'px,' \+ dy \+ 'px\)'\)/u);
+  assert.match(source, /main\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\) scale\(' \+ initialScale \+ '\)'\)/u);
   assert.match(source, /main\.style\.setProperty\('overflow','hidden','important'\)/u);
   assert.doesNotMatch(source, /setProperty\('height',[^\n]*'important'\)/u);
+  assert.doesNotMatch(source, /setProperty\('width',[^\n]*'important'\)/u);
   assert.doesNotMatch(source, /setProperty\('transform',[^\n]*'important'\)/u);
   assert.match(source, /const mainAnimation = main\.animate\(/u);
-  assert.match(source, /height: collapsedHeight \+ 'px'/u);
   assert.match(source, /height: targetHeight \+ 'px'/u);
+  assert.match(source, /width: targetWidth \+ 'px'/u);
+  assert.match(source, /transform: 'translateY\(0px\) scale\(1\)'/u);
   assert.doesNotMatch(source, /clipPath|header\.animate\(|sections\.forEach/u);
   assert.match(source, /treepolo:entry-start/u);
   assert.match(source, /treepolo:entry-complete/u);
-  assert.match(source, new RegExp(`setTimeout\\(beginReportReveal,${TITLE_HOLD_MS}\\)`,'u'));
-  assert.ok(REVEAL_DURATION_MS > 0);
+});
+
+test('post-entry help cue dims everything outside help and pulses a bright ring without extra cue markup', () => {
+  const css = introStyle();
+  const source = introScript();
+  assert.match(css, /body\.report-entry-help-cue-active \.report-help-trigger\{[^}]*z-index:4100!important/u);
+  assert.match(css, /report-help-trigger::before\{[^}]*box-shadow:0 0 0 100vmax rgba\(0,0,0,\.52\)/u);
+  assert.match(css, /report-help-trigger::after\{[^}]*border:2px solid rgba\(178,255,213,\.96\)/u);
+  assert.match(css, /@keyframes report-entry-help-ring/u);
+  assert.match(css, /25%,75%/u);
+  assert.match(source, /body\.classList\.add\('report-entry-help-cue-active'\)/u);
+  assert.match(source, /document\.addEventListener\('pointerdown',helpCueDismissHandler,true\)/u);
+  assert.match(source, /document\.addEventListener\('keydown',helpCueDismissHandler,true\)/u);
+  assert.match(source, new RegExp(`setTimeout\\(stopHelpCue,${HELP_CUE_DURATION_MS}\\)`,'u'));
+  assert.match(source, /startHelpCue\(\);/u);
+  assert.doesNotMatch(introMarkup(), /help-cue|spotlight/iu);
 });
 
 test('entry runtime remembers this open instance so reload does not replay it', () => {
