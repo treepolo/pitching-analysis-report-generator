@@ -15,6 +15,7 @@ const {
   TITLE_BAR_HOLD_MS,
   SIGNATURE_TYPE_INTERVAL_MS,
   HEADER_MOVE_DURATION_MS,
+  BACKGROUND_FADE_MS,
   REVEAL_DURATION_MS,
   HELP_CUE_DURATION_MS,
   injectReportEntryIntro,
@@ -38,15 +39,17 @@ test('entry intro keeps the clean centered TREEPOLO typing ident', () => {
   assert.match(css, /visibility:hidden!important/u);
 });
 
-test('entry timing keeps mirrored ident and title fades plus the established reveal pacing', () => {
+test('entry timing keeps a deliberate black beat, mirrored fades and the established reveal pacing', () => {
   assert.ok(TYPE_START_DELAY_MS >= 650);
   assert.ok(IDENT_DURATION_MS >= 2800);
   assert.ok(IDENT_EXIT_MS >= 220);
   assert.equal(TITLE_STAGE_FADE_MS, IDENT_EXIT_MS);
-  assert.ok(TITLE_STAGE_GAP_MS > 0 && TITLE_STAGE_GAP_MS <= 100);
+  assert.equal(TITLE_STAGE_GAP_MS, 420);
   assert.ok(TITLE_BAR_HOLD_MS >= 500);
   assert.ok(SIGNATURE_TYPE_INTERVAL_MS >= 60);
   assert.equal(HEADER_MOVE_DURATION_MS, 1750);
+  assert.equal(BACKGROUND_FADE_MS, 746);
+  assert.ok(BACKGROUND_FADE_MS < HEADER_MOVE_DURATION_MS);
   assert.equal(REVEAL_DURATION_MS, 2300);
   assert.ok(REVEAL_DURATION_MS > HEADER_MOVE_DURATION_MS);
 });
@@ -60,17 +63,28 @@ test('title stage uses the real final title bar without content-specific entranc
   assert.doesNotMatch(css, /body\.report-entry-title-stage>main h1[^}]*transform/u);
 });
 
-test('title and canonical backdrop fade in only after TREEPOLO has fully faded out', () => {
+test('title fades in after TREEPOLO and backdrop waits for the report reveal', () => {
   const css = introStyle();
   const source = introScript();
   assert.match(css, /body\.report-entry-intro-active\[data-tree-polo-background="true"\]\{background:#000!important\}/u);
   assert.match(css, /body\.report-entry-intro-active\[data-tree-polo-background="true"\]::before\{opacity:0\}/u);
-  assert.match(css, new RegExp(`body\\.report-entry-title-stage\\[data-tree-polo-background="true"\\]::before\\{animation:tree-polo-title-background-in ${TITLE_STAGE_FADE_MS}ms linear both\\}`,'u'));
-  assert.match(css, /@keyframes tree-polo-title-background-in\{from\{opacity:0\}to\{opacity:1\}\}/u);
+  assert.match(css, new RegExp(`body\\.report-entry-report-reveal\\[data-tree-polo-background="true"\\]::before\\{animation:tree-polo-report-background-in ${BACKGROUND_FADE_MS}ms linear both\\}`,'u'));
+  assert.match(css, /@keyframes tree-polo-report-background-in\{from\{opacity:0\}to\{opacity:1\}\}/u);
   assert.match(css, /\.report-entry-intro\.is-title-stage,\.report-entry-intro\.is-title-stage \.report-entry-intro-stage\{background:transparent\}/u);
-  assert.doesNotMatch(css, /tree-polo-report-light-up|report-entry-report-reveal\[data-tree-polo-background/u);
+  assert.doesNotMatch(css, /report-entry-title-stage\[data-tree-polo-background[^}]*animation/u);
   assert.match(source, new RegExp(`const titleFadeAnimation = header\\.animate\\([\\s\\S]*?opacity: 0[\\s\\S]*?opacity: 1[\\s\\S]*?duration: ${TITLE_STAGE_FADE_MS}[\\s\\S]*?easing: 'linear'`,'u'));
+  assert.match(source, /body\.classList\.add\('report-entry-report-reveal'\)/u);
   assert.doesNotMatch(source, /overlayAnimation/u);
+});
+
+test('background fade duration is derived from ninety percent of title travel under the same easing', async () => {
+  const source = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-entry-intro.js'), 'utf8');
+  assert.match(source, /const HEADER_MOVE_HOLD_OFFSET = \.06/u);
+  assert.match(source, /const HEADER_MOVE_EASING = 'cubic-bezier\(\.22,\.72,\.16,1\)'/u);
+  assert.match(source, /const BACKGROUND_REVEAL_TRAVEL_FRACTION = \.9/u);
+  assert.match(source, /function timeFractionForEasedProgress/u);
+  assert.match(source, /HEADER_MOVE_HOLD_OFFSET[\s\S]*\(1 - HEADER_MOVE_HOLD_OFFSET\) \* BACKGROUND_REVEAL_TRAVEL_FRACTION/u);
+  assert.match(source, /HEADER_MOVE_DURATION_MS \* timeFractionForEasedProgress/u);
 });
 
 test('phone entry does not override title-bar geometry during the intro', () => {
@@ -102,7 +116,7 @@ test('scrollbar stays visually hidden through entry and reveals only after user 
   assert.match(html, /<html lang="zh-Hant" class="report-scrollbar-pending">/u);
 });
 
-test('entry runtime types the ident and starts the title stage only after ident exit and a short black beat', () => {
+test('entry runtime types the ident and starts the title stage only after ident exit and a deliberate black beat', () => {
   const source = introScript();
   assert.match(source, /const text = 'TREEPOLO'\.slice\(0,typedCount\)/u);
   assert.match(source, /identTree\.textContent = text\.slice\(0,4\)/u);
@@ -156,8 +170,8 @@ test('reveal slides the report sheet from a truly viewport-centered title bar an
   assert.match(source, /reportBody\.style\.overflow = 'hidden'/u);
   assert.match(source, /reportBody\.style\.transform = 'translateY\(' \+ dy \+ 'px\)'/u);
   assert.match(source, /header\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\)'\)/u);
-  assert.match(source, new RegExp(`const headerAnimation = header\\.animate\\([\\s\\S]*?offset: \\.06[\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
-  assert.match(source, new RegExp(`const bodyPositionAnimation = reportBody\\.animate\\([\\s\\S]*?offset: \\.06[\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
+  assert.match(source, new RegExp(`const headerAnimation = header\\.animate\\([\\s\\S]*?offset: 0\\.06[\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
+  assert.match(source, new RegExp(`const bodyPositionAnimation = reportBody\\.animate\\([\\s\\S]*?offset: 0\\.06[\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
   assert.match(source, new RegExp(`const bodyHeightAnimation = reportBody\\.animate\\([\\s\\S]*?height: targetBodyHeight \\+ 'px'[\\s\\S]*?duration: ${REVEAL_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
   assert.match(source, new RegExp(`const sheetSlideAnimation = reportBodyInner\\.animate\\([\\s\\S]*?sheetStartY[\\s\\S]*?sheetEndY[\\s\\S]*?duration: ${REVEAL_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
   assert.match(source, /const unwrapReportBody = \(\) =>/u);
