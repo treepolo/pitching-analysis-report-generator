@@ -1,14 +1,19 @@
 'use strict';
 
 const IDENT_DURATION_MS = 4200;
+const REVEAL_DURATION_MS = 1750;
 
 function introStyle() {
   return `<style data-report-entry-intro-style>
 html.report-entry-intro-lock,body.report-entry-intro-lock{overflow:hidden!important;overscroll-behavior:none!important}
+.report-help-trigger{transition:opacity .34s ease,visibility .34s ease!important}
 body.report-entry-intro-active .report-help-trigger{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
+body.report-entry-intro-active[data-tree-polo-background="true"]::before{filter:brightness(.16) saturate(.72);opacity:.16}
+body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animation:tree-polo-report-light-up 1.36s cubic-bezier(.2,.72,.2,1) both}
 .report-entry-intro[hidden]{display:none!important}
 .report-entry-intro{position:fixed;inset:0;z-index:5000;overflow:hidden;background:#000;color:#fff;cursor:default;touch-action:none;user-select:none;-webkit-user-select:none}
-.report-entry-intro-stage{position:absolute;inset:0;display:grid;place-items:center;background:#000}
+.report-entry-intro-stage{position:absolute;inset:0;display:grid;place-items:center;background:#000;transition:opacity .12s linear}
+.report-entry-intro.is-report-reveal .report-entry-intro-stage{opacity:0}
 .tree-polo-ident-word{position:absolute;left:50%;top:50%;margin:0;color:#72e57d;font-family:Impact,"Arial Black","Segoe UI Black",sans-serif;font-size:clamp(46px,8.2vw,128px);font-weight:900;line-height:.82;letter-spacing:.055em;text-transform:uppercase;white-space:nowrap;transform:translate(-50%,-50%) scaleX(.78);transform-origin:50% 50%;text-shadow:-1px 0 0 #9dffa0,1px 0 0 #155c2d,0 0 16px rgba(66,220,105,.2);animation:tree-polo-ident-word 1.46s cubic-bezier(.2,.72,.2,1) both}
 .tree-polo-ident-mark{position:absolute;left:50%;top:50%;width:min(24vw,190px);height:min(38vw,300px);min-width:112px;min-height:176px;transform:translate(-50%,-50%);opacity:0;animation:tree-polo-ident-mark 2.34s cubic-bezier(.19,.73,.18,1) 1.18s both}
 .tree-polo-ident-mark::before{content:"";position:absolute;left:39%;top:0;width:22%;height:100%;background:linear-gradient(90deg,#103d22 0%,#56d978 34%,#a8ff9c 52%,#3dba66 72%,#0f4525 100%);box-shadow:0 0 20px rgba(85,240,119,.17)}
@@ -23,6 +28,7 @@ body.report-entry-intro-active .report-help-trigger{opacity:0!important;visibili
 @keyframes tree-polo-ident-mark{0%{opacity:0;filter:blur(2px);transform:translate(-50%,-50%) scale(.88)}13%{opacity:1;filter:blur(0)}43%{opacity:1;transform:translate(-50%,-50%) scale(1)}69%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}100%{opacity:0;filter:blur(2px);transform:translate(-50%,-50%) scale(5.9)}}
 @keyframes tree-polo-ident-spectrum{0%{opacity:0;filter:blur(2px) saturate(1.05);transform:scaleX(.055)}12%{opacity:.96}46%{opacity:1;filter:blur(.35px) saturate(1.2);transform:scaleX(.94)}76%{opacity:1;transform:scaleX(1.08)}100%{opacity:0;filter:blur(2.6px) saturate(.92);transform:scaleX(1.17)}}
 @keyframes tree-polo-ident-vignette{0%{opacity:0}15%{opacity:.72}75%{opacity:.86}100%{opacity:1}}
+@keyframes tree-polo-report-light-up{0%{filter:brightness(.12) saturate(.68);opacity:.12}45%{filter:brightness(.58) saturate(.88);opacity:.66}100%{filter:brightness(1) saturate(1);opacity:1}}
 @media(max-width:700px){.tree-polo-ident-word{font-size:clamp(38px,13vw,78px);letter-spacing:.04em}.tree-polo-ident-mark{width:31vw;height:50vw}}
 @media print{.report-entry-intro{display:none!important}}
 </style>`;
@@ -46,6 +52,9 @@ function introScript() {
   if (!overlay) return;
   const root = document.documentElement;
   const body = document.body;
+  const main = document.querySelector('body>main');
+  const header = document.querySelector('body>main header.tree-polo-report-header,body>main header.report-header');
+  const sections = main ? [...main.querySelectorAll(':scope>section.report-section')] : [];
   root.classList.add('report-entry-intro-lock');
   body.classList.add('report-entry-intro-lock','report-entry-intro-active');
 
@@ -86,16 +95,62 @@ function introScript() {
     window.setTimeout(() => context.close().catch(() => {}),2900);
   };
 
-  const finish = () => {
+  const finishEntry = () => {
     overlay.hidden = true;
     overlay.remove();
     root.classList.remove('report-entry-intro-lock');
-    body.classList.remove('report-entry-intro-lock','report-entry-intro-active');
-    window.dispatchEvent(new CustomEvent('treepolo:intro-ident-complete'));
+    body.classList.remove('report-entry-intro-lock','report-entry-intro-active','report-entry-report-reveal');
+    window.dispatchEvent(new CustomEvent('treepolo:entry-complete'));
+  };
+
+  const beginReportReveal = () => {
+    overlay.classList.add('is-report-reveal');
+    body.classList.add('report-entry-report-reveal');
+    const overlayAnimation = overlay.animate([
+      { opacity: 1, offset: 0 },
+      { opacity: 1, offset: .18 },
+      { opacity: 0, offset: 1 },
+    ], { duration: ${REVEAL_DURATION_MS}, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' });
+
+    const animations = [overlayAnimation];
+    if (header) {
+      const rect = header.getBoundingClientRect();
+      const centerX = (window.innerWidth || document.documentElement.clientWidth || 0) / 2;
+      const centerY = (window.innerHeight || document.documentElement.clientHeight || 0) / 2;
+      const dx = centerX - (rect.left + rect.width / 2);
+      const dy = centerY - (rect.top + rect.height / 2);
+      header.style.setProperty('z-index','5101','important');
+      header.style.setProperty('will-change','transform,opacity');
+      animations.push(header.animate([
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(1.035)', opacity: 0, offset: 0 },
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(1.035)', opacity: 1, offset: .18 },
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(1.035)', opacity: 1, offset: .42 },
+        { transform: 'translate(0px,0px) scale(1)', opacity: 1, offset: 1 },
+      ], { duration: ${REVEAL_DURATION_MS}, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' }));
+    }
+
+    sections.forEach((section,index) => {
+      section.style.setProperty('will-change','clip-path,transform,opacity');
+      animations.push(section.animate([
+        { clipPath: 'inset(0 0 100% 0)', transform: 'translateY(-14px)', opacity: .08, offset: 0 },
+        { clipPath: 'inset(0 0 100% 0)', transform: 'translateY(-14px)', opacity: .08, offset: .25 },
+        { clipPath: 'inset(0 0 0 0)', transform: 'translateY(0)', opacity: 1, offset: 1 },
+      ], { duration: ${REVEAL_DURATION_MS} + Math.min(index,3) * 55, easing: 'cubic-bezier(.2,.72,.2,1)', fill: 'forwards' }));
+    });
+
+    window.setTimeout(() => {
+      animations.forEach((animation) => { try { animation.cancel(); } catch {} });
+      if (header) {
+        header.style.removeProperty('z-index');
+        header.style.removeProperty('will-change');
+      }
+      sections.forEach((section) => section.style.removeProperty('will-change'));
+      finishEntry();
+    }, ${REVEAL_DURATION_MS} + 90);
   };
 
   playIdentSound();
-  window.setTimeout(finish,${IDENT_DURATION_MS});
+  window.setTimeout(beginReportReveal,${IDENT_DURATION_MS});
 })();
 </script>`;
 }
@@ -119,6 +174,7 @@ function injectReportEntryIntro(html) {
 
 module.exports = {
   IDENT_DURATION_MS,
+  REVEAL_DURATION_MS,
   injectReportEntryIntro,
   introMarkup,
   introScript,
