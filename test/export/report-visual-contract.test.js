@@ -78,21 +78,27 @@ test('current player visual contract keeps desktop and phone control geometry', 
   assert.match(html, /0 0 9px 2px rgba\(66,211,146,\.40\)/u);
 });
 
-test('current Tree Polo canonical surface keeps text branding and background without a header logo resource', () => {
+test('current Tree Polo canonical surface keeps header text branding, branded footer and background', () => {
   const html = brandedCanonicalHtml();
 
   assert.equal((html.match(/<style\b/gu) || []).length, 1);
   assert.match(html, /data-report-style-bundle/u);
   assert.match(html, /data-report-canonical-theme/u);
-  assert.doesNotMatch(html, /tree-polo-brand-logo|<img[^>]+tree-polo-logo/iu);
+  assert.doesNotMatch(html, /tree-polo-brand-logo/u);
+  assert.match(html, /<img class="tree-polo-footer-logo" src="images\/tree-polo-logo\.webp"/u);
   assert.doesNotMatch(html, /<link\b[^>]*\brel=["']icon["'][^>]*tree-polo-logo/iu);
   assert.match(html, /tree-polo-signature-tree/u);
   assert.match(html, /tree-polo-signature-polo/u);
+  assert.match(html, /data-tree-polo-promotion/u);
+  assert.match(html, /data-tree-polo-footer/u);
+  assert.match(html, /希望我的洞察，能在你追求卓越的路上幫上忙。/u);
   assert.match(html, /<body data-tree-polo-background="true">/u);
   assert.match(html, /body\[data-tree-polo-background="true"\]::before\{[^}]*tree-polo-report-background\.jpg/u);
   assert.match(html, /main \{[^}]*background: #fff[^}]*box-shadow: 0 2px 12px/u);
   assert.match(html, /tree-polo-report-header\{[^}]*min-height:54px[^}]*padding:10px 12px[^}]*background:#fff/u);
   assert.match(html, /tree-polo-report-header::before,body>main \.tree-polo-report-header::after\{display:none!important\}/u);
   assert.match(html, /tree-polo-signature-tree,body>main \.tree-polo-signature-polo\{color:#1a8917!important/u);
+  assert.match(html, /report-style-source:data-report-entry-intro-style; role:component-style/u);
+  assert.match(html, /report-style-source:data-tree-polo-footer-style; role:component-style/u);
   assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme|--tree-polo-logo/u);
 });

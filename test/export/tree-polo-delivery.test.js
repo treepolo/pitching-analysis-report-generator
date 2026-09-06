@@ -72,7 +72,14 @@ test('delivers folder, HTML and ZIP with the canonical Tree Polo package contrac
   const html = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
   assert.match(html, new RegExp(`<title>王小明${BRAND_SUFFIX}<\\/title>`, 'u'));
   assert.match(html, /<h1>王小明投球分析報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹<\/span><span class="tree-polo-signature-polo">Polo<\/span><\/span><\/h1>/u);
-  assert.doesNotMatch(html, /tree-polo-brand-logo|<img[^>]+tree-polo-logo/iu);
+  assert.doesNotMatch(html, /tree-polo-brand-logo/u);
+  assert.match(html, /<img class="tree-polo-footer-logo" src="images\/tree-polo-logo\.webp"/u);
+  assert.match(html, /data-tree-polo-promotion/u);
+  assert.match(html, /data-tree-polo-footer/u);
+  assert.match(html, /希望我的洞察，能在你追求卓越的路上幫上忙。/u);
+  assert.match(html, /https:\/\/www\.instagram\.com\/treepolooo\//u);
+  assert.match(html, /https:\/\/vocus\.cc\/user\/@treepolooo/u);
+  assert.match(html, /https:\/\/www\.youtube\.com\/@treepolo/u);
   assert.doesNotMatch(html, /<link\b[^>]*\brel=["']icon["'][^>]*tree-polo-logo/iu);
   assert.match(html, /data-tree-polo-background="true"/u);
   assert.doesNotMatch(html, new RegExp(LEGACY_BRAND_SUFFIX, 'u'));
@@ -80,7 +87,9 @@ test('delivers folder, HTML and ZIP with the canonical Tree Polo package contrac
   assert.match(html, /data-report-style-bundle/u);
   assert.match(html, /report-style-source:data-report-canonical-theme; role:canonical-visual/u);
   assert.match(html, /report-style-source:data-report-mobile-shell-refinement; role:functional-layout/u);
-  assert.match(html, /report-style-source:data-report-entry-spotlight-style; role:component-style/u);
+  assert.match(html, /report-style-source:data-report-entry-intro-style; role:component-style/u);
+  assert.match(html, /report-style-source:data-tree-polo-footer-style; role:component-style/u);
+  assert.doesNotMatch(html, /report-style-source:data-report-entry-spotlight-style/u);
   assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme|legacy-visual|final-visual/u);
 
   const manifest = JSON.parse(await fs.readFile(path.join(result.folderPath, 'export-manifest.json'), 'utf8'));

@@ -10,14 +10,18 @@ const {
   BRAND_SUFFIX,
   LEGACY_BRAND_SUFFIX,
   REPORT_BACKGROUND_RELATIVE_PATH,
+  SOCIAL_LINKS,
   applyTreePoloPackageHtml,
   brandedDisplayTitle,
   brandedReportName,
   canonicalReportName,
   createTreePoloPackageAssets,
   enableTreePoloBackground,
+  injectTreePoloPromotionFooter,
   shortenBrandSuffix,
   stylizeBrandSignature,
+  treePoloFooterStyle,
+  treePoloPromotionFooterMarkup,
 } = require('../../src/export/tree-polo-package');
 
 test('Tree Polo naming preserves the long visible title and short delivery suffix', () => {
@@ -28,7 +32,7 @@ test('Tree Polo naming preserves the long visible title and short delivery suffi
   assert.ok(canonicalReportName('王'.repeat(200)).length <= 80);
 });
 
-test('Tree Polo HTML transform keeps text branding without loading the removed header logo', () => {
+test('Tree Polo HTML transform adds branded title, background, promotion links and closing footer', () => {
   const source = '<html><head><title>王小明</title><style data-report-canonical-theme>body{color:#242424}</style></head><body><main><header class="report-header"><p class="eyebrow">Pitching analysis report</p><h1>王小明</h1></header></main><p>以下圖解直接使用這份報告中的實際播放器介面。</p><h3>實際播放器圖解</h3></body></html>';
   const html = applyTreePoloPackageHtml(source, {
     title: '王小明',
@@ -36,13 +40,31 @@ test('Tree Polo HTML transform keeps text branding without loading the removed h
   });
   assert.match(html, new RegExp(`<title>王小明${BRAND_SUFFIX}<\\/title>`, 'u'));
   assert.match(html, /class="report-header tree-polo-report-header"/u);
-  assert.doesNotMatch(html, /tree-polo-brand-logo|<img[^>]+tree-polo-logo/iu);
-  assert.doesNotMatch(html, /<link\b[^>]*\brel=["']icon["'][^>]*tree-polo-logo/iu);
   assert.match(html, /<h1>王小明投球分析報告<span class="tree-polo-signature">by<span class="tree-polo-signature-tree">小樹<\/span><span class="tree-polo-signature-polo">Polo<\/span><\/span><\/h1>/u);
   assert.match(html, /<body data-tree-polo-background="true">/u);
+  assert.match(html, /data-tree-polo-promotion/u);
+  assert.match(html, /data-tree-polo-footer/u);
+  assert.match(html, /希望我的洞察，能在你追求卓越的路上幫上忙。/u);
+  assert.match(html, /<img class="tree-polo-footer-logo" src="images\/tree-polo-logo\.webp"/u);
+  assert.match(html, /https:\/\/www\.instagram\.com\/treepolooo\//u);
+  assert.match(html, /https:\/\/vocus\.cc\/user\/@treepolooo/u);
+  assert.match(html, /https:\/\/www\.youtube\.com\/@treepolo/u);
+  assert.doesNotMatch(html, /tree-polo-brand-logo/u);
+  assert.doesNotMatch(html, /<link\b[^>]*\brel=["']icon["'][^>]*tree-polo-logo/iu);
   assert.doesNotMatch(html, /Pitching analysis report|以下圖解直接使用|<h3>實際播放器圖解<\/h3>/u);
-  assert.equal((html.match(/<style\b/gu) || []).length, 1);
+  assert.equal((html.match(/<style\b/gu) || []).length, 2);
   assert.doesNotMatch(html, /data-tree-polo-brand-theme|data-tree-polo-refined-theme/u);
+});
+
+test('promotion links expose clickable platform icon and brand name in one anchor', () => {
+  const markup = treePoloPromotionFooterMarkup({ logoRelativePath: BRAND_LOGO_RELATIVE_PATH });
+  for (const [kind, label, href] of SOCIAL_LINKS) {
+    assert.match(markup, new RegExp(`tree-polo-promotion-link-${kind}`, 'u'));
+    assert.match(markup, new RegExp(href.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+    assert.match(markup, new RegExp(`tree-polo-promotion-name">${label}`, 'u'));
+  }
+  assert.match(markup, /target="_blank" rel="noopener noreferrer"/u);
+  assert.match(treePoloFooterStyle(), /\.tree-polo-promotion-link:hover/u);
 });
 
 test('Tree Polo semantic helpers remain idempotent at their owned seam', () => {
@@ -50,6 +72,11 @@ test('Tree Polo semantic helpers remain idempotent at their owned seam', () => {
   assert.equal((enableTreePoloBackground(background).match(/data-tree-polo-background/g) || []).length, 1);
   const signature = stylizeBrandSignature('<h1>王小明投球分析報告by小樹Polo</h1>');
   assert.equal((stylizeBrandSignature(signature).match(/tree-polo-signature/g) || []).length, 3);
+  const footer = injectTreePoloPromotionFooter('<html><head></head><body><main></main></body></html>');
+  const twice = injectTreePoloPromotionFooter(footer);
+  assert.equal((twice.match(/data-tree-polo-footer-style/g) || []).length, 1);
+  assert.equal((twice.match(/data-tree-polo-promotion/g) || []).length, 1);
+  assert.equal((twice.match(/data-tree-polo-footer>/g) || []).length, 1);
 });
 
 test('Tree Polo package assets are explicit required assets and keep logo identity collision-safe', async () => {
