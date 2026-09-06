@@ -104,7 +104,9 @@ test('reveal geometrically pins the report surface to the title bar while body h
   assert.match(source, /node !== header && !node\.classList\?\.contains\('report-fixed-header-spacer'\)/u);
   assert.match(source, /const headerMarginBottom = Math\.max\(0,numberPx\(headerStyle\.marginBottom\)\)/u);
   assert.match(source, /header\.style\.setProperty\('margin-bottom','0px','important'\)/u);
+  assert.match(source, /header\.style\.setProperty\('border-bottom-width','\.5px','important'\)/u);
   assert.match(source, /header\.style\.removeProperty\('margin-bottom'\)/u);
+  assert.match(source, /header\.style\.removeProperty\('border-bottom-width'\)/u);
   assert.match(source, /const naturalHeaderRect = header\.getBoundingClientRect\(\)/u);
   assert.match(source, /const naturalBodyRect = reportBody\.getBoundingClientRect\(\)/u);
   assert.match(source, /const seamOffset = naturalHeaderRect\.bottom - naturalBodyRect\.top/u);
@@ -116,10 +118,11 @@ test('reveal geometrically pins the report surface to the title bar while body h
   assert.match(source, /reportBody\.style\.transform = 'translateY\(' \+ dy \+ 'px\)'/u);
   assert.match(source, /header\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\)'\)/u);
   assert.match(source, /const targetBodyHeight = Math\.max\(1,Math\.ceil\(reportBodyInner\.getBoundingClientRect\(\)\.height\)\)/u);
-  assert.match(source, new RegExp(`const headerAnimation = header\\.animate\\([\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
-  assert.match(source, new RegExp(`const bodyPositionAnimation = reportBody\\.animate\\([\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
+  assert.match(source, new RegExp(`const headerAnimation = header\\.animate\\([\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
+  assert.match(source, new RegExp(`const bodyPositionAnimation = reportBody\\.animate\\([\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
   assert.match(source, new RegExp(`const bodyHeightAnimation = reportBody\\.animate\\([\\s\\S]*?height: targetBodyHeight \\+ 'px'[\\s\\S]*?duration: ${REVEAL_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
   assert.doesNotMatch(source, /offset: \.06/u);
+  assert.doesNotMatch(source, /cubic-bezier/u);
   assert.match(source, /const unwrapReportBody = \(\) =>/u);
   assert.match(source, /const source = reportBodyInner \|\| reportBody/u);
   assert.match(source, /while \(source\.firstChild\) main\.insertBefore\(source\.firstChild,reportBody\)/u);
