@@ -16,9 +16,6 @@ html.report-entry-intro-lock,body.report-entry-intro-lock{overflow:hidden!import
 body.report-entry-intro-active .report-help-trigger{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
 body.report-entry-intro-active>main{visibility:hidden}
 body.report-entry-title-stage>main{visibility:visible}
-body.report-entry-title-stage:not(.report-entry-report-reveal)>main>:not(header){visibility:hidden}
-body.report-entry-title-stage:not(.report-entry-report-reveal)>main .tree-polo-signature{position:absolute!important;opacity:0!important;pointer-events:none!important}
-body.report-entry-report-reveal>main>:not(header){animation:report-entry-content-in ${REVEAL_DURATION_MS}ms ease both}
 body.report-entry-intro-active[data-tree-polo-background="true"]::before{opacity:0}
 body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animation:tree-polo-report-light-up 1.2s cubic-bezier(.2,.72,.2,1) both}
 .report-entry-intro[hidden]{display:none!important}
@@ -33,14 +30,12 @@ body.report-entry-help-cue-active .report-help-trigger{z-index:4100!important;is
 body.report-entry-help-cue-active::after{content:"";position:fixed;inset:0;z-index:4090;pointer-events:none;background:radial-gradient(circle max(160px,30vw) at var(--report-help-cue-x,calc(100vw - 56px)) var(--report-help-cue-y,calc(100vh - 40px)),rgba(0,0,0,0) 0%,rgba(0,0,0,0) 6%,rgba(0,0,0,.025) 16%,rgba(0,0,0,.07) 27%,rgba(0,0,0,.15) 39%,rgba(0,0,0,.27) 52%,rgba(0,0,0,.41) 65%,rgba(0,0,0,.56) 77%,rgba(0,0,0,.69) 87%,rgba(0,0,0,.79) 94%,rgba(0,0,0,.88) 100%);animation:report-entry-help-mask ${HELP_CUE_DURATION_MS}ms ease both}
 body.report-entry-help-cue-active .report-help-trigger::after{content:"";position:absolute;inset:-6px;z-index:1;border:2px solid rgba(178,255,213,.96);border-radius:999px;pointer-events:none;animation:report-entry-help-ring 2.4s ease-in-out infinite,report-entry-help-life ${HELP_CUE_DURATION_MS}ms linear both}
 @keyframes tree-polo-report-light-up{0%{opacity:0}35%{opacity:.42}100%{opacity:1}}
-@keyframes report-entry-content-in{0%,16%{opacity:0}42%{opacity:1}100%{opacity:1}}
 @keyframes report-entry-help-mask{0%{opacity:0}7%{opacity:1}88%{opacity:1}100%{opacity:0}}
 @keyframes report-entry-help-ring{0%,50%,100%{border-color:rgba(178,255,213,.98);box-shadow:0 0 0 1px rgba(0,166,90,.72),0 0 18px rgba(0,166,90,.82)}25%,75%{border-color:rgba(178,255,213,.34);box-shadow:0 0 0 1px rgba(0,166,90,.16),0 0 5px rgba(0,166,90,.18)}}
 @keyframes report-entry-help-life{0%{opacity:0}7%{opacity:1}88%{opacity:1}100%{opacity:0}}
 @media(max-width:700px){
   .tree-polo-ident-word{font-size:clamp(38px,12vw,68px);letter-spacing:.06em}
   body.report-entry-intro-active:not(.report-entry-report-reveal)[data-tree-polo-background="true"]::before{background-image:none!important;background-color:#000!important;opacity:0!important}
-  body.report-entry-intro-active>main header.tree-polo-report-header,body.report-entry-intro-active>main header.report-header{position:absolute!important;top:0!important;left:-5px!important;right:auto!important;width:100vw!important;max-width:none!important;margin:0!important}
 }
 @media print{.report-entry-intro{display:none!important}body.report-entry-help-cue-active::after,body.report-entry-help-cue-active .report-help-trigger::after{display:none!important}}
 </style>`;
@@ -116,7 +111,8 @@ function introScript() {
   let activeAnimations = [];
   let audioCleanup = () => {};
   let finished = false;
-  let collapsedState = null;
+  let revealState = null;
+  let reportBody = null;
   let typedCount = 0;
   let signatureTypedCount = 0;
   let signaturePrepared = false;
@@ -132,14 +128,23 @@ function introScript() {
 
   const restoreMain = () => {
     if (!main) return;
-    ['position','z-index','clip-path','will-change','opacity','isolation']
-      .forEach((property) => main.style.removeProperty(property));
+    [
+      'position','z-index','background','border-color','box-shadow','padding-bottom',
+      'will-change','opacity','isolation',
+    ].forEach((property) => main.style.removeProperty(property));
   };
 
   const restoreHeader = () => {
     if (!header) return;
     header.style.removeProperty('transform');
     header.style.removeProperty('will-change');
+  };
+
+  const unwrapReportBody = () => {
+    if (!reportBody || !main) return;
+    while (reportBody.firstChild) main.insertBefore(reportBody.firstChild,reportBody);
+    reportBody.remove();
+    reportBody = null;
   };
 
   const restoreSignature = () => {
@@ -153,8 +158,9 @@ function introScript() {
   const clearAnimatedState = () => {
     activeAnimations.forEach((animation) => { try { animation.cancel(); } catch {} });
     activeAnimations = [];
-    restoreMain();
     restoreHeader();
+    unwrapReportBody();
+    restoreMain();
     restoreSignature();
   };
 
@@ -292,58 +298,76 @@ function introScript() {
   document.addEventListener('pointerdown',skipEntry,{ capture:true,passive:false });
   document.addEventListener('touchstart',skipEntry,{ capture:true,passive:false });
 
+  const numberPx = (value) => {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   const prepareCollapsedReport = () => {
     if (!main || !header || !title) return false;
-    const mainRect = main.getBoundingClientRect();
+    const contentNodes = [...main.children].filter((node) => (
+      node !== header && !node.classList?.contains('report-fixed-header-spacer')
+    ));
+    if (contentNodes.length === 0) return false;
+
+    reportBody = document.createElement('div');
+    reportBody.dataset.reportEntryBody = 'true';
+    contentNodes.forEach((node) => reportBody.append(node));
+    main.append(reportBody);
+
+    const mainStyle = window.getComputedStyle(main);
+    const headerStyle = window.getComputedStyle(header);
+    const mainPaddingLeft = numberPx(mainStyle.paddingLeft);
+    const mainPaddingRight = numberPx(mainStyle.paddingRight);
+    const mainPaddingBottom = numberPx(mainStyle.paddingBottom);
+    const headerMarginBottom = Math.max(0,numberPx(headerStyle.marginBottom));
+
+    reportBody.style.boxSizing = 'border-box';
+    reportBody.style.position = 'relative';
+    reportBody.style.width = main.clientWidth + 'px';
+    reportBody.style.marginLeft = (-mainPaddingLeft) + 'px';
+    reportBody.style.marginTop = (-headerMarginBottom) + 'px';
+    reportBody.style.paddingTop = headerMarginBottom + 'px';
+    reportBody.style.paddingRight = mainPaddingRight + 'px';
+    reportBody.style.paddingBottom = mainPaddingBottom + 'px';
+    reportBody.style.paddingLeft = mainPaddingLeft + 'px';
+    reportBody.style.background = '#fff';
+
     const headerRect = header.getBoundingClientRect();
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-    const finalTopInset = Math.max(0,headerRect.top - mainRect.top);
     const dy = (viewportHeight / 2) - (headerRect.top + headerRect.height / 2);
-    const initialTopInset = Math.max(0,finalTopInset + dy);
-    const initialBottomInset = Math.max(0,mainRect.height - initialTopInset - headerRect.height);
+    const targetBodyHeight = Math.max(1,Math.ceil(reportBody.getBoundingClientRect().height));
 
-    collapsedState = { dy, initialTopInset, initialBottomInset };
+    revealState = { dy, targetBodyHeight };
     main.style.setProperty('position','relative','important');
     main.style.setProperty('z-index','5001','important');
     main.style.setProperty('isolation','isolate','important');
-    main.style.setProperty('clip-path','inset(' + initialTopInset + 'px 0 ' + initialBottomInset + 'px 0)');
-    main.style.setProperty('will-change','clip-path');
+    main.style.setProperty('background','transparent','important');
+    main.style.setProperty('border-color','transparent','important');
+    main.style.setProperty('box-shadow','none','important');
+    main.style.setProperty('padding-bottom','0px','important');
     main.style.setProperty('opacity','1','important');
+
     header.style.setProperty('transform','translateY(' + dy + 'px)');
     header.style.setProperty('will-change','transform');
+
+    reportBody.style.height = '0px';
+    reportBody.style.overflow = 'hidden';
+    reportBody.style.transform = 'translateY(' + dy + 'px)';
+    reportBody.style.willChange = 'height,transform';
     return true;
   };
 
   const beginReportReveal = () => {
     if (finished) return;
-    if (!collapsedState || !main || !header) {
+    if (!revealState || !main || !header || !reportBody) {
       finishEntry(false);
       return;
     }
     body.classList.add('report-entry-report-reveal');
     signatureTypeTimer = window.setTimeout(typeNextSignatureCharacter,0);
 
-    const { dy, initialTopInset, initialBottomInset } = collapsedState;
-    const mainAnimation = main.animate([
-      {
-        clipPath: 'inset(' + initialTopInset + 'px 0 ' + initialBottomInset + 'px 0)',
-        offset: 0,
-      },
-      {
-        clipPath: 'inset(' + initialTopInset + 'px 0 ' + initialBottomInset + 'px 0)',
-        offset: .06,
-      },
-      {
-        clipPath: 'inset(0px 0 0px 0)',
-        offset: 1,
-      },
-    ], {
-      duration: ${REVEAL_DURATION_MS},
-      easing: 'cubic-bezier(.22,.72,.16,1)',
-      fill: 'forwards',
-    });
-    activeAnimations.push(mainAnimation);
-
+    const { dy, targetBodyHeight } = revealState;
     const headerAnimation = header.animate([
       { transform: 'translateY(' + dy + 'px)', offset: 0 },
       { transform: 'translateY(' + dy + 'px)', offset: .06 },
@@ -354,6 +378,29 @@ function introScript() {
       fill: 'forwards',
     });
     activeAnimations.push(headerAnimation);
+
+    const bodyAnimation = reportBody.animate([
+      {
+        transform: 'translateY(' + dy + 'px)',
+        height: '0px',
+        offset: 0,
+      },
+      {
+        transform: 'translateY(' + dy + 'px)',
+        height: '0px',
+        offset: .06,
+      },
+      {
+        transform: 'translateY(0px)',
+        height: targetBodyHeight + 'px',
+        offset: 1,
+      },
+    ], {
+      duration: ${REVEAL_DURATION_MS},
+      easing: 'cubic-bezier(.22,.72,.16,1)',
+      fill: 'forwards',
+    });
+    activeAnimations.push(bodyAnimation);
 
     const overlayAnimation = overlay.animate([
       { opacity: 1, offset: 0 },
@@ -372,12 +419,12 @@ function introScript() {
   const beginTitleStage = () => {
     if (finished) return;
     overlay.classList.add('is-title-stage');
-    body.classList.add('report-entry-title-stage');
     prepareSignatureTyping();
     if (!prepareCollapsedReport()) {
       finishEntry(false);
       return;
     }
+    body.classList.add('report-entry-title-stage');
     titleBarTimer = window.setTimeout(beginReportReveal,${TITLE_BAR_HOLD_MS});
   };
 
