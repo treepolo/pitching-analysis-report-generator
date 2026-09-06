@@ -1,46 +1,50 @@
 'use strict';
 
-const IDENT_DURATION_MS = 4200;
-const REVEAL_DURATION_MS = 1750;
+const IDENT_DURATION_MS = 2200;
+const TITLE_HOLD_MS = 560;
+const REVEAL_DURATION_MS = 1650;
 
 function introStyle() {
   return `<style data-report-entry-intro-style>
 html.report-entry-intro-lock,body.report-entry-intro-lock{overflow:hidden!important;overscroll-behavior:none!important}
 .report-help-trigger{transition:opacity .34s ease,visibility .34s ease!important}
 body.report-entry-intro-active .report-help-trigger{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
-body.report-entry-intro-active[data-tree-polo-background="true"]::before{filter:brightness(.16) saturate(.72);opacity:.16}
-body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animation:tree-polo-report-light-up 1.36s cubic-bezier(.2,.72,.2,1) both}
+body.report-entry-intro-active>main{visibility:hidden}
+body.report-entry-title-stage>main{visibility:visible}
+body.report-entry-intro-active[data-tree-polo-background="true"]::before{opacity:0}
+body.report-entry-report-reveal[data-tree-polo-background="true"]::before{animation:tree-polo-report-light-up 1.2s cubic-bezier(.2,.72,.2,1) both}
 .report-entry-intro[hidden]{display:none!important}
 .report-entry-intro{position:fixed;inset:0;z-index:5000;overflow:hidden;background:#000;color:#fff;cursor:default;touch-action:none;user-select:none;-webkit-user-select:none}
-.report-entry-intro-stage{position:absolute;inset:0;display:grid;place-items:center;background:#000;transition:opacity .12s linear}
-.report-entry-intro.is-report-reveal .report-entry-intro-stage{opacity:0}
-.tree-polo-ident-word{position:absolute;left:50%;top:50%;margin:0;color:#72e57d;font-family:Impact,"Arial Black","Segoe UI Black",sans-serif;font-size:clamp(46px,8.2vw,128px);font-weight:900;line-height:.82;letter-spacing:.055em;text-transform:uppercase;white-space:nowrap;transform:translate(-50%,-50%) scaleX(.78);transform-origin:50% 50%;text-shadow:-1px 0 0 #9dffa0,1px 0 0 #155c2d,0 0 16px rgba(66,220,105,.2);animation:tree-polo-ident-word 1.46s cubic-bezier(.2,.72,.2,1) both}
-.tree-polo-ident-mark{position:absolute;left:50%;top:50%;width:min(24vw,190px);height:min(38vw,300px);min-width:112px;min-height:176px;transform:translate(-50%,-50%);opacity:0;animation:tree-polo-ident-mark 2.34s cubic-bezier(.19,.73,.18,1) 1.18s both}
-.tree-polo-ident-mark::before{content:"";position:absolute;left:39%;top:0;width:22%;height:100%;background:linear-gradient(90deg,#103d22 0%,#56d978 34%,#a8ff9c 52%,#3dba66 72%,#0f4525 100%);box-shadow:0 0 20px rgba(85,240,119,.17)}
-.tree-polo-ident-mark::after{content:"";position:absolute;left:0;top:0;width:100%;height:21%;background:linear-gradient(180deg,#8aff96 0%,#4fca70 43%,#18572f 100%);box-shadow:0 0 18px rgba(91,244,121,.15)}
-.tree-polo-ident-edge{position:absolute;inset:0;pointer-events:none}
-.tree-polo-ident-edge::before,.tree-polo-ident-edge::after{content:"";position:absolute;top:0;height:100%;width:2px;background:rgba(194,255,202,.78);filter:blur(.15px);opacity:.7}
-.tree-polo-ident-edge::before{left:39%}.tree-polo-ident-edge::after{right:39%}
-.tree-polo-ident-spectrum{position:absolute;inset:-6%;opacity:0;transform:scaleX(.055);transform-origin:50% 50%;background:repeating-linear-gradient(90deg,#07170d 0 .8%,#1c6b36 .8% 1.6%,#5ed97a 1.6% 2.35%,#b6ff97 2.35% 2.85%,#42b979 2.85% 3.65%,#0f614f 3.65% 4.35%,#62e5c6 4.35% 5.15%,#d5ff9e 5.15% 5.72%,#2fa95e 5.72% 6.7%,#123b27 6.7% 7.45%);filter:saturate(1.18) contrast(1.1);animation:tree-polo-ident-spectrum 2.02s cubic-bezier(.17,.64,.2,1) 2.13s both}
-.tree-polo-ident-spectrum::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.52),transparent 21%,rgba(255,255,255,.08) 50%,transparent 79%,rgba(0,0,0,.52)),radial-gradient(ellipse at center,rgba(160,255,170,.18),transparent 58%);mix-blend-mode:screen}
-.tree-polo-ident-vignette{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 20%,rgba(0,0,0,.18) 58%,rgba(0,0,0,.86) 100%);pointer-events:none;opacity:0;animation:tree-polo-ident-vignette 2.02s ease 2.13s both}
-@keyframes tree-polo-ident-word{0%{opacity:0;filter:blur(1.6px);transform:translate(-50%,-50%) scaleX(.72) scale(.965)}18%{opacity:1;filter:blur(0)}62%{opacity:1;transform:translate(-50%,-50%) scaleX(.78) scale(1)}100%{opacity:0;filter:blur(.5px);transform:translate(-50%,-50%) scaleX(.79) scale(1.025)}}
-@keyframes tree-polo-ident-mark{0%{opacity:0;filter:blur(2px);transform:translate(-50%,-50%) scale(.88)}13%{opacity:1;filter:blur(0)}43%{opacity:1;transform:translate(-50%,-50%) scale(1)}69%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}100%{opacity:0;filter:blur(2px);transform:translate(-50%,-50%) scale(5.9)}}
-@keyframes tree-polo-ident-spectrum{0%{opacity:0;filter:blur(2px) saturate(1.05);transform:scaleX(.055)}12%{opacity:.96}46%{opacity:1;filter:blur(.35px) saturate(1.2);transform:scaleX(.94)}76%{opacity:1;transform:scaleX(1.08)}100%{opacity:0;filter:blur(2.6px) saturate(.92);transform:scaleX(1.17)}}
-@keyframes tree-polo-ident-vignette{0%{opacity:0}15%{opacity:.72}75%{opacity:.86}100%{opacity:1}}
-@keyframes tree-polo-report-light-up{0%{filter:brightness(.12) saturate(.68);opacity:.12}45%{filter:brightness(.58) saturate(.88);opacity:.66}100%{filter:brightness(1) saturate(1);opacity:1}}
-@media(max-width:700px){.tree-polo-ident-word{font-size:clamp(38px,13vw,78px);letter-spacing:.04em}.tree-polo-ident-mark{width:31vw;height:50vw}}
+.report-entry-intro-stage{position:absolute;inset:0;display:grid;place-items:center;background:#000}
+.tree-polo-ident-word{display:inline-flex;align-items:baseline;margin:0;font-family:Arial,Helvetica,"Segoe UI",sans-serif;font-size:clamp(44px,7.2vw,104px);font-weight:700;line-height:1;letter-spacing:.075em;white-space:nowrap}
+.tree-polo-ident-char{display:inline-block;opacity:0;animation:tree-polo-type-char 1ms linear forwards;animation-delay:var(--type-delay)}
+.tree-polo-ident-tree{color:#49b675}
+.tree-polo-ident-polo{color:#f4f4f4}
+.report-entry-intro.is-title-stage .tree-polo-ident-word{opacity:0;transition:opacity .16s linear}
+@keyframes tree-polo-type-char{to{opacity:1}}
+@keyframes tree-polo-report-light-up{0%{opacity:0}35%{opacity:.42}100%{opacity:1}}
+@media(max-width:700px){.tree-polo-ident-word{font-size:clamp(38px,12vw,68px);letter-spacing:.06em}}
 @media print{.report-entry-intro{display:none!important}}
 </style>`;
 }
 
 function introMarkup() {
+  const characters = [
+    ['T', 'tree', 0.18],
+    ['R', 'tree', 0.31],
+    ['E', 'tree', 0.44],
+    ['E', 'tree', 0.57],
+    ['P', 'polo', 0.70],
+    ['O', 'polo', 0.83],
+    ['L', 'polo', 0.96],
+    ['O', 'polo', 1.09],
+  ];
+  const word = characters
+    .map(([character, group, delay]) => `<span class="tree-polo-ident-char tree-polo-ident-${group}" style="--type-delay:${delay}s">${character}</span>`)
+    .join('');
   return `<div class="report-entry-intro" data-report-entry-intro aria-hidden="true">
   <div class="report-entry-intro-stage">
-    <p class="tree-polo-ident-word">TREEPOLO</p>
-    <div class="tree-polo-ident-mark" aria-hidden="true"><span class="tree-polo-ident-edge"></span></div>
-    <div class="tree-polo-ident-spectrum" aria-hidden="true"></div>
-    <div class="tree-polo-ident-vignette" aria-hidden="true"></div>
+    <p class="tree-polo-ident-word" aria-label="TREEPOLO">${word}</p>
   </div>
 </div>`;
 }
@@ -53,8 +57,7 @@ function introScript() {
   const root = document.documentElement;
   const body = document.body;
   const main = document.querySelector('body>main');
-  const header = document.querySelector('body>main header.tree-polo-report-header,body>main header.report-header');
-  const sections = main ? [...main.querySelectorAll(':scope>section.report-section')] : [];
+  const header = main?.querySelector(':scope>header.tree-polo-report-header,:scope>header.report-header') || null;
   const storageKey = 'treepolo-report-entry-seen:' + String(location.href).split('#')[0];
   const historyKey = '__treePoloEntrySeen';
   const readSessionSeen = () => { try { return sessionStorage.getItem(storageKey) === '1'; } catch { return false; } };
@@ -66,7 +69,7 @@ function introScript() {
 
   if (readSessionSeen() || readHistorySeen()) {
     overlay.remove();
-    body.classList.remove('report-entry-intro-active','report-entry-report-reveal','report-entry-intro-lock');
+    body.classList.remove('report-entry-intro-active','report-entry-title-stage','report-entry-report-reveal','report-entry-intro-lock');
     root.classList.remove('report-entry-intro-lock');
     return;
   }
@@ -75,11 +78,13 @@ function introScript() {
   body.classList.add('report-entry-intro-lock','report-entry-intro-active');
 
   let identTimer = 0;
+  let titleHoldTimer = 0;
   let finishTimer = 0;
-  let audioCleanup = () => {};
-  let activeAnimations = [];
-  let finished = false;
   let suppressClickTimer = 0;
+  let activeAnimations = [];
+  let audioCleanup = () => {};
+  let finished = false;
+  let collapsedState = null;
 
   const preventInteraction = (event) => {
     if (finished) return;
@@ -90,21 +95,27 @@ function introScript() {
   const blockedEvents = ['wheel','touchmove','keydown'];
   blockedEvents.forEach((type) => document.addEventListener(type,preventInteraction,{ capture:true,passive:false }));
 
+  const restoreMain = () => {
+    if (!main) return;
+    [
+      'position','z-index','transform','transform-origin','clip-path',
+      'will-change','opacity','isolation',
+    ].forEach((property) => main.style.removeProperty(property));
+  };
+
   const clearAnimatedState = () => {
     activeAnimations.forEach((animation) => { try { animation.cancel(); } catch {} });
     activeAnimations = [];
-    if (header) {
-      header.style.removeProperty('z-index');
-      header.style.removeProperty('will-change');
-    }
-    sections.forEach((section) => section.style.removeProperty('will-change'));
+    restoreMain();
   };
 
   const removeInteractionBlock = () => {
     blockedEvents.forEach((type) => document.removeEventListener(type,preventInteraction,{ capture:true }));
+    document.removeEventListener('pointerdown',skipEntry,true);
+    document.removeEventListener('touchstart',skipEntry,true);
   };
 
-  const playIdentSound = () => {
+  const playIntroSound = () => {
     const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextCtor) return () => {};
     let context;
@@ -112,31 +123,26 @@ function introScript() {
     const start = context.currentTime + 0.03;
     const master = context.createGain();
     master.gain.setValueAtTime(0.0001,start);
-    master.gain.exponentialRampToValueAtTime(0.88,start + 0.018);
-    master.gain.exponentialRampToValueAtTime(0.0001,start + 2.55);
+    master.gain.exponentialRampToValueAtTime(0.3,start + 0.02);
+    master.gain.exponentialRampToValueAtTime(0.0001,start + 1.72);
     master.connect(context.destination);
+
     const strike = (time,frequency,decay,level) => {
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.type = 'sine';
       oscillator.frequency.setValueAtTime(frequency,time);
-      oscillator.frequency.exponentialRampToValueAtTime(Math.max(36,frequency * 0.58),time + decay);
+      oscillator.frequency.exponentialRampToValueAtTime(Math.max(42,frequency * .68),time + decay);
       gain.gain.setValueAtTime(level,time);
       gain.gain.exponentialRampToValueAtTime(0.0001,time + decay);
-      oscillator.connect(gain); gain.connect(master); oscillator.start(time); oscillator.stop(time + decay + .03);
+      oscillator.connect(gain);
+      gain.connect(master);
+      oscillator.start(time);
+      oscillator.stop(time + decay + .03);
     };
-    strike(start + .05,118,.34,.78);
-    strike(start + .31,82,.72,.98);
-    strike(start + .34,164,.46,.24);
-    const shimmer = context.createOscillator();
-    const shimmerGain = context.createGain();
-    shimmer.type = 'triangle';
-    shimmer.frequency.setValueAtTime(276,start + .56);
-    shimmer.frequency.exponentialRampToValueAtTime(520,start + 1.86);
-    shimmerGain.gain.setValueAtTime(.0001,start + .52);
-    shimmerGain.gain.exponentialRampToValueAtTime(.075,start + .79);
-    shimmerGain.gain.exponentialRampToValueAtTime(.0001,start + 2.18);
-    shimmer.connect(shimmerGain); shimmerGain.connect(master); shimmer.start(start + .52); shimmer.stop(start + 2.22);
+
+    strike(start + 1.08,132,.38,.42);
+    strike(start + 1.25,88,.72,.72);
     if (context.state === 'suspended') context.resume().catch(() => {});
     return () => { try { context.close().catch(() => {}); } catch {} };
   };
@@ -145,6 +151,7 @@ function introScript() {
     if (finished) return;
     finished = true;
     if (identTimer) window.clearTimeout(identTimer);
+    if (titleHoldTimer) window.clearTimeout(titleHoldTimer);
     if (finishTimer) window.clearTimeout(finishTimer);
     if (suppressClickTimer) window.clearTimeout(suppressClickTimer);
     audioCleanup();
@@ -153,7 +160,7 @@ function introScript() {
     overlay.hidden = true;
     overlay.remove();
     root.classList.remove('report-entry-intro-lock');
-    body.classList.remove('report-entry-intro-lock','report-entry-intro-active','report-entry-report-reveal');
+    body.classList.remove('report-entry-intro-lock','report-entry-intro-active','report-entry-title-stage','report-entry-report-reveal');
     window.dispatchEvent(new CustomEvent('treepolo:entry-complete',{ detail:{ skipped } }));
   };
 
@@ -172,50 +179,91 @@ function introScript() {
     suppressClickTimer = window.setTimeout(() => document.removeEventListener('click',swallowNextClick,true),450);
     finishEntry(true);
   };
-  overlay.addEventListener('pointerdown',skipEntry,{ capture:true,passive:false });
-  overlay.addEventListener('touchstart',skipEntry,{ capture:true,passive:false });
+  document.addEventListener('pointerdown',skipEntry,{ capture:true,passive:false });
+  document.addEventListener('touchstart',skipEntry,{ capture:true,passive:false });
+
+  const prepareCollapsedReport = () => {
+    if (!main || !header) return false;
+    const mainRect = main.getBoundingClientRect();
+    const headerRect = header.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const dx = viewportWidth / 2 - (headerRect.left + headerRect.width / 2);
+    const dy = viewportHeight / 2 - (headerRect.top + headerRect.height / 2);
+    const visibleHeight = Math.max(1, Math.min(mainRect.height, headerRect.bottom - mainRect.top));
+    const clippedBottom = Math.max(0, mainRect.height - visibleHeight);
+
+    collapsedState = { dx, dy, clippedBottom };
+    main.style.setProperty('position','relative','important');
+    main.style.setProperty('z-index','5001','important');
+    main.style.setProperty('isolation','isolate','important');
+    main.style.setProperty('transform-origin','top center','important');
+    main.style.setProperty('transform','translate(' + dx + 'px,' + dy + 'px)','important');
+    main.style.setProperty('clip-path','inset(0 0 ' + clippedBottom + 'px 0)','important');
+    main.style.setProperty('will-change','transform,clip-path','important');
+    main.style.setProperty('opacity','1','important');
+    return true;
+  };
 
   const beginReportReveal = () => {
     if (finished) return;
-    overlay.classList.add('is-report-reveal');
+    if (!collapsedState || !main) {
+      finishEntry(false);
+      return;
+    }
     body.classList.add('report-entry-report-reveal');
+
+    const { dx, dy, clippedBottom } = collapsedState;
+    const mainAnimation = main.animate([
+      {
+        transform: 'translate(' + dx + 'px,' + dy + 'px)',
+        clipPath: 'inset(0 0 ' + clippedBottom + 'px 0)',
+        offset: 0,
+      },
+      {
+        transform: 'translate(' + dx + 'px,' + dy + 'px)',
+        clipPath: 'inset(0 0 ' + clippedBottom + 'px 0)',
+        offset: .08,
+      },
+      {
+        transform: 'translate(0px,0px)',
+        clipPath: 'inset(0 0 0px 0)',
+        offset: 1,
+      },
+    ], {
+      duration: ${REVEAL_DURATION_MS},
+      easing: 'cubic-bezier(.22,.72,.16,1)',
+      fill: 'forwards',
+    });
+    activeAnimations.push(mainAnimation);
+
     const overlayAnimation = overlay.animate([
       { opacity: 1, offset: 0 },
-      { opacity: 1, offset: .18 },
+      { opacity: 1, offset: .34 },
       { opacity: 0, offset: 1 },
-    ], { duration: ${REVEAL_DURATION_MS}, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' });
+    ], {
+      duration: ${REVEAL_DURATION_MS},
+      easing: 'cubic-bezier(.22,.61,.36,1)',
+      fill: 'forwards',
+    });
     activeAnimations.push(overlayAnimation);
 
-    if (header) {
-      const rect = header.getBoundingClientRect();
-      const centerX = (window.innerWidth || document.documentElement.clientWidth || 0) / 2;
-      const centerY = (window.innerHeight || document.documentElement.clientHeight || 0) / 2;
-      const dx = centerX - (rect.left + rect.width / 2);
-      const dy = centerY - (rect.top + rect.height / 2);
-      header.style.setProperty('z-index','5101','important');
-      header.style.setProperty('will-change','transform,opacity');
-      activeAnimations.push(header.animate([
-        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(1.035)', opacity: 0, offset: 0 },
-        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(1.035)', opacity: 1, offset: .18 },
-        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(1.035)', opacity: 1, offset: .42 },
-        { transform: 'translate(0px,0px) scale(1)', opacity: 1, offset: 1 },
-      ], { duration: ${REVEAL_DURATION_MS}, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' }));
-    }
-
-    sections.forEach((section,index) => {
-      section.style.setProperty('will-change','clip-path,transform,opacity');
-      activeAnimations.push(section.animate([
-        { clipPath: 'inset(0 0 100% 0)', transform: 'translateY(-14px)', opacity: .08, offset: 0 },
-        { clipPath: 'inset(0 0 100% 0)', transform: 'translateY(-14px)', opacity: .08, offset: .25 },
-        { clipPath: 'inset(0 0 0 0)', transform: 'translateY(0)', opacity: 1, offset: 1 },
-      ], { duration: ${REVEAL_DURATION_MS} + Math.min(index,3) * 55, easing: 'cubic-bezier(.2,.72,.2,1)', fill: 'forwards' }));
-    });
-
-    finishTimer = window.setTimeout(() => finishEntry(false),${REVEAL_DURATION_MS} + 90);
+    finishTimer = window.setTimeout(() => finishEntry(false),${REVEAL_DURATION_MS} + 80);
   };
 
-  audioCleanup = playIdentSound();
-  identTimer = window.setTimeout(beginReportReveal,${IDENT_DURATION_MS});
+  const beginTitleStage = () => {
+    if (finished) return;
+    overlay.classList.add('is-title-stage');
+    if (!prepareCollapsedReport()) {
+      finishEntry(false);
+      return;
+    }
+    body.classList.add('report-entry-title-stage');
+    titleHoldTimer = window.setTimeout(beginReportReveal,${TITLE_HOLD_MS});
+  };
+
+  audioCleanup = playIntroSound();
+  identTimer = window.setTimeout(beginTitleStage,${IDENT_DURATION_MS});
 })();
 </script>`;
 }
@@ -239,6 +287,7 @@ function injectReportEntryIntro(html) {
 
 module.exports = {
   IDENT_DURATION_MS,
+  TITLE_HOLD_MS,
   REVEAL_DURATION_MS,
   injectReportEntryIntro,
   introMarkup,
