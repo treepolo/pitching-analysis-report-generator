@@ -1,6 +1,8 @@
 'use strict';
 
 const BRAND_LOGO_RELATIVE_PATH = 'images/tree-polo-logo.webp';
+const FOOTER_MESSAGE = '希望我的洞察，能在你追求卓越的路上幫上忙。';
+const FOOTER_TAIL_CLUSTER_SIZE = 3;
 const SOCIAL_LINKS = Object.freeze([
   ['instagram', 'Instagram', 'https://www.instagram.com/treepolooo/'],
   ['vocus', '方格子 vocus', 'https://vocus.cc/user/@treepolooo'],
@@ -14,6 +16,14 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function renderFooterMessage(message = FOOTER_MESSAGE) {
+  const characters = Array.from(String(message ?? ''));
+  const tailStart = Math.max(0, characters.length - FOOTER_TAIL_CLUSTER_SIZE);
+  const prefix = escapeHtml(characters.slice(0, tailStart).join(''));
+  const tail = escapeHtml(characters.slice(tailStart).join(''));
+  return `${prefix}<span class="tree-polo-footer-no-break-tail">${tail}</span>`;
 }
 
 function socialIcon(kind) {
@@ -30,6 +40,7 @@ function promotionFooterStyle() {
   return `<style data-report-promotion-footer-style>
 .tree-polo-footer{margin:64px 20px 0;padding:38px 20px 30px;border-top:1px solid #ededed;text-align:center;color:#242424}
 .tree-polo-footer-message{width:min(680px,100%);margin:0 auto 24px;font:600 clamp(18px,2.25vw,25px)/1.55 Georgia,"Noto Serif TC","PMingLiU",serif;letter-spacing:.015em;color:#242424}
+.tree-polo-footer-no-break-tail{white-space:nowrap}
 .tree-polo-promotion{width:min(760px,100%);margin:0 auto 30px;padding:0}
 .tree-polo-promotion-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:100%;margin:0 auto}
 .tree-polo-promotion-link{display:flex;align-items:center;justify-content:center;gap:10px;min-height:58px;padding:12px 16px;border:1px solid #e1e1e1;border-radius:10px;background:#fafafa;color:#2b2b2b;text-decoration:none;font:650 13px/1.2 system-ui,-apple-system,"Segoe UI","Microsoft JhengHei",sans-serif;letter-spacing:.01em;transition:transform .18s ease,border-color .18s ease,background .18s ease,color .18s ease,box-shadow .18s ease}
@@ -46,7 +57,7 @@ function promotionFooterStyle() {
 function promotionFooterMarkup({ logoRelativePath = BRAND_LOGO_RELATIVE_PATH } = {}) {
   const links = SOCIAL_LINKS.map(([kind, label, href]) => `<a class="tree-polo-promotion-link tree-polo-promotion-link-${kind}" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" aria-label="前往${escapeHtml(label)}"><span class="tree-polo-promotion-icon">${socialIcon(kind)}</span><span class="tree-polo-promotion-name">${escapeHtml(label)}</span></a>`).join('');
   return `<footer class="tree-polo-footer" data-tree-polo-footer>
-  <p class="tree-polo-footer-message">希望我的洞察，能在你追求卓越的路上幫上忙。</p>
+  <p class="tree-polo-footer-message">${renderFooterMessage()}</p>
   <section class="tree-polo-promotion" data-tree-polo-promotion aria-label="小樹Polo 自媒體"><nav class="tree-polo-promotion-links" aria-label="小樹Polo 社群與內容平台">${links}</nav></section>
   <div class="tree-polo-footer-brand"><img class="tree-polo-footer-logo" src="${escapeHtml(logoRelativePath)}" alt="小樹Polo"><span class="tree-polo-footer-wordmark">TREEPOLO</span></div>
   <p class="tree-polo-footer-meta">Pitching Analysis Report by 小樹Polo · © TREEPOLO</p>
