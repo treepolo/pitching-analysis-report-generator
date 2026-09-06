@@ -25,6 +25,13 @@ test('mobile report shell is truly edge-to-edge and centered', () => {
   assert.match(css, /header\.tree-polo-report-header \{[\s\S]*?margin: 0 -5px 8px !important/u);
 });
 
+test('mobile report background is permanently black and never uses the desktop photograph', () => {
+  const css = mobileShellCss();
+  assert.match(css, /body\[data-tree-polo-background="true"\][\s\S]*?background: #000 !important/u);
+  assert.match(css, /body\[data-tree-polo-background="true"\]::before \{[\s\S]*?background-color: #000 !important/u);
+  assert.match(css, /body\[data-tree-polo-background="true"\]::before \{[\s\S]*?background-image: none !important/u);
+});
+
 test('mobile shell reserves fixed title space on report content instead of inflating the main above the header', () => {
   const css = mobileShellCss();
   assert.doesNotMatch(css, /padding: 70px 5px 12px !important/u);
