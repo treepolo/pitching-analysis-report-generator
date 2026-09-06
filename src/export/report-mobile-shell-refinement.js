@@ -14,15 +14,12 @@ function mobileShellCss() {
     overflow-x: hidden !important;
   }
 
-  /* Phone reports never use the photographic desktop backdrop. Keep the
-     canonical mobile canvas black in every entry and post-entry state. */
+  /* Keep a black phone canvas underneath the canonical photographic backdrop.
+     The backdrop itself stays owned by report-theme.js, while the entry intro
+     controls when it becomes visible. */
   html,
   body[data-tree-polo-background="true"] {
     background: #000 !important;
-  }
-  body[data-tree-polo-background="true"]::before {
-    background-color: #000 !important;
-    background-image: none !important;
   }
 
   /* The phone report is edge-to-edge. Keep the report surface itself flush to
