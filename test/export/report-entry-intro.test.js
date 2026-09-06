@@ -25,7 +25,7 @@ test('entry intro is a clean centered TREEPOLO typing ident with plain split col
   assert.match(css, /\.report-entry-intro\{[^}]*position:fixed[^}]*background:#000/u);
   assert.match(css, /\.tree-polo-ident-word\{[^}]*display:inline-flex[^}]*width:max-content[^}]*justify-content:center/u);
   assert.match(css, /\.tree-polo-ident-word\{[^}]*font-family:Arial,Helvetica,"Segoe UI",sans-serif/u);
-  assert.match(css, /\.tree-polo-ident-tree\{color:#3fa66c\}/u);
+  assert.match(css, /\.tree-polo-ident-tree\{color:#00a65a\}/u);
   assert.match(css, /\.tree-polo-ident-polo\{color:#f5f5f5\}/u);
   assert.doesNotMatch(css, /tree-polo-ident-char|tree-polo-ident-mark|tree-polo-ident-spectrum|tree-polo-ident-vignette/u);
   assert.doesNotMatch(css, /text-shadow|filter:blur|linear-gradient|radial-gradient/u);
