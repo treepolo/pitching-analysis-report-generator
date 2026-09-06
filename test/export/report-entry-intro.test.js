@@ -35,13 +35,13 @@ test('entry intro keeps the clean centered TREEPOLO typing ident', () => {
   assert.match(css, /visibility:hidden!important/u);
 });
 
-test('entry timing keeps a black lead-in, a final-size title-bar hold and a long reveal', () => {
+test('entry timing keeps a black lead-in, a final-size title-bar hold and a deliberately slow reveal', () => {
   assert.ok(TYPE_START_DELAY_MS >= 650);
   assert.ok(IDENT_DURATION_MS >= 2800);
   assert.ok(IDENT_EXIT_MS >= 220);
   assert.ok(TITLE_BAR_HOLD_MS >= 500);
   assert.ok(SIGNATURE_TYPE_INTERVAL_MS >= 60);
-  assert.ok(REVEAL_DURATION_MS >= 1600);
+  assert.ok(REVEAL_DURATION_MS >= 2800);
 });
 
 test('title stage uses the real final title bar without content-specific entrance effects', () => {
@@ -53,10 +53,10 @@ test('title stage uses the real final title bar without content-specific entranc
   assert.doesNotMatch(css, /body\.report-entry-title-stage>main h1[^}]*transform/u);
 });
 
-test('background remains black until the report starts expanding and phone pre-reveal never paints the image', () => {
+test('background remains black until the report starts expanding and then reveals linearly with it', () => {
   const css = introStyle();
   assert.match(css, /report-entry-intro-active\[data-tree-polo-background="true"\]::before\{opacity:0\}/u);
-  assert.match(css, /report-entry-report-reveal\[data-tree-polo-background="true"\]::before/u);
+  assert.match(css, new RegExp(`report-entry-report-reveal\\[data-tree-polo-background="true"\\]::before\\{animation:tree-polo-report-light-up ${REVEAL_DURATION_MS}ms linear both\\}`,'u'));
   assert.match(css, /@keyframes tree-polo-report-light-up/u);
   assert.match(css, /@media\(max-width:700px\)[\s\S]*?report-entry-intro-active:not\(\.report-entry-report-reveal\)\[data-tree-polo-background="true"\]::before\{[^}]*background-image:none!important[^}]*background-color:#000!important[^}]*opacity:0!important/u);
 });
@@ -88,7 +88,7 @@ test('entry runtime types the ident and starts the title stage only after ident 
   assert.match(source, new RegExp(`setTimeout\\(beginTitleStage,${IDENT_DURATION_MS}\\)`,'u'));
 });
 
-test('reveal builds one temporary report body that unfolds from beneath the moving title bar', () => {
+test('reveal keeps the report surface flush to the title bar and unfolds it at constant speed', () => {
   const source = introScript().match(/<script data-report-entry-intro-runtime>\s*([\s\S]*?)\s*<\/script>/u)?.[1];
   assert.ok(source);
   assert.doesNotThrow(() => new vm.Script(source));
@@ -99,15 +99,21 @@ test('reveal builds one temporary report body that unfolds from beneath the movi
   assert.match(source, /contentNodes\.forEach\(\(node\) => reportBodyInner\.append\(node\)\)/u);
   assert.match(source, /reportBody\.append\(reportBodyInner\)/u);
   assert.match(source, /node !== header && !node\.classList\?\.contains\('report-fixed-header-spacer'\)/u);
+  assert.match(source, /const headerMarginBottom = Math\.max\(0,numberPx\(headerStyle\.marginBottom\)\)/u);
+  assert.match(source, /header\.style\.setProperty\('margin-bottom','0px','important'\)/u);
+  assert.match(source, /header\.style\.removeProperty\('margin-bottom'\)/u);
+  assert.match(source, /reportBody\.style\.marginTop = '0px'/u);
+  assert.match(source, /reportBodyInner\.style\.paddingTop = headerMarginBottom \+ 'px'/u);
+  assert.doesNotMatch(source, /marginTop = \(-headerMarginBottom\)/u);
   assert.match(source, /reportBody\.style\.height = '0px'/u);
   assert.match(source, /reportBody\.style\.overflow = 'hidden'/u);
   assert.match(source, /reportBody\.style\.transform = 'translateY\(' \+ dy \+ 'px\)'/u);
   assert.match(source, /header\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\)'\)/u);
   assert.match(source, /const targetBodyHeight = Math\.max\(1,Math\.ceil\(reportBodyInner\.getBoundingClientRect\(\)\.height\)\)/u);
-  assert.match(source, /const headerAnimation = header\.animate\(/u);
-  assert.match(source, /const bodyAnimation = reportBody\.animate\(/u);
-  assert.match(source, /height: targetBodyHeight \+ 'px'/u);
-  assert.match(source, /\{ transform: 'translateY\(0px\)', offset: 1 \}/u);
+  assert.match(source, /const headerAnimation = header\.animate\([\s\S]*?easing: 'linear'/u);
+  assert.match(source, /const bodyAnimation = reportBody\.animate\([\s\S]*?height: targetBodyHeight \+ 'px'[\s\S]*?easing: 'linear'/u);
+  assert.doesNotMatch(source, /offset: \.06/u);
+  assert.doesNotMatch(source, /cubic-bezier/u);
   assert.match(source, /const unwrapReportBody = \(\) =>/u);
   assert.match(source, /const source = reportBodyInner \|\| reportBody/u);
   assert.match(source, /while \(source\.firstChild\) main\.insertBefore\(source\.firstChild,reportBody\)/u);
