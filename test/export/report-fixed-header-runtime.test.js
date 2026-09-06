@@ -31,10 +31,10 @@ test('desktop fixed header preserves layout with a spacer and locks horizontal g
   assert.match(script, /header\.dataset\.reportHeaderFixed = 'true'/u);
 });
 
-test('phone header is fixed from first paint and uses exact viewport width without a spacer', () => {
+test('phone header is fixed outside intro and uses exact viewport width without a spacer', () => {
   const script = fixedHeaderScript();
   const css = fixedHeaderStyle();
-  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?body>main header\.tree-polo-report-header,[\s\S]*?position: fixed !important/u);
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?body:not\(\.report-entry-intro-active\)>main header\.tree-polo-report-header,[\s\S]*?position: fixed !important/u);
   assert.match(css, /@media \(max-width: 700px\)[\s\S]*?top: 0 !important[\s\S]*?left: 0 !important/u);
   assert.match(css, /\.report-fixed-header-spacer\[data-active="true"\][\s\S]*?display: none !important/u);
   assert.match(script, /const mobileQuery = window\.matchMedia\('\(max-width: 700px\)'\)/u);
@@ -43,6 +43,19 @@ test('phone header is fixed from first paint and uses exact viewport width witho
   assert.match(script, /document\.documentElement\.clientWidth/u);
   assert.match(script, /header\.style\.setProperty\('left', '0px', 'important'\)/u);
   assert.match(script, /header\.style\.setProperty\('width', viewportWidth\(\) \+ 'px', 'important'\)/u);
+});
+
+test('fixed header runtime suspends itself during entry animation and restores canonical behavior afterwards', () => {
+  const script = fixedHeaderScript();
+  assert.match(script, /let introSuspended = false/u);
+  assert.match(script, /const suspendForIntro = \(\) => \{/u);
+  assert.match(script, /introSuspended = true/u);
+  assert.match(script, /setFixed\(false\)/u);
+  assert.match(script, /const resumeAfterIntro = \(\) => \{/u);
+  assert.match(script, /introSuspended = false/u);
+  assert.match(script, /window\.addEventListener\('treepolo:entry-start', suspendForIntro\)/u);
+  assert.match(script, /window\.addEventListener\('treepolo:entry-complete', resumeAfterIntro\)/u);
+  assert.match(script, /if \(introSuspended\) \{[\s\S]*?setFixed\(false\);[\s\S]*?return;/u);
 });
 
 test('fixed header runtime handles viewport-mode changes and releases itself for printing', () => {
