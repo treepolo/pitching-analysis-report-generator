@@ -10,9 +10,6 @@ const {
   normalizeRelativeAssetPath,
 } = require('./asset-paths');
 
-const HTML_ASSET_ATTRIBUTE_PATTERN = /\b(src|poster)\s*=\s*(["'])(.*?)\2/giu;
-const HTML_ANCHOR_HREF_PATTERN = /<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1/giu;
-
 function decodeHtmlAttribute(value) {
   return value
     .replaceAll('&amp;', '&')
@@ -40,8 +37,8 @@ function validateNavigationHref(value) {
 function extractHtmlAssetReferences(html) {
   if (typeof html !== 'string') throw new ExportValidationError('Rendered HTML must be a string');
   const references = [];
-  let match;
-  while ((match = HTML_ASSET_ATTRIBUTE_PATTERN.exec(html)) !== null) {
+
+  for (const match of html.matchAll(/\b(src|poster)\s*=\s*(["'])(.*?)\2/giu)) {
     const attribute = match[1].toLowerCase();
     const value = match[3];
     let decoded;
@@ -53,7 +50,7 @@ function extractHtmlAssetReferences(html) {
     references.push({ attribute, value, relativePath: normalizeRelativeAssetPath(decoded) });
   }
 
-  while ((match = HTML_ANCHOR_HREF_PATTERN.exec(html)) !== null) {
+  for (const match of html.matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1/giu)) {
     validateNavigationHref(match[2]);
   }
 
