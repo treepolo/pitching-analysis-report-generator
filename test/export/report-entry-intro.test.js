@@ -36,14 +36,14 @@ test('entry intro keeps the clean centered TREEPOLO typing ident', () => {
   assert.match(css, /visibility:hidden!important/u);
 });
 
-test('entry timing keeps the older brisk title travel and slower linear page reveal', () => {
+test('entry timing keeps the older brisk title travel and a quicker linear page reveal', () => {
   assert.ok(TYPE_START_DELAY_MS >= 650);
   assert.ok(IDENT_DURATION_MS >= 2800);
   assert.ok(IDENT_EXIT_MS >= 220);
   assert.ok(TITLE_BAR_HOLD_MS >= 500);
   assert.ok(SIGNATURE_TYPE_INTERVAL_MS >= 60);
   assert.equal(HEADER_MOVE_DURATION_MS, 1750);
-  assert.ok(REVEAL_DURATION_MS >= 2800);
+  assert.equal(REVEAL_DURATION_MS, 2300);
   assert.ok(REVEAL_DURATION_MS > HEADER_MOVE_DURATION_MS);
 });
 
