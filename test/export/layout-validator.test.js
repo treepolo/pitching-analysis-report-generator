@@ -83,6 +83,39 @@ test('blocks an unmanifested or external asset reference', async () => {
   );
 });
 
+test('allows HTTPS navigation anchors without treating them as packaged assets', async () => {
+  const root = await createLayout(
+    'external-navigation',
+    '<!doctype html><a href="https://www.instagram.com/treepolooo/" target="_blank" rel="noopener noreferrer">Instagram</a>',
+  );
+  const result = await validateExportLayout(root, { assetManifest: [] });
+  assert.equal(result.valid, true);
+  assert.equal(result.referencedAssetCount, 0);
+  assert.deepEqual(result.references, []);
+
+  for (const [name, href] of [
+    ['http-navigation', 'http://example.test/'],
+    ['javascript-navigation', 'javascript:alert(1)'],
+    ['data-navigation', 'data:text/html,hello'],
+    ['relative-navigation', 'other.html'],
+  ]) {
+    const unsafeRoot = await createLayout(name, `<a href="${href}">unsafe</a>`);
+    await assert.rejects(
+      validateExportLayout(unsafeRoot, { assetManifest: [] }),
+      (error) => error instanceof ExportValidationError && /navigation href/i.test(error.message),
+    );
+  }
+
+  const linkedRuntimeRoot = await createLayout(
+    'linked-runtime',
+    '<!doctype html><link rel="stylesheet" href="https://example.test/style.css"><p>report</p>',
+  );
+  await assert.rejects(
+    validateExportLayout(linkedRuntimeRoot, { assetManifest: [] }),
+    (error) => error instanceof ExportValidationError && /external runtime resources/i.test(error.message),
+  );
+});
+
 test('detects missing staged files and unused manifest entries', async () => {
   const missingRoot = await createLayout('missing-file', '<img src="images/frame.png">');
   await assert.rejects(
