@@ -12,6 +12,10 @@ const DESKTOP_HERO_LETTER_SPACING = -0.025;
 const PHONE_HERO_LETTER_SPACING = -0.022;
 const DESKTOP_COMPACT_LETTER_SPACING = 0.035;
 const PHONE_COMPACT_LETTER_SPACING = 0.025;
+const DESKTOP_HERO_INLINE_PAD = 32;
+const PHONE_HERO_INLINE_PAD = 18;
+const DESKTOP_COMPACT_INLINE_PAD = 16;
+const PHONE_COMPACT_INLINE_PAD = 12;
 const DESKTOP_SIGNATURE_SIZE = 15.12;
 const PHONE_SIGNATURE_SIZE = 13.12;
 const MOBILE_CONTENT_GAP = 16;
@@ -94,6 +98,9 @@ function fixedHeaderScript() {
   let titleCharacters = [];
   let centerShift = 0;
   let centerShiftDirty = true;
+  let naturalMarginLeft = '0px';
+  let naturalMarginRight = '0px';
+  let naturalMarginBottom = 0;
 
   const clamp01 = (value) => Math.max(0, Math.min(1, value));
   const lerp = (start, end, progress) => start + ((end - start) * progress);
@@ -114,6 +121,8 @@ function fixedHeaderScript() {
       compactFont: ${PHONE_COMPACT_TITLE_SIZE},
       heroLetterSpacing: ${PHONE_HERO_LETTER_SPACING},
       compactLetterSpacing: ${PHONE_COMPACT_LETTER_SPACING},
+      heroInlinePad: ${PHONE_HERO_INLINE_PAD},
+      compactInlinePad: ${PHONE_COMPACT_INLINE_PAD},
       signatureSize: ${PHONE_SIGNATURE_SIZE},
     }
     : {
@@ -123,6 +132,8 @@ function fixedHeaderScript() {
       compactFont: ${DESKTOP_COMPACT_TITLE_SIZE},
       heroLetterSpacing: ${DESKTOP_HERO_LETTER_SPACING},
       compactLetterSpacing: ${DESKTOP_COMPACT_LETTER_SPACING},
+      heroInlinePad: ${DESKTOP_HERO_INLINE_PAD},
+      compactInlinePad: ${DESKTOP_COMPACT_INLINE_PAD},
       signatureSize: ${DESKTOP_SIGNATURE_SIZE},
     };
 
@@ -204,10 +215,15 @@ function fixedHeaderScript() {
   };
 
   const syncSpacer = (height) => {
-    const style = window.getComputedStyle(header);
-    spacer.style.height = (height + Math.max(0, numeric(style.marginBottom))) + 'px';
-    spacer.style.marginLeft = style.marginLeft;
-    spacer.style.marginRight = style.marginRight;
+    if (!fixed) {
+      const style = window.getComputedStyle(header);
+      naturalMarginLeft = style.marginLeft;
+      naturalMarginRight = style.marginRight;
+      naturalMarginBottom = Math.max(0, numeric(style.marginBottom));
+    }
+    spacer.style.height = (height + naturalMarginBottom) + 'px';
+    spacer.style.marginLeft = naturalMarginLeft;
+    spacer.style.marginRight = naturalMarginRight;
     spacer.style.marginTop = '0';
     spacer.style.marginBottom = '0';
   };
@@ -257,6 +273,11 @@ function fixedHeaderScript() {
       metrics.compactLetterSpacing,
       fontProgress,
     );
+    const currentInlinePad = lerp(
+      metrics.heroInlinePad,
+      metrics.compactInlinePad,
+      fontProgress,
+    );
 
     header.style.setProperty('--tree-polo-header-height', currentHeight.toFixed(3) + 'px');
     header.style.setProperty('--tree-polo-title-size', currentFont.toFixed(3) + 'px');
@@ -264,6 +285,7 @@ function fixedHeaderScript() {
       '--tree-polo-title-letter-spacing',
       currentLetterSpacing.toFixed(5) + 'em',
     );
+    header.style.setProperty('--tree-polo-title-inline-pad', currentInlinePad.toFixed(3) + 'px');
     header.style.setProperty('--tree-polo-signature-size', metrics.signatureSize + 'px');
     if (alignProgress >= .999) header.dataset.reportTitleCompact = 'true';
     else delete header.dataset.reportTitleCompact;
