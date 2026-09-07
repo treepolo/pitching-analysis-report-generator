@@ -398,7 +398,6 @@ function introScript() {
       : 0;
     const initialHeaderRect = header.getBoundingClientRect();
     const headerHeight = initialHeaderRect.height;
-    const sheetStartY = isPhoneLayout ? -headerHeight : 0;
     const sheetEndY = isPhoneLayout ? 0 : headerHeight;
 
     reportBody = document.createElement('div');
@@ -425,7 +424,8 @@ function introScript() {
     reportBodyInner.style.paddingBottom = mainPaddingBottom + 'px';
     reportBodyInner.style.paddingLeft = mainPaddingLeft + 'px';
     reportBodyInner.style.background = '#fff';
-    reportBodyInner.style.transform = 'translateY(' + sheetStartY + 'px)';
+    reportBodyInner.style.transformOrigin = 'top center';
+    reportBodyInner.style.transform = 'translateY(' + sheetEndY + 'px) scaleY(0)';
     reportBodyInner.style.willChange = 'transform';
 
     const contentHeight = Math.max(
@@ -449,9 +449,9 @@ function introScript() {
     header.style.setProperty('opacity','0');
     header.style.setProperty('will-change','transform,opacity');
 
-    reportBody.style.height = '0px';
+    reportBody.style.height = targetBodyHeight + 'px';
     reportBody.style.overflow = 'hidden';
-    reportBody.style.willChange = 'height,transform';
+    reportBody.style.willChange = 'transform';
 
     const positionedHeaderRect = header.getBoundingClientRect();
     const visualViewport = window.visualViewport;
@@ -460,7 +460,7 @@ function introScript() {
       : (document.documentElement.clientHeight || window.innerHeight || 0) / 2;
     const dy = viewportCenterY - (positionedHeaderRect.top + positionedHeaderRect.height / 2);
 
-    revealState = { dy, sheetStartY, sheetEndY, targetBodyHeight };
+    revealState = { dy, sheetEndY, targetBodyHeight };
     header.style.setProperty('transform','translateY(' + dy + 'px)');
     reportBody.style.transform = 'translateY(' + dy + 'px)';
     return true;
@@ -475,7 +475,7 @@ function introScript() {
     body.classList.add('report-entry-report-reveal');
     signatureTypeTimer = window.setTimeout(typeNextSignatureCharacter,0);
 
-    const { dy, sheetStartY, sheetEndY, targetBodyHeight } = revealState;
+    const { dy, sheetEndY } = revealState;
     const headerAnimation = header.animate([
       { transform: 'translateY(' + dy + 'px)', offset: 0 },
       { transform: 'translateY(' + dy + 'px)', offset: ${HEADER_MOVE_HOLD_OFFSET} },
@@ -498,25 +498,15 @@ function introScript() {
     });
     activeAnimations.push(bodyPositionAnimation);
 
-    const bodyHeightAnimation = reportBody.animate([
-      { height: '0px' },
-      { height: targetBodyHeight + 'px' },
+    const sheetUnfoldAnimation = reportBodyInner.animate([
+      { transform: 'translateY(' + sheetEndY + 'px) scaleY(0)' },
+      { transform: 'translateY(' + sheetEndY + 'px) scaleY(1)' },
     ], {
       duration: ${REVEAL_DURATION_MS},
       easing: 'linear',
       fill: 'forwards',
     });
-    activeAnimations.push(bodyHeightAnimation);
-
-    const sheetSlideAnimation = reportBodyInner.animate([
-      { transform: 'translateY(' + sheetStartY + 'px)' },
-      { transform: 'translateY(' + sheetEndY + 'px)' },
-    ], {
-      duration: ${REVEAL_DURATION_MS},
-      easing: 'linear',
-      fill: 'forwards',
-    });
-    activeAnimations.push(sheetSlideAnimation);
+    activeAnimations.push(sheetUnfoldAnimation);
 
     finishTimer = window.setTimeout(() => finishEntry(false),${REVEAL_DURATION_MS} + 80);
   };
