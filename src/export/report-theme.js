@@ -20,7 +20,7 @@ html { min-height: 100%; background: #f2f2f2; }
 body, body * { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 body { min-width: 0; min-height: 100vh; margin: 0; overflow-x: hidden; background: #f2f2f2; color: var(--reader-text); font: 13px/1.5 Tahoma, "Segoe UI", "Microsoft JhengHei", sans-serif; }
 button, input, select { font-family: Tahoma, "Segoe UI", "Microsoft JhengHei", sans-serif; font-size: 11px; }
-main { width: min(calc(100% - 16px), 1100px); min-width: 0; margin: 8px auto 28px; padding: 0 8px 12px; border: 1px solid #e6e6e6; border-radius: 3px; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+main { width: min(calc(100% - 16px), 1100px); min-width: 0; margin: 28px auto 28px; padding: 0 8px 12px; border: 1px solid #e6e6e6; border-radius: 3px; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
 .report-header { position: relative; min-height: 54px; margin: 0 -8px 0; padding: 10px 12px; border-bottom: 1px solid #e6e6e6; background: #fff; box-shadow: none; color: #242424; }
 .report-header::before { display: none; }
 .eyebrow { margin: 0 0 2px; color: #6b6b6b; font-size: 10px; font-weight: 600; letter-spacing: normal; text-shadow: none; text-transform: none; }
@@ -174,7 +174,7 @@ body[data-tree-polo-background="true"]::before{content:"";position:fixed;inset:0
 .report-help-note{border-left:3px solid #1a8917!important;border-radius:0 8px 8px 0!important;background:#f7f7f7!important;color:#525252!important;font-size:13px!important;line-height:1.55!important}
 .report-help-actions{border-top:1px solid #e6e6e6!important}.report-help-actions span{color:#6b6b6b!important;font-size:12px!important}
 .report-help-tutorial-button,.report-help-tutorial-stop,.report-help-tutorial-controls button{border:1px solid #d0d0d0!important;border-radius:999px!important;background:#fff!important;box-shadow:none!important;color:#242424!important;text-shadow:none!important}
-.report-help-tutorial-button{font:600 .8rem/1.2 system-ui,sans-serif!important}.report-help-tutorial-stop{font:700 .76rem/1.2 system-ui,sans-serif!important}.report-help-tutorial-controls button{font:600 .76rem/1.2 system-ui,sans-serif!important}
+.report-help-tutorial-button{font:600 .8rem/1.2 system-ui,-apple-system,"Segoe UI",sans-serif!important}.report-help-tutorial-stop{font:700 .76rem/1.2 system-ui,-apple-system,"Segoe UI",sans-serif!important}.report-help-tutorial-controls button{font:600 .76rem/1.2 system-ui,-apple-system,"Segoe UI",sans-serif!important}
 .report-help-tutorial-button:hover,.report-help-tutorial-stop:hover,.report-help-tutorial-controls button:hover:not(:disabled){border-color:#242424!important;background:#f2f2f2!important;color:#242424!important}
 .report-help-tutorial-button,.report-help-tutorial-controls [data-report-help-tutorial-full]{border-color:#1a8917!important;background:#1a8917!important;color:#fff!important}
 .report-help-tutorial-button:hover,.report-help-tutorial-controls [data-report-help-tutorial-full]:hover{border-color:#156d12!important;background:#156d12!important;color:#fff!important}
