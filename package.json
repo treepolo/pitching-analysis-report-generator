@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Desktop-first local pitching analysis report generator",
-  "main": "src/electron-bootstrap.js",
+  "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
