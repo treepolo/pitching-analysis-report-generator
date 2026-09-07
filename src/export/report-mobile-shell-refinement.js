@@ -22,9 +22,10 @@ function mobileShellCss() {
     background: #000 !important;
   }
 
-  /* The phone report is edge-to-edge. The first content block reserves the
-     opening headline height supplied by the header runtime; this space stays
-     stable while the fixed header itself morphs with scroll progress. */
+  /* The phone report is edge-to-edge. Keep the report surface itself flush to
+     the viewport so the real title bar keeps identical geometry during entry
+     and after it becomes fixed. Reserve the fixed bar + visual gap on the
+     first report section instead of padding the whole main above the header. */
   body>main {
     width: 100% !important;
     max-width: none !important;
@@ -34,7 +35,7 @@ function mobileShellCss() {
     border-right: 0 !important;
   }
   body>main>section.report-section:first-of-type {
-    margin-top: var(--tree-polo-mobile-header-space, 114px) !important;
+    margin-top: 70px !important;
   }
   body>main header.tree-polo-report-header {
     width: auto !important;

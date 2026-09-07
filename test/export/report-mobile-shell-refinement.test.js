@@ -32,10 +32,10 @@ test('mobile report keeps a black underlay without suppressing the canonical pho
   assert.doesNotMatch(css, /background-image:\s*none/u);
 });
 
-test('mobile shell reserves runtime-supplied hero-header space while keeping the page flush to the top', () => {
+test('mobile shell reserves fixed title space on report content instead of inflating the main above the header', () => {
   const css = mobileShellCss();
-  assert.match(css, /body>main>section\.report-section:first-of-type \{[\s\S]*?margin-top: var\(--tree-polo-mobile-header-space, 114px\) !important/u);
-  assert.match(css, /body>main \{[\s\S]*?margin: 0 !important/u);
+  assert.doesNotMatch(css, /padding: 70px 5px 12px !important/u);
+  assert.match(css, /body>main>section\.report-section:first-of-type \{[\s\S]*?margin-top: 70px !important/u);
   assert.match(css, /@media print[\s\S]*?body>main>section\.report-section:first-of-type[\s\S]*?margin-top: 0 !important/u);
 });
 
