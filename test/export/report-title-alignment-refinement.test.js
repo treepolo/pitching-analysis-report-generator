@@ -8,36 +8,43 @@ const {
   injectReportTitleAlignmentRefinement,
   titleAlignmentCss,
 } = require('../../src/export/report-title-alignment-refinement');
-const { renderReportTheme } = require('../../src/export/report-theme');
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
 
-test('report title copy is centered against the full title bar', () => {
+test('report title starts as a large left-aligned headline using the real title bar', () => {
   const css = titleAlignmentCss();
+  assert.match(css, /--tree-polo-header-height: 118px/u);
+  assert.match(css, /--tree-polo-title-size: 46px/u);
+  assert.match(css, /--tree-polo-title-letter-spacing: -\.025em/u);
   assert.match(css, /\.tree-polo-brand-copy \{[\s\S]*?position: absolute !important/u);
-  assert.match(css, /left: 50% !important/u);
-  assert.match(css, /top: 50% !important/u);
-  assert.match(css, /transform: translate\(-50%, -50%\) !important/u);
-  assert.match(css, /text-align: center !important/u);
+  assert.match(css, /left: 0 !important/u);
+  assert.match(css, /right: 0 !important/u);
+  assert.match(css, /padding: 0 var\(--tree-polo-title-inline-pad\) !important/u);
+  assert.match(css, /text-align: left !important/u);
+  assert.doesNotMatch(css, /left: 50% !important|translate\(-50%, -50%\)/u);
 });
 
-test('centered title uses the full no-logo header width and protects long names', () => {
+test('phone uses the same headline concept at a phone-appropriate scale', () => {
   const css = titleAlignmentCss();
-  assert.match(css, /max-width: calc\(100% - 32px\) !important/u);
-  assert.match(css, /white-space: nowrap !important/u);
-  assert.match(css, /text-overflow: ellipsis !important/u);
-  assert.match(css, /@media \(max-width: 700px\)/u);
-  assert.match(css, /max-width: calc\(100% - 24px\) !important/u);
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?--tree-polo-header-height: 98px/u);
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?--tree-polo-title-size: 32px/u);
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?--tree-polo-title-inline-pad: 18px/u);
 });
 
-test('title alignment owns positioning only while canonical theme owns signature typography', () => {
-  const alignmentCss = titleAlignmentCss();
-  const themeCss = renderReportTheme();
-  assert.doesNotMatch(alignmentCss, /tree-polo-signature/u);
-  assert.doesNotMatch(alignmentCss, /font-size:|font-weight:|letter-spacing:/u);
-  assert.match(themeCss, /tree-polo-signature\{[^}]*font-size:\.84em!important[^}]*font-weight:500!important/u);
-  assert.match(themeCss, /tree-polo-signature\{[^}]*letter-spacing:\.02em!important[^}]*margin-left:\.12em!important/u);
-  assert.match(themeCss, /@media \(max-width: 700px\)[\s\S]*tree-polo-signature\{font-size:\.82em!important\}/u);
+test('title alignment exposes per-character translation without duplicating the title', () => {
+  const css = titleAlignmentCss();
+  assert.match(css, /\.tree-polo-title-char \{[\s\S]*?display: inline-block/u);
+  assert.match(css, /translateX\(var\(--tree-polo-char-shift, 0px\)\)/u);
+  assert.match(css, /will-change: transform/u);
+  assert.doesNotMatch(css, /::before[^}]*content:|::after[^}]*content:/u);
+});
+
+test('headline typography resolves back to compact printable title geometry', () => {
+  const css = titleAlignmentCss();
+  assert.match(css, /@media print[\s\S]*?min-height: 54px !important/u);
+  assert.match(css, /@media print[\s\S]*?font-size: 18px !important/u);
+  assert.match(css, /@media print[\s\S]*?letter-spacing: \.035em !important/u);
+  assert.match(css, /@media print[\s\S]*?\.tree-polo-title-char \{[\s\S]*?transform: none !important/u);
 });
 
 test('title alignment refinement injects once', () => {
