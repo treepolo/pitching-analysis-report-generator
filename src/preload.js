@@ -34,7 +34,7 @@ const MEDIA_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u;
 const EXPORT_JOB_ID_PATTERN = /^[0-9a-f-]{36}$/iu;
 const FRAME_CACHE_REQUEST_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u;
 const FRAME_CACHE_KEY_PATTERN = /^[a-f0-9]{64}$/iu;
-const EXPORT_OUTPUT_KINDS = new Set(['folder', 'zip', 'both']);
+const EXPORT_OUTPUT_KINDS = new Set(['folder', 'zip', 'both', 'single-html']);
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 const closeCallbacks = new Set();
 
