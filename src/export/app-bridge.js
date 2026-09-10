@@ -7,7 +7,7 @@ const { exportReport } = require('./exporter');
 const { ExportValidationError } = require('./asset-paths');
 
 const PROJECT_ID_PATTERN = /^[a-z0-9-]{1,80}$/u;
-const OUTPUT_KINDS = new Set(['folder', 'zip', 'both']);
+const OUTPUT_KINDS = new Set(['folder', 'zip', 'both', 'single-html']);
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 const OUTPUT_NOT_WRITABLE_CODE = 'EXPORT_OUTPUT_NOT_WRITABLE';
 
@@ -243,7 +243,7 @@ class ExportJobController {
     try {
       const result = await this.exporter({
         ...job.request,
-        createZip: job.request.outputKind !== 'folder',
+        createZip: job.request.outputKind === 'zip' || job.request.outputKind === 'both',
         signal: job.controller.signal,
       });
       if (job.controller.signal.aborted) throw cancellationError();
