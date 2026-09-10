@@ -75,6 +75,18 @@ test('single-html jobs do not request ZIP creation', async () => {
   assert.equal(captured.createZip, false);
 });
 
+test('preload export bridge accepts the single-html output contract', async () => {
+  const preload = await fs.readFile(path.join(__dirname, '..', '..', 'src', 'preload.js'), 'utf8');
+  assert.match(
+    preload,
+    /EXPORT_OUTPUT_KINDS\s*=\s*new Set\(\[[^\]]*['"]single-html['"][^\]]*\]\)/u,
+  );
+  assert.match(
+    preload,
+    /startExport:\s*\(request\)\s*=>\s*ipcRenderer\.invoke\('export:start',\s*assertExportRequest\(request\)\)/u,
+  );
+});
+
 test('exports a portable report folder whose only payload is one self-contained HTML file', async () => {
   const sourceVideo = path.join(testRoot, 'single-html-source.mp4');
   const videoBytes = Buffer.from('single-html-video-fixture');
