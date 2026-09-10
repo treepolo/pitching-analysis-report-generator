@@ -17,6 +17,7 @@ const {
 const { validateExportLayout } = require('./layout-validator');
 const { renderReportHtml, toPortableReportDocument } = require('./report-renderer');
 const { bundleReportStyles } = require('./report-style-bundler');
+const { inlineReportAssets } = require('./single-html-packager');
 const {
   applyTreePoloPackageHtml,
   canonicalReportName,
@@ -550,6 +551,28 @@ function exportManifest({
   };
 }
 
+function singleHtmlExportManifest(sourceManifest, { html, reportFileName, singleHtml }) {
+  const inlinedIds = new Set(singleHtml.inlinedAssets.map((asset) => asset.id));
+  return {
+    ...sourceManifest,
+    format: 'pitching-analysis-report-single-html',
+    assets: sourceManifest.assets.map((asset) => ({
+      ...asset,
+      inlined: inlinedIds.has(asset.id),
+    })),
+    files: [{
+      relativePath: reportFileName,
+      byteLength: Buffer.byteLength(html),
+      sha256: sha256(Buffer.from(html)),
+    }],
+    packaging: {
+      kind: 'single-html',
+      inlinedAssetCount: singleHtml.inlinedAssetCount,
+      sourceAssetByteLength: singleHtml.inlinedAssets.reduce((total, asset) => total + asset.byteLength, 0),
+    },
+  };
+}
+
 async function writeJson(filePath, value, phase = 'write-manifest') {
   await withExportFsRetry(
     () => fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8'),
@@ -610,8 +633,10 @@ async function exportReport({
     throw new ExportValidationError('Export outputDirectory parent must be a directory');
   }
 
+  const shouldCreateSingleHtml = outputKind === 'single-html';
   const shouldKeepFolder = outputKind !== 'zip';
-  const shouldCreateZip = createZip === true || outputKind === 'zip' || outputKind === 'both';
+  const shouldCreateZip = !shouldCreateSingleHtml
+    && (createZip === true || outputKind === 'zip' || outputKind === 'both');
   const baseName = canonicalReportName(reportName ?? safeReportDocument.title);
   const runExport = () => withOutputLock(outputRoot, async () => {
     const outputTargets = await resolveOutputTargets({
@@ -678,7 +703,95 @@ async function exportReport({
         title: reportDocument?.title ?? reportName,
         logoRelativePath: treePoloPackage.logoRelativePath,
       });
-      const html = bundleReportStyles(packagedHtml);
+      const bundledHtml = bundleReportStyles(packagedHtml);
+
+      if (shouldCreateSingleHtml) {
+        await withExportFsRetry(
+          () => fs.writeFile(path.join(stagingPath, reportFileName), bundledHtml, 'utf8'),
+          'write-report',
+        );
+        const sourceManifest = exportManifest({
+          reportDocument: safeReportDocument,
+          safeName,
+          stagedAssets,
+          html: bundledHtml,
+          reportFileName,
+          warnings,
+        });
+        await writeJson(path.join(stagingPath, 'export-manifest.json'), sourceManifest, 'write-manifest');
+        const validation = await validateExportLayout(stagingPath, {
+          assetManifest: stagedManifest,
+          html: bundledHtml,
+          requireAllManifestAssetsUsed: false,
+          verifyManifest: true,
+          htmlFileName: reportFileName,
+        });
+        sourceManifest.validation = {
+          valid: validation.valid,
+          assetCount: validation.assetCount,
+          referencedAssetCount: validation.referencedAssetCount,
+        };
+
+        let singleHtml;
+        try {
+          singleHtml = await inlineReportAssets({
+            html: bundledHtml,
+            stagedAssets,
+            rootPath: stagingPath,
+            signal,
+          });
+        } catch (error) {
+          throw annotateExportFsError(error, 'inline-assets');
+        }
+        if (singleHtml.unusedAssets.length > 0) {
+          throw new ExportValidationError('Single HTML export could not inline every staged asset', {
+            unusedAssetIds: singleHtml.unusedAssets.map((asset) => asset.id),
+          });
+        }
+        throwIfAborted(signal);
+        await withExportFsRetry(
+          () => fs.writeFile(path.join(stagingPath, reportFileName), singleHtml.html, 'utf8'),
+          'write-single-html',
+        );
+        await withExportFsRetry(
+          () => fs.rm(path.join(stagingPath, 'videos'), { recursive: true, force: true }),
+          'finalize-single-html',
+        );
+        await withExportFsRetry(
+          () => fs.rm(path.join(stagingPath, 'images'), { recursive: true, force: true }),
+          'finalize-single-html',
+        );
+        await withExportFsRetry(
+          () => fs.rm(path.join(stagingPath, 'export-manifest.json'), { force: true }),
+          'finalize-single-html',
+        );
+        const manifest = singleHtmlExportManifest(sourceManifest, {
+          html: singleHtml.html,
+          reportFileName,
+          singleHtml,
+        });
+        await commitStagingDirectory(stagingPath, folderPath, {
+          sameDestination: temporary.sameDestination,
+        });
+        moved = true;
+        const cleanupError = await cleanupExportPath(temporaryRoot);
+        if (cleanupError) warnings.push('匯出暫存檔清理稍後重試；輸出內容已完成。');
+        const { html: _singleHtmlSource, ...singleHtmlResult } = singleHtml;
+        return {
+          folderPath,
+          zipPath: null,
+          safeName,
+          reportFileName,
+          reportDocumentSha256: manifest.report.documentSha256,
+          manifest,
+          validation,
+          zip: null,
+          singleHtml: singleHtmlResult,
+          warnings,
+        };
+      }
+
+      const html = bundledHtml;
       await withExportFsRetry(
         () => fs.writeFile(path.join(stagingPath, reportFileName), html, 'utf8'),
         'write-report',
