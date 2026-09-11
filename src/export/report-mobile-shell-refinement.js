@@ -43,14 +43,15 @@ function mobileShellCss() {
     margin: 0 -5px 8px !important;
   }
 
-  /* Page-scale gestures are disabled on phones while ordinary one-finger
-     vertical scrolling and range-slider dragging remain available. */
+  /* Keep one-finger vertical page scrolling available, but reserve range
+     gestures for the native slider itself so iOS WebKit cannot claim the
+     drag as viewport panning partway through the interaction. */
   html,
   body {
     touch-action: pan-y !important;
   }
   input[type="range"] {
-    touch-action: pan-x !important;
+    touch-action: none !important;
   }
 }
 
