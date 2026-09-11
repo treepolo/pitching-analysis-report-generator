@@ -6,6 +6,7 @@ on:
       - worker/desktop-vertical-slice
     paths:
       - 'report-opener/**'
+      - 'test/report-opener.test.js'
       - '.github/workflows/report-opener-pages.yml'
   workflow_dispatch:
 
@@ -27,6 +28,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify report opener contract
+        run: node --test test/report-opener.test.js
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload report opener
