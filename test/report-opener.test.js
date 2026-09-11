@@ -35,7 +35,7 @@ test('Pages workflow publishes the canonical report-opener source to the deploym
   assert.match(workflow, /git fetch origin gh-pages/u);
   assert.match(workflow, /git worktree add[^\n]+origin\/gh-pages/u);
   assert.match(workflow, /cp -a report-opener\/\.[^\n]+pages_dir/u);
-  assert.match(workflow, /git push origin HEAD:gh-pages/u);
+  assert.match(workflow, /git -C [^\n]+pages_dir[^\n]+ push origin HEAD:gh-pages/u);
   assert.doesNotMatch(workflow, /actions\/deploy-pages@/u);
 });
 
