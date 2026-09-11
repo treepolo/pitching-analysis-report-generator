@@ -39,14 +39,15 @@ test('mobile shell reserves fixed title space on report content instead of infla
   assert.match(css, /@media print[\s\S]*?body>main>section\.report-section:first-of-type[\s\S]*?margin-top: 0 !important/u);
 });
 
-test('mobile viewport locks page scaling while preserving range dragging', () => {
+test('mobile viewport locks page scaling while reserving range drags for the slider', () => {
   const source = '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>';
   const html = injectReportMobileShellRefinement(source);
   assert.equal(LOCKED_VIEWPORT, 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
   assert.match(html, /maximum-scale=1, user-scalable=no/u);
   const css = mobileShellCss();
   assert.match(css, /touch-action: pan-y !important/u);
-  assert.match(css, /input\[type="range"\][\s\S]*?touch-action: pan-x !important/u);
+  assert.match(css, /input\[type="range"\][\s\S]*?touch-action: none !important/u);
+  assert.doesNotMatch(css, /input\[type="range"\][\s\S]*?touch-action: pan-x !important/u);
 });
 
 test('mobile zoom lock blocks pinch-style gestures only in phone layout', () => {
