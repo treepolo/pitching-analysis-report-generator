@@ -240,7 +240,7 @@ function renderPlayerVideo(block, side, asset, posterAsset, comparison) {
     + metadata.fpsAttribute + metadata.frameCountAttribute + metadata.frameTimesAttribute + '>'
     + sideHeading
     + '<div class="portable-frame-surface" data-frame-surface tabindex="-1" aria-label="' + escapeHtml(sideLabel + '影格畫面') + '">'
-    + '<video playsinline preload="metadata" data-player-video src="' + escapeHtml(encodeAssetPath(asset.relativePath)) + '"' + poster + '>'
+    + '<video playsinline muted preload="metadata" data-player-video src="' + escapeHtml(encodeAssetPath(asset.relativePath)) + '"' + poster + '>'
     + '此瀏覽器不支援內嵌影片。'
     + '</video>'
     + '<span data-frame-placeholder>正在載入第一幀…</span>'
