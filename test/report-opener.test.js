@@ -10,10 +10,6 @@ const repositoryRoot = path.resolve(__dirname, '..');
 const openerPath = path.join(repositoryRoot, 'report-opener', 'index.html');
 const workflowPath = path.join(repositoryRoot, '.github', 'workflows', 'report-opener-pages.yml');
 
-function read(relativePath) {
-  return fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
-}
-
 test('report opener is a first-class repository source with a local-only file flow', () => {
   const html = fs.readFileSync(openerPath, 'utf8');
 
@@ -29,18 +25,22 @@ test('report opener is a first-class repository source with a local-only file fl
   assert.doesNotThrow(() => new vm.Script(scripts[0]));
 });
 
-test('Pages workflow deploys only the canonical report-opener source and gates deployment on its contract test', () => {
+test('Pages workflow publishes the canonical report-opener source to the deployment branch after its contract test', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
 
   assert.match(workflow, /branches:\s*\n\s*- worker\/desktop-vertical-slice/u);
   assert.match(workflow, /- 'report-opener\/\*\*'/u);
   assert.match(workflow, /- 'test\/report-opener\.test\.js'/u);
-  assert.match(workflow, /path: report-opener/u);
   assert.match(workflow, /node --test test\/report-opener\.test\.js/u);
-  assert.match(workflow, /actions\/deploy-pages@v4/u);
+  assert.match(workflow, /git fetch origin gh-pages/u);
+  assert.match(workflow, /git worktree add[^\n]+origin\/gh-pages/u);
+  assert.match(workflow, /cp -a report-opener\/\.[^\n]+pages_dir/u);
+  assert.match(workflow, /git push origin HEAD:gh-pages/u);
+  assert.doesNotMatch(workflow, /actions\/deploy-pages@/u);
 });
 
-test('legacy gh-pages content is not referenced as source by the repository deployment workflow', () => {
-  const workflow = read('.github/workflows/report-opener-pages.yml');
-  assert.doesNotMatch(workflow, /checkout[^\n]*gh-pages|ref:\s*gh-pages|path:\s*gh-pages/iu);
+test('gh-pages is treated as generated deployment output rather than a source of truth', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  assert.doesNotMatch(workflow, /checkout[^\n]*ref:\s*gh-pages/iu);
+  assert.doesNotMatch(workflow, /cp -a[^\n]*gh-pages[^\n]*report-opener/iu);
 });
