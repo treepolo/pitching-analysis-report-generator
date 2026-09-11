@@ -106,3 +106,14 @@ Each downstream owner must consume the upstream canonical contract; no owner may
 狀態：**RESOLVED — Desktop application approved by user on 2026-08-14**。
 
 使用者決定：採 Desktop application。後續以可逆、可測試的 technical decision 維護 shell/framework、native media strategy 與 packaging；不把這些細節冒充新的產品 checkpoint。正式 application data storage 採 `PROJECT_STATE.md` 的 project-root 方案；若未來要改為其他位置，必須同步更新 current state、backup/restore 與 acceptance evidence。
+
+## 7. Report opener ownership and deployment
+
+The iPhone/iPad browser report opener is a first-class product surface, not a hand-maintained GitHub Pages artifact.
+
+- Canonical source: `report-opener/` on the product branch.
+- Deployment owner: `.github/workflows/report-opener-pages.yml`.
+- Contract test: `test/report-opener.test.js`.
+- The opener reads a user-selected single-HTML report locally through the browser and must not upload report contents to GitHub, TREEPOLO, or another service.
+- GitHub Pages receives the `report-opener/` directory as a deployment artifact. Any legacy `gh-pages` branch content is non-canonical and must not be edited as a source of truth.
+- Changes to the opener source, its contract test, or its deployment workflow trigger the dedicated Pages workflow; deployment is gated by the opener contract test.
