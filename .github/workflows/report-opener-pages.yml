@@ -11,9 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: report-opener-pages
@@ -21,25 +19,33 @@ concurrency:
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout product source
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Verify report opener contract
         run: node --test test/report-opener.test.js
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload report opener
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: report-opener
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish canonical opener to gh-pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin gh-pages
+          pages_dir="$(mktemp -d)"
+          git worktree add "$pages_dir" origin/gh-pages
+          find "$pages_dir" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a report-opener/. "$pages_dir"/
+          git -C "$pages_dir" config user.name "github-actions[bot]"
+          git -C "$pages_dir" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$pages_dir" add -A
+          if git -C "$pages_dir" diff --cached --quiet; then
+            echo "Report opener deployment is already current."
+            exit 0
+          fi
+          git -C "$pages_dir" commit -m "deploy: report opener ${GITHUB_SHA::12}"
+          git -C "$pages_dir" push origin HEAD:gh-pages
