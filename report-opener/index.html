@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d0c">
+  <title>TREEPOLO 投球分析報告開啟器</title>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;color:#f4f7f5;background:#0b0d0c;color-scheme:dark}
+    *{box-sizing:border-box}
+    html,body{width:100%;min-height:100%;margin:0}
+    body{min-height:100dvh;background:#0b0d0c}
+    button,input{font:inherit}
+    .launcher{min-height:100dvh;display:grid;place-items:center;padding:calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom))}
+    .card{width:min(100%,520px);padding:32px 24px;border:1px solid #29322d;border-radius:16px;background:#121613;box-shadow:0 24px 80px rgba(0,0,0,.28)}
+    .brand{margin:0 0 12px;font-size:15px;font-weight:800;letter-spacing:.12em}.tree{color:#00a65a}.polo{color:#f5f5f5}
+    h1{margin:0 0 10px;font-size:clamp(28px,8vw,42px);line-height:1.1;letter-spacing:-.025em}
+    .lead{margin:0 0 26px;color:#b7c1bb;line-height:1.7}
+    .open-button{display:flex;width:100%;min-height:52px;align-items:center;justify-content:center;border:0;border-radius:10px;background:#00a65a;color:#fff;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    .open-button:active{transform:translateY(1px)}
+    .privacy{margin:16px 0 0;color:#8f9b94;font-size:13px;line-height:1.55;text-align:center}
+    .status{min-height:22px;margin:12px 0 0;color:#d4ddd8;font-size:14px;text-align:center}
+    .status[data-state="error"]{color:#ffb4ab}
+    .viewer{position:fixed;inset:0;background:#000}
+    .viewer[hidden],.launcher[hidden]{display:none!important}
+    .report-frame{display:block;width:100%;height:100dvh;border:0;background:#000}
+    .loading{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:24px;background:#0b0d0c;color:#d4ddd8;text-align:center}
+    .loading[hidden]{display:none}
+  </style>
+</head>
+<body>
+  <main id="launcher" class="launcher">
+    <section class="card" aria-labelledby="title">
+      <p class="brand"><span class="tree">TREE</span><span class="polo">POLO</span></p>
+      <h1 id="title">開啟投球分析報告</h1>
+      <p class="lead">選擇已下載到 iPhone 或 iPad「檔案」中的單一網頁報告。</p>
+      <button id="choose-report" class="open-button" type="button">選擇報告檔案</button>
+      <input id="report-file" type="file" accept=".html,.htm,text/html" hidden>
+      <p class="privacy">報告只會在這台裝置的瀏覽器中讀取，不會上傳到 TREEPOLO 或 GitHub。</p>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <section id="viewer" class="viewer" hidden aria-label="投球分析報告">
+    <div id="loading" class="loading">正在開啟報告…</div>
+    <iframe
+      id="report-frame"
+      class="report-frame"
+      title="投球分析報告"
+      sandbox="allow-scripts allow-forms allow-modals allow-downloads allow-popups allow-popups-to-escape-sandbox"
+      allow="autoplay; fullscreen"
+      referrerpolicy="no-referrer"
+    ></iframe>
+  </section>
+
+  <script>
+    (() => {
+      const launcher = document.getElementById('launcher');
+      const viewer = document.getElementById('viewer');
+      const chooseButton = document.getElementById('choose-report');
+      const input = document.getElementById('report-file');
+      const status = document.getElementById('status');
+      const loading = document.getElementById('loading');
+      const frame = document.getElementById('report-frame');
+      let activeUrl = '';
+
+      const setStatus = (message, state = '') => {
+        status.textContent = message;
+        status.dataset.state = state;
+      };
+
+      const releaseActiveUrl = () => {
+        if (!activeUrl) return;
+        URL.revokeObjectURL(activeUrl);
+        activeUrl = '';
+      };
+
+      const openReport = (file) => {
+        if (!file) return;
+        const fileName = String(file.name || '');
+        const looksLikeHtml = /\.html?$/iu.test(fileName) || file.type === 'text/html';
+        if (!looksLikeHtml) {
+          setStatus('請選擇輸出器產生的 .html 報告檔。', 'error');
+          input.value = '';
+          return;
+        }
+
+        releaseActiveUrl();
+        setStatus('正在開啟報告…');
+        const htmlFile = file.type === 'text/html'
+          ? file
+          : new Blob([file], { type: 'text/html;charset=utf-8' });
+        activeUrl = URL.createObjectURL(htmlFile);
+        loading.hidden = false;
+        viewer.hidden = false;
+        launcher.hidden = true;
+        frame.src = activeUrl;
+      };
+
+      chooseButton.addEventListener('click', () => {
+        setStatus('');
+        input.click();
+      });
+
+      input.addEventListener('change', () => {
+        openReport(input.files && input.files[0]);
+      });
+
+      frame.addEventListener('load', () => {
+        loading.hidden = true;
+      });
+
+      window.addEventListener('pagehide', releaseActiveUrl, { once: true });
+    })();
+  </script>
+</body>
+</html>

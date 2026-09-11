@@ -1,0 +1,38 @@
+name: Deploy report opener to GitHub Pages
+
+on:
+  push:
+    branches:
+      - worker/desktop-vertical-slice
+    paths:
+      - 'report-opener/**'
+      - '.github/workflows/report-opener-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: report-opener-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload report opener
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: report-opener
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
