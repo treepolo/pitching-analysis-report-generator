@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#0d1712">
+  <title>TREEPOLO 投球分析報告開啟器</title>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;color:#17221c;background:#f4f7f5}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#f4f7f5}body{min-height:100dvh;display:grid;place-items:center;padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))}.card{width:min(100%,520px);background:#fff;border:1px solid #dfe7e2;border-radius:18px;padding:30px 24px;box-shadow:0 16px 48px rgba(21,45,31,.10)}.brand{font-weight:850;letter-spacing:.08em;font-size:26px;margin:0 0 8px}.brand .tree{color:#00a65a}.brand .polo{color:#17221c}h1{font-size:24px;line-height:1.3;margin:0 0 10px}p{line-height:1.7;margin:0;color:#526159}.primary{display:block;width:100%;margin-top:24px;border:0;border-radius:12px;background:#0d1712;color:#fff;font:inherit;font-weight:750;font-size:17px;padding:15px 18px;cursor:pointer}.primary:active{transform:translateY(1px)}.hint{font-size:14px;margin-top:15px}.privacy{font-size:13px;color:#6e7b74;margin-top:18px}.error{margin-top:16px;padding:12px 14px;border-radius:10px;background:#fff0f0;color:#9a2525;font-size:14px;line-height:1.5}.viewer{position:fixed;inset:0;z-index:10;background:#fff;display:none}.viewer[data-open="true"]{display:block}.viewer iframe{display:block;width:100%;height:100dvh;border:0;background:#fff}.close{position:fixed;z-index:12;top:max(10px,env(safe-area-inset-top));right:10px;border:1px solid rgba(255,255,255,.35);border-radius:999px;background:rgba(8,15,11,.78);backdrop-filter:blur(8px);color:#fff;font:inherit;font-size:13px;font-weight:700;padding:9px 12px;box-shadow:0 4px 16px rgba(0,0,0,.18)}[hidden]{display:none!important}
+  </style>
+</head>
+<body>
+  <main class="card" id="opener">
+    <p class="brand"><span class="tree">TREE</span><span class="polo">POLO</span></p>
+    <h1>投球分析報告開啟器</h1>
+    <p>選擇已下載到 iPhone／iPad「檔案」中的 TREEPOLO 單一網頁報告，即可直接在目前的瀏覽器中開啟。</p>
+    <button class="primary" id="choose" type="button">開啟報告</button>
+    <input id="file" type="file" accept=".html,.htm,text/html" hidden>
+    <p class="hint">建議使用 Chrome 或 Safari。選檔後不需要再次上傳。</p>
+    <p class="privacy">報告只會在你的裝置與瀏覽器內讀取；此頁不會把報告檔案傳送到 GitHub 或 TREEPOLO 伺服器。</p>
+    <p class="error" id="error" role="alert" hidden></p>
+  </main>
+
+  <section class="viewer" id="viewer" data-open="false" aria-label="投球分析報告">
+    <button class="close" id="close" type="button">關閉報告</button>
+    <iframe id="report" title="TREEPOLO 投球分析報告" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
+  </section>
+
+  <script>
+    (() => {
+      const choose = document.getElementById('choose');
+      const input = document.getElementById('file');
+      const viewer = document.getElementById('viewer');
+      const frame = document.getElementById('report');
+      const close = document.getElementById('close');
+      const error = document.getElementById('error');
+      let currentUrl = '';
+      let currentBlob = null;
+
+      const showError = (message) => {
+        error.textContent = message;
+        error.hidden = false;
+      };
+      const clearError = () => {
+        error.textContent = '';
+        error.hidden = true;
+      };
+      const releaseCurrentReport = () => {
+        frame.removeAttribute('src');
+        if (currentUrl) URL.revokeObjectURL(currentUrl);
+        currentUrl = '';
+        currentBlob = null;
+      };
+      const closeReport = () => {
+        viewer.dataset.open = 'false';
+        releaseCurrentReport();
+        input.value = '';
+      };
+
+      choose.addEventListener('click', () => {
+        clearError();
+        input.click();
+      });
+
+      input.addEventListener('change', () => {
+        clearError();
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (!/\.html?$/iu.test(file.name || '')) {
+          showError('請選擇 TREEPOLO 匯出的 .html 報告檔。');
+          input.value = '';
+          return;
+        }
+        releaseCurrentReport();
+        // Wrap the selected File with an explicit text/html MIME type. iOS Files
+        // may hand browsers an empty or generic MIME type even for .html files.
+        // Blob composition references the existing File payload and avoids reading
+        // a potentially very large report into a JavaScript string first.
+        currentBlob = new Blob([file], { type: 'text/html' });
+        currentUrl = URL.createObjectURL(currentBlob);
+        frame.src = currentUrl;
+        viewer.dataset.open = 'true';
+      });
+
+      frame.addEventListener('error', () => {
+        closeReport();
+        showError('瀏覽器無法載入這份報告。請確認檔案完整後重試。');
+      });
+      close.addEventListener('click', closeReport);
+      window.addEventListener('pagehide', () => {
+        if (currentUrl) URL.revokeObjectURL(currentUrl);
+      }, { once: true });
+    })();
+  </script>
+</body>
+</html>
