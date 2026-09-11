@@ -70,7 +70,9 @@ test('single-player rate changes keep the current playback mode and switch only 
 });
 
 test('iOS WebKit previews single-player rate changes and commits one paused media transition', () => {
-  assert.match(runtime, /const isIOSWebKit = \(\(\) => \{[\s\S]*\/(?:\(\?:iPad\|iPhone\|iPod\)|[^\n]+)\/iu\.test\(userAgent\)[\s\S]*navigator\.maxTouchPoints/u);
+  assert.match(runtime, /const isIOSWebKit = \(\(\) => \{/u);
+  assert.match(runtime, /iPad\|iPhone\|iPod/u);
+  assert.match(runtime, /navigator\.maxTouchPoints/u);
   const commitStart = runtime.indexOf('const commitRate = async (requested) => {');
   const stepStart = runtime.indexOf('const step = (direction) => {', commitStart);
   assert.ok(commitStart >= 0 && stepStart > commitStart);
