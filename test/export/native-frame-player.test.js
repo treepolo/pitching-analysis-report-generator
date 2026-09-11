@@ -69,6 +69,21 @@ test('single-player rate changes keep the current playback mode and switch only 
   assert.doesNotMatch(runtime, /if \(wasManual\) \{ cancelManual\(\); runtime\.playing = false; video\.pause\(\); \}/u);
 });
 
+test('iOS WebKit previews single-player rate changes and commits one paused media transition', () => {
+  assert.match(runtime, /const isIOSWebKit = \(\(\) => \{[\s\S]*\/(?:\(\?:iPad\|iPhone\|iPod\)|[^\n]+)\/iu\.test\(userAgent\)[\s\S]*navigator\.maxTouchPoints/u);
+  const commitStart = runtime.indexOf('const commitRate = async (requested) => {');
+  const stepStart = runtime.indexOf('const step = (direction) => {', commitStart);
+  assert.ok(commitStart >= 0 && stepStart > commitStart);
+  const commitSource = runtime.slice(commitStart, stepStart);
+  assert.match(commitSource, /const shouldProtectTransition = isIOSWebKit/u);
+  assert.match(commitSource, /await pauseMediaForRateChange\(video\)/u);
+  assert.match(commitSource, /waitForMediaEvent\(video, 'ratechange', 300\)/u);
+  assert.match(commitSource, /applyRate\(rate, \{ resume: false \}\)/u);
+  assert.match(commitSource, /await play\(\{ fromRateTransition: true \}\)/u);
+  assert.match(runtime, /rateSlider\?\.addEventListener\('input',[\s\S]*if \(isIOSWebKit\) previewRate\(rate\);\s*else applyRate\(rate\);/u);
+  assert.match(runtime, /rateSlider\?\.addEventListener\('change', \(\) => \{ if \(isIOSWebKit\) commitRatePreview\(\); \}\)/u);
+});
+
 test('shared extended clock advances only when the target frame changes and both seeks are settled', () => {
   assert.match(runtime, /const nextIndex = clamp\(Math\.floor\(nextFrame\)/u);
   assert.match(runtime, /const readyToPresent = videos\.every\(\(video\) => !video\?\.seeking\)/u);
@@ -80,6 +95,20 @@ test('shared rate changes keep the current playback mode instead of rebuilding i
   assert.match(runtime, /if \(!nativeSupported\) \{\s*state\.rateTransition = false;\s*if \(!wasManual\) startSharedManual\(\)/u);
   assert.match(runtime, /if \(!wasManual\) \{\s*state\.rateTransition = false;\s*state\.playing = true/u);
   assert.doesNotMatch(runtime, /state\.operationSerial \+= 1; state\.rate = nextRate/u);
+});
+
+test('iOS WebKit previews shared rate changes and resumes only after both media elements settle', () => {
+  const commitStart = runtime.indexOf('const commitSharedRate = async (requested) => {');
+  const toggleStart = runtime.indexOf('const togglePlayback = async () => {', commitStart);
+  assert.ok(commitStart >= 0 && toggleStart > commitStart);
+  const commitSource = runtime.slice(commitStart, toggleStart);
+  assert.match(commitSource, /const shouldProtectTransition = isIOSWebKit && !state\.manual && state\.playing/u);
+  assert.match(commitSource, /await Promise\.all\(videos\.map\(\(video\) => pauseMediaForRateChange\(video\)\)\)/u);
+  assert.match(commitSource, /const rateSettled = videos\.map\(\(video\) => waitForMediaEvent\(video, 'ratechange', 300\)\)/u);
+  assert.match(commitSource, /actions\.forEach\(\(action\) => action\.applyRate\(nextRate, \{ resume: false \}\)\)/u);
+  assert.match(commitSource, /await Promise\.all\(actions\.map\(\(action\) => action\.play\(\)\)\)/u);
+  assert.match(runtime, /if \(isIOSWebKit\) previewSharedRate\(rate\);\s*else setRate\(rate\);/u);
+  assert.match(runtime, /rateSlider\?\.addEventListener\('change', \(\) => \{ if \(isIOSWebKit\) commitSharedRatePreview\(\); \}\)/u);
 });
 
 test('canonical native player owns cross-block playback arbitration', () => {
