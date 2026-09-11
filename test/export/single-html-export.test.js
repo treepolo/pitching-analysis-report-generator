@@ -18,7 +18,7 @@ test.after(async () => {
   if (testRoot) await fs.rm(testRoot, { recursive: true, force: true });
 });
 
-test('inlines encoded and plain asset URLs without leaving sibling-file references', async () => {
+test('inlines images directly and stores each video payload once for lazy blob playback', async () => {
   const rootPath = path.join(testRoot, 'packager');
   const videoPath = path.join(rootPath, 'videos', '投 球.mp4');
   const imagePath = path.join(rootPath, 'images', 'background.jpg');
@@ -28,6 +28,7 @@ test('inlines encoded and plain asset URLs without leaving sibling-file referenc
   await fs.writeFile(imagePath, Buffer.from('image-bytes'));
 
   const source = '<video src="videos/%E6%8A%95%20%E7%90%83.mp4"></video>'
+    + '<video src="videos/%E6%8A%95%20%E7%90%83.mp4"></video>'
     + '<style>body{background:url("images/background.jpg")}</style>';
   const result = await inlineReportAssets({
     html: source,
@@ -38,7 +39,12 @@ test('inlines encoded and plain asset URLs without leaving sibling-file referenc
     ],
   });
 
-  assert.match(result.html, /src="data:video\/mp4;base64,dmlkZW8tYnl0ZXM="/u);
+  assert.equal((result.html.match(/data-tree-polo-inline-video-src="video-1"/gu) || []).length, 2);
+  assert.equal((result.html.match(/dmlkZW8tYnl0ZXM=/gu) || []).length, 1);
+  assert.match(result.html, /data-tree-polo-inline-video-payload="video-1"/u);
+  assert.match(result.html, /data-tree-polo-inline-video-runtime/u);
+  assert.match(result.html, /URL\.createObjectURL\(blob\)/u);
+  assert.doesNotMatch(result.html, /data:video\/mp4;base64,/u);
   assert.match(result.html, /url\("data:image\/jpeg;base64,aW1hZ2UtYnl0ZXM="\)/u);
   assert.doesNotMatch(result.html, /videos\//u);
   assert.doesNotMatch(result.html, /images\/background\.jpg/u);
@@ -139,10 +145,11 @@ test('exports a portable report folder whose only payload is one self-contained 
   const finalEntries = await fs.readdir(result.folderPath);
   assert.deepEqual(finalEntries, [result.reportFileName]);
   const html = await fs.readFile(path.join(result.folderPath, result.reportFileName), 'utf8');
-  assert.match(
-    html,
-    new RegExp(`data:video/mp4;base64,${videoBytes.toString('base64')}`, 'u'),
-  );
+  assert.match(html, new RegExp(videoBytes.toString('base64'), 'u'));
+  assert.match(html, /data-tree-polo-inline-video-payload="video-1"/u);
+  assert.match(html, /data-tree-polo-inline-video-src="video-1"/u);
+  assert.match(html, /URL\.createObjectURL\(blob\)/u);
+  assert.doesNotMatch(html, /data:video\/mp4;base64,/u);
   assert.match(html, /data:image\/jpeg;base64,/u);
   assert.match(html, /data:image\/webp;base64,/u);
   assert.doesNotMatch(html, /src="videos\//u);
