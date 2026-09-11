@@ -73,25 +73,28 @@ function renderInlineVideoRuntime() {
     if (key) payloads.set(key, node);
   });
 
-  const decodeBase64Blob = (base64, mediaType) => {
-    const chunkCharacters = 4 * 1024 * 1024;
+  const yieldToBrowser = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const decodeBase64Blob = async (base64, mediaType) => {
+    const chunkCharacters = 2 * 1024 * 1024;
     const parts = [];
     for (let offset = 0; offset < base64.length; offset += chunkCharacters) {
-      const binary = atob(base64.slice(offset, offset + chunkCharacters));
+      const end = Math.min(base64.length, offset + chunkCharacters);
+      const binary = atob(base64.slice(offset, end));
       const bytes = new Uint8Array(binary.length);
       for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
       parts.push(bytes);
+      if (end < base64.length) await yieldToBrowser();
     }
     return new Blob(parts, { type: mediaType || 'video/mp4' });
   };
 
-  const materialize = (key) => {
+  const materialize = async (key) => {
     if (objectUrls.has(key)) return objectUrls.get(key);
     const payload = payloads.get(key);
     if (!payload) throw new Error('Embedded video payload is missing');
     const base64 = (payload.textContent || '').trim();
     const mediaType = payload.getAttribute(mediaTypeAttribute) || 'video/mp4';
-    const blob = decodeBase64Blob(base64, mediaType);
+    const blob = await decodeBase64Blob(base64, mediaType);
     const objectUrl = URL.createObjectURL(blob);
     objectUrls.set(key, objectUrl);
     payload.textContent = '';
@@ -111,7 +114,6 @@ function renderInlineVideoRuntime() {
     if (!key) return;
     pending.add(video);
     decodeQueue = decodeQueue
-      .then(() => new Promise((resolve) => setTimeout(resolve, 0)))
       .then(() => materialize(key))
       .then((objectUrl) => {
         if (!video.isConnected) return;
@@ -132,7 +134,7 @@ function renderInlineVideoRuntime() {
         observer.unobserve(entry.target);
         activate(entry.target);
       });
-    }, { rootMargin: '1200px 0px' })
+    }, { rootMargin: '400px 0px' })
     : null;
 
   videos.forEach((video) => {
