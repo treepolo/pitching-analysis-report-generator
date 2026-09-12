@@ -38,7 +38,7 @@ test('temporary player diagnostics inject exactly once', () => {
   const twice = injectReportPlayerDiagnostics(once);
   assert.equal((twice.match(/data-report-player-diagnostics-style/g) || []).length, 1);
   assert.equal((twice.match(/data-report-player-diagnostics-runtime/g) || []).length, 1);
-  assert.equal((twice.match(/data-report-player-diagnostics-toggle/g) || []).length, 2);
+  assert.equal(twice, once);
 });
 
 test('renderer places the temporary observer before the entry intro runtime', () => {
