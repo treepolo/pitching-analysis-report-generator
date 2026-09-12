@@ -145,6 +145,85 @@ function renderInlineVideoRuntime() {
     else activate(video);
   });
 
+  const debugEntries = [];
+  const debugLimit = 400;
+  const runtimeSnapshot = (runtime) => runtime ? {
+    index: runtime.index,
+    rate: runtime.rate,
+    playing: runtime.playing,
+    playOperation: runtime.playOperation,
+    manual: runtime.manual,
+    seekSerial: runtime.seekSerial,
+    operationSerial: runtime.operationSerial,
+    rateSerial: runtime.rateSerial,
+    exactSeek: runtime.exactSeek,
+    rateTransition: runtime.rateTransition,
+    lifecycle: runtime.lifecycle,
+  } : null;
+  const playerSnapshot = (target) => {
+    const block = target?.closest?.('[data-native-frame-player-block]') || null;
+    const toggle = target?.closest?.('[data-frame-action="toggle"]')
+      || block?.querySelector?.('[data-frame-action="toggle"]')
+      || null;
+    const sides = block
+      ? [...block.querySelectorAll('[data-native-frame-player]')]
+      : [];
+    return {
+      toggle: toggle ? {
+        disabled: Boolean(toggle.disabled),
+        ariaPressed: toggle.getAttribute('aria-pressed'),
+        text: toggle.textContent,
+      } : null,
+      sides: sides.map((side) => {
+        const video = side.querySelector('[data-player-video]');
+        return {
+          side: side.dataset.playerSide || null,
+          runtime: runtimeSnapshot(side.__nativeFramePlayerActions?.runtime),
+          video: video ? {
+            paused: video.paused,
+            seeking: video.seeking,
+            ended: video.ended,
+            currentTime: Number(video.currentTime),
+            readyState: video.readyState,
+            playbackRate: Number(video.playbackRate),
+          } : null,
+        };
+      }),
+    };
+  };
+  const recordPlayerDebug = (type, target, extra = null) => {
+    const entry = {
+      at: new Date().toISOString(),
+      time: typeof performance !== 'undefined' && Number.isFinite(performance.now()) ? performance.now() : Date.now(),
+      type,
+      snapshot: playerSnapshot(target),
+      ...(extra ? { extra } : {}),
+    };
+    debugEntries.push(entry);
+    if (debugEntries.length > debugLimit) debugEntries.splice(0, debugEntries.length - debugLimit);
+  };
+  window.__TREEPOLO_PLAYER_DEBUG__ = {
+    entries: debugEntries,
+    snapshot: () => debugEntries.slice(),
+    text: () => JSON.stringify(debugEntries, null, 2),
+    clear: () => { debugEntries.length = 0; },
+  };
+  ['pointerdown', 'pointerup', 'click'].forEach((eventName) => {
+    document.addEventListener(eventName, (event) => {
+      const toggle = event.target?.closest?.('[data-frame-action="toggle"]');
+      if (!toggle) return;
+      recordPlayerDebug('toggle-' + eventName, toggle);
+      if (eventName === 'click') {
+        setTimeout(() => recordPlayerDebug('toggle-click-after-task', toggle), 0);
+      }
+    }, true);
+  });
+  document.querySelectorAll('video[data-player-video]').forEach((video) => {
+    ['play', 'playing', 'pause', 'waiting', 'stalled', 'seeking', 'seeked', 'ended', 'ratechange'].forEach((eventName) => {
+      video.addEventListener(eventName, () => recordPlayerDebug('media-' + eventName, video));
+    });
+  });
+
   window.addEventListener('pagehide', () => {
     objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
     objectUrls.clear();
