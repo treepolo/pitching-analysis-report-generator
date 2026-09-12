@@ -4,6 +4,13 @@ const LOCKED_VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, u
 
 function mobileShellCss() {
   return `<style data-report-mobile-shell-refinement>
+/* Range gesture ownership is independent of the phone visual breakpoint.
+   Keep touch drags on the native slider on tablets as well, without enlarging
+   its track, thumb, padding, or hit target. */
+input[type="range"] {
+  touch-action: none !important;
+}
+
 @media (max-width: 700px) {
   html,
   body {
@@ -43,15 +50,10 @@ function mobileShellCss() {
     margin: 0 -5px 8px !important;
   }
 
-  /* Keep one-finger vertical page scrolling available, but reserve range
-     gestures for the native slider itself so iOS WebKit cannot claim the
-     drag as viewport panning partway through the interaction. */
+  /* Keep one-finger vertical page scrolling available outside controls. */
   html,
   body {
     touch-action: pan-y !important;
-  }
-  input[type="range"] {
-    touch-action: none !important;
   }
 }
 
