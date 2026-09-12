@@ -101,6 +101,17 @@ function renderNativeFramePlayerScript() {
       target?.matches?.('input:not([type="range"]), textarea, select, [contenteditable="true"]')
       || target?.isContentEditable
     );
+    const updateToggleControl = (toggle, disabled, playing) => {
+      if (!toggle) return;
+      const icon = playing ? '⏸' : '▶';
+      const pressed = playing ? 'true' : 'false';
+      const label = playing ? '暫停' : '播放';
+      if (toggle.disabled !== disabled) toggle.disabled = disabled;
+      if (toggle.textContent !== icon) toggle.textContent = icon;
+      if (toggle.getAttribute('aria-pressed') !== pressed) toggle.setAttribute('aria-pressed', pressed);
+      if (toggle.getAttribute('aria-label') !== label) toggle.setAttribute('aria-label', label);
+      if (toggle.title !== label) toggle.title = label;
+    };
 
     document.querySelectorAll('[data-native-frame-player]').forEach((side) => {
       const video = side.querySelector('[data-player-video]');
@@ -238,13 +249,7 @@ function renderNativeFramePlayerScript() {
           : '共 -- 幀';
         if (previous) previous.disabled = count <= 0 || pending || runtime.index <= 0;
         if (next) next.disabled = count <= 0 || pending || runtime.index >= maximum;
-        if (toggle) {
-          toggle.disabled = count <= 0 || togglePending;
-          toggle.textContent = playbackIntentActive ? '⏸' : '▶';
-          toggle.setAttribute('aria-pressed', playbackIntentActive ? 'true' : 'false');
-          toggle.setAttribute('aria-label', playbackIntentActive ? '暫停' : '播放');
-          toggle.title = playbackIntentActive ? '暫停' : '播放';
-        }
+        updateToggleControl(toggle, count <= 0 || togglePending, playbackIntentActive);
         if (rateInput) rateInput.disabled = count <= 0 || pending;
         if (rateSlider) rateSlider.disabled = count <= 0 || pending;
         if (resetRate) resetRate.disabled = count <= 0 || pending;
@@ -963,7 +968,7 @@ function renderNativeFramePlayerScript() {
         if (total) total.textContent = state.count > 0 ? ('共 ' + state.count + ' 幀') : '共 -- 幀';
         if (previous) previous.disabled = pending || state.index <= 0;
         if (next) next.disabled = pending || state.index >= state.count - 1;
-        if (toggle) { toggle.disabled = pending || state.rateTransition || state.rateGestureActive; toggle.textContent = state.playing ? '⏸' : '▶'; toggle.setAttribute('aria-pressed', state.playing ? 'true' : 'false'); toggle.setAttribute('aria-label', state.playing ? '暫停' : '播放'); toggle.title = state.playing ? '暫停' : '播放'; }
+        updateToggleControl(toggle, pending || state.rateTransition || state.rateGestureActive, state.playing);
         if (rateInput) { rateInput.value = formatRate(displayedRate); rateInput.disabled = pending; }
         if (rateSlider) { rateSlider.value = String(rateToSlider(displayedRate)); rateSlider.disabled = pending; }
         if (resetRate) resetRate.disabled = pending;
