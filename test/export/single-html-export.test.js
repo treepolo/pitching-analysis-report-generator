@@ -47,6 +47,10 @@ test('inlines images directly and stores each video payload once for lazy blob p
   assert.match(result.html, /const decodeBase64Blob = async/u);
   assert.match(result.html, /if \(end < base64\.length\) await yieldToBrowser\(\)/u);
   assert.match(result.html, /rootMargin: '400px 0px'/u);
+  assert.match(result.html, /window\.__TREEPOLO_PLAYER_DEBUG__ = \{/u);
+  assert.match(result.html, /toggle-click-after-task/u);
+  assert.match(result.html, /media-playing/u);
+  assert.match(result.html, /media-pause/u);
   assert.doesNotMatch(result.html, /data:video\/mp4;base64,/u);
   assert.match(result.html, /url\("data:image\/jpeg;base64,aW1hZ2UtYnl0ZXM="\)/u);
   assert.doesNotMatch(result.html, /videos\//u);
@@ -153,6 +157,8 @@ test('exports a portable report folder whose only payload is one self-contained 
   assert.match(html, /data-tree-polo-inline-video-src="video-1"/u);
   assert.match(html, /URL\.createObjectURL\(blob\)/u);
   assert.match(html, /const decodeBase64Blob = async/u);
+  assert.match(html, /window\.__TREEPOLO_PLAYER_DEBUG__ = \{/u);
+  assert.match(html, /recordPlayerDebug\('toggle-' \+ eventName/u);
   assert.doesNotMatch(html, /data:video\/mp4;base64,/u);
   assert.match(html, /data:image\/jpeg;base64,/u);
   assert.match(html, /data:image\/webp;base64,/u);
