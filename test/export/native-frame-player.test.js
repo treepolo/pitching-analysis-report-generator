@@ -58,9 +58,35 @@ test('single-player owns one native play request while pending and keeps pause i
   assert.match(updateSource, /const pending = unavailable \|\| runtime\.playOperation !== null/u);
   assert.match(updateSource, /const togglePending = unavailable \|\| runtime\.rateTransition \|\| runtime\.rateGestureActive/u);
   assert.match(updateSource, /const playbackIntentActive = runtime\.playing \|\| runtime\.playOperation !== null/u);
-  assert.match(updateSource, /toggle\.disabled = count <= 0 \|\| togglePending/u);
+  assert.match(updateSource, /updateToggleControl\(toggle, count <= 0 \|\| togglePending, playbackIntentActive\)/u);
   assert.doesNotMatch(updateSource, /toggle\.disabled = count <= 0 \|\| playbackPending/u);
   assert.match(toggleSource, /if \(runtime\.playOperation !== null\) \{ stop\('已暫停。'\); return; \}/u);
+});
+
+test('playback progress preserves stable toggle DOM while the pointer is held', () => {
+  const helperStart = runtime.indexOf('const updateToggleControl = (toggle, disabled, playing) => {');
+  const playerStart = runtime.indexOf("document.querySelectorAll('[data-native-frame-player]').forEach", helperStart);
+  assert.ok(helperStart >= 0 && playerStart > helperStart);
+  const helperSource = runtime.slice(helperStart, playerStart);
+  assert.match(helperSource, /if \(toggle\.disabled !== disabled\) toggle\.disabled = disabled/u);
+  assert.match(helperSource, /if \(toggle\.textContent !== icon\) toggle\.textContent = icon/u);
+  assert.match(helperSource, /if \(toggle\.getAttribute\('aria-pressed'\) !== pressed\) toggle\.setAttribute\('aria-pressed', pressed\)/u);
+  assert.match(helperSource, /if \(toggle\.getAttribute\('aria-label'\) !== label\) toggle\.setAttribute\('aria-label', label\)/u);
+  assert.match(helperSource, /if \(toggle\.title !== label\) toggle\.title = label/u);
+
+  const singleUpdateStart = runtime.indexOf('const updateControls = () => {');
+  const singleSyncStart = runtime.indexOf('const syncProgress =', singleUpdateStart);
+  const singleUpdateSource = runtime.slice(singleUpdateStart, singleSyncStart);
+  assert.match(singleUpdateSource, /updateToggleControl\(toggle, count <= 0 \|\| togglePending, playbackIntentActive\)/u);
+  assert.doesNotMatch(singleUpdateSource, /toggle\.textContent\s*=/u);
+
+  const sharedBlockStart = runtime.indexOf("document.querySelectorAll('[data-native-frame-player-block]').forEach");
+  const sharedUpdateStart = runtime.indexOf('const update = () => {', sharedBlockStart);
+  const sharedUpdateEnd = runtime.indexOf('const cancelSharedManual = () => {', sharedUpdateStart);
+  assert.ok(sharedBlockStart >= 0 && sharedUpdateStart > sharedBlockStart && sharedUpdateEnd > sharedUpdateStart);
+  const sharedUpdateSource = runtime.slice(sharedUpdateStart, sharedUpdateEnd);
+  assert.match(sharedUpdateSource, /updateToggleControl\(toggle, pending \|\| state\.rateTransition \|\| state\.rateGestureActive, state\.playing\)/u);
+  assert.doesNotMatch(sharedUpdateSource, /toggle\.textContent\s*=/u);
 });
 
 test('single-player rate changes keep the current playback mode and switch only when required', () => {
