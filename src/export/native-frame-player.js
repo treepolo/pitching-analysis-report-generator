@@ -131,6 +131,9 @@ function renderNativeFramePlayerScript() {
         rate: RATE_DEFAULT,
         ratePreview: null,
         rateCommitSerial: 0,
+        rateGestureActive: false,
+        rateGestureResume: false,
+        rateGestureSettled: null,
         playing: false,
         playOperation: null,
         manual: false,
@@ -219,7 +222,7 @@ function renderNativeFramePlayerScript() {
           || !runtime.firstFrameReady
           || runtime.exactSeek !== null;
         const pending = unavailable || runtime.playOperation !== null;
-        const togglePending = unavailable || runtime.rateTransition;
+        const togglePending = unavailable || runtime.rateTransition || runtime.rateGestureActive;
         const playbackIntentActive = runtime.playing || runtime.playOperation !== null;
         runtime.index = clamp(runtime.index, 0, maximum);
         if (timeline) {
@@ -446,6 +449,9 @@ function renderNativeFramePlayerScript() {
         runtime.rateTransition = false;
         runtime.ratePreview = null;
         runtime.rateCommitSerial += 1;
+        runtime.rateGestureActive = false;
+        runtime.rateGestureResume = false;
+        runtime.rateGestureSettled = null;
         cancelManual();
         ++runtime.seekSerial;
         runtime.exactSeek = null;
@@ -662,10 +668,42 @@ function renderNativeFramePlayerScript() {
         updateControls();
         await play({ fromRateTransition: true });
       };
-      const commitRatePreview = () => {
-        if (runtime.ratePreview === null) return;
-        const rate = runtime.ratePreview;
-        void commitRate(rate);
+      const beginRateGesture = () => {
+        if (!isIOSWebKit || runtime.manual || runtime.rateGestureActive) return;
+        runtime.rateCommitSerial += 1;
+        runtime.ratePreview = null;
+        runtime.rateGestureActive = true;
+        runtime.rateGestureResume = runtime.playing || (!video.paused && runtime.lifecycle === 'playing');
+        runtime.rateGestureSettled = null;
+        if (runtime.rateGestureResume) video.pause();
+        updateControls();
+      };
+      const applyRateGesture = (requested) => {
+        if (!isIOSWebKit || runtime.manual) {
+          applyRate(requested);
+          return;
+        }
+        if (!runtime.rateGestureActive) beginRateGesture();
+        const rate = clampRate(requested, runtime.rate);
+        runtime.ratePreview = null;
+        runtime.rateGestureSettled = waitForMediaEvent(video, 'ratechange', 300);
+        applyRate(rate, { resume: false });
+        runtime.rateGestureActive = true;
+        updateControls();
+      };
+      const endRateGesture = async () => {
+        if (!isIOSWebKit || !runtime.rateGestureActive) return;
+        const shouldResume = runtime.rateGestureResume;
+        const settled = runtime.rateGestureSettled;
+        const serial = ++runtime.rateCommitSerial;
+        const operation = runtime.operationSerial;
+        runtime.rateGestureActive = false;
+        runtime.rateGestureResume = false;
+        runtime.rateGestureSettled = null;
+        if (settled) await settled;
+        if (serial !== runtime.rateCommitSerial || operation !== runtime.operationSerial || !side.isConnected) return;
+        updateControls();
+        if (shouldResume) await play({ fromRateTransition: true });
       };
       const step = (direction) => {
         if (!runtime.loaded || !runtime.firstFrameReady
@@ -718,12 +756,15 @@ function renderNativeFramePlayerScript() {
       timeline?.addEventListener('pointercancel', onTimeline);
       timeline?.addEventListener('input', onTimeline);
       timeline?.addEventListener('change', onTimeline);
+      rateSlider?.addEventListener('pointerdown', () => { if (isIOSWebKit) beginRateGesture(); });
+      rateSlider?.addEventListener('pointerup', () => { if (isIOSWebKit) void endRateGesture(); });
+      rateSlider?.addEventListener('pointercancel', () => { if (isIOSWebKit) void endRateGesture(); });
       rateSlider?.addEventListener('input', (event) => {
         const rate = sliderToRate(event.target.value);
-        if (isIOSWebKit) previewRate(rate);
+        if (isIOSWebKit) applyRateGesture(rate);
         else applyRate(rate);
       });
-      rateSlider?.addEventListener('change', () => { if (isIOSWebKit) commitRatePreview(); });
+      rateSlider?.addEventListener('change', () => { if (isIOSWebKit) void endRateGesture(); });
       rateInput?.addEventListener('input', (event) => {
         if (event.target.value.trim() === '') return;
         if (isIOSWebKit) previewRate(event.target.value);
@@ -788,7 +829,7 @@ function renderNativeFramePlayerScript() {
       video.addEventListener('seeked', () => { if (isSharedSide()) return; hidePlaceholder(); syncProgress(); });
       video.addEventListener('pause', () => {
         if (isSharedSide()) return;
-        if (!runtime.manual && runtime.exactSeek === null && runtime.lifecycle !== 'ended') {
+        if (!runtime.rateGestureActive && !runtime.manual && runtime.exactSeek === null && runtime.lifecycle !== 'ended') {
           runtime.playing = false;
           if (runtime.lifecycle === 'playing') runtime.lifecycle = 'paused';
           updateControls();
@@ -867,7 +908,7 @@ function renderNativeFramePlayerScript() {
       const resetRate = controls?.querySelector('[data-frame-action="reset-rate"]');
       const loopInput = controls?.querySelector('[data-frame-loop], [data-frame-common-loop]');
       const status = controls?.querySelector('[data-frame-player-status]');
-      const state = { index: 0, count: 0, playing: false, rate: RATE_DEFAULT, ratePreview: null, rateCommitSerial: 0, sync: null, initialized: false, initializing: false, loopTransition: false, rateTransition: false, manual: false, manualTime: null, manualTimestamp: null, manualCancel: null, manualSerial: 0, operationSerial: 0, rateSerial: 0 };
+      const state = { index: 0, count: 0, playing: false, rate: RATE_DEFAULT, ratePreview: null, rateCommitSerial: 0, rateGestureActive: false, rateGestureResume: false, rateGestureSettled: null, sync: null, initialized: false, initializing: false, loopTransition: false, rateTransition: false, manual: false, manualTime: null, manualTimestamp: null, manualCancel: null, manualSerial: 0, operationSerial: 0, rateSerial: 0 };
       const sideStatuses = sides.map((side) => side.querySelector('[data-frame-side-status]'));
       const setStatus = (message, stateName = '') => { if (status) { status.textContent = message; status.dataset.state = stateName; } };
       const loopEnabled = () => block.dataset.commonLoopEnabled !== 'false' && (!loopInput || loopInput.checked !== false);
@@ -922,7 +963,7 @@ function renderNativeFramePlayerScript() {
         if (total) total.textContent = state.count > 0 ? ('共 ' + state.count + ' 幀') : '共 -- 幀';
         if (previous) previous.disabled = pending || state.index <= 0;
         if (next) next.disabled = pending || state.index >= state.count - 1;
-        if (toggle) { toggle.disabled = pending || state.rateTransition; toggle.textContent = state.playing ? '⏸' : '▶'; toggle.setAttribute('aria-pressed', state.playing ? 'true' : 'false'); toggle.setAttribute('aria-label', state.playing ? '暫停' : '播放'); toggle.title = state.playing ? '暫停' : '播放'; }
+        if (toggle) { toggle.disabled = pending || state.rateTransition || state.rateGestureActive; toggle.textContent = state.playing ? '⏸' : '▶'; toggle.setAttribute('aria-pressed', state.playing ? 'true' : 'false'); toggle.setAttribute('aria-label', state.playing ? '暫停' : '播放'); toggle.title = state.playing ? '暫停' : '播放'; }
         if (rateInput) { rateInput.value = formatRate(displayedRate); rateInput.disabled = pending; }
         if (rateSlider) { rateSlider.value = String(rateToSlider(displayedRate)); rateSlider.disabled = pending; }
         if (resetRate) resetRate.disabled = pending;
@@ -964,7 +1005,20 @@ function renderNativeFramePlayerScript() {
         };
         setStatus('播放中（使用擴充速度時鐘）。', 'loaded'); update(); scheduleSharedManual(tick); return true;
       };
-      const stop = (message = null) => { state.operationSerial += 1; state.rateCommitSerial += 1; state.ratePreview = null; cancelSharedManual(); state.playing = false; state.rateTransition = false; actions.forEach((action) => action.stop()); if (message) setStatus(message, 'loaded'); update(); };
+      const stop = (message = null) => {
+        state.operationSerial += 1;
+        state.rateCommitSerial += 1;
+        state.ratePreview = null;
+        state.rateGestureActive = false;
+        state.rateGestureResume = false;
+        state.rateGestureSettled = null;
+        cancelSharedManual();
+        state.playing = false;
+        state.rateTransition = false;
+        actions.forEach((action) => action.stop());
+        if (message) setStatus(message, 'loaded');
+        update();
+      };
       const seekControl = async (target, announce = true, { bootstrap = false } = {}) => {
         if (!state.initialized && !bootstrap) {
           setStatus('影片正在準備，請稍候。', 'pending');
@@ -1083,13 +1137,71 @@ function renderNativeFramePlayerScript() {
           update();
         }
       };
-      const commitSharedRatePreview = () => {
-        if (state.ratePreview === null) return;
-        const rate = state.ratePreview;
-        void commitSharedRate(rate);
+      const beginSharedRateGesture = () => {
+        if (!isIOSWebKit || state.manual || state.rateGestureActive) return;
+        state.rateCommitSerial += 1;
+        state.ratePreview = null;
+        state.rateGestureActive = true;
+        state.rateGestureResume = state.playing;
+        state.rateGestureSettled = null;
+        if (state.rateGestureResume) {
+          state.rateTransition = true;
+          videos.forEach((video) => video?.pause());
+        }
+        update();
+      };
+      const applySharedRateGesture = (requested) => {
+        if (!isIOSWebKit || state.manual) {
+          setRate(requested);
+          return;
+        }
+        if (!state.rateGestureActive) beginSharedRateGesture();
+        const nextRate = clampRate(requested, state.rate);
+        state.ratePreview = null;
+        state.rate = nextRate;
+        state.rateSerial += 1;
+        state.rateGestureSettled = videos.map((video) => waitForMediaEvent(video, 'ratechange', 300));
+        actions.forEach((action) => action.applyRate(nextRate, { resume: false }));
+        if (state.rateGestureResume) state.rateTransition = true;
+        state.rateGestureActive = true;
+        update();
+      };
+      const endSharedRateGesture = async () => {
+        if (!isIOSWebKit || !state.rateGestureActive) return;
+        const shouldResume = state.rateGestureResume;
+        const settled = state.rateGestureSettled;
+        const serial = ++state.rateCommitSerial;
+        const operation = state.operationSerial;
+        state.rateGestureActive = false;
+        state.rateGestureResume = false;
+        state.rateGestureSettled = null;
+        if (settled) await Promise.all(settled);
+        if (serial !== state.rateCommitSerial || operation !== state.operationSerial || !block.isConnected) return;
+        state.rateTransition = false;
+        if (!shouldResume) {
+          update();
+          return;
+        }
+        const nativeSupported = videos.every((video) => {
+          const actual = Number(video?.playbackRate);
+          return Number.isFinite(actual) && Math.abs(actual - state.rate) < 0.001;
+        });
+        if (!nativeSupported) {
+          startSharedManual();
+          return;
+        }
+        state.playing = true;
+        setStatus('播放中。', 'loaded');
+        update();
+        await Promise.all(actions.map((action) => action.play()));
+        if (serial !== state.rateCommitSerial || operation !== state.operationSerial || !block.isConnected) return;
+        if (!actions.every((action) => action.runtime.playing || action.runtime.manual)) {
+          state.playing = false;
+          update();
+        }
       };
       const togglePlayback = async () => {
-        if (state.rateTransition) return;
+        if (state.rateTransition || state.rateGestureActive) return;
         if (!state.initialized || state.initializing) {
           setStatus('影片正在準備，請稍候。', 'pending');
           update();
@@ -1127,12 +1239,15 @@ function renderNativeFramePlayerScript() {
         else setRate(RATE_DEFAULT);
       });
       timeline?.addEventListener('input', (event) => { void seekControl(numberValue(event.target.value, 0)); });
+      rateSlider?.addEventListener('pointerdown', () => { if (isIOSWebKit) beginSharedRateGesture(); });
+      rateSlider?.addEventListener('pointerup', () => { if (isIOSWebKit) void endSharedRateGesture(); });
+      rateSlider?.addEventListener('pointercancel', () => { if (isIOSWebKit) void endSharedRateGesture(); });
       rateSlider?.addEventListener('input', (event) => {
         const rate = sliderToRate(event.target.value);
-        if (isIOSWebKit) previewSharedRate(rate);
+        if (isIOSWebKit) applySharedRateGesture(rate);
         else setRate(rate);
       });
-      rateSlider?.addEventListener('change', () => { if (isIOSWebKit) commitSharedRatePreview(); });
+      rateSlider?.addEventListener('change', () => { if (isIOSWebKit) void endSharedRateGesture(); });
       rateInput?.addEventListener('input', (event) => {
         if (event.target.value.trim() === '') return;
         if (isIOSWebKit) previewSharedRate(event.target.value);
@@ -1145,8 +1260,8 @@ function renderNativeFramePlayerScript() {
       loopInput?.addEventListener('change', (event) => { block.dataset.commonLoopEnabled = event.target.checked ? 'true' : 'false'; update(); });
       videos.forEach((video) => {
         video?.addEventListener('timeupdate', syncProgress);
-        video?.addEventListener('playing', () => { if (!state.rateTransition) { state.playing = true; update(); } });
-        video?.addEventListener('pause', () => { if (!video.ended && !state.loopTransition && !state.rateTransition && !actions.some((action) => action.runtime.manual)) { state.playing = false; actions.forEach((action) => action.stop()); update(); } });
+        video?.addEventListener('playing', () => { if (!state.rateTransition && !state.rateGestureActive) { state.playing = true; update(); } });
+        video?.addEventListener('pause', () => { if (!video.ended && !state.loopTransition && !state.rateTransition && !state.rateGestureActive && !actions.some((action) => action.runtime.manual)) { state.playing = false; actions.forEach((action) => action.stop()); update(); } });
         video?.addEventListener('loadedmetadata', () => {
           update();
           const sideMetadataReady = actions.every((action) => action.runtime.loaded && action.runtime.metadataInitialized);
