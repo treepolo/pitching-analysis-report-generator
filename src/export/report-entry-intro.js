@@ -175,7 +175,6 @@ function introScript() {
   let titleBarTimer = 0;
   let signatureTypeTimer = 0;
   let finishTimer = 0;
-  let suppressClickTimer = 0;
   let helpCueTimer = 0;
   let helpCueDismissHandler = null;
   let activeAnimations = [];
@@ -242,8 +241,7 @@ function introScript() {
 
   const removeInteractionBlock = () => {
     blockedEvents.forEach((type) => document.removeEventListener(type,preventInteraction,{ capture:true }));
-    document.removeEventListener('pointerdown',skipEntry,true);
-    document.removeEventListener('touchstart',skipEntry,true);
+    document.removeEventListener('click',skipEntry,true);
   };
 
   const stopHelpCue = () => {
@@ -343,7 +341,7 @@ function introScript() {
   const finishEntry = (skipped = false) => {
     if (finished) return;
     finished = true;
-    [typeTimer,identExitTimer,identTimer,titleBarTimer,signatureTypeTimer,finishTimer,suppressClickTimer]
+    [typeTimer,identExitTimer,identTimer,titleBarTimer,signatureTypeTimer,finishTimer]
       .forEach((timer) => { if (timer) window.clearTimeout(timer); });
     audioCleanup();
     clearAnimatedState();
@@ -358,23 +356,12 @@ function introScript() {
     if (shouldShowHelpCue) startHelpCue();
   };
 
-  const swallowNextClick = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    document.removeEventListener('click',swallowNextClick,true);
-    if (suppressClickTimer) window.clearTimeout(suppressClickTimer);
-  };
-
   const skipEntry = (event) => {
     if (finished) return;
-    if (event) preventInteraction(event);
-    document.addEventListener('click',swallowNextClick,true);
-    suppressClickTimer = window.setTimeout(() => document.removeEventListener('click',swallowNextClick,true),450);
+    preventInteraction(event);
     finishEntry(true);
   };
-  document.addEventListener('pointerdown',skipEntry,{ capture:true,passive:false });
-  document.addEventListener('touchstart',skipEntry,{ capture:true,passive:false });
+  document.addEventListener('click',skipEntry,{ capture:true,passive:false });
 
   const numberPx = (value) => {
     const parsed = Number.parseFloat(value);
