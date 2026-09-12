@@ -146,7 +146,54 @@ function renderInlineVideoRuntime() {
   });
 
   const debugEntries = [];
-  const debugLimit = 400;
+  const debugLimit = 500;
+  const debugNodeIds = new WeakMap();
+  const debugPointerStarts = new Map();
+  let debugNextNodeId = 1;
+  let debugLastTogglePointerUp = null;
+  const debugNodeId = (node) => {
+    if (!node || (typeof node !== 'object' && typeof node !== 'function')) return null;
+    if (!debugNodeIds.has(node)) debugNodeIds.set(node, debugNextNodeId++);
+    return debugNodeIds.get(node);
+  };
+  const describeDebugNode = (node) => {
+    if (!node) return null;
+    const element = node.nodeType === 1 ? node : node.parentElement;
+    if (!element) return { nodeId: debugNodeId(node), nodeType: node.nodeType || null };
+    return {
+      nodeId: debugNodeId(element),
+      tag: String(element.tagName || '').toLowerCase(),
+      id: element.id || null,
+      className: typeof element.className === 'string' ? element.className : null,
+      action: element.getAttribute?.('data-frame-action') || null,
+      role: element.getAttribute?.('role') || null,
+      connected: Boolean(element.isConnected),
+    };
+  };
+  const debugHitTarget = (event) => {
+    const x = Number(event?.clientX);
+    const y = Number(event?.clientY);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || typeof document.elementFromPoint !== 'function') return null;
+    try { return describeDebugNode(document.elementFromPoint(x, y)); } catch { return null; }
+  };
+  const debugEventExtra = (event) => ({
+    eventType: event?.type || null,
+    pointerId: Number.isFinite(Number(event?.pointerId)) ? Number(event.pointerId) : null,
+    pointerType: event?.pointerType || null,
+    button: Number.isFinite(Number(event?.button)) ? Number(event.button) : null,
+    buttons: Number.isFinite(Number(event?.buttons)) ? Number(event.buttons) : null,
+    clientX: Number.isFinite(Number(event?.clientX)) ? Number(event.clientX) : null,
+    clientY: Number.isFinite(Number(event?.clientY)) ? Number(event.clientY) : null,
+    defaultPrevented: Boolean(event?.defaultPrevented),
+    cancelBubble: Boolean(event?.cancelBubble),
+    eventPhase: Number(event?.eventPhase) || null,
+    target: describeDebugNode(event?.target),
+    currentTarget: describeDebugNode(event?.currentTarget),
+    hitTarget: debugHitTarget(event),
+    path: typeof event?.composedPath === 'function'
+      ? event.composedPath().slice(0, 6).map(describeDebugNode)
+      : [],
+  });
   const runtimeSnapshot = (runtime) => runtime ? {
     index: runtime.index,
     rate: runtime.rate,
@@ -170,9 +217,11 @@ function renderInlineVideoRuntime() {
       : [];
     return {
       toggle: toggle ? {
+        nodeId: debugNodeId(toggle),
         disabled: Boolean(toggle.disabled),
         ariaPressed: toggle.getAttribute('aria-pressed'),
         text: toggle.textContent,
+        connected: Boolean(toggle.isConnected),
       } : null,
       sides: sides.map((side) => {
         const video = side.querySelector('[data-player-video]');
@@ -206,18 +255,74 @@ function renderInlineVideoRuntime() {
     entries: debugEntries,
     snapshot: () => debugEntries.slice(),
     text: () => JSON.stringify(debugEntries, null, 2),
-    clear: () => { debugEntries.length = 0; },
+    clear: () => { debugEntries.length = 0; debugPointerStarts.clear(); debugLastTogglePointerUp = null; },
   };
-  ['pointerdown', 'pointerup', 'click'].forEach((eventName) => {
+  document.addEventListener('pointerdown', (event) => {
+    const toggle = event.target?.closest?.('[data-frame-action="toggle"]');
+    if (!toggle) return;
+    const pointerId = Number.isFinite(Number(event.pointerId)) ? Number(event.pointerId) : -1;
+    debugPointerStarts.set(pointerId, {
+      toggle,
+      toggleNodeId: debugNodeId(toggle),
+      startedAt: typeof performance !== 'undefined' && Number.isFinite(performance.now()) ? performance.now() : Date.now(),
+    });
+    recordPlayerDebug('toggle-pointerdown', toggle, debugEventExtra(event));
+  }, true);
+  document.addEventListener('pointerup', (event) => {
+    const pointerId = Number.isFinite(Number(event.pointerId)) ? Number(event.pointerId) : -1;
+    const start = debugPointerStarts.get(pointerId);
+    const toggle = start?.toggle || event.target?.closest?.('[data-frame-action="toggle"]');
+    if (!toggle) return;
+    const now = typeof performance !== 'undefined' && Number.isFinite(performance.now()) ? performance.now() : Date.now();
+    debugLastTogglePointerUp = {
+      at: now,
+      pointerId,
+      toggle,
+      toggleNodeId: start?.toggleNodeId || debugNodeId(toggle),
+      clientX: Number(event.clientX),
+      clientY: Number(event.clientY),
+    };
+    recordPlayerDebug('toggle-pointerup', toggle, {
+      ...debugEventExtra(event),
+      startedToggleNodeId: start?.toggleNodeId || null,
+      sameToggleNode: Boolean(start?.toggle && start.toggle === toggle),
+    });
+    debugPointerStarts.delete(pointerId);
+  }, true);
+  ['pointercancel', 'lostpointercapture'].forEach((eventName) => {
     document.addEventListener(eventName, (event) => {
-      const toggle = event.target?.closest?.('[data-frame-action="toggle"]');
-      if (!toggle) return;
-      recordPlayerDebug('toggle-' + eventName, toggle);
-      if (eventName === 'click') {
-        setTimeout(() => recordPlayerDebug('toggle-click-after-task', toggle), 0);
-      }
+      const pointerId = Number.isFinite(Number(event.pointerId)) ? Number(event.pointerId) : -1;
+      const start = debugPointerStarts.get(pointerId);
+      if (!start) return;
+      recordPlayerDebug('toggle-' + eventName, start.toggle, {
+        ...debugEventExtra(event),
+        startedToggleNodeId: start.toggleNodeId,
+      });
+      debugPointerStarts.delete(pointerId);
     }, true);
   });
+  document.addEventListener('click', (event) => {
+    const directToggle = event.target?.closest?.('[data-frame-action="toggle"]');
+    const now = typeof performance !== 'undefined' && Number.isFinite(performance.now()) ? performance.now() : Date.now();
+    const recent = debugLastTogglePointerUp && now - debugLastTogglePointerUp.at <= 800
+      ? debugLastTogglePointerUp
+      : null;
+    if (!directToggle && !recent) return;
+    const toggle = directToggle || recent.toggle;
+    recordPlayerDebug(directToggle ? 'toggle-click' : 'global-click-after-toggle', toggle, {
+      ...debugEventExtra(event),
+      priorToggleNodeId: recent?.toggleNodeId || null,
+      clickHitsSameToggleNode: Boolean(directToggle && recent?.toggle && directToggle === recent.toggle),
+      millisecondsAfterPointerUp: recent ? now - recent.at : null,
+    });
+    if (directToggle) {
+      setTimeout(() => recordPlayerDebug('toggle-click-after-task', toggle, {
+        toggleNodeId: debugNodeId(toggle),
+        connected: Boolean(toggle.isConnected),
+      }), 0);
+    }
+    debugLastTogglePointerUp = null;
+  }, true);
   document.querySelectorAll('video[data-player-video]').forEach((video) => {
     ['play', 'playing', 'pause', 'waiting', 'stalled', 'seeking', 'seeked', 'ended', 'ratechange'].forEach((eventName) => {
       video.addEventListener(eventName, () => recordPlayerDebug('media-' + eventName, video));
