@@ -49,8 +49,8 @@ test('inlines images directly and stores each video payload once for lazy blob p
   assert.match(result.html, /rootMargin: '400px 0px'/u);
   assert.match(result.html, /window\.__TREEPOLO_PLAYER_DEBUG__ = \{/u);
   assert.match(result.html, /toggle-click-after-task/u);
-  assert.match(result.html, /media-playing/u);
-  assert.match(result.html, /media-pause/u);
+  assert.match(result.html, /\['play', 'playing', 'pause', 'waiting', 'stalled', 'seeking', 'seeked', 'ended', 'ratechange'\]/u);
+  assert.match(result.html, /recordPlayerDebug\('media-' \+ eventName, video\)/u);
   assert.doesNotMatch(result.html, /data:video\/mp4;base64,/u);
   assert.match(result.html, /url\("data:image\/jpeg;base64,aW1hZ2UtYnl0ZXM="\)/u);
   assert.doesNotMatch(result.html, /videos\//u);
