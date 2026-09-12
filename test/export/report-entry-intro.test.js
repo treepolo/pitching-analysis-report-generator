@@ -150,7 +150,7 @@ test('reveal slides the report sheet from a truly viewport-centered title bar an
   assert.match(source, /reportBodyInner\.style\.display = 'flow-root'/u);
   assert.match(source, /reportBodyInner\.style\.paddingTop = phoneContentTop \+ 'px'/u);
   assert.match(source, /reportBodyInner\.style\.background = '#fff'/u);
-  assert.match(source, /reportBodyInner\.style\.transform = 'translateY\(' \+ sheetStartY \+ 'px'\)/u);
+  assert.match(source, /reportBodyInner\.style\.transform = 'translateY\(' \+ sheetStartY \+ 'px\)'/u);
   assert.match(source, /reportBody\.style\.zIndex = '1'/u);
   assert.match(source, /header\.style\.setProperty\('z-index','2','important'\)/u);
   assert.match(source, /header\.style\.setProperty\('border-bottom-color','transparent','important'\)/u);
@@ -168,8 +168,8 @@ test('reveal slides the report sheet from a truly viewport-centered title bar an
   assert.match(source, /revealState = \{ dy, sheetStartY, sheetEndY, targetBodyHeight \}/u);
   assert.match(source, /reportBody\.style\.height = '0px'/u);
   assert.match(source, /reportBody\.style\.overflow = 'hidden'/u);
-  assert.match(source, /reportBody\.style\.transform = 'translateY\(' \+ dy \+ 'px'\)/u);
-  assert.match(source, /header\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px'\)'\)/u);
+  assert.match(source, /reportBody\.style\.transform = 'translateY\(' \+ dy \+ 'px\)'/u);
+  assert.match(source, /header\.style\.setProperty\('transform','translateY\(' \+ dy \+ 'px\)'\)/u);
   assert.match(source, new RegExp(`const headerAnimation = header\\.animate\\([\\s\\S]*?offset: 0\\.06[\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
   assert.match(source, new RegExp(`const bodyPositionAnimation = reportBody\\.animate\\([\\s\\S]*?offset: 0\\.06[\\s\\S]*?duration: ${HEADER_MOVE_DURATION_MS}[\\s\\S]*?easing: 'cubic-bezier\\(\\.22,\\.72,\\.16,1\\)'`,'u'));
   assert.match(source, new RegExp(`const bodyHeightAnimation = reportBody\\.animate\\([\\s\\S]*?height: targetBodyHeight \\+ 'px'[\\s\\S]*?duration: ${REVEAL_DURATION_MS}[\\s\\S]*?easing: 'linear'`,'u'));
