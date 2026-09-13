@@ -4,10 +4,10 @@ const LOCKED_VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, u
 
 function mobileShellCss() {
   return `<style data-report-mobile-shell-refinement>
-/* Range gesture ownership is independent of the phone visual breakpoint.
-   Keep touch drags on the native slider on tablets as well, without enlarging
-   its track, thumb, padding, or hit target. */
-input[type="range"] {
+/* iOS WebKit owns range drags explicitly. Other platforms keep their native
+   slider gesture behavior unchanged. This does not enlarge the track, thumb,
+   padding, or hit target. */
+html.report-ios-webkit input[type="range"] {
   touch-action: none !important;
 }
 
@@ -92,6 +92,7 @@ function iosRangeDragScript() {
       || (platform === 'MacIntel' && Number(navigator.maxTouchPoints) > 1);
   })();
   if (!isIOSWebKit) return;
+  document.documentElement.classList.add('report-ios-webkit');
 
   const selector = 'input[type="range"][data-frame-timeline], input[type="range"][data-frame-rate]';
   const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
