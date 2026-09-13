@@ -40,7 +40,7 @@ test('mobile shell reserves fixed title space on report content instead of infla
   assert.match(css, /@media print[\s\S]*?body>main>section\.report-section:first-of-type[\s\S]*?margin-top: 0 !important/u);
 });
 
-test('range drag ownership applies beyond the phone visual breakpoint without expanding phone layout behavior', () => {
+test('range drag ownership is scoped to iOS WebKit without expanding phone layout behavior', () => {
   const source = '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>';
   const html = injectReportMobileShellRefinement(source);
   assert.equal(LOCKED_VIEWPORT, 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
@@ -48,12 +48,12 @@ test('range drag ownership applies beyond the phone visual breakpoint without ex
 
   const css = mobileShellCss();
   const phoneBreakpointIndex = css.indexOf('@media (max-width: 700px)');
-  const rangeRuleIndex = css.indexOf('input[type="range"]');
+  const rangeRuleIndex = css.indexOf('html.report-ios-webkit input[type="range"]');
   assert.ok(rangeRuleIndex >= 0 && phoneBreakpointIndex > rangeRuleIndex);
   assert.equal((css.match(/input\[type="range"\]/gu) || []).length, 1);
   assert.match(css.slice(rangeRuleIndex, phoneBreakpointIndex), /touch-action: none !important/u);
   assert.match(css.slice(phoneBreakpointIndex), /touch-action: pan-y !important/u);
-  assert.doesNotMatch(css.slice(phoneBreakpointIndex), /input\[type="range"\][\s\S]*?touch-action: none !important/u);
+  assert.doesNotMatch(css, /(?:^|\n)input\[type="range"\]\s*\{/u);
   assert.doesNotMatch(css, /input\[type="range"\][\s\S]*?touch-action: pan-x !important/u);
 });
 
@@ -61,6 +61,10 @@ test('iOS report ranges derive drag values only from pointer X without changing 
   const script = iosRangeDragScript();
   assert.match(script, /iPad\|iPhone\|iPod/u);
   assert.match(script, /navigator\.maxTouchPoints/u);
+  const gateIndex = script.indexOf('if (!isIOSWebKit) return;');
+  const classIndex = script.indexOf("document.documentElement.classList.add('report-ios-webkit');");
+  const listenerIndex = script.indexOf("document.addEventListener('pointerdown'");
+  assert.ok(gateIndex >= 0 && classIndex > gateIndex && listenerIndex > classIndex);
   assert.match(script, /data-frame-timeline/u);
   assert.match(script, /data-frame-rate/u);
   assert.match(script, /valueFromClientX/u);
