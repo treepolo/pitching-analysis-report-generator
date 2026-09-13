@@ -160,6 +160,7 @@ function renderNativeFramePlayerScript() {
         dragTarget: null,
         dragFrame: null,
         rateTransition: false,
+        loopTransition: false,
         loaded: false,
         metadataInitialized: false,
         firstFrameReady: false,
@@ -710,6 +711,40 @@ function renderNativeFramePlayerScript() {
         updateControls();
         if (shouldResume) await play({ fromRateTransition: true });
       };
+      const rewindLoop = async (bounds) => {
+        if (runtime.loopTransition) return;
+        if (!isIOSWebKit || runtime.manual) {
+          video.currentTime = bounds.start;
+          if (!video.paused && !runtime.manual) void video.play().catch(() => {});
+          return;
+        }
+        const operation = runtime.operationSerial;
+        const shouldResume = runtime.playing || (!video.paused && runtime.lifecycle === 'playing');
+        runtime.loopTransition = true;
+        try {
+          video.pause();
+          video.currentTime = bounds.start;
+          if (video.seeking) {
+            await new Promise((resolve) => video.addEventListener('seeked', resolve, { once: true }));
+          }
+          if (operation !== runtime.operationSerial || !side.isConnected) return;
+          syncProgress(bounds.start);
+          if (shouldResume) {
+            await video.play();
+            if (operation !== runtime.operationSerial || !side.isConnected) return;
+            runtime.playing = true;
+            runtime.lifecycle = 'playing';
+          }
+        } catch (error) {
+          if (operation !== runtime.operationSerial || !side.isConnected) return;
+          runtime.playing = false;
+          runtime.lifecycle = 'error';
+          setStatus('影片循環定位失敗：' + (error?.message || '請重試。'), 'error');
+        } finally {
+          runtime.loopTransition = false;
+          updateControls();
+        }
+      };
       const step = (direction) => {
         if (!runtime.loaded || !runtime.firstFrameReady
           || runtime.lifecycle === 'idle' || runtime.lifecycle === 'loading' || runtime.lifecycle === 'error') {
@@ -819,8 +854,11 @@ function renderNativeFramePlayerScript() {
           video.currentTime = bounds.start;
         } else if (bounds.end !== null && video.currentTime >= bounds.end - 0.005) {
           if (loopInput?.checked) {
-            video.currentTime = bounds.start;
-            if (!video.paused && !runtime.manual) void video.play().catch(() => {});
+            if (isIOSWebKit && !runtime.manual) void rewindLoop(bounds);
+            else {
+              video.currentTime = bounds.start;
+              if (!video.paused && !runtime.manual) void video.play().catch(() => {});
+            }
           } else if (!runtime.manual) {
             video.currentTime = bounds.end;
             video.pause();
@@ -834,7 +872,7 @@ function renderNativeFramePlayerScript() {
       video.addEventListener('seeked', () => { if (isSharedSide()) return; hidePlaceholder(); syncProgress(); });
       video.addEventListener('pause', () => {
         if (isSharedSide()) return;
-        if (!runtime.rateGestureActive && !runtime.manual && runtime.exactSeek === null && runtime.lifecycle !== 'ended') {
+        if (!runtime.loopTransition && !runtime.rateGestureActive && !runtime.manual && runtime.exactSeek === null && runtime.lifecycle !== 'ended') {
           runtime.playing = false;
           if (runtime.lifecycle === 'playing') runtime.lifecycle = 'paused';
           updateControls();
@@ -844,8 +882,11 @@ function renderNativeFramePlayerScript() {
         if (isSharedSide()) return;
         const bounds = segmentBounds();
         if (loopInput?.checked) {
-          video.currentTime = bounds.start;
-          void video.play().catch(() => {});
+          if (isIOSWebKit && !runtime.manual) void rewindLoop(bounds);
+          else {
+            video.currentTime = bounds.start;
+            void video.play().catch(() => {});
+          }
           return;
         }
         runtime.playing = false;
