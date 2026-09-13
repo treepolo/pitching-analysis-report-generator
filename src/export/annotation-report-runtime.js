@@ -69,6 +69,7 @@ function annotationReaderScript(records) {
   const payload = ${payload};
   const players = [...document.querySelectorAll('figure.report-video')];
   const frameTimesCache = new WeakMap();
+  const presentedTimes = new WeakMap();
 
   function frameTimes(side) {
     if (frameTimesCache.has(side)) return frameTimesCache.get(side);
@@ -81,10 +82,26 @@ function annotationReaderScript(records) {
     return values;
   }
 
+  function trackPresentedTime(video) {
+    if (typeof video.requestVideoFrameCallback !== 'function') return;
+    const onFrame = (_now, metadata) => {
+      const mediaTime = Number(metadata?.mediaTime);
+      if (Number.isFinite(mediaTime)) presentedTimes.set(video, Math.max(0, mediaTime));
+      video.requestVideoFrameCallback(onFrame);
+    };
+    video.requestVideoFrameCallback(onFrame);
+  }
+
+  function displayedMediaTime(video) {
+    const presented = Number(presentedTimes.get(video));
+    if (Number.isFinite(presented)) return Math.max(0, presented);
+    return Math.max(0, Number(video.currentTime) || 0);
+  }
+
   function currentFrame(side) {
     const video = side.querySelector('[data-player-video]');
     if (!video) return 0;
-    const currentTime = Math.max(0, Number(video.currentTime) || 0);
+    const currentTime = displayedMediaTime(video);
     const times = frameTimes(side);
     if (times.length > 0 && times.every((time) => Number.isFinite(time))) {
       let low = 0;
@@ -190,6 +207,7 @@ function annotationReaderScript(records) {
       overlay.setAttribute('aria-hidden', 'true');
       surface.append(overlay);
       addControls(side, annotations);
+      trackPresentedTime(video);
       mounted.push({ side, surface, video, overlay, annotations });
     }
   }
