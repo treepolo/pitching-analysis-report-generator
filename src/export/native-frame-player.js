@@ -711,13 +711,8 @@ function renderNativeFramePlayerScript() {
         updateControls();
         if (shouldResume) await play({ fromRateTransition: true });
       };
-      const rewindLoop = async (bounds) => {
+      const rewindIOSLoop = async (bounds) => {
         if (runtime.loopTransition) return;
-        if (!isIOSWebKit || runtime.manual) {
-          video.currentTime = bounds.start;
-          if (!video.paused && !runtime.manual) void video.play().catch(() => {});
-          return;
-        }
         const operation = runtime.operationSerial;
         const shouldResume = runtime.playing || (!video.paused && runtime.lifecycle === 'playing');
         runtime.loopTransition = true;
@@ -854,7 +849,7 @@ function renderNativeFramePlayerScript() {
           video.currentTime = bounds.start;
         } else if (bounds.end !== null && video.currentTime >= bounds.end - 0.005) {
           if (loopInput?.checked) {
-            if (isIOSWebKit && !runtime.manual) void rewindLoop(bounds);
+            if (isIOSWebKit && !runtime.manual) void rewindIOSLoop(bounds);
             else {
               video.currentTime = bounds.start;
               if (!video.paused && !runtime.manual) void video.play().catch(() => {});
@@ -882,7 +877,7 @@ function renderNativeFramePlayerScript() {
         if (isSharedSide()) return;
         const bounds = segmentBounds();
         if (loopInput?.checked) {
-          if (isIOSWebKit && !runtime.manual) void rewindLoop(bounds);
+          if (isIOSWebKit && !runtime.manual) void rewindIOSLoop(bounds);
           else {
             video.currentTime = bounds.start;
             void video.play().catch(() => {});
