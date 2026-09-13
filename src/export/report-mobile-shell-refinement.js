@@ -82,6 +82,84 @@ function mobileZoomLockScript() {
 </script>`;
 }
 
+function iosRangeDragScript() {
+  return `<script data-report-ios-range-drag>
+(() => {
+  const isIOSWebKit = (() => {
+    const userAgent = String(navigator.userAgent || '');
+    const platform = String(navigator.platform || '');
+    return /(?:iPad|iPhone|iPod)/iu.test(userAgent)
+      || (platform === 'MacIntel' && Number(navigator.maxTouchPoints) > 1);
+  })();
+  if (!isIOSWebKit) return;
+
+  const selector = 'input[type="range"][data-frame-timeline], input[type="range"][data-frame-rate]';
+  const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+  let active = null;
+
+  const valueFromClientX = (input, clientX) => {
+    const rect = input.getBoundingClientRect();
+    const minimum = Number.isFinite(Number(input.min)) ? Number(input.min) : 0;
+    const maximum = Number.isFinite(Number(input.max)) ? Number(input.max) : 100;
+    const fallback = Number.isFinite(Number(input.value)) ? Number(input.value) : minimum;
+    if (!(rect.width > 0) || !(maximum > minimum) || !Number.isFinite(Number(clientX))) return fallback;
+
+    const fraction = clamp((Number(clientX) - rect.left) / rect.width, 0, 1);
+    let value = minimum + fraction * (maximum - minimum);
+    const step = Number(input.step);
+    if (Number.isFinite(step) && step > 0) {
+      value = minimum + Math.round((value - minimum) / step) * step;
+    }
+    return clamp(value, minimum, maximum);
+  };
+
+  const updateFromPointer = (input, event) => {
+    const value = valueFromClientX(input, event.clientX);
+    input.value = String(value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  const ownsPointer = (event) => Boolean(
+    active
+    && active.input === event.target
+    && active.pointerId === event.pointerId
+  );
+
+  document.addEventListener('pointerdown', (event) => {
+    const input = event.target?.closest?.(selector);
+    if (!input || input.disabled || event.isPrimary === false) return;
+    active = { input, pointerId: event.pointerId };
+    event.preventDefault();
+    try { input.focus({ preventScroll: true }); } catch { input.focus?.(); }
+    try { input.setPointerCapture?.(event.pointerId); } catch {}
+    updateFromPointer(input, event);
+  }, { capture: true, passive: false });
+
+  document.addEventListener('pointermove', (event) => {
+    if (!ownsPointer(event)) return;
+    event.preventDefault();
+    updateFromPointer(active.input, event);
+  }, { capture: true, passive: false });
+
+  document.addEventListener('pointerup', (event) => {
+    if (!ownsPointer(event)) return;
+    const { input, pointerId } = active;
+    event.preventDefault();
+    updateFromPointer(input, event);
+    try { input.releasePointerCapture?.(pointerId); } catch {}
+    active = null;
+  }, { capture: true, passive: false });
+
+  document.addEventListener('pointercancel', (event) => {
+    if (!ownsPointer(event)) return;
+    const { input, pointerId } = active;
+    try { input.releasePointerCapture?.(pointerId); } catch {}
+    active = null;
+  }, { capture: true, passive: false });
+})();
+</script>`;
+}
+
 function injectReportMobileShellRefinement(html) {
   let source = String(html);
   source = source.replace(
@@ -100,12 +178,19 @@ function injectReportMobileShellRefinement(html) {
       ? source.replace('</body>', `${script}\n</body>`)
       : `${source}\n${script}`;
   }
+  if (!source.includes('data-report-ios-range-drag')) {
+    const script = iosRangeDragScript();
+    source = source.includes('</body>')
+      ? source.replace('</body>', `${script}\n</body>`)
+      : `${source}\n${script}`;
+  }
   return source;
 }
 
 module.exports = {
   LOCKED_VIEWPORT,
   injectReportMobileShellRefinement,
+  iosRangeDragScript,
   mobileShellCss,
   mobileZoomLockScript,
 };
