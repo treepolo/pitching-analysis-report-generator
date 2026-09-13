@@ -8,6 +8,7 @@ const vm = require('node:vm');
 const {
   LOCKED_VIEWPORT,
   injectReportMobileShellRefinement,
+  iosRangeDragScript,
   mobileShellCss,
   mobileZoomLockScript,
 } = require('../../src/export/report-mobile-shell-refinement');
@@ -56,6 +57,24 @@ test('range drag ownership applies beyond the phone visual breakpoint without ex
   assert.doesNotMatch(css, /input\[type="range"\][\s\S]*?touch-action: pan-x !important/u);
 });
 
+test('iOS report ranges derive drag values only from pointer X without changing hit geometry', () => {
+  const script = iosRangeDragScript();
+  assert.match(script, /iPad\|iPhone\|iPod/u);
+  assert.match(script, /navigator\.maxTouchPoints/u);
+  assert.match(script, /data-frame-timeline/u);
+  assert.match(script, /data-frame-rate/u);
+  assert.match(script, /valueFromClientX/u);
+  assert.match(script, /event\.clientX/u);
+  assert.doesNotMatch(script, /clientY/u);
+  assert.match(script, /setPointerCapture/u);
+  assert.match(script, /releasePointerCapture/u);
+  assert.match(script, /event\.preventDefault\(\)/u);
+  assert.match(script, /dispatchEvent\(new Event\('input', \{ bubbles: true \}\)\)/u);
+  assert.doesNotMatch(script, /style\.(?:width|height|padding)|getBoundingClientRect\(\)[\s\S]*?\+\s*\d+/u);
+  const body = script.replace(/^<script[^>]*>/u, '').replace(/<\/script>$/u, '');
+  assert.doesNotThrow(() => new vm.Script(body));
+});
+
 test('mobile zoom lock blocks pinch-style gestures only in phone layout', () => {
   const script = mobileZoomLockScript();
   assert.match(script, /matchMedia\?\.\('\(max-width: 700px\)'\)/u);
@@ -73,6 +92,7 @@ test('mobile shell refinement injects once and renderer excludes retired desk, f
   const twice = injectReportMobileShellRefinement(once);
   assert.equal((twice.match(/data-report-mobile-shell-refinement/g) || []).length, 1);
   assert.equal((twice.match(/data-report-mobile-zoom-lock/g) || []).length, 1);
+  assert.equal((twice.match(/data-report-ios-range-drag/g) || []).length, 1);
 
   const renderer = await fs.readFile(path.join(repositoryRoot, 'src', 'export', 'report-renderer.js'), 'utf8');
   assert.match(renderer, /require\('\.\/report-mobile-shell-refinement'\)/u);
